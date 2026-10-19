@@ -12,9 +12,14 @@ fetch/decode/translation paths read (`misa`, `mseccfg`, `pma_regions`,
 its own value, by the trap's `reset_elp`), the environment/state-enable pins
 a U-mode CSR access reads (`senvcfg`, `mstateen0`, `sstateen0`), and the
 counter configuration (`scounteren`, and the four cells the cycle reads:
-`mcountinhibit`, `minstretcfg`, `mcyclecfg`, `mhpmcounter`).  The pinned
-values (`hwVal`) are the values a run of the boot program derives
-(`MachCSL.resetValRun`).  The counter
+`mcountinhibit`, `minstretcfg`, `mcyclecfg`, `mhpmcounter`); and, since the
+sail-riscv 0.16 bump, the hart's id `mhartid` (every physical access reads it,
+`within_clint`) and H's guest-external-interrupt enables `hgeie` (read by
+`read_mip`, used only when H is enabled).  The pinned values (`hwVal`) are the
+values a run of the boot program derives (`MachCSL.resetValRun`); `mhartid`'s
+pin, `bootHid cpu` (= `resetValRun cpu .mhartid`), depends on the hart and so
+is a conjunct of its own rather than a `hwVal` entry.  `hgeie` is EXISTENTIAL
+like the counters (nothing writes it).  The counter
 cells are EXISTENTIAL (`HwCounters`, Rocq `counter_caps` +
 `HartMCycle.mcycle_inc_flag`): the boot program never writes them,
 so they hold power-on garbage, and the rules are
@@ -69,14 +74,15 @@ structure HwCounters where
   holds power-on garbage. -/
   scen : BitVec 32
 
-/-- The frozen counter registers, read at an ARBITRARY value. -/
+/-- The existential cells (the frozen counter registers and `hgeie`), read at an ARBITRARY
+value. -/
 def hwAny (r : Register) : Bool :=
   match r with
   | .mcountinhibit | .minstretcfg | .mcyclecfg | .scounteren | .hgeie => true
   | _ => false
 
-/-- The registers of `hwConfig` (the pinned ones and the existential
-counter cells; `scounteren`, existential, keeps its historical slot). -/
+/-- The registers of `hwConfig` (the pinned ones, the existential cells -- `scounteren`,
+existential, keeps its historical slot -- and `mhartid`). -/
 def hwRegs : List Register :=
   [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
    .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter, .hgeie, .mhartid]
@@ -99,14 +105,15 @@ def hwConfig (cpu : CPU) : IProp GF := iprop%
   Register.senvcfg ↦ᵣ[cpu]□ 0#64 ∗
   Register.mstateen0 ↦ᵣ[cpu]□ 0#64 ∗
   Register.sstateen0 ↦ᵣ[cpu]□ 0#32 ∗
+  (∃ ctr : HwCounters,
+    Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
+    Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
+    Register.scounteren ↦ᵣ[cpu]□ ctr.scen) ∗
+  -- (since the 0.16 bump; appended LAST, durable-notes' rule for widely destructured predicates)
   Register.mhartid ↦ᵣ[cpu]□ bootHid cpu ∗
   -- H's guest-external-interrupt enables: read by `read_mip`, used only when H is enabled,
   -- written by nothing here (no reset), so power-on garbage
-  (∃ g : BitVec 64, Register.hgeie ↦ᵣ[cpu]□ g) ∗
-  ∃ ctr : HwCounters,
-    Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
-    Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
-    Register.scounteren ↦ᵣ[cpu]□ ctr.scen
+  (∃ g : BitVec 64, Register.hgeie ↦ᵣ[cpu]□ g)
 
 instance hwConfig_persistent (cpu : CPU) : Persistent (hwConfig (GF := GF) cpu) := by
   unfold hwConfig; infer_instance
@@ -128,14 +135,14 @@ read-only after (since sail-riscv 0.16 every physical access reads it, `within_c
 theorem hwConfig_mhartid (cpu : CPU) :
     hwConfig (GF := GF) cpu ⊢ Register.mhartid ↦ᵣ[cpu]□ bootHid cpu := by
   unfold hwConfig
-  iintro ⟨-, -, -, -, -, -, -, -, #H, -, -⟩
+  iintro ⟨-, -, -, -, -, -, -, -, -, #H, -⟩
   iexact H
 
 /-- H's `hgeie`, at some value, off the bundle. -/
 theorem hwConfig_hgeie (cpu : CPU) :
     hwConfig (GF := GF) cpu ⊢ ∃ g : BitVec 64, Register.hgeie ↦ᵣ[cpu]□ g := by
   unfold hwConfig
-  iintro ⟨-, -, -, -, -, -, -, -, -, H, -⟩
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, H⟩
   iexact H
 
 /-- The existential counter cells, off the bundle. -/
@@ -145,7 +152,7 @@ theorem hwConfig_counters (cpu : CPU) :
       Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
       Register.scounteren ↦ᵣ[cpu]□ ctr.scen := by
   unfold hwConfig
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, H⟩
+  iintro ⟨-, -, -, -, -, -, -, -, H, -, -⟩
   iexact H
 
 /-- An existential counter cell (`hwAny`), at some value, off the bundle. -/
@@ -198,11 +205,11 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) (g : BitVec 64) :
   imodintro
   iframe H1 H2 H3 H4 H5 H6 H8 H9 H16
   isplitl []
+  · iexists ctr
+    iframe H10 H11 H12 H13
+    iexact H7
   · iexists g
     iexact H15
-  iexists ctr
-  iframe H10 H11 H12 H13
-  iexact H7
 
 /-! ## The rules -/
 

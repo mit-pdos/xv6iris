@@ -880,9 +880,10 @@ theorem kernelData_nullBody : kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KSt
 end
 
 
-/-! ## `k_step` with `ite_true`/`ite_false` instead of `ite_true`/`ite_false`: the
-latter pin the `Decidable` instance, and the kernel loops checking that
-instance once the register file holds symbolic flag bits -/
+/-! ## `k_step` with `ite_true`/`ite_false` at an arbitrary `Decidable` instance (before Lean
+4.34 these were `if_true`/`if_false`, preferred because the `ite_*` lemmas of that time pinned the
+instance, and the kernel loops checking that instance once the register file holds symbolic
+flag bits) -/
 
 syntax "k_norm_noite" : tactic
 syntax "k_norm_noite" " [" term,* "]" : tactic

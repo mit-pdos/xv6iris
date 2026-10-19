@@ -5,9 +5,10 @@ Since sail-riscv 0.16 `tick_clock` is `clint_tick_clock`: `should_inc_mcycle`
 + an optional `mcycle` bump and the `mtime` bump -- nothing else.  The old
 model's trailing `clint_dispatch false` (which refreshed the timer-pending bits
 of `mip` from `mtimecmp`/`stimecmp` and, when `mip` changed, called the
-`csr_name_write_callback "mip"` lookup) is gone: 0.16 computes the timer
-interrupts from the compares when it reads the pending set, so the tick no
-longer reads `menvcfg`/`mtimecmp`/`stimecmp` nor writes `mip`.
+`csr_name_write_callback "mip"` lookup) is gone: 0.16 refreshes the timer
+bits of `mip` from the compares at the start of every cycle (`update_mip`,
+`swp_update_mip` in `MachCSL.WpStepHooks`), so the tick no longer reads
+`menvcfg`/`mtimecmp`/`stimecmp` nor writes `mip`.
 `swp_clint_tick_clock` is the tick over the cells it actually touches; the
 historical forms (`swp_tick_clock_core` and the corollaries over the
 configuration cells) are kept, with `mip` handed back unchanged.  The

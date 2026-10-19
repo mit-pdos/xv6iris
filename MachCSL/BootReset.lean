@@ -13,7 +13,7 @@ file IS the output of `bootProg` from SOME power-on file, and
 give consumers the reset facts.  `bootShape_bootWitness` shows the arm is
 always enabled (`bootRun_bootLand`: the run always completes).
 
-THE POWER-ON MODEL: garbage in every register, plus `boardInit`'s twelve
+THE POWER-ON MODEL: garbage in every register, plus `boardInit`'s thirteen
 explicit board-guaranteed writes, plus the privileged spec's own `reset` with
 its configuration validation.
 

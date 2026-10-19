@@ -28,8 +28,9 @@ the `update_mip` prologue), the hpm-event write marker `written_event_index`
 (cleared at every cycle's end, `clear_written_event_index`), and the Sdtrig
 trigger-write marker `written_trigger_index`, which the cycle's epilogue
 (`update_triggers`, Sdtrig off) ASSERTS is `none` -- so it is owned AT `none`.
-(Its Sail initialiser `None()` is dropped by the Lean backend and no reset
-writes it: the boot must establish it.) -/
+(Sail declares it `= None()`, but MachCSL's power-on deliberately does not run
+the model's initialisers (`MachCSL.ArchReset`), and `reset` never writes it: it
+is a board obligation, `boardRegs`.) -/
 def cycleAux (cpu : CPU) : IProp GF := iprop%
   (∃ v : BitVec 32, Register.msip ↦ᵣ[cpu] v) ∗
   (∃ v : Option (Nat × event_csr), Register.written_event_index ↦ᵣ[cpu] v) ∗

@@ -5,8 +5,9 @@ symbolic-run kit (Rocq `RiscvExec.exec` restricted to the register side, and
 
 * `bootRun m f` -- the deterministic register-only interpreter: register reads
   answer from `f`, register writes update it, the silent events the language
-  answers without moving the machine (`evStep`: message, cache/TLB ops,
-  translation markers, exception markers, cycle counts) are skipped, and
+  answers without moving the machine (`evStep`: message, the store's write
+  announcement, cache/TLB ops, translation markers, exception markers, cycle
+  counts) are skipped, and
   everything else (memory, barriers, choices, failures) is stuck (`none`).
   The boot program (`MachCSL.bootProg`) emits only register events and
   messages, so this is exactly its semantics; Rocq's `exec` additionally

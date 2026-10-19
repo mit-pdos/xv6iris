@@ -9,7 +9,8 @@ in `MachCSL.KCtx`, where the handler contract needs it.
 
 Since sail-riscv 0.16: the effective pending word is read through `read_mip`
 (`swp_read_mip_any`, in `MachCSL.WpStepHooks`, which also reads `hgeie` off the
-frozen bundle), the pending split reads `hideleg` (frozen at 0, so nothing goes to VS), and the
+frozen bundle), the pending split ignores `hideleg` without H (the model fork's guard, so nothing
+goes to VS), and the
 supervisor trap also writes the hypervisor trap CSRs whether H is enabled or
 not -- `hstatus` (`hstatusTrap`: `SPV := 0`, `GVA := 0`), `htval := 0`,
 `htinst := 0` -- so `swp_handle_interrupt_S` owns those three cells too (the

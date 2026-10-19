@@ -31,7 +31,7 @@
    `List.nodup_append`, `List.pairwise_flatten`'s projection; only the cross
    form `nodup_flatten_cross` (Rocq's `NoDup_mjoin_cross`, with
    `NoDup_app_cross` as its inline step) is stated.  `NoDup_alt` is
-   `List.getElem?_inj`.
+   `List.Nodup.getElem?_inj`.
 3. `fs_inode_blocks_disjoint`'s `##` and `fs_inode_blocks_set_sub`'s `⊆`
    are stated pointwise (`∀ b, b ∈ _ → …`); `Std.ExtTreeSet` has no
    `Disjoint`/`HasSubset` instances.

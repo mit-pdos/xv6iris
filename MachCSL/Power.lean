@@ -44,7 +44,8 @@ variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- The number of the model's registers: the constructors of `Register` (213 since sail-riscv 0.16,
 which added the H, Sdtrig, counter and interrupt-controller state; 180 before).  `ctorIdx_lt`
-checks it against the generated type, so a regeneration that changes it fails here. -/
+checks it against the generated type, so a regeneration that adds registers fails here (one
+that removed some would not: re-count after any regeneration). -/
 def regCount : Nat := 213
 
 /-- Every register. -/

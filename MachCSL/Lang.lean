@@ -60,7 +60,8 @@ The sail-riscv 0.16 bump (October 2026: concurrency interface v2, lean-sail
 v7).  The model's monad is lean-sail's free monad
 `FreeM ((Except (Sail.Error ue) InstructionEffect) ⊕ FinChoice)`, where it
 was the vendored V1 `Outcome` monad.  This semantics changed only where the
-interface forced it (`notes/design-rulings.md`, "The sail-riscv 0.16 bump"):
+interface or the 0.16 model forced it (`notes/design-rulings.md`, "The
+sail-riscv 0.16 bump"):
 
 1. Events are lean-sail's `InstructionEffect`s.  Register events carry a
    system-register id the model never sets (`none`); it is ignored.
@@ -71,8 +72,10 @@ interface forced it (`notes/design-rulings.md`, "The sail-riscv 0.16 bump"):
    a silent event.
 4. A nondeterministic choice is its own node, `.inr n`, answered by any
    `Fin n`; V1's `choose` event was answered by any value of a Sail type.
-   Fewer behaviours only at the model's `undefined_int`/`undefined_nat`/
-   `undefined_string` sites, none on a kernel path.
+   lean-sail v7 makes `undefined_int`/`undefined_nat`/`undefined_string`
+   failures (the hart is stuck) and gives `undefined_range lo lo` no answer;
+   the generated model calls none of them on any path (its one
+   `undefined_range 0 12` sits in an unused `undefined_*` helper).
 5. The other silent events are renamed (`tlbOp`, `archException`,
    `returnException`, `clockCycle`, `printMessage`); `getCycleCount` still
    answers 0.
@@ -80,12 +83,24 @@ interface forced it (`notes/design-rulings.md`, "The sail-riscv 0.16 bump"):
    `Atomic`, `InstructionFetch`, ...).  Exclusivity is still keyed on the
    reserved and conditional kinds, so the blocking semantics is unchanged
    (`MachCSL.TsoMem`).
+7. Power-on: the board also sets the model's Sdtrig bookkeeping
+   `written_trigger_index := none` (0.16 asserts it at every cycle's end;
+   `MachCSL.ArchReset`).
 
-Model-side changes this semantics merely runs: WFI retires on a pending
-enabled platform interrupt; `STIP`/`MTIP` are recomputed from the timer at
-each cycle start (the tick no longer writes `mip`); every physical access
-reads `mhartid` (`within_clint`); a supervisor or user trap also writes H's
-`hstatus`/`htval`/`htinst` (invisible without H).  The fork keeps the atomic
+The driver (`riscvStep`) is unchanged: `try_step 0 false` plus a
+nondeterministic tick.  With `exit_wait = false` a hart in WFI waits for an
+interrupt and never takes the model's forced WFI exit (upstream's own loop
+passes `true`); `notes/model-diffs.md` §5 records this.
+
+Model-side changes this semantics merely runs (a selection; the per-cycle hooks
+are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
+interrupt; `MSIP`/`STIP`/`MTIP` are recomputed from `msip` and the timer at
+each cycle start (the tick no longer writes `mip`); every cycle runs the Sdtrig
+reentrancy check and ends by asserting `written_trigger_index = none`; every
+physical access reads `mhartid` (`within_clint`); H's registers are read with H
+disabled (`hgeie` by `read_mip`, `hedeleg` by `exception_delegatee`) and a
+supervisor or user trap writes H's `hstatus`/`htval`/`htinst` (all invisible
+without H).  The fork keeps the atomic
 PTE A/D update, leaves the F/D instructions out of the generated model (as
 before the bump), and ignores `hideleg` without H (a bug fix).  Every
 deviation from upstream is listed in `notes/model-diffs.md`.

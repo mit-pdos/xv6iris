@@ -326,8 +326,8 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
 
 /-- A monadic context: commutes with every (non-failure) node at the head -- an event
 (`.inl (.ok o)`) and, since concurrency interface v2 makes finite choice a node of its own, a
-choice (`.inr n`).  `fun m => m >>= f`, `sailTryCatch · h` and the `ExceptT` early-return
-wrappers are all contexts. -/
+choice (`.inr n`).  `fun m => m >>= f`, `sailTryCatch · h` and the early-return blocks
+`SailME.run (monadLift · >>= k)` are all contexts. -/
 def MCtx {X : Type} (C : SailM X → SailM Unit) : Prop :=
   (∀ (o : InstructionEffect) (k : InstructionEffect.ret o → SailM X),
     C (.impure (.inl (.ok o)) k) = .impure (.inl (.ok o)) (fun v => C (k v))) ∧

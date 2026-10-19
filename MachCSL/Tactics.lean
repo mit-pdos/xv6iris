@@ -328,9 +328,9 @@ def isHwReg (r : Lean.Expr) : Bool :=
    ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
    ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
 
-/-- The frozen counter registers the cycle reads (`MachCSL.hwAny`): cells of
-the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
-answered at an arbitrary value. -/
+/-- The existential cells of the persistent `hwConfig` bundle (`MachCSL.hwAny`: the frozen
+counter registers the cycle reads, and H's `hgeie`), so a read is answered at an arbitrary
+value. -/
 def isHwAnyReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.mcountinhibit, ``LeanRV64D.Register.minstretcfg,
    ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren,

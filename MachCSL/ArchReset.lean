@@ -74,7 +74,9 @@ register pinned to an ISA-unspecified simulator value.  Real hardware that
 powers up with garbage in a register the spec does not reset would then fall
 OUTSIDE the theorem.  The chosen model is the weaker, honest one: garbage
 everywhere except a SHORT, EXPLICIT list of board obligations, each of which
-is a claim about the BOARD a reader can check against real hardware.
+is a claim about the BOARD a reader can check against real hardware -- except
+one piece of the model's own bookkeeping (`written_trigger_index`, below, since
+sail-riscv 0.16), which a real board has no counterpart for.
 
 KEEP THE LIST MINIMAL: a register belongs here only if some consumed reset
 fact does NOT follow from `init_model` over an OPEN file.  Register by
