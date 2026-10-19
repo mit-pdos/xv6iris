@@ -818,6 +818,7 @@ import Weak.SbHoldX
 import Weak.SbHoldZero
 import Weak.SbBlocked
 import Weak.SbLbFree
+import Weak.SbVirtio
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
