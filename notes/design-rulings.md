@@ -97,13 +97,17 @@ bump's plan, kept outside the repository):
   softfloat externs into `execute`.  The fork drops that dependency and the two FP arms.  The
   generated model has no F/D instructions, as before the bump, and the softfloat axioms stay
   outside every audited cone (`notes/adequacy_axioms_baseline.md`).
-- **H's interrupt registers are reset.** 0.16's interrupt check reads `hideleg` and `hgeie` on every
-  cycle, H enabled or not, and nothing reset them; under this development's arbitrary power-on
-  state a hart could route a delegated supervisor interrupt to VS and never take it.  The model fork
-  zeroes both in `reset_sys` (as an emulator that zero-initialises registers already sees).
-- **The frozen bundle grows.** `hwConfig cpu` also holds `hideleg ↦□ 0`, `hgeie ↦□ 0` and
-  `mhartid ↦□ bootHid cpu`: registers written by the boot program only and read on hot paths
-  (every physical access reads `mhartid` in `within_clint` since 0.16).
+- **Follow the model; fix only clear bugs** (owner, 2026-10-19).  Every deviation from upstream
+  -- fork commits, compiler patches, post-generation patches, module subset, configuration, and how
+  MachCSL runs the model -- is tracked in `notes/model-diffs.md`.
+- **`hideleg` without H.** 0.16's interrupt check split the delegated interrupts with `hideleg`
+  whether or not H is enabled, though nothing resets it and without H nothing can write its S
+  bits; under this development's arbitrary power-on state a delegated supervisor interrupt could go
+  to VS and never be taken.  A bug: the model fork guards the read exactly as the model already
+  guards `mideleg` without S.
+- **The frozen bundle grows.** `hwConfig cpu` also holds `mhartid ↦□ bootHid cpu` (every physical
+  access reads it in `within_clint` since 0.16) and `hgeie` at an arbitrary value (read by
+  `read_mip`, used only when H is enabled, written by nothing here).
 - **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.

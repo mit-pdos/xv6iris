@@ -87,8 +87,8 @@ each cycle start (the tick no longer writes `mip`); every physical access
 reads `mhartid` (`within_clint`); a supervisor or user trap also writes H's
 `hstatus`/`htval`/`htinst` (invisible without H).  The fork keeps the atomic
 PTE A/D update, leaves the F/D instructions out of the generated model (as
-before the bump), and resets `hideleg`/`hgeie`, which the interrupt check reads
-whether or not H is enabled.
+before the bump), and ignores `hideleg` without H (a bug fix).  Every
+deviation from upstream is listed in `notes/model-diffs.md`.
 -/
 import MachCSL.Platform
 import MachCSL.BootImage

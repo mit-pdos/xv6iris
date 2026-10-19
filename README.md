@@ -127,7 +127,10 @@ fixes, build that release instead.  Three files decide what comes out: `model/sa
 realisation of the Sail platform hooks (the reservation hooks, terminal writes, the
 experimental-extensions flag), passed to sail as a second import file and never overwritten.
 Before changing the configuration, regenerate with it unchanged and check that `git diff model/` is
-empty — that separates an intended change from drift in the checkout.
+empty — that separates an intended change from drift in the checkout.  Every way the model the
+proofs are about differs from upstream (the fork's commits, compiler patches, the module subset,
+the configuration, how MachCSL runs the model) is listed in
+[`notes/model-diffs.md`](notes/model-diffs.md).
 
 ## Design
 
