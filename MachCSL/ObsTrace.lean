@@ -504,7 +504,7 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
     (j : UartId) : σ'.devs.wire j = σ.devs.wire j := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rfl
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hs⟩ | ⟨hb, _⟩
@@ -538,7 +538,7 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
     (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rfl
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hs⟩ | ⟨hb, _⟩

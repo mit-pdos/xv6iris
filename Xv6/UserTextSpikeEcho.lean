@@ -46,7 +46,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 the registers the decoder reads, at the values the user tier holds them. -/
 def spikeDrefU : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.User
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | .mseccfg => some 0#64
   | .senvcfg => some 0#64
@@ -57,7 +57,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 /-- The cells `spikeDrefU` names, at fraction `dq`. -/
 def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%
   Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.User ∗
-  Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
+  Register.misa ↦ᵣ[cpu]{dq} 0x8000000000141105#64 ∗
   Register.menvcfg ↦ᵣ[cpu]{dq} menvcfgS ∗
   Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
   Register.senvcfg ↦ᵣ[cpu]{dq} 0#64
@@ -131,7 +131,7 @@ decode, and an `rfl` on a wrong AST fails). -/
 
 /-- A reference map without `cur_privilege`. -/
 def spikeDrefNoPriv : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | .mseccfg => some 0#64
   | .senvcfg => some 0#64

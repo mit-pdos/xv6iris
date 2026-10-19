@@ -86,7 +86,7 @@ table's closed values (User, `misa`/`senvcfg`/`mstateen0`/`sstateen0` at
 about `mcounteren`/`scounteren` (Rocq `exec_check_CSR_U`'s premises). -/
 structure UxrCfg (s : UWSt) : Prop where
   priv : s.file .cur_privilege = Privilege.User
-  misa : s.file .misa = 0x800000000014112D#64
+  misa : s.file .misa = 0x8000000000141105#64
   menvcfg : s.file .menvcfg = menvcfgS
   senvcfg : s.file .senvcfg = 0#64
   mstateen0 : s.file .mstateen0 = 0#64

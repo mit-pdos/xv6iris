@@ -577,7 +577,7 @@ def check_vext_config (_ : Unit) : Bool :=
         valid)
       else valid)
   let valid : Bool :=
-    if (((vector_support_ge vector_support_level Float_single) && (not (true : Bool))) : Bool)
+    if (((vector_support_ge vector_support_level Float_single) && (not (false : Bool))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -655,7 +655,7 @@ def check_vext_config (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((false : Bool) && ((not (hartSupports Ext_Zve32f)) || (not (true : Bool)))) : Bool)
+    if (((false : Bool) && ((not (hartSupports Ext_Zve32f)) || (not (false : Bool)))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -1108,7 +1108,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
       valid)
     else valid
   let valid : Bool :=
-    if (((true : Bool) && (false : Bool)) : Bool)
+    if (((false : Bool) && (false : Bool)) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -1117,10 +1117,10 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
       valid)
     else valid
   let valid : Bool :=
-    if ((not (true : Bool)) : Bool)
+    if ((not (false : Bool)) : Bool)
     then
       (let valid : Bool :=
-        if ((true : Bool) : Bool)
+        if ((false : Bool) : Bool)
         then
           (let valid : Bool := false
           let _ : Unit :=
@@ -1129,7 +1129,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
           valid)
         else valid
       let valid : Bool :=
-        if ((true : Bool) : Bool)
+        if ((false : Bool) : Bool)
         then
           (let valid : Bool := false
           let _ : Unit :=
@@ -1138,7 +1138,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
           valid)
         else valid
       let valid : Bool :=
-        if ((true : Bool) : Bool)
+        if ((false : Bool) : Bool)
         then
           (let valid : Bool := false
           let _ : Unit :=
@@ -1147,7 +1147,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
           valid)
         else valid
       let valid : Bool :=
-        if ((true : Bool) : Bool)
+        if ((false : Bool) : Bool)
         then
           (let valid : Bool := false
           let _ : Unit :=
@@ -1247,7 +1247,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
       valid)
     else valid
   let valid : Bool :=
-    if (((false : Bool) && ((not (true : Bool)) || (not (false : Bool)))) : Bool)
+    if (((false : Bool) && ((not (false : Bool)) || (not (false : Bool)))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -2109,7 +2109,7 @@ def check_mstatus_fields (_ : Unit) : Bool :=
         valid)
       else valid)
     else
-      (if ((true : Bool) : Bool)
+      (if ((false : Bool) : Bool)
       then
         (if ((legal_fs == ExtContext_Off) : Bool)
         then

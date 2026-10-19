@@ -53,7 +53,7 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- The registers frozen at reset, at their (pinned) value. -/
 def hwVal : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .mseccfg => some 0#64
   | .pma_regions => some bootPMA
   | .htif_tohost_base => some none
@@ -97,7 +97,7 @@ instance regPointsTo_discard_persistent (cpu : CPU) (r : Register) (v : Register
 persistent; the counter cells the cycle reads at SOME value (Rocq
 `counter_caps`). -/
 def hwConfig (cpu : CPU) : IProp GF := iprop%
-  Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗
+  Register.misa ↦ᵣ[cpu]□ 0x8000000000141105#64 ∗
   Register.mseccfg ↦ᵣ[cpu]□ 0#64 ∗
   Register.pma_regions ↦ᵣ[cpu]□ bootPMA ∗
   Register.htif_tohost_base ↦ᵣ[cpu]□ none ∗
@@ -170,7 +170,7 @@ theorem hwConfig_any (cpu : CPU) (r : Register) (h : hwAny r = true) :
 /-- **Mint the bundle** (Rocq `hw_config_intro`): the pinned cells at their
 reset values and the counter cells at ANY values, persisted. -/
 theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) (g : BitVec 64) :
-    Register.misa ↦ᵣ[cpu] 0x800000000014112D#64 ∗
+    Register.misa ↦ᵣ[cpu] 0x8000000000141105#64 ∗
     Register.mseccfg ↦ᵣ[cpu] 0#64 ∗
     Register.pma_regions ↦ᵣ[cpu] bootPMA ∗
     Register.htif_tohost_base ↦ᵣ[cpu] none ∗

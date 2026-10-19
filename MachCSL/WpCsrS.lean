@@ -160,7 +160,7 @@ def mstatusLegalize (o L : BitVec 64) : BitVec 64 :=
 
 /-- The reference map of `legalize_mstatus`: it reads `misa` only. -/
 def drefMisa : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | _ => none
 
 theorem misa_drefMisa_acc (cpu : CPU) (r : Register) (v : RegisterType r)

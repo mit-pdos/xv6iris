@@ -71,15 +71,20 @@ Each is conditional and reports itself in the regeneration log.
   `rmem`, `unit_tests`).  Some unselected leaves arrive anyway through `requires` (e.g. H's
   instructions with the selected `H` group).  Pre-existing and worth knowing: `misa` advertises F
   and D (and the configuration Zfh and scalar crypto) whose instructions are not compiled, so they
-  decode as illegal; the kernel uses none of them (it never enables FS).  Tier T1; whether `misa`
-  should advertise F and D at all is the inherited "which machine" question (section 6).
+  decode as illegal; the kernel uses none of them (it never enables FS).  Tier T1.  Since
+  configuration item 8, `misa` no longer advertises F and D; the remaining advertised-but-uncompiled
+  extensions are the configuration's scalar-crypto ones.
 - **The configuration**, `model/sail-config-rv64d.json`: upstream's `config.json.in` resolved for
-  rv64d, with the deviations listed in its header (items 1-7) and marked "xv6iris" inline
+  rv64d, with the deviations listed in its header (items 1-8) and marked "xv6iris" inline
   (restored on review: item 7, the misaligned-AMO fault, had been dropped by the first refresh).
-  Tiers (the policy's T0): items 1, 2 and 4 are platform and ISA-profile choices (reason (a));
+  Tiers (the policy's T0): items 1, 2, 4 and 8 are platform and ISA-profile choices (reason (a));
   3, 5 and 6 are forced by `config_is_valid` once H and Sdtrig are off (a); item 7 is continuity
   (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec
-  permits.
+  permits.  Item 8 (owner decision 2026-10-19): F off -- D with it, since the model derives D's
+  support from F's -- and the F-dependent Zfa, Zfbfmin, Zfh, Zfhmin, Zcd off: the kernel never
+  enables `mstatus.FS` and the module subset compiles none of their instructions, so `misa` now
+  advertises what is compiled (the derived `misa` value changed accordingly; `mstatus.FS` is
+  read-only zero; the floating-point CSRs are illegal).
 
 ## 5. Where MachCSL's semantics meets the model
 
@@ -93,13 +98,14 @@ Each is conditional and reports itself in the regeneration log.
   initial value `None()`; with Sdtrig disabled nothing writes it, and every cycle's end asserts
   it is none; decided 2026-10-19).  In the policy's terms (section 5 there) a model-bookkeeping
   board line: upstream's own code relies on the declared `None()`.
-- **The driver** (`MachCSL.riscvStep`, unchanged by the bump): `try_step 0 false` plus a
+- **The driver** (`MachCSL.riscvStep`): before the bump `try_step 0 false` plus a
   nondeterministic tick.  Upstream runs two schedules of its own: the Sail `loop` (and its Lean
   emulator) passes `exit_wait = true` at every step, and its C++ harness waits a bounded number of
   ticks (`platform.max_time_to_wait`) and then passes `true`.  `exit_wait = false` means a hart in
-  WFI waits for an interrupt and never takes the model's forced WFI exit, which the spec and
-  upstream allow (fewer behaviours); the policy prefers exposing `exit_wait` nondeterministically
-  (`notes/model-policy.md`, section 5), which is an open owner decision (section 6 below).
+  WFI waited for an interrupt and never took the model's forced WFI exit (fewer behaviours than
+  upstream's drivers).  Since 2026-10-19 (owner decision) the driver is `try_step 0 ew` with `ew`
+  chosen nondeterministically like the tick, so the theorems cover every schedule: a waiting hart
+  may be left waiting or forced out in any cycle (`notes/model-policy.md`, section 5).
 - **Platform hooks** (`model/Xv6Extras.lean`, installed as `model/Lean_RV64D/LeanRV64D/Xv6Extras.lean`): realised exactly where the
   hook has no effect on modelled state; the reservation predicates are opaque parameters; the
   hooks whose results are consumed (`plat_term_read`, `get_16_random_bits`, the softfloat family)
@@ -121,8 +127,7 @@ not an open question:
 - Fork commit 1 does not compare the fresh PTE with the walked one (section 1, row 1): the
   recorded gap stays for now; a lane after the bump's leaves completes the update with the spec's
   step-7 comparison (a fork commit under T5).
-- The driver's `exit_wait = false` (section 5) becomes nondeterministic with the WFI leaves, so
-  that the theorems cover both of upstream's schedules.
+- The driver's `exit_wait` is nondeterministic since 2026-10-19 (section 5); the WFI leaves cover
+  the forced-exit arm as they are ported.
 - Nothing is filed upstream; the project keeps its own fork.
-- F and D go off in the configuration (T0(a)), so that `misa` advertises what is compiled: a
-  configuration lane with its own regeneration (the derived `misa` value changes).
+- F and D are off in the configuration since 2026-10-19 (item 8, section 4).

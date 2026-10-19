@@ -170,7 +170,7 @@ noncomputable def ufFile (C : UCfg) (P : UPtd) (v : UfVals) : RegFile := fun r =
   | .menvcfg => MENVCFG_S
   | .mcounteren => v.lf.mcen | .mtimecmp => v.lf.mtc | .stimecmp => v.stc
   | .satp => satpOf .kpt P.root | .pmpcfg_n => v.lf.pmpcfg | .pmpaddr_n => v.lf.pmpaddr
-  | .misa => 0x800000000014112D#64 | .mseccfg => 0#64 | .pma_regions => bootPMA
+  | .misa => 0x8000000000141105#64 | .mseccfg => 0#64 | .pma_regions => bootPMA
   | .htif_tohost_base => none | .elp => 0#1 | .senvcfg => 0#64 | .scounteren => v.ctr.scen
   | .mcountinhibit => v.ctr.mci | .minstretcfg => v.ctr.mic | .mcyclecfg => v.ctr.mcc | .mstateen0 => 0#64
   | .sstateen0 => 0#32 | .mhpmcounter => v.ctr.hpm

@@ -390,9 +390,9 @@ theorem swp_wpHart (cpu : CPU) (m : SailM Unit) :
 /-! ## The per-event rules -/
 
 /-- The cycle boundary: to be safe forever it suffices to be safe for the next
-cycle, whichever way the clock-tick choice goes. -/
+cycle, whichever way the clock-tick and exit-wait choices go. -/
 theorem wpLoop_restart (cpu : CPU) :
-    (∀ tick : Bool, ▷ wpHart cpu (riscvStep tick)) ⊢@{IProp GF} wpLoop cpu := by
+    (∀ tick : Bool, ∀ ew : Bool, ▷ wpHart cpu (riscvStep tick ew)) ⊢@{IProp GF} wpLoop cpu := by
   unfold wpLoop
   iintro H
   iapply wpHart_lift
@@ -401,10 +401,10 @@ theorem wpLoop_restart (cpu : CPU) :
   iintro Hclose
   isplit
   · ipureintro
-    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
+    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
   inext
   iintro %m' %σ' %Hs _
-  obtain ⟨tick, rfl, rfl⟩ := Hs
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
   imod Hclose
   imodintro
   iframe Hσ
@@ -413,7 +413,7 @@ theorem wpLoop_restart (cpu : CPU) :
 /-- `wpLoop_restart`, handing the step's later credit (`wpHart_lift`'s `£ 1`)
 to the continuation: the source of every `wpNext`'s credit. -/
 theorem wpLoop_restart_lc (cpu : CPU) :
-    (∀ tick : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick))) ⊢@{IProp GF} wpLoop cpu := by
+    (∀ tick : Bool, ∀ ew : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick ew))) ⊢@{IProp GF} wpLoop cpu := by
   unfold wpLoop
   iintro H
   iapply wpHart_lift
@@ -422,10 +422,10 @@ theorem wpLoop_restart_lc (cpu : CPU) :
   iintro Hclose
   isplit
   · ipureintro
-    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
+    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
   inext
   iintro %m' %σ' %Hs Hlc
-  obtain ⟨tick, rfl, rfl⟩ := Hs
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
   imod Hclose
   imodintro
   iframe Hσ

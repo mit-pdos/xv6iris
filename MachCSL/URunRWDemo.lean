@@ -190,7 +190,7 @@ resident, xv6's PMP and the platform PMAs), and the base register `x10`
 (the address is pinned: translation branches on it). -/
 def urwDemoPinL : RegPin
   | .cur_privilege => some Privilege.User
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .mstatus => some 0xA00000000#64
   | .satp => some 0x8000000000080000#64
   | .tlb => some urwDemoTlb

@@ -30,7 +30,7 @@ open Sail
 at the values the verified tier runs under. -/
 def udrefU : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.User
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some MENVCFG_S
   | .senvcfg => some 0#64
   | .mstateen0 => some 0#64

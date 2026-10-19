@@ -40,7 +40,7 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart_lc
-  iintro %tick
+  iintro %tick %ew
   inext
   iintro Hlc
   unfold riscvStep

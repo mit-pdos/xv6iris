@@ -220,11 +220,11 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 | fork 6 `f0ef9813`, `hideleg` ignored without H | **T4** (precedents `mideleg`, `hedeleg`; upstream's own Lean emulator admits the read) | keep; upstream candidate |
 | compiler: short-circuit, type-level parens (PRs #1750, #1774 open); keyword escape, `termination_by` (ours) | I5 rule | keep until a release contains them; the two of ours are candidates |
 | patches A, B | I7 rule | keep; both meaning-preserving; retire when the backend allows |
-| config items 1-7 | **T0**: 1, 2, 4 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep |
-| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa`'s F and D bits go with the configuration lane of decision (5) below |
+| config items 1-8 | **T0**: 1, 2, 4, 8 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep; item 8 (F and D off) added 2026-10-19 by decision (5) |
+| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa` no longer advertises F and D (configuration item 8, decision (5)) |
 | board line `written_trigger_index := none` | §5 (model bookkeeping, flagged; upstream relies on the declared `None()`) | keep |
 | `hgeie` existential, `mhartid` pinned in `hwConfig` | §5 | keep |
-| the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | becomes nondeterministic (decision (3) below) |
+| the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | nondeterministic since 2026-10-19 (decision (3)): `riscvStep tick ew` |
 | lean-sail's rendering of `undefined_*`, `exit`/`assert`, printing, uninitialised registers | interface facts, recorded in `notes/model-diffs.md` §5 | none on a kernel path |
 | the dropped fork reset `a5460414` (`hideleg`/`hgeie`) | would have been a reset in the fork for M1's sake | dropped, correctly |
 | README's "official semantics", "unmodified"; `master` for `sail2`; "nothing reported upstream" | §1, §6 | corrected 2026-10-19 |

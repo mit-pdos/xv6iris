@@ -46,7 +46,7 @@ structure UwkPins (D : UFoot) (f : RegFile) : Prop where
   dpmpa : D.Dr .pmpaddr_n = true
   dpma : D.Dr .pma_regions = true
   dhtif : D.Dr .htif_tohost_base = true
-  misa : f .misa = 0x800000000014112D#64
+  misa : f .misa = 0x8000000000141105#64
   menv : f .menvcfg = menvcfgS
   pmp0 : pmpEnt0Ok (f .pmpcfg_n) (f .pmpaddr_n)
   pma : f .pma_regions = bootPMA

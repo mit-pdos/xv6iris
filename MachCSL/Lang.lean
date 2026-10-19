@@ -87,11 +87,12 @@ sail-riscv 0.16 bump"):
    `written_trigger_index := none` (0.16 asserts it at every cycle's end;
    `MachCSL.ArchReset`).
 
-The driver (`riscvStep`) is unchanged: `try_step 0 false` plus a
-nondeterministic tick.  With `exit_wait = false` a hart in WFI waits for an
-interrupt and never takes the model's forced WFI exit (upstream's own drivers
-run two schedules: the Sail `loop` passes `true` at every step, the C++ harness
-a bounded wait and then `true`); `notes/model-diffs.md` §5 records this.
+The driver (`riscvStep`) is `try_step 0 ew` plus a nondeterministic tick,
+with `ew` (the model's `exit_wait`) chosen nondeterministically too (owner,
+2026-10-19; before that it was fixed at `false`): a hart waiting in WFI may be
+left waiting or forced out in any cycle, which covers both of upstream's own
+schedules (the Sail `loop` passes `true` at every step, the C++ harness a
+bounded wait and then `true`); `notes/model-diffs.md` §5 records this.
 
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
@@ -255,9 +256,13 @@ abbrev MState.setRt (σ : MState) (d : DevId) (rt : DevRt) : MState :=
 a clock tick.  The model's own `loop` ticks the clock every
 `plat_insns_per_tick` instructions; the language has no instruction counter,
 so the tick is chosen nondeterministically at each cycle boundary (a sound
-weakening, exactly as in the Rocq prototype). -/
-noncomputable def riscvStep (tick : Bool) : SailM Unit := do
-  let _ ← Functions.try_step 0 false
+weakening, exactly as in the Rocq prototype).  `exit_wait` is the harness's
+other input to `try_step` -- whether a hart waiting in WFI is forced out of
+its wait this cycle (the spec allows WFI to wait or to retire; upstream's own
+drivers run two schedules) -- and is chosen the same way, so every schedule
+is covered (`notes/model-policy.md`, section 5). -/
+noncomputable def riscvStep (tick ew : Bool) : SailM Unit := do
+  let _ ← Functions.try_step 0 ew
   if tick then Functions.tick_clock () else pure ()
 
 /-! ## Expressions -/
@@ -558,7 +563,7 @@ consumes one event (or restarts the cycle at the boundary, or is blocked and
 retries the event) and continues with `m'` in state `σ'`. -/
 def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState) : Prop :=
   match m with
-  | .pure _ => ∃ tick : Bool, m' = riscvStep tick ∧ σ' = σ
+  | .pure _ => ∃ tick ew : Bool, m' = riscvStep tick ew ∧ σ' = σ
   | .impure (.inl (.error _)) _ => False
   | .impure (.inl (.ok o)) k =>
       (∃ v : InstructionEffect.ret o, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)

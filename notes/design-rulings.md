@@ -126,7 +126,10 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   The register rules spell out their continuations' binder types.
 - **The policy** (owner, 2026-10-19): `notes/model-policy.md` is approved, and the decisions it had
   left open are taken there (section 8): the A/D update's step-7 compare in a later lane, a
-  nondeterministic `exit_wait`, nothing filed upstream, F and D off in the configuration.
+  nondeterministic `exit_wait` (`riscvStep tick ew`; the cycle schemas introduce `%ew` beside
+  `%tick`, and the WFI leaves cover the forced-exit arm), nothing filed upstream, F and D off in
+  the configuration (item 8; `misa` and the `hartSupports` facts for F, D, Zfa, Zfh, Zfhmin,
+  Zfbfmin and Zcd changed with it).
 
 ## From `notes/briefs/crash_layer.md`
 

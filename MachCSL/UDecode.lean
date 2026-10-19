@@ -50,7 +50,7 @@ open LeanRV64D LeanRV64D.Functions
 user tier's values (`misa` as reset, `menvcfg` the kernel's, `senvcfg` 0). -/
 def drefU : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.User
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | .senvcfg => some 0#64
   | _ => none

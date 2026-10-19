@@ -255,7 +255,7 @@ theorem uc_finish_waiting (hD : UcFoot D) (orc : UOrc) (s : UWSt) (wr wr' : Wait
 
 /-- The closed reference map of `misa` (the `Ext_S`/`Ext_Zca` gates). -/
 def ucDrefMisa : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | _ => none
 
 theorem uc_runRead_S : runRead ucDrefMisa (currentlyEnabled extension.Ext_S) = some (true, true) := by
@@ -267,7 +267,7 @@ theorem uc_runRead_Zca : runRead ucDrefMisa (currentlyEnabled extension.Ext_Zca)
 /-- `misa` readable at its reset value. -/
 structure UcMisa (D : UFoot) (s : UWSt) : Prop where
   rd : D.Dr .misa = true
-  val : s.file .misa = 0x800000000014112D#64
+  val : s.file .misa = 0x8000000000141105#64
 
 theorem UcMisa.dref {s : UWSt} (h : UcMisa D s) :
     ∀ r v, ucDrefMisa r = some v → D.Dr r = true ∧ s.file r = v := by

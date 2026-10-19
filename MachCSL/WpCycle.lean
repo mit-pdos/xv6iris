@@ -125,7 +125,7 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
@@ -196,7 +196,7 @@ theorem wpLoop_m_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart

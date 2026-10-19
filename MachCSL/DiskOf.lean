@@ -137,7 +137,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
     (h : hartStep cpu m σ m' σ') : diskOf σ'.devs = diskOf σ.devs := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rfl
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hev⟩ | ⟨hb, _⟩
