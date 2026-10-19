@@ -45,11 +45,13 @@ theorem uservec_exec_sfence_u [CurCtx] (cpu : CPU) (c : MConf) (hok : SConfPhys 
   intro Φ
   unfold urSfence
   iintro ⟨HmConf, HPC, HnextPC, ⟨⟨Hslot, HF⟩, HR⟩, HΦ⟩
-  icases uptSlot_sfence cpu P $$ Hslot with ⟨%tlb, Htlb, Hcl⟩
+  icases uptSlot_sfence cpu P $$ Hslot with ⟨%tlb, Htlb, %hS, Hcl⟩
   iapply (execSpecF_sfence_vma cpu c false hok pc npc₀ R tlb Φ)
   iframe HmConf HPC HnextPC HR Htlb
   inext
   iintro HmConf HPC HnextPC ⟨HR, Htlb⟩
+  -- 0.16 flushes the supervisor-stage entries; the slot's TLB holds no other kind
+  rw [tlbFlushS_of_stageS tlb hS]
   ihave Hs := Hcl $$ Htlb
   iapply HΦ $$ HmConf HPC HnextPC
   iframe HF HR Hs
@@ -64,11 +66,13 @@ theorem uservec_exec_sfence_winK [CurCtx] (cpu : CPU) (c : MConf) (hok : SConfPh
   intro Φ
   unfold urSfence
   iintro ⟨HmConf, HPC, HnextPC, ⟨⟨Hwin, HF⟩, HR⟩, HΦ⟩
-  icases pt2Win_sfence cpu kroot P $$ Hwin with ⟨%tlb, Htlb, Hcl⟩
+  icases pt2Win_sfence cpu kroot P $$ Hwin with ⟨%tlb, Htlb, %hS, Hcl⟩
   iapply (execSpecF_sfence_vma cpu c false hok pc npc₀ R tlb Φ)
   iframe HmConf HPC HnextPC HR Htlb
   inext
   iintro HmConf HPC HnextPC ⟨HR, Htlb⟩
+  -- 0.16 flushes the supervisor-stage entries; the slot's TLB holds no other kind
+  rw [tlbFlushS_of_stageS tlb hS]
   ihave Hs := Hcl $$ Htlb
   iapply HΦ $$ HmConf HPC HnextPC
   iframe HF HR
