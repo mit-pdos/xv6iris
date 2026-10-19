@@ -1360,7 +1360,7 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     (hseal : kptSealOk (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top σ.top (kptSlots ra t))
     (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t)) (stk : List PAddr)
     (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
-      kptHistsAt m top (kptSlots ra t) → ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ stk) :
+      kptHistsAt m top (kptSlots ra t) → ∀ p, p ∈ stk ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p) :
     genHeapInterp σ.mem ∗ memModel σ ∗ ctxBytes curCtx ra 8 (DFrac.own 1) (pteAddr t.base 0#9) ∗
       ([∗list] e ∈ t.entries 2, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩) ∗
       ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q)
@@ -1368,7 +1368,7 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
         ctxBytes curCtx ra 8 DFrac.discard (pteAddr t.base 0#9) ∗ kptRegs (GF := GF) t ∗ kptSealed) := by
   unfold memModel memModelAt rsvModelAt kptModelAt
   iintro ⟨Hmem, ⟨Htop, Hauth, Hviews, Hresv, %hmm', ⟨%reg, Hreg, %⟨hin, hex, hok⟩, %S0, %dyn0, %stk0,
-    %⟨hlk, hseal0⟩, Hcells0, Hcarve0, _⟩, Hh, Hch⟩, Hrw, Hnew, Hcarve⟩
+    %⟨hlk, hdma0, hseal0⟩, Hcells0, Hcarve0, _⟩, Hh, Hch⟩, Hrw, Hnew, Hcarve⟩
   -- the record is empty: an earlier seal would hold the root word's discarded byte
   rcases hseal0 with ⟨rfl, _, rfl, hpre⟩ | hs0
   rotate_left
@@ -1451,6 +1451,8 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     isplitl []
     · ipureintro
       refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩,
+        ⟨hdma0.1, fun _ a H e hH he _ hS => absurd ((hmm'.1 a H hH).2 e he).1
+          (by simp only [MState.top] at hS; omega)⟩,
         Or.inr ⟨hseal, hkok, hstk σ.mem σ.top hseal hh, fun k v hv hk => ?_⟩⟩
       · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by omega)] at hv
         rcases h2 k v hv with h | ⟨e, he, hl, rfl, rfl⟩
@@ -1496,7 +1498,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t))
     (stk : List PAddr)
     (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
-      kptHistsAt m top (kptSlots ra t) → ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ stk)
+      kptHistsAt m top (kptSlots ra t) → ∀ p, p ∈ stk ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p)
     (R : IProp GF) :
     ownCtx (GF := GF) cpu curCtx ∗
       ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q) ∗
@@ -1605,7 +1607,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
   subst q'
   unfold memModel memModelAt rsvModelAt kptModelAt kptSealed kptSealedAt ksRcptsAll
   iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %⟨hin, hex, hrok, hrp⟩, %S, %dyn, %stk,
-    %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh, Hch⟩, Hb, #Hsl⟩
+    %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh, Hch⟩, Hb, #Hsl⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hsl
   have hne := hlk.2 _ hget
   rcases hseal with h0 | hok
@@ -1635,7 +1637,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc
     ipureintro
-    exact ⟨hlk, Or.inr hok⟩
+    exact ⟨hlk, hdma, Or.inr hok⟩
   | none =>
     imod ghost_map_insert_persist (ksKey q) 0 hk $$ Hreg with ⟨Hreg, #Hnew⟩
     imodintro
@@ -1658,7 +1660,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
       iframe Hcells Hcarve
       isplitl []
       · ipureintro
-        refine ⟨⟨fun k v' hv hk1 hk2 => ?_, fun v' hv => ?_⟩, Or.inr ⟨hok.1, hok.2.1, hok.2.2.1, fun k v' hv hk1 => ?_⟩⟩
+        refine ⟨⟨fun k v' hv hk1 hk2 => ?_, fun v' hv => ?_⟩, hdma, Or.inr ⟨hok.1, hok.2.1, hok.2.2.1, fun k v' hv hk1 => ?_⟩⟩
         · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey kptSealKey at *; omega)] at hv
           exact hlk.1 k v' hv hk1 hk2
         · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey kptSealKey; omega)] at hv
@@ -1701,6 +1703,42 @@ theorem wordCell_ksMint (σ : MState) (q : PAddr) (n lo : Nat) (hn : 0 < n) (v0 
     rw [rsvSetSelf h0]
     iexact Hb
   · ipureintro; exact ht
+
+/-- **A receipt minted from an owned identity-mapped kernel byte** (the page's byte 0), at an
+instruction boundary (`wpLoop_interpUpd`); the byte is handed back. -/
+theorem wpLoop_ksMint [CurCtx] (cpu : CPU) (q q' : PAddr) (hq : q' = q) (v : BitVec 8) (hal : q.toNat % 4096 = 0)
+    (hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (q + BitVec.ofNat 64 j)) :
+    kmapId (GF := GF) q' ∗ kptSealed ∗ wordPointsTo q' 1 (DFrac.own 1) v ∗
+      (wordPointsTo q' 1 (DFrac.own 1) v -∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q -∗ wpLoop cpu)
+      ⊢ wpLoop cpu := by
+  subst q'
+  iintro ⟨#Hid, #Hsl, Hw, HΦ⟩
+  iapply wpLoop_interpUpd cpu iprop(wordPointsTo (GF := GF) q 1 (DFrac.own 1) v ∗
+    ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q)
+  isplitl [Hw]
+  · iintro %σ ⟨Hmem, Hmm⟩
+    ihave Hp := wordPointsTo_phys q 1 (DFrac.own 1) v $$ Hid Hw
+    icases pwordPointsTo_cases q 1 (DFrac.own 1) v $$ Hp with ⟨%⟨hram, hal1⟩, Hb⟩
+    unfold bytesPointsTo ctxBytes
+    simp only [List.range_one]
+    icases BigSepL.bigSepL_singleton.1 $$ Hb with Hb
+    unfold ctxByte
+    icases Hb with ⟨%e, %H, Hpt, %hev, #Hk⟩
+    imod memModel_ksMint σ q (q + BitVec.ofNat 64 0) (by simp) (e :: H) hal hst $$ [Hmm Hpt Hsl]
+      with ⟨Hmm, Hpt, #Hr⟩
+    · iframe Hmm Hpt Hsl
+    imodintro
+    iframe Hmem Hmm Hr
+    iapply wordPointsTo_intro_id q 1 (DFrac.own 1) v hram hal1 $$ Hid
+    unfold bytesPointsTo ctxBytes
+    simp only [List.range_one]
+    iapply BigSepL.bigSepL_singleton.2
+    unfold ctxByte
+    iexists e, H
+    iframe Hpt Hk
+    ipureintro; exact hev
+  · iintro ⟨Hw, #Hr⟩
+    iapply HΦ $$ Hw Hr
 
 /-- **The carve from an owned byte** (mcslrec (3) X1-c): half of it goes to the interpretation's
 carve (the other half and the byte's key are dropped). -/

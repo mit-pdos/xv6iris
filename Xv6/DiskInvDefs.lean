@@ -267,10 +267,64 @@ theorem list_eq_map_range {A : Type _} (l : List A) (d : A) :
 abbrev headsAtT (Hs : Nat → Hist) (n ts : Nat) : Prop :=
   ∀ j, j < n → (Hs j).head?.map HEnt.t = some ts
 
+/-- **The footprint's stack-freedom certificate** (mcslrec (3) X1-d, `MachCSL.ksDmaCertAt` at the
+ambient era): what a DMA write presents (`MachCSL.dmaWriteLease`), so that no disk entry ever lands
+on a kernel stack.  Persistent. -/
+abbrev dmaCert (pa : PAddr) (n : Nat) : IProp GF := ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n
+
+/-- A page `kalloc` hands out is page-aligned (mcslrec (3) X1-c). -/
+theorem pageValid_aligned (p : BitVec 64) (hv : pageValid p) : p.toNat % 4096 = 0 := by
+  obtain ⟨hal, -, -⟩ := hv
+  have h12 : BitVec.extractLsb' 0 12 p = 0#12 := by revert hal; intro hal; bv_decide
+  have h := congrArg BitVec.toNat h12
+  simpa [BitVec.extractLsb'_toNat] using h
+
+/-- A page `kalloc` hands out holds no `stack0` byte (it lies above `end`). -/
+theorem pageValid_noStack (p : BitVec 64) (hv : pageValid p) (j : Nat) (hj : j < 4096) :
+    ¬ stackByteIn xv6RsvStatic (p + BitVec.ofNat 64 j) := by
+  rintro ⟨base, size, hR, h1, h2⟩
+  obtain ⟨rfl, rfl⟩ := xv6Stack_only base size hR
+  obtain ⟨-, h2', h3'⟩ := hv
+  simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr, physTop, BitVec.toNat_ofNat,
+    Nat.reducePow, Nat.reduceMod] at h2' h3'
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hs : KA.«stack0».toNat = KernelSyms.«stack0» := rfl
+  have hle : KernelSyms.«stack0» + 0x8000 ≤ KernelSyms.«end» := by decide
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega),
+    Nat.mod_eq_of_lt (by omega)] at h1 h2
+  omega
+
+/-- A status byte is a `.bss` byte past `stack0` and below `end` (a static DMA target). -/
+theorem infoStatus_bounds (i : Nat) (hi : i < NUM) (j : Nat) (hj : j < 1) :
+    KernelSyms.«stack0» + 0x8000 ≤ (aInfoStatus i + BitVec.ofNat 64 j).toNat ∧
+      (aInfoStatus i + BitVec.ofNat 64 j).toNat < KernelSyms.«end» := by
+  have hj0 : j = 0 := by omega
+  subst hj0
+  have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by unfold NUM at hi; omega
+  rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
+
+/-- **A footprint inside a page with a stack-free receipt** is certified. -/
+theorem dmaCert_page (q : PAddr) (off n : Nat) (hq : inRam q 4096 ∧ q.toNat % 4096 = 0) (hn : off + n ≤ 4096) :
+    ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q ⊢ dmaCert (hlc := hlc) (GF := GF) (q + BitVec.ofNat 64 off) n := by
+  unfold dmaCert ksDmaCertAt
+  iintro #Hr
+  iright
+  iexists q
+  iframe Hr
+  ipureintro
+  intro j hj
+  obtain ⟨⟨h1, h2⟩, h3⟩ := hq
+  unfold ramEnd at h2
+  unfold inPage
+  rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat,
+    Nat.mod_eq_of_lt (a := off) (by omega), Nat.mod_eq_of_lt (a := j) (by omega),
+    Nat.mod_eq_of_lt (a := q.toNat + off) (by omega), Nat.mod_eq_of_lt (by omega)]
+  omega
+
 /-- The footprint at FULL ownership, content unconstrained: what the
-device may WRITE. -/
+device may WRITE (with the footprint's certificate, X1-d). -/
 def dmaOwn (pa : PAddr) (n : Nat) : IProp GF := iprop%
-  ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs
+  ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ dmaCert pa n
 
 /-- The footprint at full ownership, at a value. -/
 def dmaOwnAt (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : IProp GF := iprop%
@@ -285,7 +339,7 @@ position is the handle: a reader whose view has passed it reads the
 head. -/
 def dmaOwnT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) : IProp GF := iprop%
   ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
-    ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent
+    ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent ∗ dmaCert pa n
 
 /-- A HALF of the footprint: all a DMA READ needs (a cell at any fraction
 pins the byte's top), and what leaves the other half to the driver. -/
@@ -309,34 +363,34 @@ device-key arm of `MachCSL.chainKey`). -/
 theorem dmaOwnT_auth (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ authoredBy ts diskAgent ∗ dmaOwnT pa n w ts := by
   unfold dmaOwnT
-  iintro ⟨%Hs, H, #Ht, %hp, #Ha⟩
+  iintro ⟨%Hs, H, #Ht, %hp, #Ha, #Hc⟩
   isplitl []
   · iexact Ha
   iexists Hs
-  iframe H Ht Ha
+  iframe H Ht Ha Hc
   ipureintro; exact hp
 
 theorem dmaOwnT_dmaOwn (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ dmaOwn pa n := by
   unfold dmaOwnT dmaOwn
-  iintro ⟨%Hs, H, _, %_, _⟩
+  iintro ⟨%Hs, H, _, %_, _, #Hc⟩
   iexists Hs
-  iexact H
+  iframe H Hc
 
 theorem dmaOwnT_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢
       ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
-        ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent := by
+        ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent ∗ dmaCert pa n := by
   unfold dmaOwnT; iintro H; iexact H
 
 theorem dmaOwnT_topLb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ topLb ts ∗ dmaOwnT pa n w ts := by
   unfold dmaOwnT
-  iintro ⟨%Hs, H, #Ht, %hp, #Ha⟩
+  iintro ⟨%Hs, H, #Ht, %hp, #Ha, #Hc⟩
   isplitl []
   · iexact Ht
   iexists Hs
-  iframe H Ht Ha
+  iframe H Ht Ha Hc
   ipureintro; exact hp
 
 /-- **The write, at its position**: what `MachCSL.dmaWriteLease`'s
@@ -346,9 +400,9 @@ theorem dmaOwn_leaseT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
     dmaOwn (GF := GF) pa n ∗ ((∃ ts : Nat, dmaOwnT pa n w ts) -∗ P) ⊢
       dmaWriteLease pa n w P := by
   unfold dmaOwn dmaWriteLease
-  iintro ⟨⟨%Hs, Hb⟩, Hback⟩
+  iintro ⟨⟨%Hs, Hb, #Hc⟩, Hback⟩
   iexists Hs, 0
-  iframe Hb
+  iframe Hb Hc
   isplitl []
   · iapply topLbAt_0
   iintro %t Hb2 #Hau #Htop %_
@@ -356,7 +410,7 @@ theorem dmaOwn_leaseT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
   iexists t
   unfold dmaOwnT
   iexists (pushed Hs t diskAgent w)
-  iframe Hb2 Htop Hau
+  iframe Hb2 Htop Hau Hc
   ipureintro
   exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
 /-- **The write, at its position, with the ORDERING RECEIPT.**  The client
@@ -369,9 +423,9 @@ theorem dmaOwn_leaseTb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Kb : Nat) (P
     dmaOwn (GF := GF) pa n ∗ topLb Kb ∗
       ((∃ ts : Nat, ⌜Kb < ts⌝ ∗ dmaOwnT pa n w ts) -∗ P) ⊢ dmaWriteLease pa n w P := by
   unfold dmaOwn dmaWriteLease
-  iintro ⟨⟨%Hs, Hb⟩, #Htb, Hback⟩
+  iintro ⟨⟨%Hs, Hb, #Hc⟩, #Htb, Hback⟩
   iexists Hs, Kb
-  iframe Hb Htb
+  iframe Hb Htb Hc
   iintro %t Hb2 #Hau #Htop %hlt
   iapply Hback
   iexists t
@@ -379,7 +433,7 @@ theorem dmaOwn_leaseTb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Kb : Nat) (P
   · ipureintro; exact hlt
   unfold dmaOwnT
   iexists (pushed Hs t diskAgent w)
-  iframe Hb2 Htop Hau
+  iframe Hb2 Htop Hau Hc
   ipureintro
   exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
 
@@ -464,9 +518,9 @@ theorem dmaHalfAt_pin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
 theorem dmaWriteLease_mono (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P Q : IProp GF)
     (hpq : P ⊢ Q) : dmaWriteLease (GF := GF) pa n w P ⊢ dmaWriteLease pa n w Q := by
   unfold dmaWriteLease
-  iintro ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
+  iintro ⟨%Hs, %Kb, Hb, #Htlb, #Hc, Hback⟩
   iexists Hs, Kb
-  iframe Hb Htlb
+  iframe Hb Htlb Hc
   iintro %t Hb2 Hau Ht %hkb
   iapply hpq
   iapply Hback $$ %t Hb2 Hau Ht %hkb
@@ -1063,7 +1117,7 @@ theorem used_find_mem (dl : List UsedRec) (tvn : Nat) (r : UsedRec)
 /-- **The used-index cell**, with its write log explicit. -/
 def usedIdxCell (pa : PAddr) (b : Nat) (dl : List UsedRec) : IProp GF := iprop%
   ∃ Hold : Nat → Hist,
-    histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝
+    histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝ ∗ dmaCert pa 2
 
 instance usedIdxCell_timeless (pa : PAddr) (b : Nat) (dl : List UsedRec) :
     Timeless (usedIdxCell (GF := GF) pa b dl) := by unfold usedIdxCell; infer_instance
@@ -1076,9 +1130,9 @@ theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd ep Kb
       iprop(usedIdxCell (GF := GF) pa b (dl ++ [(m, t, hd, ep)]) ∗ topLb t ∗ R) ⊢ P) :
     usedIdxCell (GF := GF) pa b dl ∗ topLb Kb ∗ R ⊢ dmaWriteLease pa 2 (wrap16 m) P := by
   unfold usedIdxCell dmaWriteLease
-  iintro ⟨⟨%Hold, Hb, %ht⟩, #Htlb, HR⟩
+  iintro ⟨⟨%Hold, Hb, %ht, #Hc⟩, #Htlb, HR⟩
   iexists ((usedW dl).hist Hold), Kb
-  iframe Hb Htlb
+  iframe Hb Htlb Hc
   iintro %t Hb2 _ #Htop %hkb
   iapply hback t hkb
   iframe Htop
@@ -1087,7 +1141,7 @@ theorem usedIdxCell_lease (pa : PAddr) (b : Nat) (dl : List UsedRec) (m hd ep Kb
     iexists Hold
     rw [WordHist.hist_push, show (⟨t, diskAgent, wrap16 m⟩ : WEnt 2) :: usedW dl
         = usedW (dl ++ [(m, t, hd, ep)]) from (usedW_snoc dl (m, t, hd, ep)).symm]
-    iframe Hb2
+    iframe Hb2 Hc
     ipureintro; exact ht
   · iexact HR
 
@@ -1280,7 +1334,7 @@ theorem dlTops_max (dl : List UsedRec) : dlTops (GF := GF) dl ⊢ topLb (maxPos 
 
 theorem usedIdxCell_cases (pa : PAddr) (b : Nat) (dl : List UsedRec) :
     usedIdxCell (GF := GF) pa b dl ⊢ ∃ Hold : Nat → Hist,
-      histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝ := by
+      histBytes pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ ⌜usedTailOk b Hold⌝ ∗ dmaCert pa 2 := by
   unfold usedIdxCell
   iintro H
   iexact H
@@ -1288,12 +1342,12 @@ theorem usedIdxCell_cases (pa : PAddr) (b : Nat) (dl : List UsedRec) :
 /-- Rebuilding the cell from its histories. -/
 theorem usedIdxCell_intro (pa : PAddr) (b : Nat) (dl : List UsedRec) (Hold : Nat → Hist)
     (h : usedTailOk b Hold) :
-    histBytes (GF := GF) pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ⊢
+    histBytes (GF := GF) pa 2 (fun _ => DFrac.own 1) ((usedW dl).hist Hold) ∗ dmaCert pa 2 ⊢
       usedIdxCell pa b dl := by
   unfold usedIdxCell
-  iintro H
+  iintro ⟨H, #Hc⟩
   iexists Hold
-  iframe H
+  iframe H Hc
   ipureintro; exact h
 
 /-- Every byte of the cell has a history: the tails are nonempty. -/
@@ -2811,7 +2865,7 @@ what makes two full footprints over one WINDOW one too many
 theorem dmaOwn_byte0 (pa : PAddr) (n : Nat) (hn : 0 < n) :
     dmaOwn (GF := GF) pa n ⊢ ∃ H : Hist, pa ↦ₕ{DFrac.own 1} H := by
   unfold dmaOwn histBytes
-  iintro ⟨%Hs, H⟩
+  iintro ⟨%Hs, H, _⟩
   icases BigSepL.bigSepL_mem_acc
       (Φ := fun j => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{(fun _ => DFrac.own 1) j} Hs j))
       (List.mem_range.2 hn) $$ H with ⟨Hb, -⟩

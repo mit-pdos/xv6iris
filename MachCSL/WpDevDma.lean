@@ -45,7 +45,7 @@ ghost state from the grown histories, the disk's authorship receipt and the
 position's top receipt. -/
 def dmaWriteLease (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) : IProp GF := iprop%
   ∃ (Hs : Nat → Hist) (Kb : Nat),
-    histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗
+    histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗ ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
     (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
         authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P)
 
@@ -62,7 +62,7 @@ it a completed request's status byte could not be read back. -/
 theorem dmaWriteLease_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) :
     dmaWriteLease pa n w P ⊢@{IProp GF}
       ∃ (Hs : Nat → Hist) (Kb : Nat),
-        histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗
+        histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗ ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
         (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
             authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P) := by
   unfold dmaWriteLease; iintro H; iexact H

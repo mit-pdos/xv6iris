@@ -564,11 +564,11 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
         · iapply hlease (σ.devs.st .virtio) s' hgt $$ [HC HR]
           iframe HC HR
         icases dmaWriteLease_cases pa n w iprop(|==> (R s' ∗ C')) $$ Hl
-          with ⟨%Hs, %Kb, Hb, #Htlb, Hback⟩
+          with ⟨%Hs, %Kb, Hb, #Htlb, #Hcert, Hback⟩
         ihave %hkb : ⌜Kb ≤ (σ.setDev .virtio s').top⌝ $$ [Hσ Htlb]
         · iapply machInterp_topLb (σ.setDev .virtio s') Kb
           iframe Hσ Htlb
-        imod machInterp_storeDma (σ.setDev .virtio s') pa n Hs w hnr hn0 $$ [$Hσ $Hb]
+        imod machInterp_storeDma (σ.setDev .virtio s') pa n Hs w hnr hn0 $$ [$Hσ $Hb $Hcert]
           with ⟨Hσ, Hb, #Hau, #Htop⟩
         ihave Hrc := Hback $$ %((σ.setDev .virtio s').top + 1) Hb Hau Htop
           %(by omega : Kb < (σ.setDev .virtio s').top + 1)
@@ -613,7 +613,7 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
             · iapply hlease (σ.devs.st .virtio) s' hgb $$ [HC HR]
               iframe HC HR
             icases dmaWriteLease_cases pa n w iprop(|==> (R s' ∗ C')) $$ Hl
-              with ⟨%Hs, %Kb, Hb, _, _⟩
+              with ⟨%Hs, %Kb, Hb, _, _, _⟩
             icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
             iapply histBytes_ramBytes σ pa n (fun _ => DFrac.own 1) Hs
             iframe Hmem Hmm Hb

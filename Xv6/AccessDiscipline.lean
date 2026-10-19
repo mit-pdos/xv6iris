@@ -815,6 +815,37 @@ theorem ksByteAt_mono {σ : MState} (hk : kptStateOkK xv6Rsv xv6KptOk σ) {s t :
   obtain ⟨i, hi, rfl, hb0⟩ := kstkPage_walk hok hh hroot hmaps (by omega) hp
   exact .inr ⟨KptSeal.pubWritten_mono hst hpw, _, kstkPage_build hok hh hroot hmaps hb0 (by omega) hi, hlo, hhi⟩
 
+/-- A `.bss` byte past `stack0` and below `end` is below `end` and off `stack0`. -/
+theorem staticByte_ok (a : PAddr) (h1 : KernelSyms.«stack0» + 0x8000 ≤ a.toNat) (h2 : a.toNat < KernelSyms.«end») :
+    a.toNat < KA.«end».toNat ∧ ¬ stackByteIn xv6RsvStatic a := by
+  refine ⟨h2, ?_⟩
+  rintro ⟨base, size, hR, hlo, hhi⟩
+  obtain ⟨rfl, rfl⟩ := xv6Stack_only base size hR
+  have hs : KA.«stack0».toNat = KernelSyms.«stack0» := rfl
+  omega
+
+/-- **A static DMA target is certified** (mcslrec (3) X1-d): every byte below `end` and off
+`stack0` is off every kernel-stack page of a sealed table of xv6's shape (those pages lie at or above
+`end`, `xv6KptOk`). -/
+theorem dmaCert_static {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] (E : EraGS)
+    (hR : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
+    (hK : MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk) (pa : PAddr) (n : Nat)
+    (h : ∀ j, j < n → (pa + BitVec.ofNat 64 j).toNat < KA.«end».toNat ∧
+      ¬ stackByteIn xv6RsvStatic (pa + BitVec.ofNat 64 j)) :
+    ⊢@{IProp GF} ksDmaCertAt E pa n := by
+  unfold ksDmaCertAt
+  ileft
+  ipureintro
+  intro j hj
+  rw [hR, hK]
+  refine ⟨(h j hj).2, fun m top S dyn hs hh hk p hp hin => ?_⟩
+  obtain ⟨pas, b, hroot, hmaps, hks⟩ := hk
+  obtain ⟨i, hi, rfl, -⟩ := kstkPage_walk hs hh hroot hmaps (Nat.le_refl _) hp
+  have h1 := (hks i hi).1
+  have h2 := (h j hj).1
+  unfold inPage at hin
+  omega
+
 /-- **`utextDiscAt`, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1],
 O1; `MachCSL.uTextDiscAt`): while hart `h` is in user mode, every history
 entry on a byte of a page that a user TEXT leaf (`U`, `X` set, `W` clear) of

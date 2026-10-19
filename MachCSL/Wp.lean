@@ -1499,19 +1499,29 @@ theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) 
     ipureintro
     exact Or.inr (ChainCert.valid_le hv hle.1 hle.2)
 
+theorem hartAgent_ne_diskAgent' (c : CPU) : hartAgent c ≠ diskAgent := by
+  simp only [diskAgent]
+  exact Nat.ne_of_lt (hartAgent_lt c)
+
 /-- A load adds no entry. -/
 theorem kptGrow_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
     memGrowR σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ σ.top ≤ (σ.afterLoad cpu pa n tvn).top ∧
-      memGrow σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ memAbove σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem :=
-  ⟨memGrowR_refl _ _, Nat.le_refl _, memGrow_refl _ _, memAbove_refl _ _⟩
+      memGrow σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ memAbove σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧
+      (∀ (a : PAddr) (H' : Hist) (e : HEnt), (σ.afterLoad cpu pa n tvn).mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid → ∃ H, σ.mem[a]? = some H ∧ e ∈ H) :=
+  ⟨memGrowR_refl _ _, Nat.le_refl _, memGrow_refl _ _, memAbove_refl _ _, fun _ H' _ h he _ => ⟨H', h, he⟩⟩
 
 /-- A hart's store adds only its own entries, at the next position. -/
 theorem kptGrow_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
     memGrowR σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ σ.top ≤ (σ.store cpu pa n w excl).top ∧
-      memGrow σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ memAbove σ.mem σ.top (σ.store cpu pa n w excl).mem :=
+      memGrow σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ memAbove σ.mem σ.top (σ.store cpu pa n w excl).mem ∧
+      (∀ (a : PAddr) (H' : Hist) (e : HEnt), (σ.store cpu pa n w excl).mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid → ∃ H, σ.mem[a]? = some H ∧ e ∈ H) :=
   ⟨memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _),
     by simp only [MState.top, List.length_append, List.length_singleton]; omega,
-    memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _), memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)⟩
+    memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _), memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _),
+    fun a H' e h he hd => by
+      rcases memNew_writeBytes σ.mem pa w (σ.top + 1) (hartAgent cpu) a H' h e he with h1 | ⟨h1, -⟩
+      · exact h1
+      · rw [h1] at hd; exact absurd hd (Nat.not_le.2 (hartAgent_lt cpu))⟩
 
 /-- A DMA write adds only the disk's entries, at the next position. -/
 theorem kptGrow_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -1547,13 +1557,26 @@ the seal are read at or below the top). -/
 theorem ksPost_grow {rs : List RsvRegion} {m m' : FlatMem} {top S : Nat} {stk : List PAddr} {reg : RegMapF Agent}
     (hg : memGrow m top m') (hm : memAbove m top m') (hS : S ≤ top) (h : ksPost rs m S stk reg) :
     ksPost rs m' S stk reg :=
-  ⟨fun p hp => h.1 p ((kstkPageAt_grow hg hm hS p).1 hp), h.2⟩
+  ⟨fun p => (h.1 p).trans (kstkPageAt_grow hg hm hS p).symm, h.2⟩
+
+/-- The DMA facts move with a step that adds no disk entry. -/
+theorem dmaOkAt_grow {rs : List RsvRegion} {m m' : FlatMem} {S : Nat} {stk : List PAddr} {dyn : List KSlot}
+    (hnd : ∀ (a : PAddr) (H' : Hist) (e : HEnt), m'[a]? = some H' → e ∈ H' → NCPU ≤ e.tid →
+      ∃ H, m[a]? = some H ∧ e ∈ H)
+    (h : dmaOkAt rs m S stk dyn) : dmaOkAt rs m' S stk dyn := by
+  refine ⟨fun a H' e hH' he hd => ?_, fun hne a H' e hH' he hd hS => ?_⟩
+  · obtain ⟨H, hH, he'⟩ := hnd a H' e hH' he hd
+    exact h.1 a H e hH he' hd
+  · obtain ⟨H, hH, he'⟩ := hnd a H' e hH' he hd
+    exact h.2 hne a H e hH he' hd hS
 
 /-- The reserved conjunct moves with the memory, given the regions'
 discipline does (and -- W8 (f3-ptek) -- the step adds only entries above the
 top). -/
 theorem rsvModel_mono (σ σ' : MState)
-    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem ∧
+      ∀ (a : PAddr) (H' : Hist) (e : HEnt), σ'.mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid →
+        ∃ H, σ.mem[a]? = some H ∧ e ∈ H)
     (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
@@ -1568,7 +1591,7 @@ theorem rsvModel_mono (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
   have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
   isplitl [Hreg Hcells Hcarve]
@@ -1580,9 +1603,9 @@ theorem rsvModel_mono (σ σ' : MState)
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc
     ipureintro
-    exact ⟨hlk, hseal.imp (fun h0 => ⟨h0.1, hpub h0.2.1, h0.2.2⟩)
+    exact ⟨hlk, dmaOkAt_grow hg.2.2.2.2 hdma, hseal.imp (fun h0 => ⟨h0.1, hpub h0.2.1, h0.2.2⟩)
       (fun h0 => ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1,
-        ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩)⟩
+        ksPost_grow hg.2.2.1 hg.2.2.2.1 h0.1.1 h0.2.2⟩)⟩
   · isplit
     · ipureintro
       exact hch hnew hlc0
@@ -1595,7 +1618,9 @@ theorem rsvModel_mono (σ σ' : MState)
 seal's certificate (W8 (f3-ptek): the boot gate opens only after the kernel
 table's seal). -/
 theorem rsvModel_mono_sealed (σ σ' : MState)
-    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem ∧
+      ∀ (a : PAddr) (H' : Hist) (e : HEnt), σ'.mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid →
+        ∃ H, σ.mem[a]? = some H ∧ e ∈ H)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
@@ -1608,7 +1633,7 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ∗ kptSealedAt E ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt kptSealedAt
-  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
+  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
     #Hsl⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hsl
   have hne := hlk.2 _ hget
@@ -1623,10 +1648,10 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc
     ipureintro
-    refine ⟨hlk, ?_⟩
+    refine ⟨hlk, dmaOkAt_grow hg.2.2.2.2 hdma, ?_⟩
     rcases hseal with h0 | h0
     · exact absurd h0.1 hne
-    · exact Or.inr ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1, ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩
+    · exact Or.inr ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1, ksPost_grow hg.2.2.1 hg.2.2.2.1 h0.1.1 h0.2.2⟩
   · isplit
     · ipureintro
       exact hch hnew hlc0

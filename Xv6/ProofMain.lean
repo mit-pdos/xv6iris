@@ -247,7 +247,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   iframe Hk Hpc Hflk Hfent Hirf Hg
   iintro %R3 Hk Hpc ⟨%γft, %γf, #Hft⟩
   -- +0x9a  virtio_disk_init, and the vdisk lock
-  iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks hproc γd fscKalloc γdl fsReadyKmem
+  iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks hproc htier γd fscKalloc γdl fsReadyKmem
     (kinitPages - kvmmakeCount) (by decide) c0 hdead)
   iframe Hk Hpc Hkml Hav Hdinv Hcc Hcfg Hgh Hcells Hg
   isplitl [Hdlf]

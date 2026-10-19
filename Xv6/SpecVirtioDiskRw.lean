@@ -122,7 +122,10 @@ def wp_virtio_disk_rw_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
     (hbno : bno.toNat < 2 ^ 31) (hdata : dataDisk.length = BSIZE)
     (hpd : descPageRw pd)
     (hkm : ∀ m, m < BSIZE →
-      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw) : Prop :=
+      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw)
+    (hbs : ∀ m, m < BSIZE →
+      KernelSyms.«stack0» + 0x8000 ≤ (aBufData (k.regs 10#5) + BitVec.ofNat 64 m).toNat ∧
+        (aBufData (k.regs 10#5) + BitVec.ofNat 64 m).toNat < KernelSyms.«end») : Prop :=
   let wr : Bool := k.regs 11#5 ≠ 0#64
   kctx cpu k ∗ pcIs cpu virtioDiskRwAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
@@ -144,8 +147,8 @@ structure VIRTIO_DISK_RW : Prop where
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (Q : IProp GF)
-    hj hproc hK hnoff htier hbno hdata hpd hkm,
+    hj hproc hK hnoff htier hbno hdata hpd hkm hbs,
     wp_virtio_disk_rw_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
-      Q hj hproc hK hnoff htier hbno hdata hpd hkm
+      Q hj hproc hK hnoff htier hbno hdata hpd hkm hbs
 
 end Xv6

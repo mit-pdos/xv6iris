@@ -119,10 +119,14 @@ theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   have hkm : ∀ m, m < BSIZE →
       kmapClass (vpnOf (aBufData (k'.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw := by
     intro m hm; rw [ha0]; exact bufData_kmapRw kk m hkk hm
+  have hbs : ∀ m, m < BSIZE →
+      KernelSyms.«stack0» + 0x8000 ≤ (aBufData (k'.regs 10#5) + BitVec.ofNat 64 m).toNat ∧
+        (aBufData (k'.regs 10#5) + BitVec.ofNat 64 m).toNat < KernelSyms.«end» := by
+    intro m hm; rw [ha0]; exact bufData_bounds kk m hkk hm
   -- a READ moves no disk byte: its permit is the trivial one (Rocq ProofBread's
   -- `disk_write_permit_trivial`), and its receipt `▷ True` is dropped
   have h := VR.wp_virtio_disk_rw_eb (hlc := hlc) (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
-    iprop(True) hj hproc hK hnoff htier hbno hbsd hpd hkm
+    iprop(True) hj hproc hK hnoff htier hbno hbsd hpd hkm hbs
   unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
     decide_true, if_true, decide_false, if_false, not_true_eq_false, Bool.false_eq_true,

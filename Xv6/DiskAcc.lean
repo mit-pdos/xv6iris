@@ -953,7 +953,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
     (hle : ts ≤ T) :
     iprop(ctxFloor (GF := GF) ξ T ∗ dmaOwnT pa n w ts) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
   unfold dmaOwnT histBytes
-  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp, #Hau⟩⟩
+  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp, #Hau, _⟩⟩
   ihave #Hfl2 := ctxFloor_le ξ T ts hle $$ Hfl
   unfold ctxBytes
   iapply (BigSepL.bigSepL_impl (l := List.range n)
@@ -1028,8 +1028,12 @@ theorem info_status_ram (i : Nat) (hi : i < NUM) : inRam (aInfoStatus i) 1 := by
 
 /-- A context window the driver gives up entirely is a full DMA footprint. -/
 theorem ctxBytes_dmaOwn (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    ctxBytes (GF := GF) ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n :=
-  ctxBytes_forget ξ pa n (DFrac.own 1) w
+    dmaCert (GF := GF) pa n ∗ ctxBytes ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n := by
+  iintro ⟨#Hc, Hb⟩
+  icases ctxBytes_forget ξ pa n (DFrac.own 1) w $$ Hb with ⟨%Hs, Hb⟩
+  unfold dmaOwn
+  iexists Hs
+  iframe Hb Hc
 
 /-- Splitting a big separating conjunction in two. -/
 theorem bigSepL_sep2 {A : Type} (l : List A) (F P Q : Nat → A → IProp GF)
@@ -1130,13 +1134,24 @@ theorem diskRing_split [CurCtx] (pav : PAddr) :
       (BitVec.ofNat 16 (ringInit j)))
 
 /-- The eight used-ring elements: entirely the device's. -/
-theorem diskUsed_split [CurCtx] (pu : PAddr) :
+theorem diskUsed_split [CurCtx] (pu : PAddr) (hpg : inRam pu 4096 ∧ pu.toNat % 4096 = 0) :
+    ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pu ⊢
     iprop([∗list] j ∈ List.range NUM,
-        ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ⊢
-      iprop([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8) :=
-  BigSepL.bigSepL_mono_of_forall
-    (Ψ := fun _ (j : Nat) => dmaOwn (GF := GF) (usedElemAt pu j) 8)
-    (fun {_ j} => ctxBytes_dmaOwn curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8)))
+        ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) -∗
+      iprop([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8) := by
+  iintro #Hr H
+  iapply (BigSepL.bigSepL_impl (l := List.range NUM)
+    (Φ := fun _ (j : Nat) => iprop(ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))))
+    (Ψ := fun _ (j : Nat) => dmaOwn (GF := GF) (usedElemAt pu j) 8)) $$ H
+  imodintro
+  iintro %k %j %hk Hb
+  have hj : j < NUM := MachCSL.rangeIdx_lt hk
+  ihave #Hc : iprop(dmaCert (GF := GF) (usedElemAt pu j) 8) $$ [Hr]
+  · unfold usedElemAt
+    iapply dmaCert_page pu (4 + 8 * j) 8 hpg (by unfold NUM at hj; omega) $$ Hr
+  iapply ctxBytes_dmaOwn curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8))
+  iframe Hb
+  iexact Hc
 
 /-- **What `virtio_disk_init` must have in hand at the `DRIVER_OK` store**:
 the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
@@ -1156,7 +1171,7 @@ window carries the history of each byte and its key, not the address's
 `Xv6.diskGeom` able to hand `virtio_disk_intr` the `MachCSL.kmapId` of
 the used page it reads. -/
 def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
-  ⌜pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ ∗
+  ⌜pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pu ∗
   ([∗list] i ∈ List.range NUM, diskSlotIn γ pd i) ∗
   diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskReadLbAuth γ 0 ∗
   diskStage γ none ∗ diskDoneAuth γ 0 ∗
@@ -1186,12 +1201,12 @@ is enough: a holder that reads the index cashes it at the handler's
 holder's own store), and the lock's handoffs transport it
 (`MachCSL.ctx_dom_key`); see `Xv6.diskPayFl`. -/
 theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
-    ctxBytes (GF := GF) ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
+    dmaCert (GF := GF) pa 2 ∗ ctxBytes ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
       ∃ b : Nat, usedIdxCell pa b [] ∗ diskBaseKeys ξ b := by
   unfold ctxBytes usedIdxCell
   simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
     Iris.Algebra.BigOpL.bigOpL_nil]
-  iintro ⟨H0, H1, -⟩
+  iintro ⟨#Hc, H0, H1, -⟩
   unfold ctxByte
   icases H0 with ⟨%e0, %T0, Hp0, %hv0, #Hk0⟩
   icases H1 with ⟨%e1, %T1, Hp1, %hv1, #Hk1⟩
@@ -1205,11 +1220,13 @@ theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
     isplitl [Hp0 Hp1]
     · simp only [if_true, show (1 : Nat) = 0 ↔ False from by decide, if_false]
       iframe Hp0 Hp1
+    isplitl []
     · ipureintro
       refine ⟨e0.t, e1.t, rfl, fun j hj => ?_⟩
       rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
       · exact ⟨e0, T0, by simp, by rw [hv0], rfl⟩
       · exact ⟨e1, T1, by simp, by rw [hv1], rfl⟩
+    · iexact Hc
   · unfold diskBaseKeys
     iexists e0.t, e1.t
     iframe Hk0 Hk1
@@ -1240,10 +1257,10 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
     imod diskCfg_freeze γ v.cfg c c' $$ [Hcfg Htok] with #Hfr
     · iframe Hcfg Htok
     unfold diskFlipIn
-    icases HIn with ⟨%hpg, Hsl, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
+    icases HIn with ⟨%hpg, #Hrc, Hsl, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
     icases diskSlots_split γ c'.desc $$ Hsl with ⟨Hauths, Hrows, Hslots⟩
     icases diskRing_split c'.avail $$ Hring with ⟨HringR, HringC⟩
-    ihave HueR := diskUsed_split c'.used $$ Hue
+    ihave HueR := diskUsed_split c'.used ⟨hpg.2.2.1, hpg.2.2.2.1⟩ $$ Hrc Hue
     icases Hui with ⟨%bb, HuiR, #Hflb⟩
     icases ctxBytes_split_dma curCtx (availIdxAt c'.avail) 2 (wrap16 0) $$ Hai
       with ⟨HaiR, HaiC⟩
@@ -1870,7 +1887,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
     (hctx : c.ctx = curCtx) (hpayw : c.dwr = false → c.payw = bvOfBytes BSIZE data)
     (hpayr : c.dwr = true → bs = c.pay)
     (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
-    diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗
+    diskInv (GF := GF) γ ∗ kmapStatic ∗ dmaCert c.status 1 ∗ dmaCert c.data BSIZE ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗
       diskStage γ (some c.hd) ∗ headTok γ c.hd .inactive ∗
       headTok γ c.md .inactive ∗ headTok γ c.tl .inactive ∗
       ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
@@ -1887,7 +1904,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
         ctxBytes curCtx c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr) := by
   unfold diskInv devInvR
-  iintro ⟨#Hinv, #HS, #Hgeom, Hpub, Hstgd, Htok, Htokm, Htokt, Hd0, Hd1, Hd2, Hhdr, Hstat,
+  iintro ⟨#Hinv, #HS, #Hcst, #Hcda, #Hgeom, Hpub, Hstgd, Htok, Htokm, Htokt, Hd0, Hd1, Hd2, Hhdr, Hstat,
     Hbuf, Hblk, Hpend⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_split_dma curCtx (descAt pd c.hd) 16 c.d0 $$ Hd0 with ⟨Hr0, Hc0⟩
@@ -1901,7 +1918,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
     iexact Hstat
   ihave Hsraw := wordPointsTo_dmaOwn c.status 1 0xff#8
     (by rw [show c.status = aInfoStatus c.hd from rfl]; exact info_status_kmapRw c.hd hwf.1)
-      $$ HS Hstat2
+      $$ HS Hcst Hstat2
   ihave Hbw : iprop(bufW (GF := GF) c ∗ bufFree c) $$ [Hbuf]
   · cases hd : c.dwr
     · rw [bufW_read c hd, bufFree_write c hd, hctx, hpayw hd]
@@ -1912,7 +1929,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
     · rw [bufW_write c hd, bufFree_read c hd]
       isplitl []
       · iempintro
-      · iapply byteBuf_bufLease c data hlen hkm $$ HS
+      · iapply byteBuf_bufLease c data hlen hkm $$ HS Hcda
         iexact Hbuf
   icases Hbw with ⟨Hbw, Hbraw⟩
   ihave Hlease : iprop(chainLease (GF := GF) pd c)
@@ -2168,7 +2185,7 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   ihave %hbb := diskBaseFrozen_agree γ b b' $$ Hbs Hbs'
   subst hbb
   ihave %hmem := diskWm_mem γ nr K dl dl0 hok.1 $$ Hdn Hwm
-  icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail⟩
+  icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail, #Hcu⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold), none, []
@@ -2198,7 +2215,8 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
     · omega
     · exact Nat.le_trans hnm0 (hdom (m0, t, hd, ep) hmt (Nat.le_trans htK hKt))
   imod diskDoneAuth_cash γ M m $$ Hnc with ⟨Hnc, #Hlb⟩
-  ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ Hb
+  ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ [Hb Hcu]
+  · iframe Hb Hcu
   have hach : m = 0 ∨ ∃ r ∈ dl, m ≤ r.1 := by
     rcases hmm with hz | ⟨t, hd, ep, ht, _⟩
     · exact Or.inl hz
@@ -3002,7 +3020,7 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
   icases diskProto_status_acc γ q c0 v c (nr + 1) t nr hwf (by omega) hg.2.2.2.1
       $$ [$Hfr Hproto Htok $Hdone Hnr] with ⟨%ts, %hts, Hrow, Hback⟩
   · iframe Hproto Htok Hnr
-  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp, #Hau⟩
+  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp, #Hau, #Hcert⟩
   obtain ⟨e, HT, heq⟩ : ∃ (e : HEnt) (HT : Hist), Hs 0 = e :: HT := by
     have h0 := hp.2 0 (by omega)
     cases hx : Hs 0 with
@@ -3044,13 +3062,13 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     rw [← nthByte_one w, ← this, nthByte_one]
   ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts) $$ [Hb]
   · iapply (show iprop(histBytes (GF := GF) c.status 1 (fun _ => DFrac.own 1) Hs ∗
-        topLb ts ∗ authoredBy ts diskAgent) ⊢ dmaOwnT c.status 1 0#8 ts from by
+        topLb ts ∗ authoredBy ts diskAgent ∗ dmaCert c.status 1) ⊢ dmaOwnT c.status 1 0#8 ts from by
       unfold dmaOwnT
-      iintro ⟨H, #Ht, #Ha⟩
+      iintro ⟨H, #Ht, #Ha, #Hc⟩
       iexists Hs
-      iframe H Ht Ha
+      iframe H Ht Ha Hc
       ipureintro; exact hp)
-    iframe Hb Htlb Hau
+    iframe Hb Htlb Hau Hcert
   icases Hback $$ Hrow with ⟨Hproto, Htok, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -3246,7 +3264,7 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     with ⟨%w8, %ts, %t, %i, %hp, #Hdone, Hrow, Hback⟩
   · iframe Hproto Hnr
   icases dmaOwnT_cases (usedElemAt c0.used (nr % NUM)) 8 w8 ts $$ Hrow
-    with ⟨%Hs, Hb, #Htlb, %hpp, #Hau⟩
+    with ⟨%Hs, Hb, #Htlb, %hpp, #Hau, #Hcert⟩
   icases histBytes_acc_lo4 (usedElemAt c0.used (nr % NUM)) (DFrac.own 1) Hs $$ Hb
     with ⟨Hlo, Hjoin⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -3296,14 +3314,15 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
   ihave Hb := Hjoin $$ Hlo
   ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w8 ts) $$ [Hb]
   · iapply (show iprop(histBytes (GF := GF) (usedElemAt c0.used (nr % NUM)) 8
-        (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗ authoredBy ts diskAgent) ⊢
+        (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗ authoredBy ts diskAgent ∗
+          dmaCert (usedElemAt c0.used (nr % NUM)) 8) ⊢
         dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w8 ts from by
       unfold dmaOwnT
-      iintro ⟨H, #Ht, #Ha⟩
+      iintro ⟨H, #Ht, #Ha, #Hc⟩
       iexists Hs
-      iframe H Ht Ha
+      iframe H Ht Ha Hc
       ipureintro; exact hpp)
-    iframe Hb Htlb Hau
+    iframe Hb Htlb Hau Hcert
   icases Hback $$ Hrow with ⟨Hproto, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>

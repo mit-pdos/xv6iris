@@ -205,6 +205,44 @@ theorem memGrowR_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 
     (ht : t0 < t) : memGrowR m t0 (m.writeBytes pa n w t h) :=
   memGrowR_foldlPush pa w t0 t h ht _ m
 
+/-- **Every entry of `m'` is an entry of `m` or satisfies `P`** (mcslrec (3) X1-d: which entries a
+step adds -- a hart's store adds its own, a DMA write the disk's, on its footprint). -/
+def memNew (m : FlatMem) (P : PAddr → HEnt → Prop) (m' : FlatMem) : Prop :=
+  ∀ (a : PAddr) (H' : Hist), m'[a]? = some H' → ∀ e ∈ H', (∃ H, m[a]? = some H ∧ e ∈ H) ∨ P a e
+
+theorem memNew_refl (m : FlatMem) (P : PAddr → HEnt → Prop) : memNew m P m :=
+  fun _ H' h _ he => .inl ⟨H', h, he⟩
+
+theorem memNew_foldlPush {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    ∀ (l : List Nat) (m : FlatMem),
+      memNew m (fun a e => e.tid = h ∧ e.t = t ∧ ∃ j ∈ l, a = pa + BitVec.ofNat 64 j)
+        (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memNew_refl m _
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    intro a H' hH' e he
+    rcases memNew_foldlPush pa w t h l _ a H' hH' e he with ⟨H1, hH1, he1⟩ | ⟨h1, h2, j', hj', ha⟩
+    · by_cases ha : a = pa + BitVec.ofNat 64 j
+      · subst ha
+        rw [FlatMem.push_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?] at hH1
+        obtain rfl := Option.some.inj hH1
+        rcases List.mem_cons.1 he1 with rfl | he1
+        · exact .inr ⟨rfl, rfl, j, List.mem_cons_self, rfl⟩
+        · cases hm : m[pa + BitVec.ofNat 64 j]? with
+          | none => rw [hm] at he1; simp at he1
+          | some H => rw [hm] at he1; exact .inl ⟨H, rfl, he1⟩
+      · rw [FlatMem.push_get?_ne _ _ _ _ ha] at hH1
+        exact .inl ⟨H1, hH1, he1⟩
+    · exact .inr ⟨h1, h2, j', List.mem_cons_of_mem _ hj', ha⟩
+
+/-- A store adds only its own entries, on its footprint. -/
+theorem memNew_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    memNew m (fun a e => e.tid = h ∧ e.t = t ∧ ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j) (m.writeBytes pa n w t h) := by
+  intro a H' hH' e he
+  rcases memNew_foldlPush pa w t h (List.range n) m a H' hH' e he with h1 | ⟨h1, h2, j, hj, ha⟩
+  · exact .inl h1
+  · exact .inr ⟨h1, h2, j, List.mem_range.1 hj, ha⟩
+
 /-! ## Lock bytes of a region list -/
 
 /-- `b` is the lock word (its low byte) of a reserved spinlock of `rs`. -/

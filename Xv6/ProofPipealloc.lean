@@ -525,28 +525,6 @@ theorem pa_slotWit (k : Nat) (hk : k < NFILE) (te : Nat) (g : Agent) (b : BitVec
   unfold entsList
   rw [aFpipe_eq', aFpipe_slot k]
 
-/-- A page `kalloc` hands out is page-aligned (mcslrec (3) X1-c). -/
-theorem pa_page_aligned (p : BitVec 64) (hv : pageValid p) : p.toNat % 4096 = 0 := by
-  obtain ⟨hal, -, -⟩ := hv
-  have h12 : BitVec.extractLsb' 0 12 p = 0#12 := by revert hal; intro hal; bv_decide
-  have h := congrArg BitVec.toNat h12
-  simpa [BitVec.extractLsb'_toNat] using h
-
-/-- A page `kalloc` hands out holds no `stack0` byte (it lies above `end`). -/
-theorem pa_page_noStack (p : BitVec 64) (hv : pageValid p) (j : Nat) (hj : j < 4096) :
-    ¬ stackByteIn xv6RsvStatic (p + BitVec.ofNat 64 j) := by
-  rintro ⟨base, size, hR, h1, h2⟩
-  obtain ⟨rfl, rfl⟩ := xv6Stack_only base size hR
-  obtain ⟨-, h2', h3'⟩ := hv
-  simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr, physTop, BitVec.toNat_ofNat,
-    Nat.reducePow, Nat.reduceMod] at h2' h3'
-  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
-  have hs : KA.«stack0».toNat = KernelSyms.«stack0» := rfl
-  have hle : KernelSyms.«stack0» + 0x8000 ≤ KernelSyms.«end» := by decide
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega),
-    Nat.mod_eq_of_lt (by omega)] at h1 h2
-  omega
-
 theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (k0 k1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (pi : BitVec 64) (hpv : pageValid pi)
@@ -728,9 +706,9 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   -- the pipe is born, registered by the receipts of `f0->pipe = pi`
   icases kctx_rsvEq cI _ $$ Hk with ⟨%heqR, Hk⟩
   -- the pipe page's stack-free receipt (mcslrec (3) X1-c): its lock word's byte 0 is owned outright
-  have hal : pi.toNat % 4096 = 0 := pa_page_aligned pi hpv
+  have hal : pi.toNat % 4096 = 0 := pageValid_aligned pi hpv
   have hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (pi + BitVec.ofNat 64 j) := by
-    intro j hj; simp only [rsvList]; rw [heqR]; exact pa_page_noStack pi hpv j hj
+    intro j hj; simp only [rsvList]; rw [heqR]; exact pageValid_noStack pi hpv j hj
   iapply wpLoop_interpUpd cI iprop(wordCell (GF := GF) pi 4 lo 0 [] ∗
     ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pi)
   isplitl [Hlw]

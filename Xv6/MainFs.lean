@@ -284,7 +284,7 @@ at `γdl` over the payload the driver returns (Rocq `newlock_at fsc_dlock`),
 completing the disk's credentials at the pages the driver chose. -/
 theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap)
     (hsie : k.sie = false) (hK : virtioDiskInitSlots ≤ k.avail) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) (hproc : k.proc = 0#64)
+    (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
     (γd : DiskNames) (γkl γdl : GName) (γk : KmemNames) (nb : Nat) (hnb : 3 ≤ nb)
     (c0 : VirtioCfg) (hdead : Virtio.live c0 = false) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 154#64) ∗
@@ -305,6 +305,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   have hvd := VD.wp_virtio_disk_init (hlc := hlc) (GF := GF) cpu
     (k.withRegs (R0.set 1#5 (KA.«main» + 158#64))) γd γkl γk nb c0 vl vn vc pd0 pav0 pu0 free0
     (by simp [hsie]) (by simp; omega) (by simp [hnoff]) (by simp [hlocks]) hnb hdead (by simp [hproc])
+    (by simp [htier])
   unfold wp_virtio_disk_init_body at hvd
   simp only [virtioDiskInitAddr] at hvd
   iapply hvd

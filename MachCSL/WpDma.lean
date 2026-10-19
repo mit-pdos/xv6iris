@@ -58,6 +58,93 @@ variable [MachFixedGS hlc GF] (E : EraGS)
 theorem hartViews_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (c : CPU) :
     hartViewsAt (GF := GF) E (σ.storeDma pa n w) c = hartViewsAt E σ c := rfl
 
+/-- **The reserved conjunct moves with a DMA write** (mcslrec (3) X1-d): as `rsvModel_mono`, and
+the new disk entries -- on the footprint, at the next position -- are off the static stacks and
+(once sealed) off every carved kernel-stack page, by the footprint's certificate (`ksDmaCertAt`:
+static, through the client's sealed-table shape, or a stack-free receipt of the page). -/
+theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hn : n ≠ 0)
+    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
+    (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
+    (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
+      relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF))
+        (σ.storeDma pa n w))
+    (hpcs : ∀ t, t ≤ σ.top → (σ.storeDma pa n w).pcAt t = σ.pcAt t)
+    (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem →
+      (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) (σ.storeDma pa n w)))
+    (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ) →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.storeDma pa n w))
+        (chainEx (hlc := hlc) (GF := GF) (σ.storeDma pa n w))) :
+    genHeapInterp (G := E.mem) σ.mem ∗ rsvModelAt E σ ∗ ksDmaCertAt E pa n ⊢@{IProp GF}
+      genHeapInterp (G := E.mem) σ.mem ∗ rsvModelAt E (σ.storeDma pa n w) := by
+  have hg := kptGrow_dma σ pa n w
+  unfold rsvModelAt chainModelAt kptModelAt
+  iintro ⟨Hm, ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩,
+    Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩, #Hc⟩
+  -- the certificate, validated against the record
+  ihave %hcert : ⌜∀ j, j < n → ¬ stackByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j) ∧
+      (dyn ≠ [] → ∀ p ∈ stk, ¬ inPage p (pa + BitVec.ofNat 64 j))⌝ $$ [Hm Hcells Hreg Hc]
+  · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hcells]
+    · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hcells]
+      iframe
+    unfold ksDmaCertAt
+    icases Hc with (%hs | ⟨%q, %hq, #Hr⟩)
+    · ipureintro
+      intro j hj
+      refine ⟨(hs j hj).1, fun hne p hp => ?_⟩
+      rcases hseal with h0 | h0
+      · exact absurd h0.1 hne
+      · exact (hs j hj).2 σ.mem σ.top S dyn h0.1 hh h0.2.1 p ((h0.2.2.1 p).1 hp)
+    · unfold ksRcptAt
+      ihave %hget := ghost_map_lookup $$ Hreg Hr
+      ipureintro
+      rcases hseal with h0 | h0
+      · have := h0.2.2.2 _ _ hget
+        unfold ksKey at this
+        omega
+      obtain ⟨_, q', hk, hal, hqs, hst⟩ := h0.2.2.2 _ _ hget (Nat.le_add_right _ _)
+      obtain rfl := KptSeal.ksKey_inj hk
+      intro j hj
+      obtain ⟨k, hk', he⟩ := inPage_off hal (hq j hj)
+      refine ⟨by rw [he]; exact hst k hk', fun _ p hp hpin => hqs ?_⟩
+      have hps := (h0.2.2.1 p).1 hp
+      obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, pl⟩ := hps
+      rw [← inPage_eq (KptSeal.leafTo_aligned pl) hal hpin (hq j hj)]
+      exact hp
+  have hnew := h (all_of_reservedOk hin hok)
+  have hmem : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := MState.storeDma_mem_of_ne σ pa n w hn
+  have hdma' : dmaOkAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem S stk dyn := by
+    refine ⟨fun a H' e hH' he hd => ?_, fun hne a H' e hH' he hd hS => ?_⟩
+    · rw [hmem] at hH'
+      rcases memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent a H' hH' e he with ⟨H, hH, he'⟩ | ⟨_, _, j, hj, rfl⟩
+      · exact hdma.1 a H e hH he' hd
+      · exact (hcert j hj).1
+    · rw [hmem] at hH'
+      rcases memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent a H' hH' e he with ⟨H, hH, he'⟩ | ⟨_, _, j, hj, rfl⟩
+      · exact hdma.2 hne a H e hH he' hd hS
+      · exact (hcert j hj).2 hne
+  iframe Hh Hm
+  isplitl [Hreg Hcells Hcarve]
+  · iexists reg
+    iframe Hreg
+    isplit
+    · ipureintro
+      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
+    iexists S, dyn, stk
+    iframe Hcells Hcarve Hrc
+    ipureintro
+    exact ⟨hlk, hdma', hseal.imp (fun h0 => ⟨h0.1, hpub h0.2.1, h0.2.2⟩)
+      (fun h0 => ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1, ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩)⟩
+  · isplit
+    · ipureintro
+      exact hch hnew hlc0
+    iexists Z
+    iframe HZ Hels
+    ipureintro
+    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2.1 hpcs hZ.2⟩
+
 /-- A DMA write by the disk: the store order grows by the disk's message,
 whose authorship and position become persistent facts.  No reservation
 moves (the step is blocked while a hart reserves a byte of the footprint,
@@ -73,19 +160,23 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
     (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
     (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) :
-    memModelAt E σ ⊢@{IProp GF} |==>
-      (memModelAt E (σ.storeDma pa n w) ∗
+    genHeapInterp (G := E.mem) σ.mem ∗ memModelAt E σ ∗ ksDmaCertAt E pa n ⊢@{IProp GF} |==>
+      (genHeapInterp (G := E.mem) σ.mem ∗ memModelAt E (σ.storeDma pa n w) ∗
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.storeDma pa n w) (kptGrow_dma σ pa n w) hpub hrsv
+  iintro ⟨Hm, ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩, #Hc⟩
+  ihave Hx := rsvModel_dma E σ pa n w hn hpub hrsv
     (relPcOk_storeDma σ pa n w (ramBytes_le hram) (relPc_le_top hmm.1) hnr) (relPc_dmaOld σ pa n w)
-    (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (relPc_le_top hmm.1)) (fun _ h => chainLoads_dma σ pa n w hmm h) $$ Hrsv
+    (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (relPc_le_top hmm.1)) (fun _ h => chainLoads_dma σ pa n w hmm h)
+    $$ [Hm Hrsv Hc]
+  · iframe Hm Hrsv Hc
+  icases Hx with ⟨Hm, Hrsv⟩
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) diskAgent
     (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
   imodintro
+  iframe Hm
   have hresv : resvMap (σ.storeDma pa n w) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
   iframe Hresv
@@ -158,11 +249,12 @@ a zero-byte DMA write is the identity (`MState.storeDma_zero`) and mints
 nothing. -/
 theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist)
     (w : BitVec (8 * n)) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0) :
-    machInterp (GF := GF) σ ∗ histBytes pa n (fun _ => DFrac.own 1) Hs ⊢ |==>
+    machInterp (GF := GF) σ ∗ histBytes pa n (fun _ => DFrac.own 1) Hs ∗
+      ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ⊢ |==>
       (machInterp (σ.storeDma pa n w) ∗
        histBytes pa n (fun _ => DFrac.own 1) (pushed Hs (σ.top + 1) diskAgent w) ∗
        authoredBy (σ.top + 1) diskAgent ∗ topLb (σ.top + 1)) := by
-  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev, Huep⟩, Hb⟩
+  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev, Huep⟩, Hb, #Hc⟩
   ihave %hram : ⌜ramBytes pa n⌝ $$ [Hmem Hmm Hb]
   · iapply histBytes_ramBytes σ pa n _ Hs $$ [Hmem Hmm Hb]
     iframe
@@ -178,8 +270,10 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
     intro h
     rw [MState.storeDma_of_ne σ pa n w hn]
     exact pubClean_store_off w (σ.top + 1) diskAgent hnr h
+  imod memModel_storeDma (MachGS.era (hlc := hlc) (GF := GF)) σ pa n w hram hno hn hpub hrsv hnr $$ [Hmem Hmm Hc]
+    with ⟨Hmem, Hmm, #Hau, #Htop⟩
+  · iframe Hmem Hmm Hc
   imod histBytes_update σ.mem pa n Hs (σ.top + 1) diskAgent w $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
-  imod memModel_storeDma _ σ pa n w hram hno hn hpub hrsv hnr $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
   imodintro
   iframe Hb Hau Htop
   iapply machInterp_of_storeDma σ pa n w hn

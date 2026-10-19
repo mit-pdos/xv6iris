@@ -192,15 +192,16 @@ theorem diskByteCtx (a : BitVec 64) (v : BitVec 8) :
 /-- **A kernel word is a DMA window**: the whole cell, given up. -/
 theorem wordPointsTo_dmaOwn (va : BitVec 64) (n : Nat) (w : BitVec (8 * n))
     (hkm : kmapClass (vpnOf va).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ wordPointsTo va n (DFrac.own 1) w -∗ dmaOwn va n := by
-  iintro #HS H
+    kmapStatic (GF := GF) ⊢ dmaCert va n -∗ wordPointsTo va n (DFrac.own 1) w -∗ dmaOwn va n := by
+  iintro #HS #Hc H
   ihave #Hid := kmapStatic_rw va hkm $$ HS
   ihave Hp := wordPointsTo_phys va n (DFrac.own 1) w $$ Hid H
   unfold pwordPointsTo
   icases Hp with ⟨%-, Hb⟩
   unfold dmaOwn
-  iapply ctxBytes_forget curCtx va n (DFrac.own 1) w
-  iexact Hb
+  icases ctxBytes_forget curCtx va n (DFrac.own 1) w $$ Hb with ⟨%Hs, Hb⟩
+  iexists Hs
+  iframe Hb Hc
 
 /-- A buffer's bytes at the running context. -/
 theorem byteBuf_ctxIdx (a : BitVec 64) (bs : List (BitVec 8))
@@ -288,15 +289,18 @@ variable [CurCtx]
 /-- **A byte buffer is a DMA window.** -/
 theorem byteBuf_dmaOwn (a : BitVec 64) (n : Nat) (bs : List (BitVec 8)) (hn : bs.length = n)
     (hkm : ∀ j, j < n → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ byteBuf a (DFrac.own 1) bs -∗ dmaOwn a n := by
-  iintro #HS H
+    kmapStatic (GF := GF) ⊢ dmaCert a n -∗ byteBuf a (DFrac.own 1) bs -∗ dmaOwn a n := by
+  iintro #HS #Hcert H
   ihave Hc := byteBuf_ctxIdx a bs (by rw [hn]; exact hkm) $$ HS H
-  iapply (show ([∗list] j ↦ b ∈ bs, ctxByte (GF := GF) curCtx (a + BitVec.ofNat 64 j)
-      (DFrac.own 1) b) ⊢ dmaOwn a n from by
+  ihave Hc := (show ([∗list] j ↦ b ∈ bs, ctxByte (GF := GF) curCtx (a + BitVec.ofNat 64 j)
+      (DFrac.own 1) b) ⊢ ∃ Hs : Nat → Hist, histBytes a n (fun _ => DFrac.own 1) Hs from by
     rw [bigSepL_range_of_list
       (fun j b => ctxByte (GF := GF) curCtx (a + BitVec.ofNat 64 j) (DFrac.own 1) b) bs 0#8, hn]
-    exact histBytes_of_bytes curCtx a (DFrac.own 1) (fun j => bs.getD j 0#8) n)
-  iexact Hc
+    exact histBytes_of_bytes curCtx a (DFrac.own 1) (fun j => bs.getD j 0#8) n) $$ Hc
+  icases Hc with ⟨%Hs, Hc⟩
+  unfold dmaOwn
+  iexists Hs
+  iframe Hc Hcert
 
 /-- **A byte buffer's bytes are DRAM**: `MachCSL.wordPointsTo` carries the
 fact, and the kernel map's identity claim moves it from the physical
@@ -330,10 +334,10 @@ theorem byteBuf_inRam (a : BitVec 64) (bs : List (BitVec 8)) (dq : DFrac)
 /-- **The data buffer, handed to the device.** -/
 theorem byteBuf_bufLease (c : Chain) (data : List (BitVec 8)) (hd : data.length = BSIZE)
     (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ byteBuf c.data (DFrac.own 1) data -∗ bufLease c := by
-  iintro #HS H
+    kmapStatic (GF := GF) ⊢ dmaCert c.data BSIZE -∗ byteBuf c.data (DFrac.own 1) data -∗ bufLease c := by
+  iintro #HS #Hc H
   unfold bufLease
-  iapply byteBuf_dmaOwn c.data BSIZE data hd hkm $$ HS
+  iapply byteBuf_dmaOwn c.data BSIZE data hd hkm $$ HS Hc
   iexact H
 
 /-- A range-indexed big-op and a list-indexed one, at the same bytes. -/

@@ -45,7 +45,7 @@ theorem virtio_disk_rw_proof
     (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) (FD : FREE_DESC) :
     VIRTIO_DISK_RW :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk Q
-      hj hproc hK hnoff htier hbno hdata hpd hkm => by
+      hj hproc hK hnoff htier hbno hdata hpd hkm hbs => by
     unfold wp_virtio_disk_rw_eb_body
     iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcaps, Hbuf, Hblk, Hperm, Hnext⟩
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -108,7 +108,7 @@ theorem virtio_disk_rw_proof
       (fun hd => by
         rw [vdrwPayw_read _ dataBuf dataDisk hd]
         exact (bytesOf_bvOfBytes BSIZE dataDisk hdata).symm)
-      hkm)
+      hkm hbs)
     isplitl [HP3]
     · iexact HP3
     iintro %R4 %ep %kq HP4

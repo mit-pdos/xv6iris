@@ -1576,7 +1576,7 @@ def ksPre (reg : RegMapF Agent) : Prop := ∀ k v, get? reg k = some v → k < 2
 /-- **The carve's list and the receipts after the seal `S`**: every kernel-stack page as of the
 seal is carved; every receipt names a page-aligned page off the carve and off the static stacks. -/
 def ksPost (rs : List RsvRegion) (m : FlatMem) (S : Nat) (stk : List PAddr) (reg : RegMapF Agent) : Prop :=
-  (∀ p, kstkPageAt rs m S p → p ∈ stk) ∧
+  (∀ p, p ∈ stk ↔ kstkPageAt rs m S p) ∧
   ∀ k v, get? reg k = some v → 2 ^ 66 ≤ k → v = 0 ∧ ∃ q : PAddr, k = ksKey q ∧ q.toNat % 4096 = 0 ∧ q ∉ stk ∧
     ∀ j, j < 4096 → ¬ stackByteIn rs (q + BitVec.ofNat 64 j)
 
@@ -1609,6 +1609,34 @@ theorem ksRcptsAll_none [MachFixedGS hlc GF] (E : EraGS) (reg : RegMapF Agent)
   iintro %q %hq
   exact absurd hq (h q)
 
+/-- `a` lies in the page at `q`. -/
+def inPage (q a : PAddr) : Prop := q.toNat ≤ a.toNat ∧ a.toNat < q.toNat + 4096
+
+/-- **The DMA entries off the kernel stacks** (mcslrec (3) X1-d, [OWN.104] (b) (iii)): every entry
+by a non-hart agent (`NCPU ≤ tid`: the disk) is off the static stacks, and -- once sealed
+(`dyn ≠ []`) -- every such entry after the seal is off every carved (kernel-stack) page. -/
+def dmaOkAt (rs : List RsvRegion) (m : FlatMem) (S : Nat) (stk : List PAddr) (dyn : List KSlot) : Prop :=
+  (∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → NCPU ≤ e.tid → ¬ stackByteIn rs a) ∧
+  (dyn ≠ [] → ∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → NCPU ≤ e.tid → S < e.t →
+    ∀ p ∈ stk, ¬ inPage p a)
+
+/-- The boot image holds no disk entry. -/
+theorem dmaOkAt_img (rs : List RsvRegion) (image : Mem) (S : Nat) (stk : List PAddr) :
+    dmaOkAt rs (imgFlat image) S stk [] := by
+  refine ⟨fun a H e hH he hd => ?_, fun h => absurd rfl h⟩
+  rw [imgFlat_get?] at hH
+  split at hH
+  · cases hv : image[a]? with
+    | none => rw [hv] at hH; cases hH
+    | some v =>
+      rw [hv] at hH
+      simp only [Option.map_some, Option.some.injEq] at hH
+      subst hH
+      simp only [List.mem_singleton] at he
+      subst he
+      exact absurd hd (by show ¬ NCPU ≤ 0; decide)
+  · cases hH
+
 /-- The interpretation's half of a carved page's byte 0. -/
 def ksCarveAt [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : IProp GF := iprop%
   ∃ H : Hist, pointsTo (G := E.mem) q (DFrac.own (1 : Qp).half) H
@@ -1622,7 +1650,8 @@ def kslotCellAt [MachFixedGS hlc GF] (E : EraGS) (S : Nat) (d : KSlot) : IProp G
 the registry `reg`. -/
 def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) : IProp GF := iprop%
   ∃ (S : Nat) (dyn : List KSlot) (stk : List PAddr),
-    ⌜kptLinked dyn reg ∧ ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem ∧
+    ⌜kptLinked dyn reg ∧ dmaOkAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem S stk dyn ∧
+      ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem ∧
         stk = [] ∧ ksPre reg) ∨
       (kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn ∧
         MachFixedGS.kptOk (hlc := hlc) (GF := GF) dyn ∧
@@ -1640,6 +1669,45 @@ instance [MachFixedGS hlc GF] (E : EraGS) : Persistent (PROP := IProp GF) (kptSe
 def kptHistsAt (m : FlatMem) (S : Nat) (dyn : List KSlot) : Prop :=
   ∀ d ∈ dyn, ∃ Hs : Nat → Hist, (∀ j, j < 8 → m[d.addr + BitVec.ofNat 64 j]? = some (Hs j)) ∧ kslotHistOk S d Hs
 
+/-- **A byte off every kernel-stack page of every sealed table of the client's shape** (`ok`): what
+the client proves of a STATIC DMA target (xv6: a buffer's data, a status byte, below `end`). -/
+def ksStatic (rs : List RsvRegion) (ok : List KSlot → Prop) (a : PAddr) : Prop :=
+  ¬ stackByteIn rs a ∧ ∀ (m : FlatMem) (top S : Nat) (dyn : List KSlot), kptSealOk rs m top S dyn →
+    kptHistsAt m S dyn → ok dyn → ∀ p, kstkPageAt rs m S p → ¬ inPage p a
+
+/-- **A DMA target's stack-freedom certificate** (mcslrec (3) X1-d) for the footprint `pa ..
+pa+n-1`: every byte is a static target (`ksStatic`: off the static stacks and off every
+kernel-stack page of every sealed table of the client's shape), or the footprint lies in a page
+with a stack-free receipt. -/
+def ksDmaCertAt [MachFixedGS hlc GF] (E : EraGS) (pa : PAddr) (n : Nat) : IProp GF := iprop%
+  ⌜∀ j, j < n → ksStatic (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF))
+    (pa + BitVec.ofNat 64 j)⌝ ∨
+  ∃ q : PAddr, ⌜∀ j, j < n → inPage q (pa + BitVec.ofNat 64 j)⌝ ∗ ksRcptAt E q
+
+instance [MachFixedGS hlc GF] (E : EraGS) (pa : PAddr) (n : Nat) :
+    Persistent (PROP := IProp GF) (ksDmaCertAt E pa n) := by
+  unfold ksDmaCertAt; infer_instance
+
+instance [MachFixedGS hlc GF] (E : EraGS) (pa : PAddr) (n : Nat) :
+    Timeless (PROP := IProp GF) (ksDmaCertAt E pa n) := by
+  unfold ksDmaCertAt; infer_instance
+
+/-- Two aligned pages sharing a byte are the same page. -/
+theorem inPage_eq {p q a : PAddr} (hp : p.toNat % 4096 = 0) (hq : q.toNat % 4096 = 0) (h1 : inPage p a)
+    (h2 : inPage q a) : p = q := by
+  unfold inPage at h1 h2
+  exact BitVec.eq_of_toNat_eq (by omega)
+
+/-- A byte of an aligned page is the page plus an offset below 4096. -/
+theorem inPage_off {q a : PAddr} (hq : q.toNat % 4096 = 0) (h : inPage q a) :
+    ∃ k, k < 4096 ∧ a = q + BitVec.ofNat 64 k := by
+  unfold inPage at h
+  have hqa := a.isLt
+  refine ⟨a.toNat - q.toNat, by omega, BitVec.eq_of_toNat_eq ?_⟩
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := a.toNat - q.toNat) (by omega),
+    Nat.mod_eq_of_lt (by omega)]
+  omega
+
 /-- **The sealed kernel table's pure fact** of the machine `σ` (W8 (f3-ptek)):
 before the seal no publication word is written; from the seal on, its facts
 (`kptSealOk`) hold and every sealed slot's histories in the memory are
@@ -1653,6 +1721,15 @@ def kptStateOk (rs : List RsvRegion) (σ : MState) : Prop :=
 def kptStateOkK (rs : List RsvRegion) (ok : List KSlot → Prop) (σ : MState) : Prop :=
   ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
     (kptSealOk rs σ.mem σ.top S dyn ∧ kptHistsAt σ.mem S dyn ∧ ok dyn)
+
+/-- **The sealed table's pure fact with the carve and the DMA facts** (mcslrec (3) X1-d): what
+the interpretation's record says of the machine, incl. that every non-hart entry is off the static
+stacks and (once sealed) off every kernel-stack page as of the seal. -/
+def kptStateOkD (rs : List RsvRegion) (ok : List KSlot → Prop) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot) (stk : List PAddr), dmaOkAt rs σ.mem S stk dyn ∧
+    ((dyn = [] ∧ pubClean rs σ.mem) ∨
+      (kptSealOk rs σ.mem σ.top S dyn ∧ kptHistsAt σ.mem S dyn ∧ ok dyn ∧
+        ∀ p, p ∈ stk ↔ kstkPageAt rs σ.mem S p))
 
 /-- Fragments of the bytes `pa .. pa+n-1` agree with the heap (era `E`). -/
 theorem kslotBytes_valid [MachFixedGS hlc GF] (E : EraGS) (m : FlatMem) (pa : PAddr) (dq : DFrac)
@@ -1712,7 +1789,7 @@ theorem kptModel_stateOk [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : R
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hseal⟩, Hc, _, _⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
     exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
@@ -1727,7 +1804,7 @@ theorem kptModel_stateOkK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : 
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOkK (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hseal⟩, Hc, _, _⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
     exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
@@ -1736,6 +1813,21 @@ theorem kptModel_stateOkK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : 
       iframe
     ipureintro
     exact ⟨S, dyn, .inr ⟨hok.1, hh, hok.2.1⟩⟩
+
+/-- ...with the carve and the DMA facts (mcslrec (3) X1-d). -/
+theorem kptModel_stateOkD [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) :
+    genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
+      ⌜kptStateOkD (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
+  unfold kptModelAt
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hdma, hseal⟩, Hc, _, _⟩
+  rcases hseal with hnil | hok
+  · ipureintro
+    exact ⟨S, dyn, stk, hdma, .inl ⟨hnil.1, hnil.2.1⟩⟩
+  · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hc]
+    · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
+      iframe
+    ipureintro
+    exact ⟨S, dyn, stk, hdma, .inr ⟨hok.1, hh, hok.2.1, hok.2.2.1⟩⟩
 
 /-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
 deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), with

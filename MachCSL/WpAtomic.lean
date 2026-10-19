@@ -996,7 +996,7 @@ theorem memModel_ksValid (σ : MState) (q : PAddr) :
     genHeapInterp σ.mem ∗ memModel σ ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q ⊢@{IProp GF}
       ⌜ksFreePg (rsvList (hlc := hlc) (GF := GF)) σ.mem q⌝ := by
   unfold memModel memModelAt rsvModelAt kptModelAt ksRcptAt
-  iintro ⟨Hm, ⟨_, _, _, _, _, ⟨%reg, Hreg, _, %S, %dyn, %stk, %⟨_, hseal⟩, Hcells, _, _⟩, _, _⟩, #Hr⟩
+  iintro ⟨Hm, ⟨_, _, _, _, _, ⟨%reg, Hreg, _, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hcells, _, _⟩, _, _⟩, #Hr⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hr
   rcases hseal with h0 | hok
   · have := h0.2.2.2 _ _ hget
@@ -1008,7 +1008,7 @@ theorem memModel_ksValid (σ : MState) (q : PAddr) :
   ipureintro
   obtain ⟨_, q', hk, hal, hq, hst⟩ := hok.2.2.2 _ _ hget (Nat.le_add_right _ _)
   obtain rfl := KptSeal.ksKey_inj hk
-  exact KptSeal.ksFreePg_of hok.1 hh hok.2.2.1 hal hq hst
+  exact KptSeal.ksFreePg_of hok.1 hh (fun p hp => (hok.2.2.1 p).2 hp) hal hq hst
 
 
 /-- Every receipt of a list is valid of the machine. -/
@@ -2001,7 +2001,7 @@ theorem memModel_kslot_acc (σ : MState) (pa : PAddr) (c : BitVec 64) :
       (∀ Hs' : Nat → Hist, ⌜kslotHistOk S ⟨pa, c, false⟩ Hs'⌝ -∗
         histBytes pa 8 (fun _ => DFrac.own (1 : Qp).half) Hs' -∗ memModel σ) := by
   unfold memModel memModelAt rsvModelAt kptModelAt kslotReg
-  iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %hrs, %S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh,
+  iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %hrs, %S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh,
     Hch⟩, #Hfrag⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hfrag
   obtain ⟨⟨daddr, dc, dfz⟩, hd, hfz, hkey, hval⟩ := hlk.1 _ _ hget (Nat.le_add_right _ _)
@@ -2045,7 +2045,7 @@ theorem memModel_kslot_acc (σ : MState) (pa : PAddr) (c : BitVec 64) :
   iexists S, dyn, stk
   iframe Hc Hcarve Hrc
   ipureintro
-  exact ⟨hlk, Or.inr hok⟩
+  exact ⟨hlk, hdma, Or.inr hok⟩
 
 theorem rsvWordHalf_intro (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
     histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ⊢@{IProp GF}

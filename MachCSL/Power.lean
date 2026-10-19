@@ -743,7 +743,7 @@ theorem wp_power [KernelMap] [KernelRsv]
               iexists 0, [], []
               isplit
               · ipureintro
-                exact ⟨rsvRegMap_kptLinked _, Or.inl ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf, rfl,
+                exact ⟨rsvRegMap_kptLinked _, by rw [hmem0]; exact dmaOkAt_img _ _ _ _, Or.inl ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf, rfl,
                   rsvRegMap_ksPre _⟩⟩
               · isplit
                 · exact BigSepL.bigSepL_nil_intro

@@ -1092,6 +1092,20 @@ theorem bnode_off_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
   unfold kmapClass
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 
+/-- A buffer's data byte is a `.bss` byte past `stack0` and below `end` (mcslrec (3) X1-d: a static
+DMA target). -/
+theorem bufData_bounds (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
+    KernelSyms.«stack0» + 0x8000 ≤ (aBufData (bnode k) + BitVec.ofNat 64 m).toNat ∧
+      (aBufData (bnode k) + BitVec.ofNat 64 m).toNat < KernelSyms.«end» := by
+  rw [bufData_toNat k m hk hm]
+  have hbc : KernelSyms.«bcache» = 0x80018748 := rfl
+  have hs : KernelSyms.«stack0» = 0x8000a420 := rfl
+  have he : KernelSyms.«end» = 0x80023b10 := rfl
+  have hk' : k < 30 := by unfold NBUF at hk; exact hk
+  have hm' : m < 1024 := by unfold BSIZE at hm; exact hm
+  rw [hbc, hs, he]
+  omega
+
 theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     kmapClass (vpnOf (aBufData (bnode k) + BitVec.ofNat 64 m)).toNat = some .rw := by
   have ha := bufData_toNat k m hk hm

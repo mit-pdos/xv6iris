@@ -29,6 +29,7 @@ import MachCSL.WpDmaCtx
 import MachCSL.WpSmodeFenceFloor2
 import Xv6.VirtioDiskRwDefs3
 import Xv6.CodeTactics
+import Xv6.AccessDiscipline
 
 namespace Xv6
 
@@ -67,7 +68,10 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hpw0 : c.dwr = false → pw = bvOfBytes BSIZE dataBuf)
     (hpw1 : c.dwr = true → dataDisk = bytesOf pw)
     (hkm : ∀ j, j < BSIZE →
-      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw) :
+      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw)
+    (hbs : ∀ m, m < BSIZE →
+      KernelSyms.«stack0» + 0x8000 ≤ (aBufData (k.regs 10#5) + BitVec.ofNat 64 m).toNat ∧
+        (aBufData (k.regs 10#5) + BitVec.ofNat 64 m).toNat < KernelSyms.«end») :
     vdrwP3Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R ∗
     (∀ (R' : RegMap) (e : Nat) (kq : Nat × Nat),
       vdrwP4Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr (c.arm e pw curCtx kq) y R' -∗
@@ -85,6 +89,14 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   have hkmc : ∀ j, j < BSIZE →
       kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw := by
     rw [hcd]; exact hkm
+  -- the two static DMA targets' certificates (mcslrec (3) X1-d)
+  icases kctx_rsvEq _ _ $$ Hk with ⟨%heqR, Hk⟩
+  icases kctx_kptOkEq _ _ $$ Hk with ⟨%heqK, Hk⟩
+  ihave #Hcst := AccessDiscipline.dmaCert_static (MachGS.era (hlc := hlc) (GF := GF)) heqR heqK c.status 1
+    (fun j hj => AccessDiscipline.staticByte_ok _ (infoStatus_bounds c.hd hh j hj).1
+      (infoStatus_bounds c.hd hh j hj).2)
+  ihave #Hcda := AccessDiscipline.dmaCert_static (MachGS.era (hlc := hlc) (GF := GF)) heqR heqK c.data BSIZE
+    (fun j hj => by rw [hcd]; exact AccessDiscipline.staticByte_ok _ (hbs j hj).1 (hbs j hj).2)
   ihave #Hinv := vdrwCaps_inv γ γl pd pav pu $$ Hcaps
   ihave #Hgeom := vdrwCaps_geom γ γl pd pav pu $$ Hcaps
   ihave %hpages := diskGeom_pages γ pd pav pu $$ Hgeom
@@ -178,7 +190,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   imod disk_publish γ pd pav pu (c.arm np pw curCtx kq) np
       dataDisk dataBuf hcwf hdl rfl rfl (fun hd => hpw0 hd) (fun hd => hpw1 hd)
       hkmc
-    $$ [Hinv HS Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hpend]
+    $$ [Hinv HS Hcst Hcda Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hpend]
     with ⟨Hpub, Hstg, Hth, Htm, Htt, Hc0, Hc1, Hc2, Hch⟩
   · isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_data,
       Chain.arm_status, Chain.arm_hdrAddr, Chain.arm_blk, Chain.arm_d0,

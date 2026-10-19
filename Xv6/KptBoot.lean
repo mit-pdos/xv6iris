@@ -202,15 +202,25 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
   have hstk : ∀ (m : FlatMem) (top : Nat),
       kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots kernelPagetableAddr t) →
       kptHistsAt m top (kptSlots kernelPagetableAddr t) →
-      ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ kstackCarve pas := by
-    intro m top hs hh p hp
+      ∀ p, p ∈ kstackCarve pas ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p := by
+    intro m top hs hh p
     have hs' : kptSealOk AccessDiscipline.xv6Rsv m top top (kptSlots KA.«kernel_pagetable» t) := by
       have h' := hs; simp only [rsvList] at h'; rw [heqR] at h'; exact h'
-    have hp' : kstkPageAt AccessDiscipline.xv6Rsv m top p := by
-      have h' := hp; simp only [rsvList] at h'; rw [heqR] at h'; exact h'
     obtain ⟨hr, hmaps, -⟩ := xv6KptOk_parts hok
-    obtain ⟨i, hi, rfl, -⟩ := AccessDiscipline.kstkPage_walk hs' hh hr hmaps (Nat.le_refl _) hp'
-    exact List.mem_map.2 ⟨i, List.mem_range.2 hi, (kSlotP_pteAddr (pas i) 0#9).symm⟩
+    have hrs : rsvList (hlc := hlc) (GF := GF) = AccessDiscipline.xv6Rsv := by simp only [rsvList]; rw [heqR]
+    rw [hrs]
+    constructor
+    · intro hp
+      obtain ⟨i, hi, rfl⟩ := List.mem_map.1 hp
+      have hb0 : kSlotP t.base 0 ≠ 0 := by
+        have e : kSlotP t.base 0 = pteAddr t.base 0#9 := kSlotP_pteAddr t.base 0#9
+        rw [e]
+        exact KptInv.root_ne_zero t _ (kvmTableOk_kptFacts_tramp t pas hok)
+      rw [show pageAddr (pas i) = kSlotP (pas i) 0 from (kSlotP_pteAddr (pas i) 0#9).symm]
+      exact AccessDiscipline.kstkPage_build hs' hh hr hmaps hb0 (Nat.le_refl _) (List.mem_range.1 hi)
+    · intro hp
+      obtain ⟨i, hi, rfl, -⟩ := AccessDiscipline.kstkPage_walk hs' hh hr hmaps (Nat.le_refl _) hp
+      exact List.mem_map.2 ⟨i, List.mem_range.2 hi, (kSlotP_pteAddr (pas i) 0#9).symm⟩
   ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) hso kernelPagetableAddr hra
     hroots hkok (kstackCarve pas) hstk R $$ [Hctx Hcarve Hents Hrw Hauth Hroot Hpub]
   · iframe Hctx Hcarve Hents Hrw Hauth Hroot Hpub
