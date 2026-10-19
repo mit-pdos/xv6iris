@@ -25,7 +25,8 @@ abbrev bootSp (s0 hartid : BitVec 64) : BitVec 64 := s0 + 4096#64 * (hartid + 1#
 /-- **WP of the boot path from `_entry` to `main`.**
 
 Hart `cpu` at `_entry` in machine mode with the reset configuration, its hart
-id in `mhartid`, the kernel text, the GOT slot holding `stack0`'s address
+id in `mhartid` (persistently: since sail-riscv 0.16 `mhartid` is a frozen cell of
+`hwConfig`, every physical access reads it), the kernel text, the GOT slot holding `stack0`'s address
 `s0` at any fraction `dqg` (Rocq's `↦ₚ₈{dq}`; the top level passes each hart a
 `DFrac.discard` copy, since eight harts share the one slot), the registers the path touches at arbitrary values, and the two stack
 frames below the hart's boot stack pointer `sp₀ = bootSp s0 hartid`
@@ -45,7 +46,7 @@ def wp_boot_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (dqg : DFrac) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
-  Register.mhartid ↦ᵣ[cpu] hartid ∗
+  Register.mhartid ↦ᵣ[cpu]□ hartid ∗
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
   kernelText ∗
@@ -60,7 +61,7 @@ def wp_boot_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   pwordPointsTo (bootSp s0 hartid - 24#64) 8 (DFrac.own 1) g8 ∗
   (∀ (t : BitVec 64) (lf : SLeft), ⌜lf.ok⌝ -∗
    sConf cpu (DFrac.own 1) (startConf t lf) -∗
-   Register.mhartid ↦ᵣ[cpu] hartid -∗
+   Register.mhartid ↦ᵣ[cpu]□ hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗
    pwordPointsTo stack0Slot 8 dqg s0 -∗
