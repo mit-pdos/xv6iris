@@ -141,14 +141,27 @@ theorem ume_resOk_trap {s : UWSt} (hl : UstLand C P t0 mm0 s) (e : ExceptionType
   unfold umaTrap
   exact ⟨hl, hl.priv, rfl, he⟩
 
-/-- The shape of an access's fault result: a `umaTrap` of a user exception
-at the landing state. -/
+/-- The shape of an access's fault result: a trap at the landing state (`umaTrapC`) whose
+exception context carries a user exception and no extension payload (sail-riscv 0.16: an
+access fault's `umaTrap`, or the translation's own context). -/
 def UmeFault (s : UWSt) (e : ExecutionResult) : Prop :=
-  ∃ (exc : ExceptionType) (va : BitVec 64), e = umaTrap s exc va ∧ userExc exc = true
+  ∃ ctx : ExceptionContext, e = umaTrapC s ctx ∧ ctx.ext = none ∧ userExc ctx.trap = true
 
 theorem ume_resOk_fault {s : UWSt} (hl : UstLand C P t0 mm0 s) {e : ExecutionResult} (h : UmeFault s e) :
     UstResOk C P t0 mm0 e s := by
-  obtain ⟨exc, va, rfl, he⟩ := h
-  exact ume_resOk_trap hl exc he va
+  obtain ⟨ctx, rfl, hext, he⟩ := h
+  exact ⟨hl, hl.priv, hext, he⟩
+
+/-- An access fault's `umaTrap` of a user exception is an access fault result. -/
+theorem ume_fault_trap (s : UWSt) (exc : ExceptionType) (va : BitVec 64) (he : userExc exc = true) :
+    UmeFault s (umaTrap s exc va) :=
+  ⟨_, rfl, rfl, he⟩
+
+/-- The instruction-offset stamp of `vmem_read/write_explicit` (sail-riscv 0.16's
+`with_excinst_offset`) keeps a fault result one. -/
+theorem ume_fault_off {s : UWSt} {e : ExecutionResult} (h : UmeFault s e) (va : virtaddr) :
+    UmeFault s (with_excinst_offset e va) := by
+  obtain ⟨ctx, rfl, hext, he⟩ := h
+  exact ⟨_, rfl, hext, he⟩
 
 end Xv6
