@@ -49,7 +49,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
   unfold execute
   swp_run 300
   iapply swp_bind
@@ -74,7 +74,7 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
   have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
@@ -117,7 +117,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
   have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
@@ -157,7 +157,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
   have hst := sstatus_set_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
