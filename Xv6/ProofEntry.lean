@@ -48,7 +48,7 @@ macro "entry_step" rule:term : tactic =>
 
 set_option maxHeartbeats 4000000 in
 theorem EntryProof : ENTRY where
-  wp_entry cpu dq dqg hartid s0 v1 v2 v10 v11 := by
+  wp_entry cpu dq dqh dqg hartid s0 v1 v2 v10 v11 := by
     unfold wp_entry_body
     iintro ⟨⟨%z, HmBoot⟩, Hmhartid, Hclock, Htok, #Htext, Hslot, Hpc, Hx1, Hx2, Hx10, Hx11, HΦ⟩
     entry_norm
@@ -65,7 +65,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx10
     entry_norm
     -- 8000000a: csrr a1, mhartid
-    entry_step wp_m_csrr_mhartid cpu dq dq (bootConfOf z) (bootConfOf_ok z) _ false 11#5 (by decide) v11 hartid
+    entry_step wp_m_csrr_mhartid cpu dq dqh (bootConfOf z) (bootConfOf_ok z) _ false 11#5 (by decide) v11 hartid
     iintro HmBoot Hclock Hpc Hx11 Hmhartid
     entry_norm
     -- 8000000e: c.addi a1, a1, 1

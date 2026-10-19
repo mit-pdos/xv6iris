@@ -93,6 +93,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     kctx c ((k.intrOff true false).withRegs R') ∗ pcIs c userretVa ∗
     Register.sepc ↦ᵣ[c] tfResumePc Vx.tf ∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
+    hTrapCsrs c ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr N.j) ∗
     procPrivFd N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) Mx ∗ fkrFrame ksp ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone ∗ W ∗
@@ -113,7 +114,8 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     cases Wk with
     | none => trivial
     | some W0 => exact urunEq_resume hrk hu rfl rfl rfl rfl rfl rfl
-  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hco, Hsin, Hclose⟩
+  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hh, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hco, Hsin,
+    Hclose⟩
   icases ut_kctx_kptOnAt c _ (by simp only [KCtx.withRegs_tier, KCtx.intrOff_tier]; exact h.tier)
     $$ Hk with ⟨#Hkp, Hk⟩
   ihave #Hkp' := (show kptOnAt (GF := GF) ((k.intrOff true false).withRegs R').root ⊢
@@ -168,7 +170,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
   ihave Hstk := fkr_frame_stack ksp $$ Hfr
   isplitr; · iexact Hwire
   isplitr; · iexact Htr
-  iframe Hk Hstk Hpc Hsepc Hsc Htv Hstv Hpt Htf
+  iframe Hk Hstk Hpc Hsepc Hsc Htv Hh Hstv Hpt Htf
   isplitl [Hres]
   · subst hksp
     iexact Hres

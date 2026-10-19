@@ -25,6 +25,7 @@ Rocq's §1 case analysis (O1/O2/O3cur/O3prev) is the three branches of
 -/
 import Xv6.UptWalkTramp
 import Xv6.UPtWalkaddrLemmas
+import MachCSL.WpSmodeSfence
 
 noncomputable section
 
@@ -58,6 +59,19 @@ theorem tlbOk2_ofK (tk tu : PTree) (tlb : Tlb) (h : tlbOk tk tlb) : tlbOk2 tk tu
 
 theorem tlbOk2_ofU (tk tu : PTree) (tlb : Tlb) (h : utlbOk tu tlb) : tlbOk2 tk tu tlb :=
   fun i hi ent hget => Or.inr (h i hi ent hget)
+
+/-- The user table's TLB holds supervisor-stage entries only (sail-riscv 0.16: the
+entries `sfence.vma` flushes, `MachCSL.tlbFlushS`). -/
+theorem utlbOk_stageS (tu : PTree) (tlb : Tlb) (h : utlbOk tu tlb) : tlbStageS tlb := by
+  intro j hj ent he
+  obtain ⟨_, _, _, _, _, _, _, rfl⟩ := h j hj ent he
+  rfl
+
+/-- The window's TLB holds supervisor-stage entries only (either table's entries are
+`tlbEntryOf`'s, of the supervisor stage). -/
+theorem tlbOk2_stageS (tk tu : PTree) (tlb : Tlb) (h : tlbOk2 tk tu tlb) : tlbStageS tlb := by
+  intro j hj ent he
+  rcases h j hj ent he with ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩ <;> rfl
 
 /-- A user-table `A`/`D` write-back keeps both kinds of entry sound. -/
 theorem tlbOk2_setLeafU (tk tu : PTree) (tlb : Tlb) (h : tlbOk2 tk tu tlb) (vpn : BitVec 27)
@@ -127,13 +141,15 @@ theorem tlbOk2_hit (tk tu : PTree) (tlb : Tlb) (h : tlbOk2 tk tu tlb) (vpn : Bit
   obtain ⟨rfl, hget, hm⟩ := hres
   rcases h (tlbHash vpn) (tlbHash_lt vpn) ent hget with
     ⟨vpn₁, addr, ppn, perm, a, d, a', d', -, hw, rfl⟩ | ⟨vpn₁, addr, w, w', -, hw, hww, rfl⟩
-  · have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ ppn (kLeaf ppn perm a' d') addr) 0#16
-        (BitVec.signExtend 45 vpn) = decide (vpn = vpn₁) := match_tlbEntryOf vpn₁ vpn ppn _ addr
+  · have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ ppn (kLeaf ppn perm a' d') addr) 0#16 0#14
+        (BitVec.signExtend 47 vpn) TranslationStage.S_Stage = decide (vpn = vpn₁) :=
+      match_tlbEntryOf vpn₁ vpn ppn _ addr
     rw [hm'] at hm
     obtain rfl := of_decide_eq_true hm
     exact Or.inl ⟨addr, ppn, perm, a, d, a', d', hw, rfl⟩
-  · have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ (ptePpn w) w' addr) 0#16
-        (BitVec.signExtend 45 vpn) = decide (vpn = vpn₁) := match_tlbEntryOf vpn₁ vpn (ptePpn w) w' addr
+  · have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ (ptePpn w) w' addr) 0#16 0#14
+        (BitVec.signExtend 47 vpn) TranslationStage.S_Stage = decide (vpn = vpn₁) :=
+      match_tlbEntryOf vpn₁ vpn (ptePpn w) w' addr
     rw [hm'] at hm
     obtain rfl := of_decide_eq_true hm
     exact Or.inr ⟨addr, w, w', hw, hww, rfl⟩
@@ -207,13 +223,15 @@ theorem pt2Win_enterK [CurCtx] (cpu : CPU) (tk : PTree) (M : RegMapF (BitVec 64)
 back empty, either table's slot re-forms -- the user's (userret, the user
 root installed), or the kernel's with the user table parked (uservec). -/
 theorem pt2Win_sfence [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
-    pt2Win (GF := GF) cpu kroot P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗
+    pt2Win (GF := GF) cpu kroot P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbStageS tlb⌝ ∗
       (Register.tlb ↦ᵣ[cpu] (vectorInit none) -∗
         (uptSlot cpu P ∧ (kptSlot cpu kroot ∗ uptFrame P))) := by
   unfold pt2Win
-  iintro ⟨%tk, %M, #Hkpt, %hb, %t, %ht, Ho, %tlb, Htlb, %_⟩
+  iintro ⟨%tk, %M, #Hkpt, %hb, %t, %ht, Ho, %tlb, Htlb, %htlb⟩
   iexists tlb
   iframe Htlb
+  isplitl []
+  · ipureintro; exact tlbOk2_stageS tk t tlb htlb
   iintro Htlb
   isplit
   · unfold uptSlot
@@ -240,12 +258,14 @@ theorem pt2Win_sfence [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
 /-- The user slot splits into its table and its TLB cell (an `sfence.vma`
 under the user table is the TLB cell's alone). -/
 theorem uptSlot_sfence [CurCtx] (cpu : CPU) (P : UPtd) :
-    uptSlot (GF := GF) cpu P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗
+    uptSlot (GF := GF) cpu P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbStageS tlb⌝ ∗
       (Register.tlb ↦ᵣ[cpu] (vectorInit none) -∗ uptSlot cpu P) := by
   unfold uptSlot
-  iintro ⟨%t, %ht, Ho, %tlb, Htlb, %_⟩
+  iintro ⟨%t, %ht, Ho, %tlb, Htlb, %htlb⟩
   iexists tlb
   iframe Htlb
+  isplitl []
+  · ipureintro; exact utlbOk_stageS t tlb htlb
   iintro Htlb
   iexists t
   iframe Ho

@@ -30,7 +30,7 @@ set_option maxHeartbeats 4000000 in
 theorem main_secondary_proof (CI : CPUID) (PK : PRINTK) (KVH : KVMINITHART) (TIH : TRAPINITHART)
     (PIH : PLICINITHART) (SCH : SCHEDULER) (KV : KERNELVEC) : MAIN_SECONDARY :=
   ⟨fun {GF} _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k γi ξd tlb0
-      hX hcpu hK hsie hnoff hlocks hproc => by
+      hX hcpu hK hsie hnoff hlocks hproc htlb => by
   obtain ⟨ξ, τ⟩ := X
   obtain rfl : τ = KTier.bare := hX
   letI : CurCtx := ⟨ξ, KTier.bare⟩
@@ -56,7 +56,7 @@ theorem main_secondary_proof (CI : CPUID) (PK : PRINTK) (KVH : KVMINITHART) (TIH
   iintro %R' Hk Hpc
   iapply (ms_tail KVH TIH PIH SCH KV rfl Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu (k.pushed 2) R'
     (by simp [hsie]) (by simp; omega) (by simp [hnoff]) (by simp [hlocks]) (by simp [hproc])
-    tlb0 rootAddr t M hhi hroot)
+    tlb0 rootAddr t M hhi hroot htlb)
   iframe Hk Hpc Htlb Hkpt Hroot Hcsrs Hfree Hcaps⟩
 
 end Xv6

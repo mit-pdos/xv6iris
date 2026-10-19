@@ -386,7 +386,7 @@ theorem byteBuf_pageWord [CurCtx] (b : BitVec 44) (c : BitVec 8) :
   have hsplit : (4096 : Nat) = 8 + 4088 := by omega
   have hal : (pageAddr b).toNat % 8 = 0 := by
     have h8 : BitVec.extractLsb' 0 3 (pageAddr b) = 0#3 := by
-      simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+      simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
       bv_decide
     have h8' := congrArg BitVec.toNat h8
     simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat,

@@ -36,12 +36,6 @@ theorem legalize_xepc_main : LeanRV64D.Functions.legalize_xepc (KA.«main») = K
   legalize_xepc_of_even _ (by decide)
 theorem legalize_xepc_main_lit : LeanRV64D.Functions.legalize_xepc KA.«main» = KA.«main» := legalize_xepc_main
 
-/-- `w_medeleg(0xffff)` at ANY old value (`legalize_medeleg` ignores it): the
-power-on garbage in `medeleg` is overwritten. -/
-theorem legalize_medeleg_any (o : BitVec 64) :
-    LeanRV64D.Functions.legalize_medeleg o 0xffff#64 = 0xb3ff#64 :=
-  legalize_medeleg_xv6
-
 /-- `start`'s `mstatus` (`MPP := S`) keeps machine interrupts off and `MPRV`
 clear. -/
 theorem start_mok_ms : BitVec.extractLsb' 3 1 0xA00000800#64 = 0#1 ∧
@@ -65,7 +59,7 @@ macro "st_norm" : tactic =>
       bootConf_menvcfg, bootConf_mcounteren, bootConf_mtimecmp, bootConf_stimecmp, bootConf_pmpcfg,
       bootConf_pmpaddr, bootConfOf_mstatus, bootConfOf_mie, bootConfOf_mideleg, bootConfOf_medeleg,
       bootConfOf_mepc, bootConfOf_satp, bootConfOf_menvcfg, bootConfOf_mcounteren, bootConfOf_mtimecmp,
-      bootConfOf_stimecmp, bootConfOf_pmpcfg, bootConfOf_pmpaddr, legalize_medeleg_any,
+      bootConfOf_stimecmp, bootConfOf_pmpcfg, bootConfOf_pmpaddr, update_Mstatus_SDT_xv6,
       startAddr, mainAddr, timerinitAddr,
       BitVec.reduceOfNat, BitVec.ofNat_add, k_addr,
       start_br_main, start_br_timerinit, start_ret_and,
@@ -348,6 +342,7 @@ theorem StartProof (T : TIMERINIT) : START where
     st_norm
     -- 800000ca: mret
     iapply wp_m_mret cpu _ ok9 (KA.«start» + 0x72#64) false (by decide : BitVec.extractLsb' 11 2 0xA00000800#64 = 1#2)
+      (by decide : BitVec.extractLsb' 39 1 0xA00000800#64 = 0#1)
       (by decide : BitVec.extractLsb' 2 1 0xA000000000000000#64 = 0#1)
     -- Fold the `mepc` mask with a stated equation: letting `simp` fold it by
     -- `rfl` (`BitVec.reduceAnd`) makes the kernel's check of the resulting

@@ -156,6 +156,7 @@ def wp_prepare_return_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [Fd
     Register.sepc ↦ᵣ[cpu'] (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
     (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
+    hTrapCsrs cpu' -∗
     Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
     procPrivFd γ pa pid
       { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k.root) (V.kstack + 4096#64) (hartId cpu') } M -∗

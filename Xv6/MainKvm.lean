@@ -138,7 +138,7 @@ end
 /-! ## The table publication and `kvminithart()` -/
 
 theorem mn_pageAddr_hi (t : BitVec 44) : BitVec.extractLsb' 56 8 (pageAddr t) = 0#8 := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem mn_ret_7a : jumpPc (KA.«main» + 122#64) = KA.«main» + 122#64 := by decide
@@ -169,7 +169,7 @@ set_option maxHeartbeats 4000000 in
 table: the ambient context moves to `X.toKpt`. -/
 theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.bare) (cpu : CPU)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : 2 ≤ k.avail) (tlb0 : Tlb) (t : PTree)
-    (M : RegMapF (BitVec 64)) :
+    (M : RegMapF (BitVec 64)) (htlb : tlbStageS tlb0) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 118#64) ∗ Register.tlb ↦ᵣ[cpu] tlb0 ∗
     kptOn t M ∗ pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗
     (∀ R : RegMap, kctxL (X := X.toKpt) false cpu ((k.toKpt t.base).withRegs R) -∗
@@ -182,7 +182,7 @@ theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.ba
   iintro Hk Hpc
   have hkv := KVH.wp_kvminithart (GF := GF) X cpu (k.withRegs (R0.set 1#5 (KA.«main» + 122#64)))
     tlb0 (pageAddr t.base) DFrac.discard t M hX (by simp [hsie]) (by simp; omega) (mn_pageAddr_hi t.base)
-    (Xv6.kxc_tfp_extract t.base).symm
+    (Xv6.kxc_tfp_extract t.base).symm htlb
   unfold wp_kvminithart_body at hkv
   simp only [kvminithartAddr] at hkv
   iapply hkv

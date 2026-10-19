@@ -58,7 +58,7 @@ theorem entries_page : ∀ (lvl : Nat) (t : PTree) (x : BitVec 64 × BitVec 64),
 /-! ## A valid page's entry addresses are aligned RAM words -/
 
 theorem pageAddr_shl (b : BitVec 44) : Xv6.pageAddr b = (BitVec.setWidth 64 b) <<< 12 := by
-  simp only [Xv6.pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [Xv6.pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem pageAddr_toNat (b : BitVec 44) : (Xv6.pageAddr b).toNat = 4096 * b.toNat := by

@@ -83,9 +83,9 @@ theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) 
   rw [hs]
   iframe Hk Hpc Hte Hce Hpv
   iapply wpNext_intro_lc
-  iintro %c' Hlc %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
+  iintro %c' Hlc %R' %hR Hk Hpc Hsepc Hsc Htv Hh Hstv Hcl Hpv
   iapply (fkr_close UC W Γ c' kb R' eb root ksp N Vx Mx sts gn cs Wk hΓ hj h hksp hR hgn hlen hrk hct)
-  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hco Hsin Hclose
+  iframe Hk Hpc Hsepc Hsc Htv Hh Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hco Hsin Hclose
 
 set_option maxHeartbeats 4000000 in
 /-- **The steady arm** (Rocq `wp_forkret`'s `steady = true` case): the block

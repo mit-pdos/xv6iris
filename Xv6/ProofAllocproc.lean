@@ -494,7 +494,7 @@ theorem ap_pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
     pageAddr (BitVec.extractLsb' 12 44 p) = p := by
   obtain ⟨h1, -, h3⟩ := h
   unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   revert h1 h3
   bv_decide
 

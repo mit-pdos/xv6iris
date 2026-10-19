@@ -445,7 +445,8 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
     (cpu : CPU) (k : KCtx) (R : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64)
     (tlb0 : Tlb) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
-    (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) :
+    (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr)
+    (htlb : tlbStageS tlb0) :
     kctx cpu (k.withRegs R) ∗ pcIs cpu (KA.«main» + 50#64) ∗ Register.tlb ↦ᵣ[cpu] tlb0 ∗
     kptOn t M ∗ pwordPointsTo kernelPagetableAddr 8 DFrac.discard rootAddr ∗
     trapCsrs cpu ∗ cpuCtxFree cpu ∗
@@ -459,6 +460,7 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
   iintro Hk Hpc
   have hkv := KVH.wp_kvminithart (GF := GF) X cpu (k.withRegs (R.set 1#5 (KA.«main» + 54#64)))
     tlb0 rootAddr DFrac.discard t M hX (by simp [hsie]) (by simp; unfold schedulerSlots at hK; omega) hhi hroot
+    htlb
   unfold wp_kvminithart_body at hkv
   simp only [kvminithartAddr] at hkv
   iapply hkv

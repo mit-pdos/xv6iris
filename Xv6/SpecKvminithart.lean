@@ -10,13 +10,18 @@ and no translation yet, so it rides client-side at Bare), the global
 and the installed table (`kptOn`, persistent: published once by the boot
 hart between kvminit and this call).  What it hands back: the Bare
 translation slot's `stvec` cell (the Kpt slot does not own it), the global,
-and the context at the Kpt tier.  Boot-only, interrupts off: every
+and the context at the Kpt tier.  Since sail-riscv 0.16 the TLB carries the
+translation stage and `sfence.vma` flushes the supervisor-stage entries only
+(`MachCSL.tlbFlushS`), so the entry TLB is required to hold supervisor-stage
+entries only (`tlbStageS tlb0`, a kernel invariant: with H off the model adds
+no other kind; the boot chain's TLB is the reset one).  Boot-only, interrupts off: every
 resource here is hart-indexed (as the Rocq `SpecKvminithart` insists).
 Imports only definitional files.
 -/
 import Xv6.Image
 import Xv6.Geom
 import MachCSL.WpSmodeKpt
+import MachCSL.WpSmodeSfence
 
 noncomputable section
 
@@ -37,7 +42,8 @@ def kernelPagetableAddr : BitVec 64 := KA.«kernel_pagetable»
 def wp_kvminithart_body {GF : BundledGFunctors.{0}} [MachGS GF] (X : CurCtx)
     (cpu : CPU) (k : KCtx) (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree)
     (M : RegMapF (BitVec 64)) (hX : X.curTier = KTier.bare) (hsie : k.sie = false) (hK : 2 ≤ k.avail)
-    (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) : Prop :=
+    (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr)
+    (hstage : tlbStageS tlb0) : Prop :=
   kctxL (X := X) false cpu k ∗ pcIs cpu kvminithartAddr ∗ Register.tlb ↦ᵣ[cpu] tlb0 ∗
   pwordPointsTo kernelPagetableAddr 8 dqr rootAddr ∗ kptOn t M ∗
   (∀ R' : RegMap, kctxL (X := X.toKpt) false cpu ((k.toKpt (BitVec.extractLsb' 12 44 rootAddr)).withRegs R') -∗
@@ -48,7 +54,8 @@ def wp_kvminithart_body {GF : BundledGFunctors.{0}} [MachGS GF] (X : CurCtx)
 /-- The interface of `kvminithart`. -/
 structure KVMINITHART : Prop where
   wp_kvminithart : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (X : CurCtx) (cpu : CPU) (k : KCtx)
-    (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree) (M : RegMapF (BitVec 64)) hX hsie hK hhi hroot,
-    wp_kvminithart_body (GF := GF) X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot
+    (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree) (M : RegMapF (BitVec 64)) hX hsie hK hhi hroot
+    hstage,
+    wp_kvminithart_body (GF := GF) X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot hstage
 
 end Xv6

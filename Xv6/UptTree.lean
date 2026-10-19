@@ -163,8 +163,8 @@ theorem uptTlbVpnOk (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27)
     tlbVpnOk tlb vpn ppn perm addr := by
   intro ent hget hm
   obtain ⟨vpn', addr', w, w', -, hw', hww, rfl⟩ := h (tlbHash vpn) (tlbHash_lt vpn) ent hget
-  have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn' (ptePpn w) w' addr') 0#16 (BitVec.signExtend 45 vpn) =
-      decide (vpn = vpn') := match_tlbEntryOf vpn' vpn (ptePpn w) w' addr'
+  have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn' (ptePpn w) w' addr') 0#16 0#14 (BitVec.signExtend 47 vpn)
+      TranslationStage.S_Stage = decide (vpn = vpn') := match_tlbEntryOf vpn' vpn (ptePpn w) w' addr'
   rw [hm'] at hm
   have hv : vpn = vpn' := of_decide_eq_true hm
   subst hv
