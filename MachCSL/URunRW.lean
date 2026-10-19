@@ -635,11 +635,14 @@ the interface's answer (`memReadAns`); these are the same leaves at a raw node -
 through `swp_event*_at` at `m := .impure (.inl (.ok o)) k`, the answer handed to `k` as the
 interface gives it (a read: the bits and an empty tag vector; a write: `.ok ()`). -/
 
+/-- The model's effect type (concurrency interface v2): an event or a failure, or a finite
+choice; `SailM X = FreeM SailEff X`. -/
+abbrev SailEff : Type := (Except (Sail.Error exception) InstructionEffect) ⊕ FinChoice
+
 /-- A node's answer type, as the free monad computes it (`Effect.ret` of the node, an `abbrev`,
 so that a node `.impure (.inl (.ok o)) k` with `k : ERet o → _` is type-correct to `simp` at
 reducible transparency; `InstructionEffect.ret` itself is a plain `def`). -/
-abbrev ERet (o : InstructionEffect) : Type :=
-  Effect.ret (Sum.inl (Except.ok o) : (Except (Sail.Error exception) InstructionEffect) ⊕ FinChoice)
+abbrev ERet (o : InstructionEffect) : Type := Effect.ret (Sum.inl (Except.ok o) : SailEff)
 
 section rawleaves
 variable {GF : BundledGFunctors.{0}} [MachGS GF]

@@ -10,7 +10,8 @@ fetch node, the fetch leaf, and a walk FROM its continuation -- possibly
 twice (the 2+2 straddle).  `uftRun` is that composition as ONE pure walk:
 `runRW` at every other node, and at a fetch node it asks the oracle for the
 fetched value (the oracle's head answer's `bitvector (8 * n)` choice, so no
-new oracle type is needed) after checking that the fetched bytes are OWNED
+new oracle type is needed; concurrency interface v2: the answer is
+`.ok (w, 0#numTag)`, the bits and an empty tag vector) after checking that the fetched bytes are OWNED
 (in the byte map's domain -- what the leaf needs).  The value is thus
 ∀-quantified exactly as `swp_sail_mem_read_ifetch_ctx` answers.
 
@@ -55,21 +56,21 @@ def UAns.setBv (a : UAns) (m : Nat) (w : BitVec m) : UAns where
   simp [UAns.setBv]
 
 /-- Is the call an instruction-fetch read? -/
-def uftIsFetch : Eff RegisterType exception → Bool
-  | .ok (.memRead _ _ req) => akIfetch req.access_kind
+def uftIsFetch : SailEff → Bool
+  | .inl (.ok (.memRead req)) => akIfetch req.accessKind
   | _ => false
 
 /-- **The walker with fetches.**  `runRW` at every node but a fetch; a fetch
 of `n` owned bytes answers the oracle's head `bitvector (8 * n)` choice. -/
 def uftRun {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UWSt × UOrc)
   | orc, s, .pure x => some (x, s, orc)
-  | orc, s, .impure (.ok (.memRead n vasize req)) k =>
-    if akIfetch req.access_kind then
-      if n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true then
-        uftRun D orc.tail s (k (.Ok ((orc 0).ch (.bitvector (8 * n)), none)))
+  | orc, s, .impure (.inl (.ok (.memRead req))) k =>
+    if akIfetch req.accessKind then
+      if req.size < 2 ^ 64 ∧ bmOwned s.mm req.pa req.size = true then
+        uftRun D orc.tail s (k (Except.ok ((orc 0).ch (.bitvector (8 * req.size)), 0#req.numTag)))
       else none
     else
-      (runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure)).bind
+      (runRW D orc s (FreeM.impure (.inl (.ok (.memRead req))) FreeM.pure)).bind
         fun r => uftRun D r.2.2 r.2.1 (k r.1)
   | orc, s, .impure c k =>
     (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uftRun D r.2.2 r.2.1 (k r.1)
@@ -78,46 +79,45 @@ section walker
 variable (D : UFoot)
 
 /-- A non-fetch node is a one-node `runRW` walk, then the continuation. -/
-theorem uftRun_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uftRun_node {X : Type} (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) (hc : uftIsFetch c = false) :
     uftRun D orc s (FreeM.impure c k) =
       (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uftRun D r.2.2 r.2.1 (k r.1) := by
-  rcases c with e | op
+  rcases c with (e | op) | n
   · simp only [uftRun]
   · cases op with
-    | memRead n vasize req =>
+    | memRead R =>
       simp only [uftIsFetch] at hc
       simp only [uftRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uftRun]
+  · simp only [uftRun]
 
 /-- A fetch node: the owned bytes' check, then the oracle's answer. -/
-theorem uftRun_fetch {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hk : akIfetch req.access_kind = true) :
-    uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) =
-      if n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true then
-        uftRun D orc.tail s (k (.Ok ((orc 0).ch (.bitvector (8 * n)), none)))
+theorem uftRun_fetch {X : Type} (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X) (hk : akIfetch R.accessKind = true) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) =
+      if R.size < 2 ^ 64 ∧ bmOwned s.mm R.pa R.size = true then
+        uftRun D orc.tail s (k (Except.ok ((orc 0).ch (.bitvector (8 * R.size)), 0#R.numTag)))
       else none := by
   simp only [uftRun, hk, ite_true]
 
-theorem uftIsFetch_true {c : Eff RegisterType exception} (h : uftIsFetch c = true) :
-    ∃ (n vasize : Nat) (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak),
-      c = .ok (.memRead n vasize req) ∧ akIfetch req.access_kind = true := by
-  rcases c with e | op
+theorem uftIsFetch_true {c : SailEff} (h : uftIsFetch c = true) :
+    ∃ R : MemRequest, c = .inl (.ok (.memRead R)) ∧ akIfetch R.accessKind = true := by
+  rcases c with (e | op) | n
   · simp [uftIsFetch] at h
   · cases op with
-    | memRead n vasize req => exact ⟨n, vasize, req, rfl, h⟩
+    | memRead R => exact ⟨R, rfl, h⟩
     | _ => simp [uftIsFetch] at h
+  · simp [uftIsFetch] at h
 
 /-- `runRW` refuses a fetch node. -/
-theorem uft_runRW_fetch_none {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uft_runRW_fetch_none {X : Type} (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) (hc : uftIsFetch c = true) : runRW D orc s (FreeM.impure c k) = none := by
-  obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
-  exact ufm_runRW_ifetch D orc s req k hk
+  obtain ⟨R, rfl, hk⟩ := uftIsFetch_true hc
+  exact ufm_runRW_ifetch D orc s R k hk
 
 /-- A node, for `runRW`: the one-node walk, then the continuation. -/
-theorem uft_runRW_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uft_runRW_node {X : Type} (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) :
     runRW D orc s (FreeM.impure c k) =
       (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => runRW D r.2.2 r.2.1 (k r.1) := by
@@ -155,8 +155,8 @@ theorem uftRun_bind {X Y : Type} (m : SailM X) (f : X → SailM Y) :
     rw [e]
     cases hc : uftIsFetch c with
     | true =>
-      obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
-      rw [uftRun_fetch D orc s req _ hk, uftRun_fetch D orc s req _ hk]
+      obtain ⟨R, rfl, hk⟩ := uftIsFetch_true hc
+      rw [uftRun_fetch D orc s R _ hk, uftRun_fetch D orc s R _ hk]
       split
       · exact ih _ _ _
       · rfl
@@ -175,54 +175,62 @@ theorem uftRun_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : U
     (h : uftRun D orc s m = none) : uftRun D orc s (m >>= f) = none := by
   rw [uftRun_bind, h]; rfl
 
-/-- **A fetch leaf, as a walk**: `n` owned bytes, the oracle's answer. -/
-theorem uftRun_sail_mem_read_ifetch (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.pa n = true) :
-    uftRun D orc s (ArchSem.sail_mem_read req) =
-      some (.Ok ((orc 0).ch (.bitvector (8 * n)), none), s, orc.tail) := by
-  show uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure) = _
-  rw [uftRun_fetch D orc s req _ hk, ite_eq_left ⟨hn, ho⟩]
+/-- **A fetch leaf, as a walk**: `n` owned bytes, the oracle's answer (as the model's byte
+vectors, `sail_mem_read`'s conversion of the interface's bits). -/
+theorem uftRun_sail_mem_read_ifetch (orc : UOrc) (s : UWSt) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.address n = true) :
+    uftRun D orc s (LeanRV64D.ArchSem.sail_mem_read req) =
+      some (.Ok (bitvec_to_vecbytes ((orc 0).ch (.bitvector (8 * n))), bitvec_to_vecbool 0#nt), s, orc.tail) := by
+  rw [sail_mem_read_def req, uftRun_fetch D orc s (memReq req) _ hk, ite_eq_left ⟨hn, ho⟩]
   rfl
 
 /-- The one-node walks can be re-run on any continuation of the oracle
 (a node consumes at most its head answer). -/
-theorem uft_runRW_node_shift (c : Eff RegisterType exception) (s : UWSt) (orc : UOrc) (v : ArchSem.Effect.ret c)
+theorem uft_runRW_node_shift (c : SailEff) (s : UWSt) (orc : UOrc) (v : ArchSem.Effect.ret c)
     (s' : UWSt) (orc' : UOrc) (h : runRW D orc s (FreeM.impure c FreeM.pure) = some (v, s', orc'))
     (o : UOrc) : ∃ orc₀, runRW D orc₀ s (FreeM.impure c FreeM.pure) = some (v, s', o) := by
-  rcases c with e | op
+  rcases c with (e | op) | n
   · cases h
   · cases op with
-    | regRead r =>
+    | regRead r a =>
       by_cases hr : D.Dr r = true
       · refine ⟨o, ?_⟩
-        rw [runRW_regRead_dr D orc s r _ hr] at h
-        rw [runRW_regRead_dr D o s r _ hr]
-        have h' : (some (s.file r, s, orc) : Option (RegisterType r × UWSt × UOrc)) = some (v, s', orc') := h
+        have e1 := runRW_regRead_dr D orc s r (a := a) (FreeM.pure : RegisterType r → SailM (RegisterType r)) hr
+        have e2 := runRW_regRead_dr D o s r (a := a) (FreeM.pure : RegisterType r → SailM (RegisterType r)) hr
+        have h' : (some (s.file r, s, orc) : Option (RegisterType r × UWSt × UOrc)) = some (v, s', orc') :=
+          e1.symm.trans h
         cases h'
-        rfl
+        exact e2
       · have hr' : D.Dr r = false := by simpa using hr
         by_cases ha : D.Dany r = true
         · refine ⟨UOrc.cons (orc 0) o, ?_⟩
-          rw [runRW_regRead_any D orc s r _ hr' ha] at h
-          rw [runRW_regRead_any D _ s r _ hr' ha]
+          have e1 := runRW_regRead_any D orc s r (a := a)
+            (FreeM.pure : RegisterType r → SailM (RegisterType r)) hr' ha
+          have e2 := runRW_regRead_any D (UOrc.cons (orc 0) o) s r (a := a)
+            (FreeM.pure : RegisterType r → SailM (RegisterType r)) hr' ha
           have h' : (some ((orc 0).reg r, s, orc.tail) : Option (RegisterType r × UWSt × UOrc)) =
-            some (v, s', orc') := h
+            some (v, s', orc') := e1.symm.trans h
           cases h'
-          rfl
+          exact e2
         · have ha' : D.Dany r = false := by simpa using ha
           simp only [runRW, hr', ha', Bool.false_eq_true, ite_false] at h
           cases h
-    | choose p =>
-      refine ⟨UOrc.cons (orc 0) o, ?_⟩
-      have h' : (some ((orc 0).ch p, s, orc.tail) : Option (p.reflect × UWSt × UOrc)) = some (v, s', orc') := h
-      cases h'
-      rfl
     | _ =>
       refine ⟨o, ?_⟩
       revert h
       simp only [runRW]
-      (repeat' split) <;> intro h <;> simp_all
+      (repeat' split) <;> intro h <;> first | (cases h; rfl) | cases h
+  · -- a finite choice consumes the head answer
+    refine ⟨UOrc.cons (orc 0) o, ?_⟩
+    revert h
+    simp only [runRW]
+    split
+    · intro h
+      simp only [Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl, rfl⟩ := h
+      rfl
+    · intro h; cases h
 
 end walker
 
@@ -264,31 +272,29 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
     intro s hok Φ
     cases hc : uftIsFetch c with
     | true =>
-      obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
-      have hcond : n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true := by
+      obtain ⟨R, rfl, hk⟩ := uftIsFetch_true hc
+      have hcond : R.size < 2 ^ 64 ∧ bmOwned s.mm R.pa R.size = true := by
         have h := hok (UOrc.dflt s.rs)
-        rw [uftRun_fetch D _ s req k hk] at h
-        by_cases hn : n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true
+        rw [uftRun_fetch D _ s R k hk] at h
+        by_cases hn : R.size < 2 ^ 64 ∧ bmOwned s.mm R.pa R.size = true
         · exact hn
         · rw [ite_eq_right hn] at h
           cases h
       -- the oracle that answers `w'` at the fetch, then continues with `o`
-      have hstep : ∀ (w' : BitVec (8 * n)) (o : UOrc),
-          uftRun D (UOrc.cons ((o 0).setBv (8 * n) w') o) s (FreeM.impure (.ok (.memRead n vasize req)) k) =
-            uftRun D o s (k (.Ok (w', none))) := by
+      have hstep : ∀ (w' : BitVec (8 * R.size)) (o : UOrc),
+          uftRun D (UOrc.cons ((o 0).setBv (8 * R.size) w') o) s (FreeM.impure (.inl (.ok (.memRead R))) k) =
+            uftRun D o s (k (Except.ok (w', 0#R.numTag))) := by
         intro w' o
-        rw [uftRun_fetch D _ s req k hk, ite_eq_left hcond, UOrc.tail_cons, UOrc.cons_zero, UAns.setBv_ch]
-      show uFr RF BF s ∗ uftPost RF BF s (FreeM.impure (.ok (.memRead n vasize req)) k) Φ ⊢
-        swp cpu (ArchSem.sail_mem_read req >>= k) Φ
+        rw [uftRun_fetch D _ s R k hk, ite_eq_left hcond, UOrc.tail_cons, UOrc.cons_zero, UAns.setBv_ch]
       unfold uFr
       iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
-      iapply ufm_swp_ifetch_bind cpu BF s.mm req k hk hcond.1 hcond.2 Φ
+      iapply ufm_swp_ifetch_bind cpu BF s.mm R k hk hcond.1 hcond.2 Φ
       iframe HB
       inext
       iintro %w' HB
-      have hok' : ∀ o, (uftRun D o s (k (.Ok (w', none)))).isSome = true := fun o => by
+      have hok' : ∀ o, (uftRun D o s (k (Except.ok (w', 0#R.numTag)))).isSome = true := fun o => by
         rw [← hstep w' o]; exact hok _
-      iapply ih (.Ok (w', none)) s hok' Φ
+      iapply ih (Except.ok (w', 0#R.numTag)) s hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr; iframe
       iapply uftPost_step RF BF s s _ _ Φ (fun o => ⟨_, hstep w' o⟩) $$ HP
