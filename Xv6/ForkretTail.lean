@@ -56,7 +56,7 @@ theorem fkr_userret_va' :
 /-- **MAKE_SATP** (`(pa >> 12) | (8L << 60)`), at a page address. -/
 theorem fkr_make_satp (r : BitVec 44) :
     (pageAddr r >>> 12) ||| 0x8000000000000000#64 = satpOf KTier.kpt r := by
-  unfold pageAddr pteAddr zero_extend Sail.BitVec.zeroExtend satpOf
+  unfold pageAddr pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend satpOf
   bv_decide
 
 theorem fkr_ctx_setReg (k : KCtx) (r : BitVec 5) (v : BitVec 64) (a b : Bool) (R : RegMap) :
