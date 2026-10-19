@@ -8,7 +8,9 @@ files import Proof files).
 
 Whenever the power is on, the machine's memory obeys W8's export
 `AccessDiscipline.xv6AccessDisc` = `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt
-∧ lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp` (mcslrec (1)
+∧ lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp ∧ relProvAt ∧
+dynLockWinZAt ∧ ksFrameAt` (eleven conjuncts; mcslrec (3) X1 [OWN.90] [OWN.104] (b): `ksFrameAt`;
+row 5′ E4 (c) [OWN.107]: `dynLockWinZAt`; mcslrec (2) [OWN.82] (a1): `relProvAt`; mcslrec (1)
 [OWN.99]; W8 (f3-utext) O1 + T4 [OWN.89]; W8 (f2-ctx): three of §C W8's six conjuncts; W8
 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]): every foreign hart entry a hart's coherence
 floor names is SYNC-CHAINED to it (release → acquire hops through the
@@ -23,12 +25,15 @@ a static lock's whole histories, a live pipe lock's over its window (W8
 (f3-pipelk) [OWN.65], mechanism [OWN.71]); `cpus[h]`'s cells are written
 only by hart `h` after power-on; a non-holder's read of any such lock's
 `lk->cpu` never returns its own pointer; and after the kernel page table's seal every entry of it is written
-only by a hart, whole, with an A/D variant of its sealed value.  The
+only by a hart, whole, with an A/D variant of its sealed value; the release
+sites' provenance is recorded per store; a live pipe lock's word is 0 at its
+window's opening; and a kernel-stack byte is, from then on, in no exempt class
+and written by harts only (no DMA).  The
 `ip->ref` and `holding()` clauses are ONE benign-race class (unlocked reads
-of lock-protected words, harmless by a value argument).  Not yet exported:
-the user tables' half of the A/D clause (W8 (f3-pteu)), and W8 (f3-utext)'s
-`utextDiscAt` (`cpuProcDiscAt` is permanently out of the export, [OWN.80]);
-later items only strengthen the conjunction.
+of lock-protected words, harmless by a value argument).  The user tables'
+half of the A/D clause is `uptDiscAt` (W8 (f3-utext) T4); `cpuProcDiscAt` is
+permanently out of the export ([OWN.80]); later items only strengthen the
+conjunction.
 -/
 import Xv6.SystemAdequacyDisc
 import Xv6.ProofUser

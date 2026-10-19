@@ -35,6 +35,9 @@ W9b1-FRAME's two `ld ra`.
        allocator fact — not in the export);
   (iii) `frameNoDmaAfter σ pa s`: every entry on the frame byte after the spill is a hart's
        (`chainOkAt` exempts DMA authors — not in the export).
+  Both are DISCHARGED at a kernel-stack byte (`MachCSL.ksByteAt`) by `framesOfKs`, from the
+  export's eleventh conjunct `ksFrameAt` (mcslrec (3) X1); "no user PTE points at a kernel-stack
+  page" stays NAMED ([OWN.104] (b)).
 **The realization interface** (`FrameWin`, W11-F's composition / B5's per-state discharge, of the
 same kind as `RvwmoXv6Adequacy.readAt`/`syncRealized`): the restore's MachCSL source is the graph
 read's stamp (`restoreAt`); in-order realization of `j` over the window; and the two TEXT facts
@@ -461,6 +464,15 @@ theorem frameHoldStores :
        ((KernelSyms.«mycpu» : Int) + 0x4, some 0)] ∧
     spAdj (kw (KernelSyms.«mycpu» : Int)) = some (-16) := by
   decide +kernel
+
+/-- **(ii) + (iii) AT A KERNEL-STACK BYTE** (mcslrec (3) X1, [OWN.90] [OWN.104] (b)): a byte that
+is a kernel-stack byte as of the spill `s` (`MachCSL.ksByteAt`: of `stack0`, or of a page the
+sealed kernel table maps at a `KSTACK(i)`) is unexempt and DMA-free after `s` — the export's
+eleventh conjunct `ksFrameAt`, read at `pa`. -/
+theorem framesOfKs (σ : MState) (hD : xv6AccessDisc σ) {pa : PAddr} {s : Nat}
+    (hks : ksByteAt xv6Rsv σ.mem s pa) : frameUnexemptAfter σ pa s ∧ frameNoDmaAfter σ pa s :=
+  let h := hD.2.2.2.2.2.2.2.2.2.2 pa s hks
+  ⟨h.1, h.2⟩
 
 end PinTrapFrame
 end Weak
