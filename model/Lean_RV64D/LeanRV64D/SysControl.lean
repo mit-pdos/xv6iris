@@ -1506,10 +1506,13 @@ def getPendingSet (priv : Privilege) : SailM (Option ((BitVec 64) × Privilege))
     then readReg mideleg
     else (pure (zeros (n := 64)))
   let pending ← do (pure ((← (read_mip IncludePlatformInterrupts)) &&& (← readReg mie)))
+  let hideleg_bits ← do
+    if ((← (currentlyEnabled Ext_H)) : Bool)
+    then readReg hideleg
+    else (pure (zeros (n := 64)))
   let pending_m := (pending &&& (Complement.complement mideleg_bits))
-  let pending_s ← do
-    (pure (pending &&& (mideleg_bits &&& (Complement.complement (← readReg hideleg)))))
-  let pending_vs ← do (pure (pending &&& (mideleg_bits &&& (← readReg hideleg))))
+  let pending_s := (pending &&& (mideleg_bits &&& (Complement.complement hideleg_bits)))
+  let pending_vs := (pending &&& (mideleg_bits &&& hideleg_bits))
   let mIE ← do
     (pure ((← do
           if ((priv == Machine) : Bool)
@@ -1588,8 +1591,8 @@ def track_trap (p : Privilege) (is_interrupt : Bool) (cause : (BitVec 6)) : Sail
           (csr_name_write_callback "htval" (← readReg htval))
           (csr_name_write_callback "htinst" (← readReg htinst)))
       else (pure ()))
-  | .User => (internal_error "sys/sys_control.sail" 216 "Invalid privilege level")
-  | .VirtualUser => (internal_error "sys/sys_control.sail" 217 "Invalid privilege level")
+  | .User => (internal_error "sys/sys_control.sail" 219 "Invalid privilege level")
+  | .VirtualUser => (internal_error "sys/sys_control.sail" 220 "Invalid privilege level")
   | .VirtualSupervisor =>
     (do
       (csr_name_write_callback "vscause" (← readReg vscause))
@@ -1706,7 +1709,7 @@ def trap_handler_inner (del_priv : Privilege) (c : TrapCause) (pc : (BitVec 64))
             | .Supervisor => (pure 1#1)
             | .VirtualSupervisor => (pure 1#1)
             | .Machine =>
-              (internal_error "sys/sys_control.sail" 335 "invalid privilege for s-mode trap")))
+              (internal_error "sys/sys_control.sail" 338 "invalid privilege for s-mode trap")))
         writeReg hstatus (Sail.BitVec.updateSubrange (← readReg hstatus) 7 7
           (bool_to_bit (← (inVirtualPrivilege ()))))
         writeReg hstatus (Sail.BitVec.updateSubrange (← readReg hstatus) 8 8
@@ -1724,8 +1727,8 @@ def trap_handler_inner (del_priv : Privilege) (c : TrapCause) (pc : (BitVec 64))
         let _ : Unit := (handle_trap_extension del_priv pc ext)
         (track_trap del_priv is_interrupt cause)
         (prepare_trap_vector del_priv (← readReg scause)))
-    | .User => (internal_error "sys/sys_control.sail" 355 "Invalid privilege level")
-    | .VirtualUser => (internal_error "sys/sys_control.sail" 356 "Invalid privilege level")
+    | .User => (internal_error "sys/sys_control.sail" 358 "Invalid privilege level")
+    | .VirtualUser => (internal_error "sys/sys_control.sail" 359 "Invalid privilege level")
     | .VirtualSupervisor =>
       (do
         sail_assert (← (currentlyEnabled Ext_H)) "no hypervisor-extended supervisor mode present for delegation"
@@ -1741,7 +1744,7 @@ def trap_handler_inner (del_priv : Privilege) (c : TrapCause) (pc : (BitVec 64))
             match (← readReg cur_privilege) with
             | .VirtualUser => (pure 0#1)
             | .VirtualSupervisor => (pure 1#1)
-            | _ => (internal_error "sys/sys_control.sail" 368 "invalid privilege for vs-mode trap")))
+            | _ => (internal_error "sys/sys_control.sail" 371 "invalid privilege for vs-mode trap")))
         writeReg vsepc pc
         writeReg vstval (tval excinfo)
         writeReg cur_privilege del_priv
@@ -1878,7 +1881,7 @@ def reset_misa (_ : Unit) : SailM Unit := do
   writeReg misa (Sail.BitVec.updateSubrange (← readReg misa) 8 8
     (Complement.complement (_get_Misa_E (← readReg misa))))
   if (((hartSupports Ext_F) && (hartSupports Ext_Zfinx)) : Bool)
-  then (internal_error "sys/sys_control.sail" 520 "F and Zfinx cannot both be enabled!")
+  then (internal_error "sys/sys_control.sail" 523 "F and Zfinx cannot both be enabled!")
   else (pure ())
   writeReg misa (Sail.BitVec.updateSubrange (← readReg misa) 5 5
     (bool_to_bit (hartSupports Ext_F)))
@@ -1913,8 +1916,6 @@ def reset_sys (_ : Unit) : SailM Unit := do
   then writeReg mseccfg (Sail.BitVec.updateSubrange (← readReg mseccfg) 10 10 0#1)
   else (pure ())
   (reset_stateen ())
-  writeReg hideleg (zeros (n := 64))
-  writeReg hgeie (zeros (n := 64))
   writeReg vstart (zeros (n := 64))
   writeReg vl (zeros (n := 64))
   writeReg vcsr (Sail.BitVec.updateSubrange (← readReg vcsr) 2 1 0b00#2)

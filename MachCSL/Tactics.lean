@@ -326,15 +326,15 @@ def stripWrappers (x : Lean.Expr) : Lean.Expr := Id.run do
 def isHwReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.misa, ``LeanRV64D.Register.mseccfg, ``LeanRV64D.Register.pma_regions,
    ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
-   ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0, ``LeanRV64D.Register.hideleg,
-   ``LeanRV64D.Register.hgeie].any r.isConstOf
+   ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
 
 /-- The frozen counter registers the cycle reads (`MachCSL.hwAny`): cells of
 the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
 answered at an arbitrary value. -/
 def isHwAnyReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.mcountinhibit, ``LeanRV64D.Register.minstretcfg,
-   ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren].any r.isConstOf
+   ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren,
+   ``LeanRV64D.Register.hgeie].any r.isConstOf
 
 /-- Name for the cell hypothesis of register `r`. -/
 def regHypName (r : Lean.Expr) : Name :=

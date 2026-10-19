@@ -52,11 +52,10 @@ firmware step keeps `bootPost`. -/
 theorem bootFin_init_boot_requirements (hid : BitVec 64) (pma : List PMA_Region) (f : BootRegs)
     (hp : bootPost hid pma f) :
     BootFin (fun _ f' => bootPost hid pma f') (init_boot_requirements ()) f := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19,
-    h20⟩ := hp
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := hp
   boot_peel
   refine bootFin_pure _ _ _
-    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals boot_lk
   all_goals first | rfl | assumption
 
@@ -92,8 +91,6 @@ def resetValRun (cpu : CPU) : (r : Register) → Option (RegisterType r)
   | .PC => some 0x80000000#64
   | .nextPC => some 0x80000000#64
   | .mhartid => some (bootHid cpu)
-  | .hideleg => some 0#64
-  | .hgeie => some 0#64
   | _ => none
 
 /-- Rocq `reset_regs`: the derived pins and `pmpAllOff`. -/
@@ -103,8 +100,7 @@ def resetRegsRun (cpu : CPU) (f : RegFile) : Prop :=
 
 theorem resetRegsRun_of_bootPost (cpu : CPU) (f : RegFile) (h : bootPost (bootHid cpu) bootPMA f) :
     resetRegsRun cpu f := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18, h19,
-    h20⟩ := h
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15, h16, h17, h18⟩ := h
   refine ⟨fun r v hv => ?_, h15⟩
   unfold resetValRun at hv
   split at hv <;> (try simp only [Option.some.injEq, reduceCtorEq] at hv) <;> subst hv <;>
