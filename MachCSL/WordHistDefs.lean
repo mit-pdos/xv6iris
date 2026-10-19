@@ -34,6 +34,14 @@ def WEnt.visible (h : Agent) (tv : Nat) (e : WEnt n) : Bool :=
 theorem WEnt.proj_visible (j : Nat) (h : Agent) (tv : Nat) (e : WEnt n) :
     (e.proj j).visible h tv = e.visible h tv := rfl
 
+/-- Visible to agent `h` at (landing) view `tv` (route P, as `HEnt.visibleP`): landed at or
+below the view, or the agent's own. -/
+def WEnt.visibleP (lp : LandPos) (h : Agent) (tv : Nat) (e : WEnt n) : Bool :=
+  (lp e.t).any (· ≤ tv) || decide (e.tid = h)
+
+theorem WEnt.proj_visibleP (j : Nat) (lp : LandPos) (h : Agent) (tv : Nat) (e : WEnt n) :
+    (e.proj j).visibleP lp h tv = e.visibleP lp h tv := rfl
+
 /-- The byte histories of the word: `W`'s projections over the tails. -/
 def WordHist.hist (W : WordHist n) (Hold : Nat → Hist) (j : Nat) : Hist :=
   W.map (WEnt.proj j) ++ Hold j

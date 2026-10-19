@@ -46,17 +46,15 @@ theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF
       swp cpu (ConcurrencyInterfaceV1.sail_barrier .Barrier_RISCV_i) Φ := by
   unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit ifenceStep
   iintro ⟨Hs, HP, HΦ⟩
-  iapply swp_event_mm cpu (.barrier .Barrier_RISCV_i) (fun v => FreeM.pure v) Φ
-    (barrier_not_blocked cpu .Barrier_RISCV_i)
-  iintro %σ Hσ
+  iapply swp_event_barrier cpu .Barrier_RISCV_i (fun v => FreeM.pure v) Φ
+    iprop((∀ (σ : MState) (K : Nat), ⌜σ.tv cpu ≤ K⌝ -∗ ⌜ownPub (hartAgent cpu) σ.log ≤ K⌝ -∗
+      iviewLb cpu K -∗ genHeapInterp σ.mem -∗ memModel σ -∗ P -∗
+      |==> (genHeapInterp σ.mem ∗ memModel σ ∗ Q K)) ∗ P ∗ ▷ (∀ K, iviewLb cpu K -∗ Q K -∗ Φ ()))
+  iframe Hs HP HΦ
+  iintro ⟨Hs, HP, HΦ⟩ %σ %_ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-  · iapply memModel_mmOk $$ Hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  isplit
-  · ipureintro
-    exact ⟨(), σ.fence cpu .Barrier_RISCV_i, fun _ => mmOk_sbNil hmm cpu, rfl⟩
   inext
   iintro %v' %σ' %Hev
   obtain ⟨_, rfl⟩ := Hev

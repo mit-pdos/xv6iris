@@ -1182,4 +1182,257 @@ theorem FlatMem.writeBytes_histOkP_landed {n : Nat} (m : FlatMem) (lp : LandPos)
         exact hm a H hget
   exact key _ m hm
 
+/-! ### Route P, increment P-M3a: a pending entry and the readings over landing positions
+
+An ISSUED (pending) entry on top of a history changes neither its landed top nor what a
+foreign agent reads at any view (`Hist.topL_cons_pending`, `FlatMem.writeBytes_topL`); a
+landing certificate at or below the view makes an entry visible (`HEnt.visibleP_of_landed`). -/
+
+/-- A pending entry on top does not change the landed top. -/
+theorem Hist.topL_cons_pending (lp : LandPos) (e : HEnt) (H : Hist) (h : lp e.t = none) :
+    Hist.topL lp (e :: H) = Hist.topL lp H := by
+  simp [Hist.topL, h]
+
+theorem FlatMem.push_topL (m : FlatMem) (lp : LandPos) (a b : PAddr) (e : HEnt) (h : lp e.t = none) :
+    ((m.push a e)[b]?).bind (Hist.topL lp) = (m[b]?).bind (Hist.topL lp) := by
+  by_cases hab : b = a
+  · subst hab
+    rw [FlatMem.push_get?_eq, Option.bind_some, Hist.topL_cons_pending lp e _ h,
+      Std.ExtTreeMap.getD_eq_getD_getElem?]
+    cases m[b]? with
+    | none => rfl
+    | some H => rfl
+  · rw [FlatMem.push_get?_ne _ _ _ _ hab]
+
+/-- **An ISSUE changes no byte's landed top** (route P): its entries are pending. -/
+theorem FlatMem.writeBytes_topL {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n))
+    (t : Nat) (h : Agent) (ht : lp t = none) (b : PAddr) :
+    ((m.writeBytes pa n w t h)[b]?).bind (Hist.topL lp) = (m[b]?).bind (Hist.topL lp) := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem),
+      ((l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m :
+        FlatMem)[b]?).bind (Hist.topL lp) = (m[b]?).bind (Hist.topL lp) := by
+    intro l
+    induction l with
+    | nil => intro m; rfl
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      rw [ih, FlatMem.push_topL m lp _ b _ ht]
+  exact key _ m
+
+/-- A landed entry at or below the view is visible (route P). -/
+theorem HEnt.visibleP_of_landed (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) {p : Nat}
+    (hp : lp e.t = some p) (hle : p ≤ tv) : e.visibleP lp h tv = true := by
+  simp [HEnt.visibleP, hp, hle]
+
+/-- An agent's own entry is visible to it at every view (route P: forwarding). -/
+theorem HEnt.visibleP_of_own (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) (ht : e.tid = h) :
+    e.visibleP lp h tv = true := by
+  simp [HEnt.visibleP, ht]
+
+/-- A foreign PENDING entry is visible to no agent but its author, at no view (route P). -/
+theorem HEnt.visibleP_pending (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) (hp : lp e.t = none)
+    (hne : e.tid ≠ h) : e.visibleP lp h tv = false := by
+  simp [HEnt.visibleP, hp, hne]
+
+/-- The entry agent `h` reads at (landing) view `tv` (route P; `Hist.readEnt`'s twin). -/
+def Hist.readEntP (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist) : Option HEnt :=
+  H.find? (HEnt.visibleP lp h tv)
+
+theorem Hist.readP_eq_readEntP (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist) :
+    Hist.readP lp h tv H = (Hist.readEntP lp h tv H).map HEnt.v := rfl
+
+theorem Hist.readP_cons_visible (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) (H : Hist)
+    (hv : e.visibleP lp h tv = true) : Hist.readP lp h tv (e :: H) = some e.v := by
+  simp [Hist.readP, hv]
+
+/-- What agent `h` reads at (landing) view `tv` at `a` (route P; `FlatMem.read`'s twin). -/
+def FlatMem.readP (m : FlatMem) (lp : LandPos) (h : Agent) (tv : Nat) (a : PAddr) : Option (BitVec 8) :=
+  m[a]?.bind (Hist.readP lp h tv)
+
+/-- Agent `h` at (landing) view `tv` reads exactly the bytes of `w` at `pa .. pa+n-1` (route P;
+`FlatMem.readBytes`'s twin). -/
+def FlatMem.readBytesP (m : FlatMem) (lp : LandPos) (h : Agent) (tv : Nat) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → m.readP lp h tv (pa + BitVec.ofNat 64 j) = some (nthByte w j)
+
+/-- The bytes of `w` are at the LANDED top at `pa .. pa+n-1` (route P: what an exclusive read
+reads; `FlatMem.topBytes`'s twin). -/
+def FlatMem.topBytesL (m : FlatMem) (lp : LandPos) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → (m[pa + BitVec.ofNat 64 j]?).bind (Hist.topL lp) = some (nthByte w j)
+
+/-! ### Route P, increment P-M3b: a write that LANDS AT ONCE keeps the co order
+
+An exclusive write (an AMO's write half, `sc`, the walker's A/D write-back) and a DMA write
+land in the step that issues them: each footprint byte gets the entry inserted right BELOW its
+pending prefix (`Hist.insLanded`, `FlatMem.landBytes`) -- co-after every landed entry,
+co-before every pending one.  Stated over the landing positions AFTER the write (`lp`, where
+the write's stamp lands at `q`, at or above every landed position). -/
+
+theorem FlatMem.pushLanded_get?_ne (m : FlatMem) (lp : LandPos) (a a' : PAddr) (e : HEnt) (h : a' ≠ a) :
+    (m.pushLanded lp a e)[a']? = m[a']? := by
+  unfold FlatMem.pushLanded
+  rw [Std.ExtTreeMap.getElem?_insert]
+  simp [Ne.symm h]
+
+theorem FlatMem.pushLanded_get?_eq (m : FlatMem) (lp : LandPos) (a : PAddr) (e : HEnt) :
+    (m.pushLanded lp a e)[a]? = some (Hist.insLanded lp e (m.getD a [])) := by
+  unfold FlatMem.pushLanded
+  rw [Std.ExtTreeMap.getElem?_insert]
+  simp
+
+theorem FlatMem.landBytes_get?_notin {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr)
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (a : PAddr) (ha : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) :
+    (m.landBytes lp pa n w t h)[a]? = m[a]? := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat), (∀ j ∈ l, a ≠ pa + BitVec.ofNat 64 j) → ∀ m : FlatMem,
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m :
+        FlatMem)[a]? = m[a]? := by
+    intro l
+    induction l with
+    | nil => intros; rfl
+    | cons j l ih =>
+      intro hl m
+      simp only [List.foldl_cons]
+      rw [ih (fun j' hj' => hl j' (List.mem_cons_of_mem _ hj')),
+        FlatMem.pushLanded_get?_ne _ _ _ _ _ (hl j (List.mem_cons_self))]
+  exact key _ (fun j hj => ha j (List.mem_range.1 hj)) m
+
+/-- In a co-ordered history nothing below a landed entry is pending: the part after the pending
+prefix is all landed. -/
+theorem histOkP_dropWhile_landed (lp : LandPos) (log : List Agent) (H : Hist) (hH : histOkP lp log H) :
+    ∀ y ∈ H.dropWhile (fun x => (lp x.t).isNone), (lp y.t).isSome := by
+  have hpw : (H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone)).Pairwise
+      (coAbove lp) := by
+    rw [List.takeWhile_append_dropWhile]; exact hH.1
+  have hD := (List.pairwise_append.1 hpw).2.1
+  cases hd : H.dropWhile (fun x => (lp x.t).isNone) with
+  | nil => intro y hy; simp at hy
+  | cons d D =>
+    have hdl : (lp d.t).isNone = false := by
+      have := List.head?_dropWhile_not (fun x => (lp x.t).isNone) H
+      rw [hd] at this
+      simpa using this
+    have hds : (lp d.t).isSome := by
+      cases hl : lp d.t with
+      | none => rw [hl] at hdl; cases hdl
+      | some _ => rfl
+    rw [hd, List.pairwise_cons] at hD
+    intro y hy
+    rcases List.mem_cons.1 hy with rfl | hy
+    · exact hds
+    · have hdy := hD.1 y hy
+      unfold coAbove at hdy
+      cases hl : lp d.t with
+      | none => rw [hl] at hds; cases hds
+      | some p =>
+        rw [hl] at hdy
+        cases hly : lp y.t with
+        | none => rw [hly] at hdy; exact hdy.elim
+        | some _ => rfl
+
+/-- **A landed insert keeps a history in co order** (route P): the entry lands at `q`, at or above
+every landed position of the history. -/
+theorem histOkP_insLanded (lp : LandPos) (log : List Agent) (e : HEnt) (q : Nat) (H : Hist)
+    (hH : histOkP lp log H) (he : lp e.t = some q) (hq : ∀ x ∈ H, ∀ p, lp x.t = some p → p ≤ q)
+    (heb : e.t ≤ log.length ∧ (e.t = 0 ∨ log[e.t - 1]? = some e.tid)) :
+    histOkP lp log (Hist.insLanded lp e H) := by
+  have hDl := histOkP_dropWhile_landed lp log H hH
+  have hpw : (H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone)).Pairwise
+      (coAbove lp) := by
+    rw [List.takeWhile_append_dropWhile]; exact hH.1
+  obtain ⟨hP, hD, hPD⟩ := List.pairwise_append.1 hpw
+  have hmemP : ∀ x ∈ H.takeWhile (fun x => (lp x.t).isNone), x ∈ H := fun x hx =>
+    List.takeWhile_subset _ hx
+  have hmemD : ∀ x ∈ H.dropWhile (fun x => (lp x.t).isNone), x ∈ H := fun x hx =>
+    List.dropWhile_subset _ hx
+  unfold Hist.insLanded
+  refine ⟨List.pairwise_append.2 ⟨hP, List.pairwise_cons.2 ⟨fun y hy => ?_, hD⟩, fun x hx y hy => ?_⟩,
+    fun x hx => ?_⟩
+  · -- the inserted entry is co-above every landed entry below it
+    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (hDl y hy)
+    unfold coAbove
+    rw [he, hp]
+    exact hq y (hmemD y hy) p hp
+  · rcases List.mem_cons.1 hy with rfl | hy
+    · -- every pending entry is co-above the inserted (landed) one
+      have hxn : (lp x.t).isNone = true := List.all_eq_true.1 List.all_takeWhile x hx
+      unfold coAbove
+      rw [he]
+      cases hl : lp x.t with
+      | none => trivial
+      | some _ => rw [hl] at hxn; cases hxn
+    · exact hPD x hx y hy
+  · rcases List.mem_append.1 hx with hx | hx
+    · exact hH.2 x (hmemP x hx)
+    · rcases List.mem_cons.1 hx with rfl | hx
+      · exact heb
+      · exact hH.2 x (hmemD x hx)
+
+/-- **A write that LANDS AT ONCE keeps every history in co order** (route P): `lp` are the
+landing positions AFTER the write, the write's fresh stamp `log.length + 1` landed at `q`, at or
+above every landed position of the memory. -/
+theorem FlatMem.landBytes_histOkP {n : Nat} (m : FlatMem) (lp : LandPos) (log : List Agent) (pa : PAddr)
+    (w : BitVec (8 * n)) (h : Agent) (q : Nat) (hq : lp (log.length + 1) = some q)
+    (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp (log ++ [h]) H ∧
+      ∀ e ∈ H, ∀ p, lp e.t = some p → p ≤ q) :
+    ∀ (a : PAddr) (H : Hist), (m.landBytes lp pa n w (log.length + 1) h)[a]? = some H →
+      histOkP lp (log ++ [h]) H ∧ ∀ e ∈ H, ∀ p, lp e.t = some p → p ≤ q := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat) (m : FlatMem),
+      (∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp (log ++ [h]) H ∧
+        ∀ e ∈ H, ∀ p, lp e.t = some p → p ≤ q) →
+      ∀ (a : PAddr) (H : Hist), (l.foldl (fun (m : FlatMem) j =>
+          m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨log.length + 1, h, nthByte w j⟩) m : FlatMem)[a]? = some H →
+        histOkP lp (log ++ [h]) H ∧ ∀ e ∈ H, ∀ p, lp e.t = some p → p ≤ q := by
+    intro l
+    induction l with
+    | nil => intro m hm; exact hm
+    | cons j l ih =>
+      intro m hm
+      simp only [List.foldl_cons]
+      apply ih
+      intro a H hget
+      by_cases hja : a = pa + BitVec.ofNat 64 j
+      · subst hja
+        rw [FlatMem.pushLanded_get?_eq] at hget
+        obtain rfl := Option.some.inj hget
+        have hold : histOkP lp (log ++ [h]) (m.getD (pa + BitVec.ofNat 64 j) []) ∧
+            ∀ e ∈ m.getD (pa + BitVec.ofNat 64 j) [], ∀ p, lp e.t = some p → p ≤ q := by
+          rw [Std.ExtTreeMap.getD_eq_getD_getElem?]
+          cases hg : m[pa + BitVec.ofNat 64 j]? with
+          | none => exact ⟨⟨List.Pairwise.nil, fun e he => by simp at he⟩, fun e he => by simp at he⟩
+          | some H₀ => exact hm _ _ hg
+        refine ⟨histOkP_insLanded lp (log ++ [h]) _ q _ hold.1 hq hold.2 ⟨by simp, Or.inr (by simp)⟩,
+          fun e he p hp => ?_⟩
+        unfold Hist.insLanded at he
+        rcases List.mem_append.1 he with he | he
+        · exact hold.2 e (List.takeWhile_subset _ he) p hp
+        · rcases List.mem_cons.1 he with rfl | he
+          · rw [hq] at hp; exact Nat.le_of_eq (Option.some.inj hp).symm
+          · exact hold.2 e (List.dropWhile_subset _ he) p hp
+      · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ hja] at hget
+        exact hm a H hget
+  exact key _ m hm
+
+/-- An address outside the footprint is not in the snapshot. -/
+theorem snapOf_get?_notin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (a : PAddr)
+    (hin : ¬ ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j) : (snapOf pa n w)[a]? = none := by
+  unfold snapOf Mem.writeBytes
+  have key : ∀ (l : List Nat), (∀ j ∈ l, a ≠ pa + BitVec.ofNat 64 j) → ∀ m : Mem,
+      (l.foldl (fun (m : Mem) j => m.insert (pa + BitVec.ofNat 64 j) (nthByte w j)) m : Mem)[a]? = m[a]? := by
+    intro l
+    induction l with
+    | nil => intros; rfl
+    | cons j l ih =>
+      intro hl m
+      simp only [List.foldl_cons]
+      rw [ih (fun j' hj' => hl j' (List.mem_cons_of_mem _ hj')), Std.ExtTreeMap.getElem?_insert]
+      rw [if_neg]
+      intro h
+      exact hl j List.mem_cons_self ((Std.LawfulEqCmp.compare_eq_iff_eq).1 h).symm
+  rw [key _ (fun j hj heq => hin ⟨j, List.mem_range.1 hj, heq⟩) ∅]
+  simp
+
 end MachCSL

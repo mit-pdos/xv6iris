@@ -813,6 +813,31 @@ theorem memRam_writeBytes {m : FlatMem} {pa : PAddr} {n : Nat} {w : BitVec (8 * 
     obtain ⟨j, hj, rfl⟩ := hex
     exact hram j hj
 
+/-- A byte that agrees with the LANDED top of memory has a history, so it is DRAM (route P). -/
+theorem inRam_of_topL {m : FlatMem} (hm : memRam m) {lp : LandPos} {a : PAddr} {v : BitVec 8}
+    (h : (m[a]?).bind (Hist.topL lp) = some v) : inRam a 1 := by
+  cases hg : m[a]? with
+  | none => rw [hg] at h; simp at h
+  | some H => exact hm _ _ hg
+
+/-- **A reserved footprint is DRAM** (route P, from the route-P invariant's landed-top
+reservation clause): the hart's own reservation of `snapOf pa n w` covers every byte of the
+footprint, and a reserved byte has a history. -/
+theorem ramBytes_of_resvL {σ : MState} (hP : σ.okP) (hm : memRam σ.mem) {cpu : CPU} {pa : PAddr}
+    {n : Nat} {w : BitVec (8 * n)} (hn : n < 2 ^ 64) (hr : σ.resv cpu = some (snapOf pa n w)) :
+    ramBytes pa n := fun j hj =>
+  inRam_of_topL hm (hP.2.1 cpu _ hr _ (nthByte w j) (snapOf_get? pa n w hn j hj))
+
+/-- A footprint a pending store of the hart touches is not an MMIO footprint (route P: the
+store's entries are histories, and histories are DRAM). -/
+theorem not_devBytes_of_sbOverlaps {σ : MState} (hm : memRam σ.mem) {cpu : CPU} {pa : PAddr}
+    {n : Nat} (h : σ.sbOverlaps cpu pa n) : ¬ devBytes pa n := by
+  obtain ⟨_, _, j, hj, H, hH, -⟩ := h
+  intro hd
+  have hdj := hd j hj
+  rw [devAddr_false_of_inRam (hm _ _ hH)] at hdj
+  exact absurd hdj (by decide)
+
 /-- A byte that agrees with the top of memory has a history, so it is DRAM. -/
 theorem inRam_of_top {m : FlatMem} (hm : memRam m) {a : PAddr} {v : BitVec 8}
     (h : (m[a]?).bind Hist.top = some v) : inRam a 1 := by
@@ -2020,6 +2045,137 @@ theorem epochRecOk_storeG (σ : MState) (g : Agent) (hP : σ.okP) (hs0 : σ.sbNi
     obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu' hct'' hlp''
     exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
 
+/-- **AN ISSUE KEEPS THE RECORDS' INVARIANT** (route P's plain store, increment P-M3a; no
+staging premise): the new pending store joins the hart's buffer at the hart's CURRENT epoch,
+which is at least every record's, and is issued after every record's top; nothing lands. -/
+theorem epochRecOk_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hP : σ.okP) (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk (σ.log ++ [hartAgent cpu]) σ.llog (σ.issue cpu pa n w).sb σ.sbEp M := by
+  have hll := hP.2.2.2.2.1
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  refine ⟨hk, by simp only [List.length_append, List.length_singleton]; omega, fun p hp => ?_, ?_⟩
+  · have hp' : p ∈ (if c = cpu then σ.sb cpu ++ [(σ.top + 1, σ.sbEp cpu)] else σ.sb c) := hp
+    split at hp'
+    · rename_i hc
+      subst hc
+      rcases List.mem_append.1 hp' with hp' | hp'
+      · exact hsbr p hp'
+      · rw [List.mem_singleton] at hp'
+        subst hp'
+        refine ⟨fun hle => ?_, fun _ => hk⟩
+        simp only [MState.top] at hle hs
+        omega
+    · exact hsbr p hp'
+  · intro u t' p' hu1 hus hst' hu hct' hlp'
+    have hu_le : u ≤ σ.top := Nat.le_trans hus hs
+    have ht'0 : t' ≠ 0 := by omega
+    have ht'm : t' ∈ σ.llog := (lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp']; rfl)
+    have ht'le := (hll t' ht'm).2
+    have hu' : σ.log[u - 1]? = some (hartAgent c) := by
+      rw [List.getElem?_append_left (by simp only [MState.top] at hu_le; omega)] at hu; exact hu
+    have hct'' : σ.log[t' - 1]? = some (hartAgent c) := by
+      rw [List.getElem?_append_left (by simp only [MState.top] at ht'le; omega)] at hct'; exact hct'
+    exact hlb u t' p' hu1 hus hst' hu' hct'' hlp'
+
+/-- **AN EXCLUSIVE WRITE (route P) KEEPS THE RECORDS' INVARIANT** (increment P-M3b; no staging
+premise): it lands at once, so every own store issued up to a record's top must have landed
+before it -- and it has, by the write's epoch guard (`MState.landNowOk`, F-P-W1-1: every pending
+own store is of the CURRENT epoch, while the stores up to a record's top are of an earlier one). -/
+theorem epochRecOk_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (ak : AK) (hP : σ.okP) (hln : σ.landNowOk cpu pa n ak) (M : RegMapF Agent)
+    (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk (σ.storeL cpu pa n w).log (σ.storeL cpu pa n w).llog (σ.storeL cpu pa n w).sb
+      (σ.storeL cpu pa n w).sbEp M := by
+  have hll := hP.2.2.2.2.1
+  have hsb := hP.2.2.2.2.2.2.1
+  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  refine ⟨hk, by show s ≤ (σ.log ++ [hartAgent cpu]).length; simp only [List.length_append,
+    List.length_singleton]; omega, hsbr, ?_⟩
+  intro u t' p' hu1 hus hst' hu hct' hlp'
+  have hu_le : u ≤ σ.top := Nat.le_trans hus hs
+  have hu' : σ.log[u - 1]? = some (hartAgent c) := by
+    have hu0 : (σ.log ++ [hartAgent cpu])[u - 1]? = some (hartAgent c) := hu
+    rw [List.getElem?_append_left (by simp only [MState.top] at hu_le; omega)] at hu0; exact hu0
+  by_cases htt : t' = σ.top + 1
+  · -- the write itself: by `cpu`, so `c = cpu`, and every own store up to the record's top landed
+    have hct0 : (σ.log ++ [hartAgent cpu])[t' - 1]? = some (hartAgent c) := hct'
+    rw [htt] at hct0
+    have hlogT : (σ.log ++ [hartAgent cpu])[σ.top + 1 - 1]? = some (hartAgent cpu) := by
+      simp [MState.top]
+    have hcc : c = cpu := by
+      rw [hlogT] at hct0
+      exact Fin.ext (Option.some.inj hct0).symm
+    subst hcc
+    have hlp0 : lpOf (σ.llog ++ [σ.top + 1]) t' = some p' := hlp'
+    rw [htt, lpOf_snoc_self σ.llog _ (by omega) hfresh] at hlp0
+    obtain rfl := Option.some.inj hlp0
+    have hu0 : u ≠ 0 := by omega
+    by_cases hul : u ∈ σ.llog
+    · obtain ⟨q, hq⟩ := Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog u hu0).2 hul)
+      have hq' := lpOf_le σ.llog u q hq
+      exact ⟨q, by omega, lpOf_snoc_of_some σ.llog _ u q hq⟩
+    · exfalso
+      obtain ⟨eu, heu⟩ := (hsb c u).2 ⟨hu1, hu_le, hu', hul⟩
+      have h1 := (hsbr (u, eu) heu).1 hus
+      have h2 := (hln.2 (u, eu) heu).1
+      simp only at h1 h2
+      omega
+  · have hlp'' : lpOf σ.llog t' = some p' := by
+      have hlp0 : lpOf (σ.llog ++ [σ.top + 1]) t' = some p' := hlp'
+      rwa [lpOf_snoc_ne σ.llog _ t' htt] at hlp0
+    have ht'0 : t' ≠ 0 := by omega
+    have ht'm : t' ∈ σ.llog := (lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp'']; rfl)
+    have ht'le := (hll t' ht'm).2
+    have hct'' : σ.log[t' - 1]? = some (hartAgent c) := by
+      have hct0 : (σ.log ++ [hartAgent cpu])[t' - 1]? = some (hartAgent c) := hct'
+      rw [List.getElem?_append_left (by simp only [MState.top] at ht'le; omega)] at hct0; exact hct0
+    obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu' hct'' hlp''
+    exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
+
+/-- **A DMA WRITE (route P) KEEPS THE RECORDS' INVARIANT** (increment P-M3b): it is the disk's,
+so it is no hart's store across a record's top. -/
+theorem epochRecOk_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hP : σ.okP) (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk (σ.storeDmaL pa n w).log (σ.storeDmaL pa n w).llog (σ.storeDmaL pa n w).sb
+      (σ.storeDmaL pa n w).sbEp M := by
+  by_cases hn : n = 0
+  · subst hn; exact h
+  have hll := hP.2.2.2.2.1
+  have hlog : (σ.storeDmaL pa n w).log = σ.log ++ [diskAgent] := by simp only [if_neg hn]
+  have hllog : (σ.storeDmaL pa n w).llog = σ.llog ++ [σ.top + 1] := by
+    simp only [if_neg hn]
+  rw [hlog, hllog]
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  refine ⟨hk, by simp only [List.length_append, List.length_singleton]; omega, hsbr, ?_⟩
+  intro u t' p' hu1 hus hst' hu hct' hlp'
+  have hu_le : u ≤ σ.top := Nat.le_trans hus hs
+  have hu' : σ.log[u - 1]? = some (hartAgent c) := by
+    rw [List.getElem?_append_left (by simp only [MState.top] at hu_le; omega)] at hu; exact hu
+  by_cases htt : t' = σ.top + 1
+  · exfalso
+    have hlogT : (σ.log ++ [diskAgent])[σ.top + 1 - 1]? = some diskAgent := by simp [MState.top]
+    rw [htt, hlogT] at hct'
+    exact (show hartAgent c ≠ diskAgent by simp only [diskAgent]; exact Nat.ne_of_lt (hartAgent_lt c))
+      (Option.some.inj hct').symm
+  · have hlp'' : lpOf σ.llog t' = some p' := by rwa [lpOf_snoc_ne σ.llog _ t' htt] at hlp'
+    have ht'0 : t' ≠ 0 := by omega
+    have ht'm : t' ∈ σ.llog := (lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp'']; rfl)
+    have ht'le := (hll t' ht'm).2
+    have hct'' : σ.log[t' - 1]? = some (hartAgent c) := by
+      rw [List.getElem?_append_left (by simp only [MState.top] at ht'le; omega)] at hct'; exact hct'
+    obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu' hct'' hlp''
+    exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
+
+/-- An exclusive read (route P) moves no log, buffer or epoch: the records stay. -/
+theorem epochRecOk_afterExclL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (acq : Bool) (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk (σ.afterExclL cpu pa n w acq).log (σ.afterExclL cpu pa n w acq).llog
+      (σ.afterExclL cpu pa n w acq).sb (σ.afterExclL cpu pa n w acq).sbEp M := h
+
 /-- A step that raises store epochs only keeps the records' invariant. -/
 theorem epochRecOk_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
     (sbEp sbEp' : CPU → Nat) (hge : ∀ c, sbEp c ≤ sbEp' c) (M : RegMapF Agent)
@@ -2098,6 +2254,21 @@ theorem lpAuthAt_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (N
   iframe Hep
   ipureintro
   exact epochRecOk_epUp _ _ _ _ _ hge M hM
+
+/-- **An issue in the landing authority** (route P, increment P-M3a): nothing lands, so no
+certificate moves; the records follow (`epochRecOk_issue`). -/
+theorem lpAuthAt_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hP : σ.okP) :
+    lpAuthAt E σ.log σ.llog σ.sb σ.sbEp ⊢@{IProp GF}
+      lpAuthAt E (σ.issue cpu pa n w).log (σ.issue cpu pa n w).llog (σ.issue cpu pa n w).sb
+        (σ.issue cpu pa n w).sbEp := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
+  iframe Hlp Hfr
+  iexists M
+  iframe Hep
+  ipureintro
+  exact epochRecOk_issue σ cpu pa n w hP M hM
 
 /-- The epoch token's mint (see `epochRecOk_mint`). -/
 theorem lpAuthAt_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → Nat)
@@ -2225,6 +2396,18 @@ theorem memModel_landedAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : 
   · iframe Hlp H
   ipureintro
   exact lpOf_of_get σ.llog t p (mmOk_okP hmm).2.2.2.1 h.1 h.2 ht
+
+/-- **`visibleAt`** (design §2.4, route P, increment P-M3a): a landing certificate at or below a
+view makes every entry at its stamp visible there, to every agent -- the visibility side
+condition of the route-P read rules (`WordHist.read_cases*P`), from the resource. -/
+theorem memModel_visibleAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat) (ht : t ≠ 0) :
+    memModelAt E σ ∗ landedAtE E t p ⊢@{IProp GF}
+      ⌜∀ (h : Agent) (tv : Nat) (e : HEnt), e.t = t → p ≤ tv → e.visibleP σ.lp h tv = true⌝ := by
+  iintro H
+  ihave %hl := memModel_landedAt E σ t p ht $$ H
+  ipureintro
+  intro h tv e het hle
+  exact HEnt.visibleP_of_landed σ.lp h tv e (by rw [het]; exact hl) hle
 
 /-- **The certificate of any landed store**, from the interpretation. -/
 theorem memModel_landedGet [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat)

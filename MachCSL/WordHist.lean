@@ -230,6 +230,161 @@ theorem Hist.readEnt_head (h : Agent) (tv : Nat) (e0 : HEnt) (H0 : Hist) (hvis :
   rw [List.find?_cons, hvis] at hr
   exact (Option.some.inj hr).symm
 
+/-! ## The read lemmas over landing positions (route P, increment P-M3a)
+
+The same word-level arguments with visibility over LANDING positions (`WEnt.visibleP`,
+`HEnt.visibleP`, design §2.4): a tail head is visible to a reader whose view has passed the
+LANDING position of its stamp (`lp lo = some p`, `p ≤ tvn` -- under route P a stamp's issue
+number is not a position), or who authored it.  Visibility still depends only on the stamp and
+the author, which the bytes of a word entry share. -/
+
+theorem WordHist.find?_histP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tv j : Nat) :
+    (W.hist Hold j).find? (HEnt.visibleP lp h tv) =
+      ((W.find? (WEnt.visibleP lp h tv)).map (WEnt.proj j)).or ((Hold j).find? (HEnt.visibleP lp h tv)) := by
+  unfold WordHist.hist
+  rw [List.find?_append, List.find?_map]
+  rfl
+
+/-- `WordHist.read_cases_vals` over landing positions. -/
+theorem WordHist.read_cases_valsP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tvn : Nat) (v0 w : BitVec (8 * n)) (htail : tailVals n v0 Hold)
+    (hvis : ∀ j, j < n → ∀ e H, Hold j = e :: H → e.visibleP lp h tvn = true)
+    (hrd : readsAreP lp h tvn (W.hist Hold) n w) :
+    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧
+      (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧ w = e.v) ∨
+    ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0) := by
+  cases hf : W.find? (WEnt.visibleP lp h tvn) with
+  | some e =>
+    left
+    obtain ⟨hvis, W1, W2, hW, hW1⟩ := List.find?_eq_some_iff_append.1 hf
+    refine ⟨W1, e, W2, hW, hvis, fun x hx => by simpa using hW1 x hx, ?_⟩
+    apply bv_eq_of_bytes
+    intro j hj
+    have := hrd j hj
+    unfold Hist.readP at this
+    rw [WordHist.find?_histP, hf] at this
+    simp only [Option.map_some, Option.some_or, WEnt.proj, Option.some.injEq] at this
+    exact this.symm
+  | none =>
+    right
+    have hnone := List.find?_eq_none.1 hf
+    refine ⟨fun x hx => by simpa using hnone x hx, ?_⟩
+    apply bv_eq_of_bytes
+    intro j hj
+    have := hrd j hj
+    obtain ⟨e, H, hH, hev⟩ := htail j hj
+    unfold Hist.readP at this
+    have hvis' : HEnt.visibleP lp h tvn e = true := hvis j hj e H hH
+    rw [WordHist.find?_histP, hf, Option.map_none, Option.none_or, hH] at this
+    simp only [List.find?_cons, hvis', Option.map_some, Option.some.injEq] at this
+    rw [← this, hev]
+
+/-- `WordHist.read_cases` over landing positions. -/
+theorem WordHist.read_casesP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tvn lo : Nat) (v0 w : BitVec (8 * n)) (htail : tailOk n lo v0 Hold)
+    (hvis : ∀ j, j < n → ∀ e H, Hold j = e :: H → e.visibleP lp h tvn = true)
+    (hrd : readsAreP lp h tvn (W.hist Hold) n w) :
+    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧
+      (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧ w = e.v) ∨
+    ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0) :=
+  WordHist.read_cases_valsP W Hold lp h tvn v0 w (tailOk_vals htail) hvis hrd
+
+/-- **`read_cases_floor` over landing positions**: the tails' stamp `lo` has LANDED at or below
+the reader's view (today: "the view has passed `lo`"). -/
+theorem WordHist.read_cases_floorP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tvn lo p : Nat) (v0 w : BitVec (8 * n)) (htail : tailOk n lo v0 Hold)
+    (hlo : lp lo = some p) (hp : p ≤ tvn) (hrd : readsAreP lp h tvn (W.hist Hold) n w) :
+    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧
+      (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧ w = e.v) ∨
+    ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0) :=
+  WordHist.read_casesP W Hold lp h tvn lo v0 w htail
+    (fun j hj e H hH => HEnt.visibleP_of_landed lp h tvn e
+      (by rw [(tailOk_head htail j hj e H hH).2]; exact hlo) hp) hrd
+
+/-- `tailOk_visible` over landing positions: the tails' stamp landed at or below a position
+`K` the view has passed, or the reader authored it. -/
+theorem tailOk_visibleP {n f K tvn : Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
+    (W : WordHist n) (lp : LandPos) (h : Agent) (ts : List (Nat × Agent)) (htail : tailOk n f v0 Hold)
+    (hKt : K ≤ tvn) (hvis : (∃ p, lp f = some p ∧ p ≤ K) ∨ (f, h) ∈ ts)
+    (hauth : authorsAre ts n (W.hist Hold)) :
+    ∀ j, j < n → ∀ e H, Hold j = e :: H → e.visibleP lp h tvn = true := by
+  intro j hj e H hH
+  have het := (tailOk_head htail j hj e H hH).2
+  rcases hvis with ⟨p, hp, hle⟩ | hmem
+  · exact HEnt.visibleP_of_landed lp h tvn e (by rw [het]; exact hp) (by omega)
+  · refine HEnt.visibleP_of_own lp h tvn e (hauth (f, h) hmem j hj e ?_ het)
+    unfold WordHist.hist
+    rw [hH]
+    exact List.mem_append_right _ List.mem_cons_self
+
+/-- `WordHist.read_cases_vis` over landing positions. -/
+theorem WordHist.read_cases_visP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tvn K f : Nat) (ts : List (Nat × Agent)) (v0 w : BitVec (8 * n)) (htail : tailOk n f v0 Hold)
+    (hKt : K ≤ tvn) (hvis : (∃ p, lp f = some p ∧ p ≤ K) ∨ (f, h) ∈ ts)
+    (hauth : authorsAre ts n (W.hist Hold)) (hrd : readsAreP lp h tvn (W.hist Hold) n w) :
+    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧
+      (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧ w = e.v) ∨
+    ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0) :=
+  WordHist.read_casesP W Hold lp h tvn f v0 w htail
+    (tailOk_visibleP W lp h ts htail hKt hvis hauth) hrd
+
+/-- `tailOkT_visible` over landing positions (per-byte stamps). -/
+theorem tailOkT_visibleP {n K tvn : Nat} {ts : Nat → Nat} {v0 : BitVec (8 * n)} {Hold : Nat → Hist}
+    (W : WordHist n) (lp : LandPos) (h : Agent) (tsl : List (Nat × Agent))
+    (htail : tailOkT n ts v0 Hold) (hKt : K ≤ tvn)
+    (hvis : ∀ j, j < n → (∃ p, lp (ts j) = some p ∧ p ≤ K) ∨ (ts j, h) ∈ tsl)
+    (hauth : authorsAre tsl n (W.hist Hold)) :
+    ∀ j, j < n → ∀ e H, Hold j = e :: H → e.visibleP lp h tvn = true := by
+  intro j hj e H hH
+  have het := (tailOkT_head htail j hj e H hH).2
+  rcases hvis j hj with ⟨p, hp, hle⟩ | hmem
+  · exact HEnt.visibleP_of_landed lp h tvn e (by rw [het]; exact hp) (by omega)
+  · refine HEnt.visibleP_of_own lp h tvn e (hauth (ts j, h) hmem j hj e ?_ het)
+    unfold WordHist.hist
+    rw [hH]
+    exact List.mem_append_right _ List.mem_cons_self
+
+/-- `WordHist.read_cases_visT` over landing positions. -/
+theorem WordHist.read_cases_visTP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tvn K : Nat) (ts : Nat → Nat) (tsl : List (Nat × Agent)) (v0 w : BitVec (8 * n))
+    (htail : tailOkT n ts v0 Hold) (hKt : K ≤ tvn)
+    (hvis : ∀ j, j < n → (∃ p, lp (ts j) = some p ∧ p ≤ K) ∨ (ts j, h) ∈ tsl)
+    (hauth : authorsAre tsl n (W.hist Hold)) (hrd : readsAreP lp h tvn (W.hist Hold) n w) :
+    (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧
+      (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧ w = e.v) ∨
+    ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0) :=
+  WordHist.read_cases_valsP W Hold lp h tvn v0 w (tailOkT_vals htail)
+    (tailOkT_visibleP W lp h tsl htail hKt hvis hauth) hrd
+
+/-- `WordHist.readEnt_cases` over landing positions. -/
+theorem WordHist.readEnt_casesP (W : WordHist n) (Hold : Nat → Hist) (lp : LandPos) (h : Agent)
+    (tv j : Nat) (e0 : HEnt) (H0 : Hist) (hH : Hold j = e0 :: H0) (hvis : e0.visibleP lp h tv = true)
+    (e : HEnt) (hr : Hist.readEntP lp h tv (W.hist Hold j) = some e) :
+    (∃ x ∈ W, e = WEnt.proj j x) ∨ e = e0 := by
+  unfold Hist.readEntP WordHist.hist at hr
+  rw [List.find?_append] at hr
+  cases hf : (W.map (WEnt.proj j)).find? (HEnt.visibleP lp h tv) with
+  | some e' =>
+    rw [hf] at hr
+    simp only [Option.some_or, Option.some.injEq] at hr
+    subst hr
+    left
+    obtain ⟨x, hx, rfl⟩ := List.mem_map.1 (List.mem_of_find?_eq_some hf)
+    exact ⟨x, hx, rfl⟩
+  | none =>
+    rw [hf, Option.none_or, hH, List.find?_cons, hvis] at hr
+    right
+    exact (Option.some.inj hr).symm
+
+/-- `Hist.readEnt_head` over landing positions. -/
+theorem Hist.readEntP_head (lp : LandPos) (h : Agent) (tv : Nat) (e0 : HEnt) (H0 : Hist)
+    (hvis : e0.visibleP lp h tv = true) (e : HEnt) (hr : Hist.readEntP lp h tv (e0 :: H0) = some e) :
+    e = e0 := by
+  unfold Hist.readEntP at hr
+  rw [List.find?_cons, hvis] at hr
+  exact (Option.some.inj hr).symm
+
 /-! ## The resource -/
 
 section res

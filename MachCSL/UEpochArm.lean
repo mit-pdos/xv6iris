@@ -526,9 +526,10 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
   iintro Hmask
   isplit
   · ipureintro
-    by_cases hno : othersReserve σ.resv cpu req.pa 8
-    · exact Or.inr ⟨σ, Or.inl hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
+    by_cases hno : othersReserve σ.resv cpu req.pa 8 ∨ ¬ σ.landNowOk cpu req.pa 8 req.access_kind
+    · exact Or.inr ⟨σ, hno.imp id (fun h => ⟨hram, h⟩), rfl⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, fun h => hno (Or.inl h),
+        Classical.byContradiction (fun h => hno (Or.inr h)), rfl, rfl⟩⟩
   inext
   iintro %σ'
   isplit

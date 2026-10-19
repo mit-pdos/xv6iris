@@ -824,38 +824,52 @@ theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
   · iintro %hb
     exact absurd hb (hnb σ σ')
 
-/-- The per-event rule for an event that is never blocked at a machine the
-interpretation describes (route P, increment P-M1: a fence's drain-blocked
-arm needs a non-empty store buffer, and `mmOk` says every buffer is empty). -/
-theorem swp_event_mm (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', mmOk σ → ¬ blockedStep cpu o σ σ')
-    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
-    (∀ σ, machInterp σ ={⊤,∅}=∗
-      ⌜∃ v σ', evStep cpu o σ v σ'⌝ ∗
-      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
-  iintro H
-  iapply swp_event_step cpu o k Φ hsil
+/-- **The per-event rule for a fence** (route P, increment P-M3a): a draining fence
+(`fenceDrainsSb`: a W→R edge or `fence.i`) whose hart still has pending stores is BLOCKED -- a
+self-loop at the unchanged state (`blockedStep`), while the hart's land arm empties the buffer --
+and is re-run, by Löb, with the same resources `P`; the event step's premise is asked only at a
+machine where the drain has happened (`fenceDrainsSb b → σ.sb cpu = []`).  No staging fact is
+used: the rule holds with non-empty buffers. -/
+theorem swp_event_barrier (cpu : CPU) {X : Type} (b : barrier_kind) (k : Unit → SailM X)
+    (Φ : X → IProp GF) (P : IProp GF) :
+    P ∗ (P -∗ ∀ σ, ⌜fenceDrainsSb b = true → σ.sb cpu = []⌝ -∗ machInterp σ ={⊤,∅}=∗
+      ▷ ∀ (v : Unit) σ', ⌜evStep cpu (.barrier b) σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.ok (.barrier b)) k) Φ := by
+  iintro ⟨HP, H⟩
+  iloeb as IH
+  iapply swp_event_step cpu (.barrier b) k Φ
   iintro %σ Hσ
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hσ]
-  · iapply machInterp_mmOk $$ Hσ
-  imod H $$ %σ Hσ with ⟨%Hred, H⟩
-  imodintro
-  isplit
-  · ipureintro
-    exact Or.inl Hred
-  inext
-  iintro %σ'
-  isplit
-  · iintro %v %hs
-    iapply H $$ %v %σ' %hs
-  · iintro %hb
-    exact absurd hb (hnb σ σ' hmm)
-
-/-- A fence's drain-blocked arm never fires under the P-M1 machine. -/
-theorem barrier_not_blocked (cpu : CPU) (b : barrier_kind) (σ σ' : MState) (hmm : mmOk σ) :
-    ¬ blockedStep cpu (.barrier b) σ σ' :=
-  fun hb => hb.2.1 (mmOk_sbNil hmm cpu)
+  by_cases hd : fenceDrainsSb b = true ∧ σ.sb cpu ≠ []
+  · iapply fupd_mask_intro LawfulSet.empty_subset
+    iintro Hmask
+    isplit
+    · ipureintro
+      exact Or.inr ⟨σ, hd.1, hd.2, rfl⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      exact absurd (Hev.1 hd.1) hd.2
+    · iintro %Hbk
+      obtain ⟨_, _, rfl⟩ := Hbk
+      imod Hmask
+      imodintro
+      iframe Hσ
+      iapply IH $$ HP H
+  · have hdr : fenceDrainsSb b = true → σ.sb cpu = [] := fun h =>
+      Classical.byContradiction (fun hn => hd ⟨h, hn⟩)
+    imod H $$ HP %σ %hdr Hσ with H
+    imodintro
+    isplit
+    · ipureintro
+      exact Or.inl ⟨(), σ.fence cpu b, hdr, rfl⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      iapply H $$ %v %σ' %Hev
+    · iintro %Hbk
+      exact absurd (hdr Hbk.1) Hbk.2.1
 
 /-! ## Derived rules for each primitive
 
@@ -2886,16 +2900,12 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
     ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
   unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
   iintro HΦ
-  iapply swp_event_mm cpu (.barrier b) (fun v => FreeM.pure v) Φ (barrier_not_blocked cpu b)
-  iintro %σ Hσ
+  iapply swp_event_barrier cpu b (fun v => FreeM.pure v) Φ iprop(▷ Φ ())
+  iframe HΦ
+  iintro HΦ %σ %_ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-  · iapply memModel_mmOk $$ Hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  isplit
-  · ipureintro
-    exact ⟨(), σ.fence cpu b, fun _ => mmOk_sbNil hmm cpu, rfl⟩
   inext
   iintro %v' %σ' %Hev
   obtain ⟨_, rfl⟩ := Hev

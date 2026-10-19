@@ -409,6 +409,12 @@ abbrev headsAre (Hs : Nat → Hist) (n : Nat) (w : BitVec (8 * n)) : Prop :=
 abbrev readsAre (h : Agent) (tvn : Nat) (Hs : Nat → Hist) (n : Nat) (w : BitVec (8 * n)) : Prop :=
   ∀ j, j < n → Hist.read h tvn (Hs j) = some (nthByte w j)
 
+/-- The reads of the histories by `h` at (landing) view `tvn` spell `w` (route P, P-M3a:
+`readsAre` over landing positions). -/
+abbrev readsAreP (lp : LandPos) (h : Agent) (tvn : Nat) (Hs : Nat → Hist) (n : Nat)
+    (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → Hist.readP lp h tvn (Hs j) = some (nthByte w j)
+
 /-- The authorship the client's fragments `ts` pin down in the histories:
 every entry at one of their timestamps is that agent's. -/
 abbrev authorsAre (ts : List (Nat × Agent)) (n : Nat) (Hs : Nat → Hist) : Prop :=
@@ -2126,21 +2132,27 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  by_cases hno : othersReserve σ.resv cpu req.pa n
-  · iapply fupd_mask_intro LawfulSet.empty_subset
+  by_cases hno : othersReserve σ.resv cpu req.pa n ∨ σ.sbOverlaps cpu req.pa n
+  · -- blocked: another hart's reservation, or (route P) an own pending store on the footprint
+    -- (the same-address drain); the hart drops its reservation and retries (Löb)
+    iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     isplit
     · ipureintro
-      exact Or.inr ⟨σ.dropResv cpu, hk, Or.inl hno, rfl⟩
+      exact Or.inr ⟨σ.dropResv cpu, hk, hno, rfl⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ | ⟨_, _, hno', _⟩
-      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ | ⟨_, _, hno', hsb', _⟩
+      · rcases hno with hno | hno
+        · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
+        · exact absurd hdev (not_devBytes_of_sbOverlaps hmm.2.2.2.1 hno)
       · rw [hif] at hif'; exact absurd hif' (by decide)
       · simp [akPlain, hk] at hpl
-      · exact absurd hno hno'
+      · rcases hno with hno | hno
+        · exact absurd hno hno'
+        · exact absurd hno hsb'
     · iintro %Hbk
       obtain ⟨_, _, hσ⟩ := Hbk
       subst σ'
@@ -2151,13 +2163,14 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
       · iapply Hclose $$ %(σ.dropResv cpu) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · ihave Hfrag := resvFragAny_of cpu none b $$ Hfrag
         iapply IH $$ %none Hfrag H
-  · imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
+  · have hsb : ¬ σ.sbOverlaps cpu req.pa n := fun h => hno (Or.inr h)
+    replace hno : ¬ othersReserve σ.resv cpu req.pa n := fun h => hno (Or.inl h)
+    imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
     · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
       iframe
     obtain ⟨w, htop, hheads⟩ := exists_top_bytes σ req.pa n Hs hget hne
     have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
-    have hsb := MState.not_sbOverlaps_of_nil σ cpu req.pa n (mmOk_sbNil hmm cpu)
     imodintro
     isplit
     · ipureintro
@@ -2318,19 +2331,27 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  by_cases hno : othersReserve σ.resv cpu req.pa n
-  · iapply fupd_mask_intro LawfulSet.empty_subset
+  ihave %hres0 : ⌜σ.resv cpu = some (snapOf req.pa n w0) ∧ (σ.hr cpu).acq = acq⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv _ σ cpu _ acq $$ [Hmm Hfrag]
+    iframe
+  have hram0 : ramBytes req.pa n := ramBytes_of_resvL (mmOk_okP hmm) hmm.2.2.2.1 hn hres0.1
+  by_cases hno : othersReserve σ.resv cpu req.pa n ∨ ¬ σ.landNowOk cpu req.pa n req.access_kind
+  · -- blocked: another hart's reservation, or (route P, F-P-W1-1) an own pending store the write
+    -- may not overtake; the write retries (Löb) while the land arm makes progress
+    iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     isplit
     · ipureintro
-      exact Or.inr ⟨σ, Or.inl hno, rfl⟩
+      exact Or.inr ⟨σ, hno.imp id (fun h => ⟨hram0, h⟩), rfl⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
-      · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
-      · exact absurd hno hno'
+      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, _, _, hno', hln', _⟩
+      · exact absurd hdev (not_devBytes_of_ramBytes hram0 (devWrite_pos hdw))
+      · rcases hno with hno | hno
+        · exact absurd hno hno'
+        · exact absurd hln' hno
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
       subst σ'
@@ -2339,7 +2360,10 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with (⟨%Hs, %T, %o, Hb, #HT, Ho, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩ |
+  · have hln : σ.landNowOk cpu req.pa n req.access_kind :=
+      Classical.byContradiction (fun h => hno (Or.inr h))
+    replace hno : ¬ othersReserve σ.resv cpu req.pa n := fun h => hno (Or.inl h)
+    imod H with (⟨%Hs, %T, %o, Hb, #HT, Ho, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩ |
       ⟨%Hs, %T, %c, Hb, #HT, #Hreg, %hks, Hcont⟩)
     rotate_left 2
     · -- a SEALED kernel-table LEAF (W8 (f3-ptek))
@@ -2363,7 +2387,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       imodintro
       isplit
       · ipureintro
-        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, hln, rfl, rfl⟩⟩
       inext
       iintro %σ'
       isplit
@@ -2403,9 +2427,9 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
-        obtain ⟨hno' | ⟨_, hln⟩, _⟩ := Hbk
+        obtain ⟨hno' | ⟨_, hln'⟩, _⟩ := Hbk
         · exact absurd hno' hno
-        · exact absurd (MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu)) hln
+        · exact absurd hln hln'
     · -- OWNED bytes
       ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
       · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
@@ -2428,7 +2452,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       imodintro
       isplit
       · ipureintro
-        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, hln, rfl, rfl⟩⟩
       inext
       iintro %σ'
       isplit
@@ -2458,9 +2482,9 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
-        obtain ⟨hno' | ⟨_, hln⟩, _⟩ := Hbk
+        obtain ⟨hno' | ⟨_, hln'⟩, _⟩ := Hbk
         · exact absurd hno' hno
-        · exact absurd (MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu)) hln
+        · exact absurd hln hln'
     · -- a RESERVED word (W8-β′)
       obtain ⟨⟨i, k, R, hi, hk', hnp, hpres⟩, hrf⟩ := hok
       ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
@@ -2485,7 +2509,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       imodintro
       isplit
       · ipureintro
-        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, hln, rfl, rfl⟩⟩
       inext
       iintro %σ'
       isplit
@@ -2525,9 +2549,9 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
-        obtain ⟨hno' | ⟨_, hln⟩, _⟩ := Hbk
+        obtain ⟨hno' | ⟨_, hln'⟩, _⟩ := Hbk
         · exact absurd hno' hno
-        · exact absurd (MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu)) hln
+        · exact absurd hln hln'
 
 
 /-! ## Monotonicity of the accessors (the stage lemmas compose them with

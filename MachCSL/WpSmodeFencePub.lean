@@ -102,16 +102,12 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
   unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
   iintro ⟨#Hau, HΦ⟩
-  iapply swp_event_mm cpu (.barrier b) (fun v => FreeM.pure v) Φ (barrier_not_blocked cpu b)
-  iintro %σ Hσ
+  iapply swp_event_barrier cpu b (fun v => FreeM.pure v) Φ iprop(▷ (viewLb cpu T -∗ Φ ()))
+  iframe HΦ
+  iintro HΦ %σ %_ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-  · iapply memModel_mmOk $$ Hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  isplit
-  · ipureintro
-    exact ⟨(), σ.fence cpu b, fun _ => mmOk_sbNil hmm cpu, rfl⟩
   inext
   iintro %v' %σ' %Hev
   obtain ⟨_, rfl⟩ := Hev
