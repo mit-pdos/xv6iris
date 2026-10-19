@@ -377,7 +377,7 @@ theorem execSpecF_ldX [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : BitV
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _)
   iframe HmConf
   inext
   iintro HmConf
@@ -460,8 +460,7 @@ theorem execSpecF_sdX [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : BitV
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _ _
-    (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _)
   iframe HmConf
   inext
   iintro HmConf

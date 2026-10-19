@@ -680,7 +680,7 @@ theorem wp_s_csrr_sstatus [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
     ⊢ wpLoop cpu := by
   have htp := fun cpu' v => tpPin_set cpu' k.regs rd v hrd.2.2
   have h := wpLoop_k_genv (lent := lent) cpu k pc (pc + instrLen is_rvc) is_rvc _
-    (fun c => lower_mstatus c.mstatus) (sstatusAt k.sie)
+    (fun c => mstatusLower c.mstatus) (sstatusAt k.sie)
     (fun c (hok : SConfAt (GF := GF) curTier c k.root k.sie) _ => by
       unfold sstatusAt; rw [lower_mstatus_sie]; exact hok.phys.2.1.1)
     (fun v => k.regs.set rd v) (fun v => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1))
