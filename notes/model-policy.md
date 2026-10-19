@@ -156,7 +156,10 @@ through T0(b).
   agreement.
 - **Reproducibility.** A regeneration is accepted only when: `git diff --exit-code model/` is
   empty *before* the intended change; every generated module builds (not only the root's import
-  closure); `tools/check_gen.py` passes; the `Register` count matches (`MachCSL.regCount`);
+  closure); `tools/check_gen.py` passes (it also regenerates the tables derived from the model:
+  `ModelFacts`, `Platform`, the literal-CSR block of `UExecCsrDflt`); the configuration's
+  deviation markers agree with its header (`tools/config_deviation_lint.py`, run by the lints);
+  the `Register` count matches (`MachCSL.regCount`);
   `#print axioms` of the top theorem shows the three standard axioms; the cold-boot proof
   evaluates `config_is_valid`; and the device-conformance runs (`tools/ci/vtest.sh`) stay green.
 - **Bumps.** The model moves release to release, never to a `master` commit.  The compiler moves
