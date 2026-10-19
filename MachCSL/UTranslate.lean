@@ -56,6 +56,7 @@ pinned in `UtrPins`; the walk is the S stage's `translate` (VMID `0`), and a
 fault is reported as an `ExceptionContext` (`utrCtx`).
 -/
 import MachCSL.URunRW
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 noncomputable section
 
