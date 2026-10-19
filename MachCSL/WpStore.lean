@@ -86,7 +86,7 @@ theorem execSpec_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   swp_run 150
   iapply swp_bind
   mconf_intro HmConf
-  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_M cpu dq c hok _)
   iframe HmConf
   iintro HmConf
   mconf_cases HmConf
@@ -149,7 +149,7 @@ theorem execSpec_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MCo
   swp_run 150
   iapply swp_bind
   mconf_intro HmConf
-  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_M cpu dq c hok _)
   iframe HmConf
   iintro HmConf
   mconf_cases HmConf
