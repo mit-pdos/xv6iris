@@ -36,12 +36,21 @@ variable {lent : Bool}
 @[sail_facts] theorem csr_name_map_forwards_stval : csr_name_map_forwards 0x143#12 = pure "stval" := rfl
 
 -- the `read_CSR` / `write_CSR` arms, so the executor never unfolds the
--- model's whole match (the unfolded body costs the kernel ~5 s per proof)
-@[sail_facts] theorem read_CSR_sepc : read_CSR 0x141#12 = get_xepc Privilege.Supervisor := rfl
-@[sail_facts] theorem read_CSR_scause : read_CSR 0x142#12 = readReg Register.scause := rfl
-@[sail_facts] theorem read_CSR_stval : read_CSR 0x143#12 = readReg Register.stval := rfl
+-- model's whole match (the unfolded body costs the kernel ~5 s per proof).
+-- sail-riscv 0.16: each arm first asks `inVirtualPrivilege` (the H
+-- extension's `vsepc`/`vscause`/`vstval` redirect, never taken here: the
+-- hart is at `Supervisor`); stated in the shape the generated code has.
+@[sail_facts] theorem read_CSR_sepc : read_CSR 0x141#12 =
+    (do if (← inVirtualPrivilege ()) then (do let p ← pure Privilege.VirtualSupervisor; get_xepc p)
+        else (do let p ← pure Privilege.Supervisor; get_xepc p)) := rfl
+@[sail_facts] theorem read_CSR_scause : read_CSR 0x142#12 =
+    (do if (← inVirtualPrivilege ()) then readReg Register.vscause else readReg Register.scause) := rfl
+@[sail_facts] theorem read_CSR_stval : read_CSR 0x143#12 =
+    (do if (← inVirtualPrivilege ()) then readReg Register.vstval else readReg Register.stval) := rfl
 @[sail_facts] theorem write_CSR_sepc (v : BitVec 64) : write_CSR 0x141#12 v =
-    (do let r ← set_xepc Privilege.Supervisor v; pure (.Ok r)) := rfl
+    (do if (← inVirtualPrivilege ()) then
+          (do let p ← pure Privilege.VirtualSupervisor; let r ← set_xepc p v; pure (.Ok r))
+        else (do let p ← pure Privilege.Supervisor; let r ← set_xepc p v; pure (.Ok r))) := rfl
 
 /-- Clearing bit 0 of an even value is the identity. -/
 theorem and_lsb0_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFFFFFFFFFFFFFE#64 = pc := by
@@ -242,10 +251,11 @@ theorem wp_s_csrw_sepc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
 /-! ## `sstatus` as the trap handler reads it -/
 
 /-- The recipe of `lower_mstatus_sie`, for the other bits `kerneltrap`
-needs: the supervisor view copies them from `mstatus`. -/
+needs: the supervisor view (`mstatusLower`, the value of 0.16's monadic
+`lower_mstatus` here) copies them from `mstatus`. -/
 macro "lower_mstatus_bit" : tactic =>
-  `(tactic| (unfold lower_mstatus
-             simp only [Mk_Sstatus, Functions.zeros,
+  `(tactic| (unfold mstatusLower
+             simp only [Mk_Sstatus, Functions.zeros, _update_Sstatus_SDT,
                _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS,
                _update_Sstatus_FS, _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR,
                _update_Sstatus_SPELP, _update_Sstatus_UXL, _update_Sstatus_SD,
@@ -257,27 +267,27 @@ macro "lower_mstatus_bit" : tactic =>
 
 /-- The `SPIE` bit of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_spie (m : BitVec 64) :
-    BitVec.extractLsb' 5 1 (lower_mstatus m) = BitVec.extractLsb' 5 1 m := by lower_mstatus_bit
+    BitVec.extractLsb' 5 1 (mstatusLower m) = BitVec.extractLsb' 5 1 m := by lower_mstatus_bit
 
 /-- The `SPP` bit of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_spp (m : BitVec 64) :
-    BitVec.extractLsb' 8 1 (lower_mstatus m) = BitVec.extractLsb' 8 1 m := by lower_mstatus_bit
+    BitVec.extractLsb' 8 1 (mstatusLower m) = BitVec.extractLsb' 8 1 m := by lower_mstatus_bit
 
 /-- The `VS` field of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_vs (m : BitVec 64) :
-    BitVec.extractLsb' 9 2 (lower_mstatus m) = BitVec.extractLsb' 9 2 m := by lower_mstatus_bit
+    BitVec.extractLsb' 9 2 (mstatusLower m) = BitVec.extractLsb' 9 2 m := by lower_mstatus_bit
 
 /-- The `FS` field of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_fs (m : BitVec 64) :
-    BitVec.extractLsb' 13 2 (lower_mstatus m) = BitVec.extractLsb' 13 2 m := by lower_mstatus_bit
+    BitVec.extractLsb' 13 2 (mstatusLower m) = BitVec.extractLsb' 13 2 m := by lower_mstatus_bit
 
 /-- The `XS` field of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_xs (m : BitVec 64) :
-    BitVec.extractLsb' 15 2 (lower_mstatus m) = BitVec.extractLsb' 15 2 m := by lower_mstatus_bit
+    BitVec.extractLsb' 15 2 (mstatusLower m) = BitVec.extractLsb' 15 2 m := by lower_mstatus_bit
 
 /-- The `MXR` bit of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_mxr (m : BitVec 64) :
-    BitVec.extractLsb' 19 1 (lower_mstatus m) = BitVec.extractLsb' 19 1 m := by lower_mstatus_bit
+    BitVec.extractLsb' 19 1 (mstatusLower m) = BitVec.extractLsb' 19 1 m := by lower_mstatus_bit
 
 /-- A full reading of an `sstatus` word the kernel read out of a
 configuration: `SIE` is the context's index, `SPIE`/`SPP` are its pinned
@@ -294,7 +304,7 @@ def sstatusFull (sie spie spp : Bool) (v : BitVec 64) : Prop :=
 
 /-- What `csrr sstatus` returns in the kernel context. -/
 theorem sstatusFull_of_lower (ms : BitVec 64) (sie spie spp : Bool) (hsm : smFacts ms sie)
-    (hsr : sretFacts ms sie spie spp) : sstatusFull sie spie spp (lower_mstatus ms) := by
+    (hsr : sretFacts ms sie spie spp) : sstatusFull sie spie spp (mstatusLower ms) := by
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hsm
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [lower_mstatus_sie]; exact hSIE
@@ -330,7 +340,7 @@ theorem wp_s_csrr_sstatus_full [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
   have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
-  have htp := tpPin_set cpu k.regs rd (lower_mstatus ms) hrd.2.2
+  have htp := tpPin_set cpu k.regs rd (mstatusLower ms) hrd.2.2
   have hexec := ((execSpecF_csrr_sstatus (GF := GF) cpu (DFrac.own 1) (sConfOf curTier k.root ms mdl mepc stc lf) false
     hok.phys pc (pc + instrLen is_rvc) rd hrd.1 (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root))
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
@@ -349,9 +359,9 @@ theorem wp_s_csrr_sstatus_full [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   have hv := sstatusFull_of_lower ms false k.spie k.spp hsm hsr
-  have hsp := KCtx.setReg_sp k rd (lower_mstatus ms) hrd.2.1
-  iapply HΦ' $$ %(lower_mstatus ms) %hv [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
-  iapply (kctx_intro' cpu (k.setReg rd (lower_mstatus ms)) (by simpa using hwf))
+  have hsp := KCtx.setReg_sp k rd (mstatusLower ms) hrd.2.1
+  iapply HΦ' $$ %(mstatusLower ms) %hv [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc
+  iapply (kctx_intro' cpu (k.setReg rd (mstatusLower ms)) (by simpa using hwf))
   simp only [KCtx.setReg_regs, KCtx.setReg_sie, KCtx.setReg_spie, KCtx.setReg_spp, KCtx.setReg_avail,
     KCtx.setReg_noff, KCtx.setReg_intena, KCtx.setReg_locks, KCtx.setReg_tier, KCtx.setReg_root,
     KCtx.setReg_proc, sConfOf_mstatus, hsp, hkt, hsie, trapRes_off, ← htp]
@@ -379,6 +389,8 @@ macro "sstatus_write_bits" : tactic =>
              simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs,
                plat_mstatus_legal_vs, legalize_extStatus_four, extStatus_dirty_iff, bool_to_bit_eq,
                extStatus_map_forwards, Functions.zeros,
+               _update_Mstatus_SDT, _update_Mstatus_GVA, _update_Mstatus_MPV, _update_Mstatus_MDT,
+               _update_Sstatus_SDT, _get_Sstatus_SDT,
                _update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE, _update_Mstatus_MPIE,
                _update_Mstatus_SPP, _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS,
                _update_Mstatus_XS, _update_Mstatus_MPRV, _update_Mstatus_SUM, _update_Mstatus_MXR,
@@ -440,7 +452,7 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT⟩ := hms
   unfold execute
   swp_run 30
   iapply swp_bind
@@ -452,10 +464,10 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_sstatus (hmpp := hMPP)
+  iapply (swp_write_CSR_sstatus (p := Privilege.Supervisor) (hp := rfl) (hmpp := hMPP))
   iframe; iframe Hhw
   inext
-  iintro Hmstatus
+  iintro Hcur_privilege Hmstatus
   simp only [sstatusWrite_eq]
   swp_run 30
   unfold wX_bits wX
