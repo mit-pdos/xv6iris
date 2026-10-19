@@ -7,8 +7,11 @@ MachCSL: `init_model` -- the configuration assert and the architectural reset
 privileged spec's own `reset` writes (PC, nextPC, cur_privilege, hart_state,
 elp), misa's extension bits from `reset_misa` over the board's MXL,
 mstateen0 from `reset_stateen`, pmpcfg's `pmpAllOff` from `reset_pmp` per
-entry (`MachCSL.BootPmp`), and the board's other writes carried through a
-chain that does not touch them.  Nothing is left over for a patch layer.
+entry (`MachCSL.BootPmp`), the board's other writes carried through a
+chain that does not touch them, and (last, since the sail-riscv 0.16 port)
+the empty TLB `reset_vmem` -> `reset_TLB` writes, which `sfence.vma`'s
+supervisor-stage flush needs (`kvminithart`, `MachCSL.tlbStageS`).  Twenty
+conjuncts; nothing is left over for a patch layer.
 
 The walk is ONE `boot_peel` over the model's own `init_model ""`, with
 `reset_pmp` sealed: at the seam the walker takes `bootFin_reset_pmp`'s landing
@@ -50,7 +53,9 @@ def bootPost (hid : BitVec 64) (pma : List PMA_Region) (f : BootRegs) : Prop :=
   f .mstateen0 = 0#64 ∧
   f .sstateen0 = 0#32 ∧
   -- the board's (0.16): the model's Sdtrig bookkeeping, asserted none at every cycle end
-  f .written_trigger_index = none
+  f .written_trigger_index = none ∧
+  -- the spec's own `reset_vmem` -> `reset_TLB` (the empty TLB, derived over the open file)
+  f .tlb = vectorInit none
 
 /-- Rocq `exec_init_model`: from a file the board has initialised, the model's
 own `init_model ""` lands in a file satisfying `bootPost`. -/
@@ -59,7 +64,7 @@ theorem bootFin_init_model (hid : BitVec 64) (f : BootRegs) (hb : bootBoardOk hi
   obtain ⟨hmisa, hmstat, hmsec, hmenv, hhtif, hpma, hpcr, hmhid, hmie, hmdl, hsenv, hsse, hwti⟩ := hb
   boot_peel [bootFin_reset_pmp]
   refine bootFin_pure _ _ _
-    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals boot_lk
   all_goals first | rfl | assumption | decide +kernel
 

@@ -472,8 +472,9 @@ def bootHartCsrRegs : List Register :=
 running token: `bootEntryPre`'s output (without the wire pins), the other
 23 GPRs, `stvec`, `hartCsrs` (`sscratch`; the state-enable pins ride
 `mBoot`'s `hwConfig`),
-`mainHartRaw`'s rows at the reset `tlb`, the empty held-lock set, the GOT
-row and the hart's `.bss` share.  Context-free (deviations 1 and 5). -/
+`mainHartRaw`'s rows at the reset `tlb` (empty: the boot run derives it,
+`MachCSL.resetValRun`), the empty held-lock set, the GOT row and the hart's
+`.bss` share.  Context-free (deviations 1 and 5). -/
 def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
   mBoot c (DFrac.own 1) ∗
   Register.mhartid ↦ᵣ[c]□ hartId c ∗ clockCells c ∗ pcIs c KA.«_entry» ∗
@@ -483,7 +484,7 @@ def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
   ([∗list] r ∈ bootGprRestRegs, regPointsTo c r (DFrac.own 1) (f r)) ∗
   (∃ v : BitVec 64, Register.stvec ↦ᵣ[c] v) ∗
   hartCsrs c ∗
-  mainHartRaw c (f .tlb) ∗
+  mainHartRaw c (Sail.vectorInit none) ∗
   lockSet c [] ∗
   bootGotRo ∗
   bootHartBss c
@@ -506,6 +507,9 @@ theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegsRun c f) :
   unfold bootHartCsrRegs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   icases Hc with ⟨Hstv, Hss, Htlb, Hep, Hca, Htv, Hhs, Hhv, Hhi, -⟩
+  have etlb : f .tlb = Sail.vectorInit none := hres.1 .tlb _ rfl
+  ihave Htlb := (show Register.tlb ↦ᵣ[c] f .tlb ⊢@{IProp GF} Register.tlb ↦ᵣ[c] Sail.vectorInit none from by
+    rw [etlb]) $$ Htlb
   ihave Hh3 := hTrapCsrs_intro c (f .hstatus) (f .htval) (f .htinst) $$ [Hhs Hhv Hhi]
   · iframe Hhs Hhv Hhi
   unfold bootHartRes hartCsrs mainHartRaw trapCsrs
