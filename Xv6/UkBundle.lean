@@ -51,8 +51,8 @@ structure UkOpened (C : UCfg) (P : UPtd) (T : BMap) (m : RegMap) (pc : BitVec 64
 
 theorem ukOpened_preS {C : UCfg} {P : UPtd} {T : BMap} {m : RegMap} {pc : BitVec 64}
     {V : Nat → List (BitVec 8)} {s : UWSt} (h : UkOpened C P T m pc V s) : UkOpened C P T m pc V (ucPreS s) :=
-  ⟨ukLand_preS h.land, ukRegs_preS h.regs, by rw [ucPreS_file_other _ _ (by decide)]; exact h.hpc,
-    by rw [ucPreS_file_other _ _ (by decide)]; exact h.hnpc, h.view⟩
+  ⟨ukLand_preS h.land, ukRegs_preS h.regs, by rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.hpc,
+    by rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.hnpc, h.view⟩
 
 section core
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -139,7 +139,7 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
   icases uk_frames_close cpu C P Rut D s $$ [Hfr Hres] with ⟨HF, HB, Hrut⟩
   · iframe
   icases uk_regs_close_trap cpu C P s.file h.cfg h.priv h.act hpc (h.npc) $$ [HF Ha]
-    with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hcfg, Hr⟩
+    with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hht, Hg, Hcfg, Hr⟩
   · iframe
   ihave Hpt := uk_userPtInvX_close cpu P D t' s.mm T K (s.file .tlb) hm' htlb' $$ HS Hr HB HX HK
   ihave Hpt := userPtInvX_forget cpu P _ $$ HS Hpt
