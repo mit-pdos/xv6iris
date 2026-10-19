@@ -813,6 +813,7 @@ import Weak.LitmusSbStuck2
 import Weak.SbKill
 import Weak.SbDevSt
 import Weak.SbHeadHop
+import Weak.SbHeadHop2
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
