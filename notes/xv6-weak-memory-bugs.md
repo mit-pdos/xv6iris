@@ -48,7 +48,20 @@ Recorded in `claude-notes/kernel-defects.md` ("Benign but load-bearing"):
 
 ## Rule for new entries ([OWN.129], owner 2026-10-20)
 
-If something looks like a bug: record it here, and carry a NAMED assumption scoped to exactly that code step (never
+If something looks like a bug — i.e. the CODE lacks an ordering RVWMO needs, not merely a proof that cannot see why the code is safe — record it here, and carry a NAMED assumption scoped to exactly that code step (never
+a general assumption for the rest of the proof). The code fixes come later.
+
+## 4. (WITHDRAWN — not a bug) `pipealloc` lock words vs earlier stores
+
+Recorded 2026-10-20 as bug-like, withdrawn the same day ([OWN.134]): xv6 is safe here — another hart gets the pipe
+only through `fork`, whose lock operations fence the creator's stores, and same-address stores land in order, so the
+`kalloc` junk on the lock words is overwritten before anyone else can read them. Only the proof's generic lock window
+was too strict (finding F-11.1c/F-11.1f); fixed in the proof (the window selects entries by issue stamp), no
+assumption.
+
+## Rule for new entries ([OWN.129], owner 2026-10-20)
+
+If something looks like a bug — i.e. the CODE lacks an ordering RVWMO needs, not merely a proof that cannot see why the code is safe — record it here, and carry a NAMED assumption scoped to exactly that code step (never
 a general assumption for the rest of the proof). The code fixes come later.
 
 ## 4. `pipealloc`: a pipe lock's words are used before the page's earlier stores are ordered (ordering gap; probably benign)
