@@ -222,7 +222,7 @@ open AmocasOddRegisterReservedBehavior
 @[sail_facts] theorem hartSupports_Ext_A : hartSupports extension.Ext_A = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_F : hartSupports extension.Ext_F = (false) := by
+@[sail_facts] theorem hartSupports_Ext_F : hartSupports extension.Ext_F = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
 @[sail_facts] theorem hartSupports_Ext_D : hartSupports extension.Ext_D = ((true && (hartSupports Ext_F))) := by
@@ -339,16 +339,16 @@ open AmocasOddRegisterReservedBehavior
 @[sail_facts] theorem hartSupports_Ext_Za128rs : hartSupports extension.Ext_Za128rs = (((plat_reservation_set_size_exp ≤b 7) && ((false : Bool) || (true : Bool)))) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zfa : hartSupports extension.Ext_Zfa = (false) := by
+@[sail_facts] theorem hartSupports_Ext_Zfa : hartSupports extension.Ext_Zfa = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zfbfmin : hartSupports extension.Ext_Zfbfmin = (false) := by
+@[sail_facts] theorem hartSupports_Ext_Zfbfmin : hartSupports extension.Ext_Zfbfmin = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zfh : hartSupports extension.Ext_Zfh = (false) := by
+@[sail_facts] theorem hartSupports_Ext_Zfh : hartSupports extension.Ext_Zfh = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zfhmin : hartSupports extension.Ext_Zfhmin = (false) := by
+@[sail_facts] theorem hartSupports_Ext_Zfhmin : hartSupports extension.Ext_Zfhmin = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
 @[sail_facts] theorem hartSupports_Ext_Zfinx : hartSupports extension.Ext_Zfinx = (false) := by
@@ -363,7 +363,7 @@ open AmocasOddRegisterReservedBehavior
 @[sail_facts] theorem hartSupports_Ext_Zcb : hartSupports extension.Ext_Zcb = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zcd : hartSupports extension.Ext_Zcd = (false) := by
+@[sail_facts] theorem hartSupports_Ext_Zcd : hartSupports extension.Ext_Zcd = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
 @[sail_facts] theorem hartSupports_Ext_Zcf : hartSupports extension.Ext_Zcf = (((false : Bool) && (xlen == 32))) := by

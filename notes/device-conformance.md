@@ -24,10 +24,11 @@ RTL: 30) either
 
 It is a regression test: the executions already recorded from real machines
 are still executions the model ADMITS.  Green set on the sail-riscv 0.16 model
-(since 2026-10-19): QEMU 66 (65 agree, 1 stuck), JH7110 23, CVA6 18 --
-Rocq's green set plus five hart-1 variants, minus the four runs the 0.16
-configuration turned red (below, "The 0.16 bump").  Before the bump: QEMU 69
-(68 agree, 1 stuck), JH7110 23, CVA6 19.
+(since 2026-10-20): QEMU 68 (67 agree, 1 stuck), JH7110 23, CVA6 19 --
+Rocq's green set plus five hart-1 variants, minus the one run the 0.16
+configuration turned red, QEMU/CoreCsrprobe (below, "The 0.16 bump"); before
+the bump QEMU 69 (68 agree, 1 stuck), JH7110 23, CVA6 19, and for one day
+(2026-10-19) three fewer.
 
 ## How it is checked
 
@@ -77,21 +78,29 @@ pointer, raw counters, virtio feature words and `seg_max`, the
 four-descriptor chain, no F/D instructions, the direct-mapped TLB, power-on
 ADUE, board and RTL CSR differences); `explain --all` prints each.
 
-### The 0.16 bump (2026-10-19): four runs red, by this tree's configuration
+### The 0.16 bump (2026-10-19/20): one run red, by this tree's configuration
 
 Re-running every checked-in capture on the sail-riscv 0.16 model (no
 capture regenerated, no proof changed) turned four green runs red and no red
-run green.  All four are FINDINGS about this tree's CONFIGURATION, both T0
-choices under `notes/model-policy.md` (section 4) recorded in
-`notes/model-diffs.md` section 4; under upstream's defaults the runs would
-agree.  0.16's device behaviour (UARTs, PLIC, CLINT, virtio) is not
-involved: every device run that was green is still green.
+run green.  All four were FINDINGS about this tree's CONFIGURATION, T0 choices
+under `notes/model-policy.md` (section 4); under upstream's defaults the runs
+would agree.  0.16's device behaviour (UARTs, PLIC, CLINT, virtio) is not
+involved: every device run that was green is still green.  Three of the four
+-- the `CoreRegsFcsr` runs -- were the symptom of a configuration item (F and
+D off) that lasted one day: every validated platform has F and D, and `misa`
+had come to read a value no platform reports, so the item was withdrawn on
+2026-10-20 and the three runs are green again (the policy's T0(a) now says the
+configuration follows the validated platforms wherever they agree).  The
+fourth, QEMU/CoreCsrprobe, stays red: Sdtrig is the one feature every
+validated platform has that this configuration lacks, kept off for its cost
+(trigger checks in every memory access and fetch, trigger registers with
+power-on obligations), and even with Sdtrig on the run would need `tselect`
+pinned to QEMU's 0 -- its pre-bump green was a `tselect` stub that always
+answered.
 
 | Run | Claim | Verdict (`explain`) and first failing obligation | Cause |
 |---|---|---|---|
-| QEMU/CoreRegsFcsr | agrees | BUDGET at pc 0, mcause 1: the run never reaches DONE, so `allShow (runTest test ...) observed` is false | configuration item 8, F and D off: `mstatus.FS` is read-only zero and the floating-point CSRs are illegal, so the test's `csrr fcsr` traps to the mtvec it never installed (0) and the fetch at 0 faults forever; the platforms read `fcsr = 0` with `FS = Initial` |
-| QEMU/CoreRegsFcsr (hart 1) | agrees | the same | the same |
-| CVA6/CoreRegsFcsr | agrees | the same | the same |
+| QEMU/CoreRegsFcsr, QEMU/CoreRegsFcsr (hart 1), CVA6/CoreRegsFcsr -- red 2026-10-19 only | agrees | BUDGET at pc 0, mcause 1: the run never reached DONE | the withdrawn item 8 (F and D off): `mstatus.FS` read-only zero and the floating-point CSRs illegal, so the test's `csrr fcsr` trapped to the mtvec it never installed; green again with F and D advertised (their instructions still uncompiled: `fcsr` is a CSR, not an instruction) |
 | QEMU/CoreCsrprobe | agrees | DONE, result differs at slot 35 (`tselect`: model 1 = trapped, QEMU 0), at the trap count (2 vs 1) and in the trap records (an extra mcause 2 at mepc 0x800003c0, mtval 0x7a0023f3 = `csrr t2, tselect`) | configuration item 3, Sdtrig off (upstream default on): reading `tselect` is an illegal instruction; the pre-bump model had a `tselect` stub that always answered |
 
 (JH7110/CoreRegsFcsr and the CVA6 and JH7110 CoreCsrprobe runs were red

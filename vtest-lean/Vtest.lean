@@ -115,6 +115,8 @@ import Vtest.QEMU.ConcSmokePass
 import Vtest.QEMU.CoreCsrwidePass
 import Vtest.QEMU.CoreHartPass
 import Vtest.QEMU.CoreIcachePass
+import Vtest.QEMU.CoreRegsFcsrHart1Pass
+import Vtest.QEMU.CoreRegsFcsrPass
 import Vtest.QEMU.CoreRegsGprPass
 import Vtest.QEMU.CoreRegsHpmHart1Pass
 import Vtest.QEMU.CoreRegsHpmLivePass
@@ -261,6 +263,7 @@ import Vtest.CVA6.PtTlbSet0Run
 import Vtest.CVA6.ClintMsipPass
 import Vtest.CVA6.ClintTimePass
 import Vtest.CVA6.CoreCsrwidePass
+import Vtest.CVA6.CoreRegsFcsrPass
 import Vtest.CVA6.CoreHartPass
 import Vtest.CVA6.CoreIcachePass
 import Vtest.CVA6.CoreRegsHpmLivePass

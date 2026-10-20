@@ -77,7 +77,7 @@ less pmpcfg, which is the predicate `pmpAllOff`). -/
 def resetValRun (cpu : CPU) : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Machine
   | .hart_state => some (HartState.HART_ACTIVE ())
-  | .misa => some 0x8000000000141105#64
+  | .misa => some 0x800000000014112D#64
   | .mstatus => some 0xA00000000#64
   | .mie => some 0#64
   | .mideleg => some 0#64

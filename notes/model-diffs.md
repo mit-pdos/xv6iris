@@ -71,20 +71,20 @@ Each is conditional and reports itself in the regeneration log.
   `rmem`, `unit_tests`).  Some unselected leaves arrive anyway through `requires` (e.g. H's
   instructions with the selected `H` group).  Pre-existing and worth knowing: `misa` advertises F
   and D (and the configuration Zfh and scalar crypto) whose instructions are not compiled, so they
-  decode as illegal; the kernel uses none of them (it never enables FS).  Tier T1.  Since
-  configuration item 8, `misa` no longer advertises F and D; the remaining advertised-but-uncompiled
-  extensions are the configuration's scalar-crypto ones.
+  decode as illegal; the kernel uses none of them (it never enables FS).  Tier T1: the platforms
+  advertise F and D, so does `misa`; an FP instruction with `FS` on decodes as illegal here where
+  the hardware would execute it -- invisible to xv6, and a recorded residual of the module subset.
 - **The configuration**, `model/sail-config-rv64d.json`: upstream's `config.json.in` resolved for
-  rv64d, with the deviations listed in its header (items 1-8) and marked "xv6iris" inline
+  rv64d, with the deviations listed in its header (items 1-7) and marked "xv6iris" inline
   (restored on review: item 7, the misaligned-AMO fault, had been dropped by the first refresh).
-  Tiers (the policy's T0): items 1, 2, 4 and 8 are platform and ISA-profile choices (reason (a));
-  3, 5 and 6 are forced by `config_is_valid` once H and Sdtrig are off (a); item 7 is continuity
-  (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec
-  permits.  Item 8 (owner decision 2026-10-19): F off -- D with it, since the model derives D's
-  support from F's -- and the F-dependent Zfa, Zfbfmin, Zfh, Zfhmin, Zcd off: the kernel never
-  enables `mstatus.FS` and the module subset compiles none of their instructions, so `misa` now
-  advertises what is compiled (the derived `misa` value changed accordingly; `mstatus.FS` is
-  read-only zero; the floating-point CSRs are illegal).  Device conformance: items 8 and 3 turn
+  Tiers (the policy's T0): items 1, 2 and 4 are platform choices (reason (a)); 3, 5 and 6 are
+  forced by `config_is_valid` once H and Sdtrig are off (a) -- Sdtrig off is the one place the
+  configuration lacks a feature every validated platform has, recorded as the QEMU/CoreCsrprobe
+  finding; item 7 is continuity (b): the user tier's misaligned-AMO arms depend on the pre-0.13
+  behaviour, which the spec permits.  A deviation 8 (F and D off, 2026-10-19) was withdrawn on
+  2026-10-20: it turned three green device-conformance runs red, because every validated platform
+  has F and D and `misa` had come to read a value no platform reports; F and D are advertised
+  again, their instructions still uncompiled (section 4's first bullet).  Device conformance: items 8 and 3 turn
   four vtest runs red (the three `core_regs_fcsr` runs; QEMU `core_csrprobe`'s `tselect`), recorded
   as findings in `notes/device-conformance.md` ("The 0.16 bump"); under upstream's defaults they
   would agree.
@@ -133,4 +133,5 @@ not an open question:
 - The driver's `exit_wait` is nondeterministic since 2026-10-19 (section 5); the WFI leaves cover
   the forced-exit arm as they are ported.
 - Nothing is filed upstream; the project keeps its own fork.
-- F and D are off in the configuration since 2026-10-19 (item 8, section 4).
+- F and D were off in the configuration for one day (item 8, 2026-10-19) and are on again since
+  2026-10-20 (section 4); Sdtrig stays off, its one device-conformance run a recorded finding.

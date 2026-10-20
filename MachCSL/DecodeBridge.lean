@@ -69,7 +69,7 @@ def runRead {X : Type} (dref : (r : Register) → Option (RegisterType r)) :
 mode (the Rocq prototype's `D_m` at `dstateM`). -/
 def drefM : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Machine
-  | .misa => some 0x8000000000141105#64
+  | .misa => some 0x800000000014112D#64
   | .mseccfg => some 0#64
   | _ => none
 
@@ -254,7 +254,7 @@ supervisor mode (the prototype's `D_s` at `dstateS`); `menvcfg` at the
 kernel's value. -/
 def drefS : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Supervisor
-  | .misa => some 0x8000000000141105#64
+  | .misa => some 0x800000000014112D#64
   | .menvcfg => some menvcfgS
   | .mseccfg => some 0#64
   | _ => none

@@ -89,7 +89,7 @@ status.
 
 | Tier | What | Admitted when | Decided by |
 |---|---|---|---|
-| **T0 Configuration** | a value of upstream's config differs from the release default | for one of two reasons, named in the entry: (a) *the platform or the kernel's ISA profile* -- a feature the kernel never uses is off, the memory map is the board's; or (b) *continuity* -- a release changed a default, the old behaviour is spec-permitted, and a theorem's soundness depends on it (cite the theorem).  "As before" alone is not a reason.  Marked inline and in the file's header; `config_is_valid` re-checked.  Experimental extensions stay at upstream's defaults behind a gate defined `false`. | integrator |
+| **T0 Configuration** | a value of upstream's config differs from the release default | for one of two reasons, named in the entry: (a) *the platform* -- the configuration follows the validated platforms (QEMU virt, JH7110, CVA6; `notes/device-conformance.md`) wherever they agree: the memory map is the board's, and a feature they have may be turned off only when the kernel never uses it *and* the cost of modelling it is documented as prohibitive, in which case its device-conformance runs are recorded as configuration findings, never removed; "the kernel never uses it" alone is not a reason (amended 2026-10-20: item 8 of 2026-10-19 turned F and D off on that reason alone, made `misa` read a value no validated platform reports, and was withdrawn); or (b) *continuity* -- a release changed a default, the old behaviour is spec-permitted, and a theorem's soundness depends on it (cite the theorem).  "As before" alone is not a reason.  Marked inline and in the file's header; `config_is_valid` re-checked.  Experimental extensions stay at upstream's defaults behind a gate defined `false`. | integrator |
 | **T1 Module selection** | what is compiled (`sail-modules.txt`; an edit to a `requires` list) | it changes only *what* is compiled, never the behaviour of what is; code the selection makes unreachable is argued unreachable in this configuration; extensions advertised by `misa` but not compiled are listed | integrator |
 | **T2 Platform integration** | a fork edit that connects the model to our platform | no configuration value or hook achieves it; the behaviour it adds or restores is spec-permitted; it is written for upstream's stated direction | integrator, reported |
 | **T3 Representation** | a fork edit the Lean target needs, with identical behaviour | behavioural identity is argued in the commit (checked where possible); it is what upstream does for its own prover targets, so it is an upstream candidate | integrator, reported |
@@ -223,8 +223,8 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 | fork 6 `f0ef9813`, `hideleg` ignored without H | **T4** (precedents `mideleg`, `hedeleg`; upstream's own Lean emulator admits the read) | keep; upstream candidate |
 | compiler: short-circuit, type-level parens (PRs #1750, #1774 open); keyword escape, `termination_by` (ours) | I5 rule | keep until a release contains them; the two of ours are candidates |
 | patches A, B | I7 rule | keep; both meaning-preserving; retire when the backend allows |
-| config items 1-8 | **T0**: 1, 2, 4, 8 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep; item 8 (F and D off) added 2026-10-19 by decision (5) |
-| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa` no longer advertises F and D (configuration item 8, decision (5)) |
+| config items 1-7 | **T0**: 1, 2, 4 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a) -- Sdtrig off is the one place the configuration lacks a feature every validated platform has (QEMU/CoreCsrprobe is its recorded finding; the cost is the trigger checks in every memory access and the trigger registers' power-on obligations); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep; item 8 (F and D off, 2026-10-19) withdrawn 2026-10-20 |
+| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa` advertises F and D as the validated platforms do, their instructions uncompiled (T1, listed; withdrawal of item 8, 2026-10-20) |
 | board line `written_trigger_index := none` | §5 (model bookkeeping, flagged; upstream relies on the declared `None()`) | keep |
 | `hgeie` existential, `mhartid` pinned in `hwConfig` | §5 | keep |
 | the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | nondeterministic since 2026-10-19 (decision (3)): `riscvStep tick ew` |
@@ -236,6 +236,7 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 with its recorded gap for now and is completed with the spec's step-7 compare in a lane of its own
 after the bump's leaves (a fork commit under T5, re-ruled then); (3) `exit_wait` becomes
 nondeterministic, with the WFI leaves of P3; (4) nothing is filed upstream (section 6); (5) F and D
-are turned off in the configuration (T0(a): the kernel never enables FS, and the module subset
-compiles neither), so that `misa` advertises what is compiled -- a configuration lane with its own
-regeneration, before the remaining leaves.
+were turned off in the configuration (then T0(a)) on 2026-10-19 and **turned back on 2026-10-20**:
+the device-conformance runs showed every validated platform has F and D and `misa` had come to read a
+value no platform reports; T0(a) was amended accordingly (above), and Sdtrig stays off with its one
+run recorded as a finding.

@@ -14,7 +14,7 @@
 //   2. `extensions.B.supported` := false and `extensions.V.support_level` := "Disabled" together
 //      with the V-dependent extensions (Zvabd Zvbb Zvbc Zvfbfmin Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned
 //      Zvknha Zvknhb Zvksed Zvksh Zvkt): the kernel is rv64gc and never writes misa; `reset_misa`
-//      must produce the tree's MISA_C = 0x8000000000141105 (item 8 clears F and D), and the model's own `config_is_valid`
+//      must produce the tree's MISA_C = 0x800000000014112D, and the model's own `config_is_valid`
 //      rejects V off without its family off.
 //   3. The extensions upstream added after the previous pin, off because they are not part of the
 //      machine the proofs are about and would widen the decoder's U-mode image for nothing:
@@ -32,11 +32,10 @@
 //   7. `memory.misaligned.exceptions.amo` := {"Some": "AccessFault"} (upstream default
 //      {"None": null}), kept from before the bump: a misaligned AMO always faults on the modelled
 //      platform (see the comment at the field).
-//   8. `extensions.F.supported` := false (upstream default: true; D follows, since the model
-//      derives D's support from F's), and with it the F-dependent `Zfa`, `Zfbfmin`, `Zfh`, `Zfhmin`
-//      and `Zcd` := false: the kernel never enables `mstatus.FS`, and the module subset compiles
-//      none of their instructions, so `misa` now advertises what is compiled (notes/model-policy.md
-//      T0(a); owner decision 2026-10-19).  `misa` reads 0x8000000000141105.
+// (A deviation 8 -- F and D off -- existed for one day, 2026-10-19, and was withdrawn on the
+// device-conformance evidence: every validated platform has F and D, and `misa` must read what the
+// boards report; notes/model-policy.md T0(a), notes/model-diffs.md section 4.  F and D are
+// advertised but their instructions are not compiled: model/sail-modules.txt.)
 // Everything else is unmodified sail-riscv 0.16 default config -- INCLUDING one default that
 // changed since the previous pin and is accepted: `platform.clint.size` 0xC000 (was 0xC0000).
 //
@@ -687,8 +686,7 @@
       "mutable_misa": true
     },
     "F": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (the kernel never enables FS; D follows, since D requires F)
-      "supported": false,
+      "supported": true,
       "mutable_misa": true,
       // When to set mstatus.FS and mstatus.SD to 1, as a result of fflags
       // being set. There are three options:
@@ -938,20 +936,16 @@
       }
     },
     "Zfa": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (F-dependent; not compiled)
-      "supported": false
+      "supported": true
     },
     "Zfbfmin": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (F-dependent; not compiled)
-      "supported": false
+      "supported": true
     },
     "Zfh": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (F-dependent; not compiled)
-      "supported": false
+      "supported": true
     },
     "Zfhmin": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (F-dependent; not compiled)
-      "supported": false
+      "supported": true
     },
     "Zfinx": {
       "supported": false
@@ -966,8 +960,7 @@
       "supported": false
     },
     "Zcd": {
-      // xv6iris: false (upstream default: true) -- deviation 8 (F-dependent; not compiled)
-      "supported": false
+      "supported": true
     },
     "Zcb": {
       "supported": true

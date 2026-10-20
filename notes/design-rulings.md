@@ -147,8 +147,11 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   left open are taken there (section 8): the A/D update's step-7 compare in a later lane, a
   nondeterministic `exit_wait` (`riscvStep tick ew`; the cycle schemas introduce `%ew` beside
   `%tick`, and the WFI leaves cover the forced-exit arm), nothing filed upstream, F and D off in
-  the configuration (item 8; `misa` and the `hartSupports` facts for F, D, Zfa, Zfh, Zfhmin,
-  Zfbfmin and Zcd changed with it).
+  the configuration (item 8) -- **reversed 2026-10-20**: the device-conformance runs showed every
+  validated platform has F and D and `misa` had come to read a value no platform reports, so F and
+  D are advertised again (their instructions still uncompiled, as always), and the policy's T0(a)
+  now says the configuration follows the validated platforms wherever they agree; Sdtrig stays off
+  with QEMU/CoreCsrprobe recorded as its finding (the pre-bump green was a `tselect` stub).
 
 ## From `notes/briefs/crash_layer.md`
 
