@@ -20,7 +20,7 @@ How the Rocq vocabulary in these notes maps to this tree:
 | `iris/` (all proofs) | `MachCSL/` (the machine framework: language, weakest preconditions, devices, adequacy) and `Xv6/` (the xv6 proofs) |
 | `iris/Spec<F>.v` / `Proof<F>.v` / `Link<F>.v` | `Xv6/Spec<F>.lean` / `Proof<F>.lean` / `Link<F>.lean` (one function per triple) |
 | snake_case names (`wp_uk_ecall_read_at`, `union_phi_sync`) | camelCase (`wp_uk_ecall_read_at` often kept, `unionPhiSync`); file headers name the Rocq source |
-| `model-xv6iris/` (Sail model in Rocq) | `model/Lean_RV64D/` (Sail model in Lean from sail-riscv 0.16, concurrency interface v2, lean-sail v7; `tools/regen_sail_model.sh`, the Sail fork `dongjaelee1/sail` `xv6` = master + four Lean-backend fixes, `notes/model-diffs.md`) |
+| `model-xv6iris/` (Sail model in Rocq) | `model/Lean_RV64D/` (Sail model in Lean from sail-riscv 0.16, concurrency interface v2, lean-sail v7; `tools/regen_sail_model.sh`, the Sail fork `dongjaelee1/sail` `xv6` = upstream `sail2` e4982101 + four Lean-backend fixes, `notes/model-diffs.md`) |
 | `kernel-rocq/`, `user-rocq/` (image dumps) | `Xv6/Kernel*.lean`, `MachCSL/KernelElf.lean`, `Xv6/User/*`, `Xv6/FsImg*` |
 | `vtest-rocq/`, `tools/vtest/` | `vtest-lean/`, `tools/vtest/` (`notes/device-conformance.md`) |
 | `make proofs`, `coqc`, `.vo` | `lake build Xv6 MachCSL` (README "Build") |

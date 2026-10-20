@@ -111,8 +111,16 @@ Sdtrig.)
 before the bump and stay red; CVA6/CoreCsrprobe's slot 35 agrees with the
 model, both trap.)  The one "stuck" run in the QEMU and CVA6 green sets is
 `core_csrwide`, stuck at `csrr mseccfg` as before the bump (the Rocq tree's
-finding 22): `notes/model-diffs.md` section 4 has the mechanism, an uncompiled
+finding 32): `notes/model-diffs.md` section 4 has the mechanism, an uncompiled
 Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
+
+What the captures witness about `misa` (`core_csrvals` slot 1, a `sw` of the
+low 32 bits; `core_regs_mcsr` does not publish it, and MXL is the board
+line's): QEMU 0x001411AD (A C D F H I M S U), JH7110 0x0094112F (A B C D F I M
+S U X), CVA6 0x0014112F (A B C D F I M S U).  All three have F and D and lack
+V; QEMU alone has H; the two boards have B and QEMU does not; the tree's
+0x...14112D is QEMU's word without H (configuration items 2-3,
+`notes/model-diffs.md` section 4; Rocq finding 29).
 
 Noted, not a difference: `Virtio.capacity0` is 2000 sectors (xv6's FSSIZE)
 where Rocq's `virtio_capacity0` is 128; a test starts its disk at 128

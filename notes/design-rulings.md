@@ -169,8 +169,22 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   decisions (6)-(10).  Two facts it surfaced, now in the records: the platforms disagree on Sdtrig
   (CVA6 traps on `csrr tselect`; QEMU and the JH7110 do not: `core_csrprobe` slot 35), so Sdtrig
   off follows CVA6 rather than, as the notes had said, lacking a feature every platform has; and
-  the one "stuck" green-set run (`core_csrwide`, M-mode `csrr mseccfg`) is the pre-bump finding 22,
+  the one "stuck" green-set run (`core_csrwide`, M-mode `csrr mseccfg`) is the pre-bump finding 32,
   caused by an uncompiled Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
+- **The second independent audit** (2026-10-20, later; `local-plan/model-bump/policy-review/audit2-2026-10-20.md`):
+  the proofs' decisions held again; it caught a false claim the morning's record fix had made --
+  "every validated platform reports `misa` without B" -- when `core_csrvals` reads B on both boards
+  (QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F; Rocq finding 29).  Owner rulings (policy section 8,
+  (11)-(13)): B stays off as a platform disagreement resolved toward QEMU (the kernel never uses it;
+  B on regrows the complete U-mode decode image, `MachCSL/UDecode.lean` pins `misa`); T0(a) gains a
+  disagreement rule (the integrator proposes with kernel-use, cost and the conformance result; the
+  owner rules; the other platforms' runs are findings), applied to H (follows the boards), Sdtrig
+  (follows CVA6) and B (follows QEMU); and the record fixes: the stuck run is finding 32, the A/D
+  `Ok(false)` arm is an `internal_error` (stuck, not a retry) and upstream's `write_ram` discards the
+  conditional-write result, fork 2 also reads `sig_hgeip`, fork 5's arms are absent by construction
+  and the edit is behaviour-changing under H+FD, fork 6 cites upstream's emulator,
+  `claude-notes/LEAN.md`'s fork line, patch B's scope, the compiler row's `rewrites.ml` nuance and
+  both hash conventions, the adequacy note's heading.
 
 ## From `notes/briefs/crash_layer.md`
 

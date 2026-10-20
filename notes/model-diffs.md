@@ -31,12 +31,12 @@ Pinned by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`.
 
 | # | Commit | Change | Tier (`notes/model-policy.md` §4) | Why |
 |---|---|---|---|---|
-| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | **T5** spec-motivated strengthening (the owner's named exception, bump decision D3) | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (bump decision D3).  Known gap: the fresh PTE is re-checked but not compared with the value the walk used (the spec's step 7 compares and, on a mismatch, walks again), so if another hart installs a different valid leaf the access uses the walked translation while A/D are set on the new PTE; an open owner decision (section 6).  Depended on by `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and the page-walk leaves (`WpPtWalk`, `WpPtWalkOwn`).  The A/D accesses are exclusive only through their read/write kinds (`Read_RISCV_reserved`/`Write_RISCV_conditional`, which `MachCSL.TsoMem.akExcl` keys on), not under 0.16's `ak_is_exclusive` (`LoadReserved`/`StoreConditional`).  The commit also drops `pmaCheck`'s `assert(not(res_or_con))` for PTE accesses and adds two constant `termination_measure`s (inert in Lean; compiler commit `b72d7e842` emits none).  Audit note (2026-10-20): MachCSL's memory never fails a conditional write (`MachCSL/Lang.lean`'s header, delta 2), so the commit's `Ok(false)` retry arm is dead here and the update's atomicity rests on `TsoMem`'s reservation blocking; the step-7 compare of the later lane closes the walk-to-re-read window only -- hardware's "the conditional write fails, walk again" arm is absent by construction, a pre-bump restriction of the language, not of the fork. |
-| 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` whether or not the Simple Interrupt Generator is configured. | **T2** platform integration | Platform fidelity: the validated platforms' external interrupts come from a PLIC that drives the pins, and upstream has no knob for that (the SIG is its only external-interrupt source and the pin registers are private; relocating the SIG's window would avoid the collision but model a device no platform has).  Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (bump decision D6). |
+| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | **T5** spec-motivated strengthening (the owner's named exception, bump decision D3) | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (bump decision D3).  Known gap: the fresh PTE is re-checked but not compared with the value the walk used (the spec's step 7 compares and, on a mismatch, walks again), so if another hart installs a different valid leaf the access uses the walked translation while A/D are set on the new PTE; an open owner decision (section 6).  Depended on by `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and the page-walk leaves (`WpPtWalk`, `WpPtWalkOwn`).  The A/D accesses are exclusive only through their read/write kinds (`Read_RISCV_reserved`/`Write_RISCV_conditional`, which `MachCSL.TsoMem.akExcl` keys on), not under 0.16's `ak_is_exclusive` (`LoadReserved`/`StoreConditional`).  The commit also drops `pmaCheck`'s `assert(not(res_or_con))` for PTE accesses and adds two constant `termination_measure`s (inert in Lean; compiler commit `b72d7e842` emits none).  Audit note (2026-10-20): MachCSL's memory never fails a conditional write (`MachCSL/Lang.lean`'s header, delta 2), so the commit's `Ok(false)` arm -- an `internal_error` ("PTE conditional write failed"), i.e. a STUCK hart, not a retry -- is dead here, and the update's atomicity rests on `TsoMem`'s reservation blocking; the step-7 compare of the later lane closes the walk-to-re-read window only -- hardware's "the conditional write fails, walk again" behaviour is absent by construction (the language's delta 2, and upstream's own `write_ram`, which answers `true` for every `Ok` of `sail_mem_write` and `false` only for an abort: section 5), a pre-bump restriction, not the fork's.  If that lane lets a PTE conditional write fail, the fork's arm must become a re-walk, not the `internal_error`. |
+| 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` (and, under H, `sig_hgeip`) whether or not the Simple Interrupt Generator is configured. | **T2** platform integration | Platform fidelity: the validated platforms' external interrupts come from a PLIC that drives the pins, and upstream has no knob for that (the SIG is its only external-interrupt source and the pin registers are private; relocating the SIG's window would avoid the collision but model a device no platform has).  Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (bump decision D6). |
 | 3 | `69ed097e` | `MemoryTriggerPayload` carries its value zero-extended to 16 bytes plus its width, instead of an existentially width-indexed vector. | **T3** representation | The Lean backend cannot represent an existentially typed union constructor (the generated model did not elaborate).  `compare_value` computes what it computed before; trigger matching is unchanged.  Sdtrig is disabled in this configuration anyway. |
 | 4 | `9da94b63` | The Zaamo after-trigger tests the result with a pattern (`Retire_Success()`) instead of `==`. | **T3** representation | `ExecutionResult` has no equality in the theorem-prover backends.  Identical behaviour. |
-| 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | **T1** module selection (a `requires` edit), plus a code edit (the two dropped arms) that T1 does not cover, argued unreachable with H off | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
-| 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | **T4** bug fix (precedents: `mideleg` ignored without S, `hedeleg` without H; upstream's own Lean emulator notes that H's registers are read without H) | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
+| 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | **T1** module selection (a `requires` edit), plus a code edit (the two dropped arms) that T1 does not cover: unreachable here twice over (`transformed_instruction` runs only under `currentlyEnabled Ext_H`; without `FD_instructions` the `LOAD_FP`/`STORE_FP` constructors do not exist, which is why the edit was needed); behaviour-changing in a configuration with H and the F/D instructions (mtinst/htinst get 0), hence local, not an upstream candidate | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
+| 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | **T4** bug fix (precedents: `mideleg` ignored without S, `hedeleg` without H; upstream's own Lean emulator notes that H's registers are read without H: `lean_emulator/LeanRiscv.lean:249-264`, "registers read during reset and interrupt polling even when executing in Machine mode", with `hideleg` initialised to `undefined_Minterrupts ()`) | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
 
 Commits 1-5 are pushed; commit 6 awaits the owner's push (a fresh clone cannot check it out until
 then).
@@ -48,8 +48,8 @@ awaits the owner's push).
 
 | Commit | Change | Kind |
 |---|---|---|
-| `518f0df34` (zeldovich, upstream PR #1750) | Boolean `&`/`|` short-circuit when an operand has effects. | Backend bug fix: without it the generated Lean always runs an effectful right operand, which changes the model's semantics. |
-| `2331f11e6` (zeldovich, upstream PR #1774) | Non-atomic operands of type-level arithmetic are parenthesised. | Backend bug fix: without it `flen` prints as 8 bits. |
+| `518f0df34` (cherry-pick of zeldovich `3c03fced`, upstream PR #1750) | Boolean `&`/`|` short-circuit when an operand has effects. | Backend bug fix: without it the generated Lean always runs an effectful right operand, which changes the model's semantics.  The rewrite lives in the shared `src/lib/rewrites.ml` but is enabled only in the Lean plugin's `lean_rewrites`: backend-only in effect. |
+| `2331f11e6` (cherry-pick of zeldovich `4b46310d`, upstream PR #1774) | Non-atomic operands of type-level arithmetic are parenthesised. | Backend bug fix: without it `flen` prints as 8 bits. |
 | `ad1ada173` (ours) | Lean command keywords (`prefix`, `infix`, ...) are escaped in identifiers. | Names only: the generated `DeviceTree` did not elaborate. |
 | `b72d7e842` (ours) | `termination_by` is emitted only on a standalone definition that calls itself. | No semantic change: the dropped measures were unused (Lean warned). |
 
@@ -58,7 +58,8 @@ awaits the owner's push).
 Each is conditional and reports itself in the regeneration log.
 - **A.** `(pure (print_ ...))` becomes `discard <| pure (print_ ...)`: the same meaning, avoiding
   a Lean elaboration-time blow-up.
-- **B.** The widths `if (64 = 32 : Bool) then a else b` are folded to `b` (xlen is 64).
+- **B.** The single-line widths `if (64 = 32 : Bool) then a else b` are folded to `b` (xlen is 64);
+  the line-wrapped forms (two in `Vmem.lean`) are left as they are, harmless.
 - **C.** None needed: Sail now emits `sail_assert`.
 
 ## 4. What is compiled and how it is configured
@@ -78,7 +79,8 @@ Each is conditional and reports itself in the regeneration log.
   for `mseccfg`/`mseccfgh` (0x747/0x757) once the privileged ISA is 1.12 or later, that clause lives
   in the uncompiled Zkr module, and the scattered function's default arm is `sail_assert false`, so
   an M-mode `csrr mseccfg` is a STUCK hart, not an illegal instruction (S- and U-mode reads fail the
-  privilege check first: `MachCSL/UExecCsrTab.lean`).  Pre-existing (the Rocq tree's finding 22),
+  privilege check first: `MachCSL/UExecCsrTab.lean`).  Pre-existing (the Rocq tree's finding 32; its
+  finding 22 is the opposite row, the CSRs the model implements that QEMU refuses),
   witnessed by `core_csrwide` on QEMU and CVA6 -- the one "stuck" run in each green set -- and off
   every kernel path (xv6's M-mode code never reads it).  `Zkr.supported := false` would not remove
   it (`hartSupports` is not consulted first); compiling Zkr would put the unrealised
@@ -88,13 +90,21 @@ Each is conditional and reports itself in the regeneration log.
 - **The configuration**, `model/sail-config-rv64d.json`: upstream's `config.json.in` resolved for
   rv64d, with the deviations listed in its header (items 1-7) and marked "xv6iris" inline
   (restored on review: item 7, the misaligned-AMO fault, had been dropped by the first refresh).
-  Tiers (the policy's T0): items 1, 2 and 4 are platform choices (reason (a); item 2 by the
-  platforms' `misa`, which all three report without B and V -- `core_regs_mcsr`/`core_csrvals`);
-  item 3 is (a) too: H off follows the boards (QEMU virt alone reports H: findings 19/29), and
-  Sdtrig off follows CVA6 where the platforms disagree -- `core_csrprobe`'s scoreboard slot 35
-  (`csrr tselect`) records a trap on CVA6 and none on QEMU or the JH7110 -- with QEMU/CoreCsrprobe
-  the recorded finding and the cost of Sdtrig on (trigger checks in every access and fetch, trigger
-  registers in the power-on obligations) not measured; items 5 and 6 are forced by
+  Tiers (the policy's T0): items 1 and 4 are platform choices (reason (a)); item 2 is (a) in two
+  parts: V off is what all three platforms report (`core_csrvals` slot 1, the `misa` low word:
+  QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F; `core_regs_mcsr` does not publish `misa`,
+  and MXL is the board line's, not a capture's), while B is a platform DISAGREEMENT -- the JH7110
+  and CVA6 report B (and the JH7110 its vendor X), QEMU virt does not (Rocq finding 29) -- resolved
+  toward QEMU by the owner's ruling of 2026-10-20 under T0(a)'s disagreement rule: the kernel never
+  uses B, and B on means regrowing the complete U-mode decode image (`MachCSL/UDecode.lean` pins
+  `misa`; the Rocq-era measurement is in `claude-notes/completed/crash.md`), the boards'
+  `core_csrvals` runs being its recorded finding (a record fix earlier the same day had claimed
+  every platform reports `misa` without B: false, corrected);
+  item 3 is (a) by the same rule: H off follows the boards (QEMU virt alone reports H: findings
+  19/29), and Sdtrig off follows CVA6 -- `core_csrprobe`'s scoreboard slot 35 (`csrr tselect`)
+  records a trap on CVA6 and none on QEMU or the JH7110 -- with QEMU/CoreCsrprobe the recorded
+  finding and the cost of Sdtrig on (trigger checks in every access and fetch, trigger registers in
+  the power-on obligations) not measured; items 5 and 6 are forced by
   `config_is_valid` once H and Sdtrig are off; item 7 is continuity (b): `MachCSL/UMemAmo.lean`'s
   rules state the pre-0.13 cause (a store/AMO access fault), which the spec permits; no capture
   exercises a misaligned AMO, so the platforms' cause is unwitnessed (an `amo_misaligned` capture
@@ -137,6 +147,10 @@ Each is conditional and reports itself in the regeneration log.
   `hi`, and has no answer when `lo = hi`; `exit` and a failed `sail_assert` are not caught by a
   Sail `try` (only user exceptions are); `print_*` are no-ops; a register without an initialiser
   is first read from the environment (MachCSL's state), since the model's initialisers are not run.
+  And upstream's own `write_ram` answers `true` for every `Ok` of `sail_mem_write` (lean-sail's
+  `Option Bool` result is discarded) and `false` only for an abort, so in this model a conditional
+  write "fails" only as an abort -- the language's delta 2 and the model agree, and fork commit 1's
+  `Ok(false)` arm is unreachable from both sides.
 - **The language** (`MachCSL/Lang.lean`'s header): how the semantics consumes the model's events.
 - **The language's restrictions** (audit, 2026-10-20; `MachCSL/Lang.lean`'s header): delta 2 -- a
   conditional write never fails -- removes spurious SC failures (compensated for LR/SC by the opaque
@@ -163,5 +177,10 @@ configuration change for the crypto/Zfh advertisements, the `csrr mseccfg` stuck
 lane (above) starts from section 1 row 1's audit note: the compare closes the walk-to-re-read window
 only, and whether the language should admit a failed conditional write for PTE kinds is part of
 that lane's question.
+
+Decided by the owner 2026-10-20 (later), on a second independent audit (`notes/model-policy.md`,
+section 8, (11)-(13)): B stays off as a platform disagreement resolved toward QEMU; T0(a) gains the
+disagreement rule; the record fixes above.  For the step-7 lane: the fork's `Ok(false)` arm is an
+`internal_error`, so letting a PTE conditional write fail needs a re-walk arm in the fork first.
 - F and D were off in the configuration for one day (item 8, 2026-10-19) and are on again since
   2026-10-20 (section 4); Sdtrig stays off, its one device-conformance run a recorded finding.

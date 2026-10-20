@@ -16,7 +16,7 @@ when set, and exit non-zero on a regression.  Audited theorems (the 13 of `tools
 the ladder's upper rungs `MachCSL.riscvPowerAdequacy` and `Xv6.xv6PowerAdequacy` (Rocq's CI reports the same
 ladder).
 
-## What a reader must trust (measured by the tools at a31d988e8, the sail-riscv 0.16 tree, Oct 19 2026; first measured at lean 6fe1eb37b, Sept 30 2026)
+## What a reader must trust (measured by the tools at a31d988e8, the sail-riscv 0.16 tree, Oct 19 2026; the audit and trusted-base checks re-run green by `tools/ci/run_all.sh` after the regeneration of c618d63e7, at 78f851447, 8bfa5fee8 and every later commit, Oct 20 2026; first measured at lean 6fe1eb37b, Sept 30 2026)
 
 1. **Lean's three axioms** `propext`, `Classical.choice`, `Quot.sound`: every audited theorem uses exactly
    these.

@@ -50,7 +50,7 @@ also reports the *trusted base* of each statement: the definitions a reader must
 
 Two restrictions of the modelled machine bound these statements and are recorded rather than hidden
 (`notes/model-diffs.md`): the memory never fails a conditional write, so the page walker's atomic A/D
-update (a fork commit) never takes its retry arm -- its atomicity rests on the TSO memory's reservation
+update (a fork commit) never takes its failure arm (an `internal_error`, not a retry) -- its atomicity rests on the TSO memory's reservation
 blocking, and the spec's step-7 re-walk is a recorded gap -- and the model's module subset and
 configuration are this tree's (F/D and scalar-crypto instructions advertised but not compiled; Sdtrig,
 H, B and V off).
