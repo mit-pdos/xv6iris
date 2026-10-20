@@ -94,10 +94,10 @@ configuration follows the validated platforms wherever they agree).  The
 fourth, QEMU/CoreCsrprobe, stays red: Sdtrig is off here (configuration item
 3).  The platforms disagree on it -- this very test's scoreboard, slot 35
 (`csrr tselect`, 1 = trapped), reads 0 on QEMU and the JH7110 and 1 on CVA6 --
-so the configuration follows CVA6 and the policy's T0(a) leaves the choice to
-the integrator; the cost of Sdtrig on (trigger checks in every memory access
-and fetch, trigger registers in the power-on obligations) has not been
-measured.  With Sdtrig on the run would read `tselect = 0` from `zeroRegs`
+so the configuration follows CVA6 (owner ruling (6), 2026-10-20, under T0(a)'s
+disagreement rule); the cost of Sdtrig on (trigger checks in every memory
+access and fetch, trigger registers in the power-on obligations) is estimated,
+not measured.  With Sdtrig on the run would read `tselect = 0` from `zeroRegs`
 without a pin; its pre-bump green was a `tselect` stub that always answered.
 (Corrected 2026-10-20: this note had said every validated platform has
 Sdtrig.)
@@ -112,7 +112,7 @@ before the bump and stay red; CVA6/CoreCsrprobe's slot 35 agrees with the
 model, both trap.)  The one "stuck" run in the QEMU and CVA6 green sets is
 `core_csrwide`, stuck at `csrr mseccfg` as before the bump (the Rocq tree's
 finding 32): `notes/model-diffs.md` section 4 has the mechanism, an uncompiled
-Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
+Zkr clause behind `is_CSR_accessible`, which no configuration flag removes.
 
 What the captures witness about `misa` (`core_csrvals` slot 1, a `sw` of the
 low 32 bits; `core_regs_mcsr` does not publish it, and MXL is the board

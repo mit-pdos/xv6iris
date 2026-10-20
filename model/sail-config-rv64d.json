@@ -16,8 +16,8 @@
 //      Zvknha Zvknhb Zvksed Zvksh Zvkt).  V: every validated platform reports `misa` without V
 //      (core_csrvals slot 1, the low 32 bits: QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F),
 //      and the model's own `config_is_valid` rejects V off without its family off.  B: the platforms
-//      DISAGREE -- QEMU virt has no B, the JH7110 and CVA6 report B (Rocq finding 29; the JH7110 also
-//      its vendor X) -- and B is off following QEMU (owner ruling, 2026-10-20, policy T0(a)'s
+//      DISAGREE -- QEMU virt has no B, the JH7110 and CVA6 report B (the JH7110 also its vendor X:
+//      Rocq finding 29; CVA6's B is its core_csrvals capture) -- and B is off following QEMU (owner ruling, 2026-10-20, policy T0(a)'s
 //      disagreement rule): the kernel never uses it, and B on means regrowing the complete U-mode
 //      decode image (`MachCSL/UDecode.lean` pins `misa` to MISA_C; the Rocq-era measurement is in
 //      claude-notes/completed/crash.md); the boards' core_csrvals runs are its recorded finding (red
@@ -28,11 +28,14 @@
 //      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd)
 //      -- the JH7110 and CVA6 report `misa` without H, QEMU virt with it (findings 19/29), so the
 //      platforms disagree and the configuration follows the boards (owner ruling, 2026-10-20, the
-//      disagreement rule); Sdtrig (its code is compiled in: `sys` requires the
+//      disagreement rule: the kernel never enters a virtual privilege or touches an H CSR, and H on
+//      would add the HLV/HSV/HFENCE families to the U-mode decode image, two-stage translation to
+//      every walk leaf and the H CSRs to the power-on obligations); Sdtrig (its code is compiled in: `sys` requires the
 //      module) -- QEMU virt and the JH7110 have trigger CSRs, CVA6 does not (core_csrprobe's
 //      scoreboard slot 35, `csrr tselect`), so the platforms disagree and the configuration follows
-//      CVA6 (owner ruling, 2026-10-20); the cost of Sdtrig on (trigger checks in every access and fetch, trigger registers in
-//      the power-on obligations) is not measured, and QEMU/core_csrprobe is its recorded finding.
+//      CVA6 (owner ruling, 2026-10-20; the kernel never touches a trigger CSR); the cost of Sdtrig on
+//      is estimated, not measured (trigger checks on every fetch, load, store and AMO leaf, the
+//      trigger file in the power-on obligations), and QEMU/core_csrprobe is its recorded finding.
 //      Both also keep the decoder's U-mode image narrow.  (Zilx and Svukte, also new,
 //      stay at upstream's default: they are experimental, and `Xv6Extras`'s
 //      `sys_enable_experimental_extensions = false` already disables them.)

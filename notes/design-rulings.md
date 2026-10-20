@@ -122,7 +122,9 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   `read_mip`, used only when H is enabled, written by nothing here) and, likewise, `hcounteren`
   (read by every counter-CSR access check since 0.16, used only at a virtual privilege; policy
   section 5: held, not reset, not a board line) and `henvcfg` (read by 0.16's CBO enable checks,
-  likewise).  The U-mode reference walks answer these reads the same way.
+  likewise).  The U-mode reference walks answer these reads the same way.  `hedeleg`, read by
+  `exception_delegatee` on every trap and used only under H, needs no cell: the trap rules answer
+  the read off-frame, universally over its value (`swp_readReg_any_bind`, `MachCSL/UTrap.lean`).
 - **`TW = 0` in the kernel's `mstatus` invariant** (2026-10-19). With `exit_wait` chosen by the
   driver, a parked S-mode WFI may be forced out, which 0.16 retires only under `mstatus.TW = 0`
   (otherwise an illegal-instruction trap).  TW is 0 on every reachable state (the board line,
@@ -170,7 +172,7 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   (CVA6 traps on `csrr tselect`; QEMU and the JH7110 do not: `core_csrprobe` slot 35), so Sdtrig
   off follows CVA6 rather than, as the notes had said, lacking a feature every platform has; and
   the one "stuck" green-set run (`core_csrwide`, M-mode `csrr mseccfg`) is the pre-bump finding 32,
-  caused by an uncompiled Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
+  caused by an uncompiled Zkr clause behind `is_CSR_accessible`, which no configuration flag removes.
 - **The second independent audit** (2026-10-20, later; `local-plan/model-bump/policy-review/audit2-2026-10-20.md`):
   the proofs' decisions held again; it caught a false claim the morning's record fix had made --
   "every validated platform reports `misa` without B" -- when `core_csrvals` reads B on both boards
@@ -185,6 +187,15 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   and the edit is behaviour-changing under H+FD, fork 6 cites upstream's emulator,
   `claude-notes/LEAN.md`'s fork line, patch B's scope, the compiler row's `rewrites.ml` nuance and
   both hash conventions, the adequacy note's heading.
+- **The third independent audit** (2026-10-20, later still; `local-plan/model-bump/policy-review/audit3-2026-10-20.md`):
+  the proofs' decisions held; every witness sentence about `misa` and `tselect` matched its decode;
+  the configuration diffs from upstream's template in exactly the 30 fields the seven header items
+  name.  Its corrections, all record: the function is `is_CSR_accessible` (0.16 has no
+  `is_CSR_defined`); the surviving line-wrapped xlen ites are fourteen, not two or three; the
+  conformance note and the policy's own decision cells now say the owner rules a T0 disagreement;
+  the H and Sdtrig rulings carry the kernel-use and cost arguments the rule asks for (Sdtrig's an
+  estimate); README names the sealed boot image beside the two opaque predicates and says the sixth
+  fork commit and the compiler merge await the owner's push.
 
 ## From `notes/briefs/crash_layer.md`
 

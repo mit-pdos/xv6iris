@@ -58,8 +58,12 @@ awaits the owner's push).
 Each is conditional and reports itself in the regeneration log.
 - **A.** `(pure (print_ ...))` becomes `discard <| pure (print_ ...)`: the same meaning, avoiding
   a Lean elaboration-time blow-up.
-- **B.** The single-line widths `if (64 = 32 : Bool) then a else b` are folded to `b` (xlen is 64);
-  the line-wrapped forms (two in `Vmem.lean`) are left as they are, harmless.
+- **B.** The single-line widths `if (64 = 32 : Bool) then a else b` are folded to `b` (xlen is 64).
+  The line-wrapped forms in type signatures (`BitVec (if ( 64` / `= 32 : Bool) then 7 else 14)`) are
+  left as they are: fourteen at this regeneration -- eight in `Vmem.lean`, five in `VmemTlb.lean`,
+  one in `Callbacks0.lean` -- counted by a two-line pattern (a line ending in `( 64` followed by one
+  starting with `= 32`), which the script's single-line count does not see; type-level, reduced by
+  Lean, harmless.  (Two earlier counts, "two" and "three", were wrong.)
 - **C.** None needed: Sail now emits `sail_assert`.
 
 ## 4. What is compiled and how it is configured
@@ -75,7 +79,7 @@ Each is conditional and reports itself in the regeneration log.
   decode as illegal; the kernel uses none of them (it never enables FS).  Tier T1: the platforms
   advertise F and D, so does `misa`; an FP instruction with `FS` on decodes as illegal here where
   the hardware would execute it -- invisible to xv6, and a recorded residual of the module subset.
-  Zkr is the exception to "decodes as illegal": `is_CSR_defined` consults `currentlyEnabled Ext_Zkr`
+  Zkr is the exception to "decodes as illegal": `is_CSR_accessible` consults `currentlyEnabled Ext_Zkr`
   for `mseccfg`/`mseccfgh` (0x747/0x757) once the privileged ISA is 1.12 or later, that clause lives
   in the uncompiled Zkr module, and the scattered function's default arm is `sail_assert false`, so
   an M-mode `csrr mseccfg` is a STUCK hart, not an illegal instruction (S- and U-mode reads fail the
@@ -94,17 +98,21 @@ Each is conditional and reports itself in the regeneration log.
   parts: V off is what all three platforms report (`core_csrvals` slot 1, the `misa` low word:
   QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F; `core_regs_mcsr` does not publish `misa`,
   and MXL is the board line's, not a capture's), while B is a platform DISAGREEMENT -- the JH7110
-  and CVA6 report B (and the JH7110 its vendor X), QEMU virt does not (Rocq finding 29) -- resolved
+  and CVA6 report B (and the JH7110 its vendor X), QEMU virt does not (Rocq finding 29 for the
+  JH7110; the CVA6 `core_csrvals` capture for CVA6) -- resolved
   toward QEMU by the owner's ruling of 2026-10-20 under T0(a)'s disagreement rule: the kernel never
   uses B, and B on means regrowing the complete U-mode decode image (`MachCSL/UDecode.lean` pins
   `misa`; the Rocq-era measurement is in `claude-notes/completed/crash.md`), the boards'
   `core_csrvals` runs being its recorded finding (a record fix earlier the same day had claimed
   every platform reports `misa` without B: false, corrected);
   item 3 is (a) by the same rule: H off follows the boards (QEMU virt alone reports H: findings
-  19/29), and Sdtrig off follows CVA6 -- `core_csrprobe`'s scoreboard slot 35 (`csrr tselect`)
-  records a trap on CVA6 and none on QEMU or the JH7110 -- with QEMU/CoreCsrprobe the recorded
-  finding and the cost of Sdtrig on (trigger checks in every access and fetch, trigger registers in
-  the power-on obligations) not measured; items 5 and 6 are forced by
+  19/29; the kernel never enters a virtual privilege or touches an H CSR, and H on would add the
+  HLV/HSV/HFENCE families to the U-mode decode image, two-stage translation to every walk leaf and
+  the H CSRs to the power-on obligations), and Sdtrig off follows CVA6 -- `core_csrprobe`'s
+  scoreboard slot 35 (`csrr tselect`) records a trap on CVA6 and none on QEMU or the JH7110 -- with
+  QEMU/CoreCsrprobe the recorded finding; the kernel never touches a trigger CSR, and the cost of
+  Sdtrig on is estimated, not measured (trigger checks on every fetch, load, store and AMO leaf, the
+  trigger file in the power-on obligations); items 5 and 6 are forced by
   `config_is_valid` once H and Sdtrig are off; item 7 is continuity (b): `MachCSL/UMemAmo.lean`'s
   rules state the pre-0.13 cause (a store/AMO access fault), which the spec permits; no capture
   exercises a misaligned AMO, so the platforms' cause is unwitnessed (an `amo_misaligned` capture
@@ -148,7 +156,9 @@ Each is conditional and reports itself in the regeneration log.
   Sail `try` (only user exceptions are); `print_*` are no-ops; a register without an initialiser
   is first read from the environment (MachCSL's state), since the model's initialisers are not run.
   And upstream's own `write_ram` answers `true` for every `Ok` of `sail_mem_write` (lean-sail's
-  `Option Bool` result is discarded) and `false` only for an abort, so in this model a conditional
+  `Option Bool` result is discarded, and is always `none`: v7's `sail_mem_write` answers `.Ok none`
+  or `.Err abort`, so the interface has no conditional-write result at all) and `false` only for an
+  abort, so in this model a conditional
   write "fails" only as an abort -- the language's delta 2 and the model agree, and fork commit 1's
   `Ok(false)` arm is unreachable from both sides.
 - **The language** (`MachCSL/Lang.lean`'s header): how the semantics consumes the model's events.
