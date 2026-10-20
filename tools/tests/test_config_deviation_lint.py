@@ -44,22 +44,27 @@ class RealFileTests(unittest.TestCase):
     def test_the_checked_in_configuration_passes(self):
         probs, items, markers = lint.check(read(CONFIG))
         self.assertEqual(probs, [])
-        self.assertEqual(items, list(range(1, 9)))
-        self.assertEqual(sorted(markers), list(range(1, 9)))
+        # the count is the file's business (7 since item 8's withdrawal, 2026-10-20); the
+        # invariant is that the items are 1..N and every item has a marker
+        self.assertGreaterEqual(len(items), 1)
+        self.assertEqual(items, list(range(1, len(items) + 1)))
+        self.assertEqual(sorted(markers), items)
 
     def test_the_cli_passes_on_it(self):
         p = subprocess.run([sys.executable, str(TOOLS / "config_deviation_lint.py")], capture_output=True,
                            text=True)
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertIn("8 header items", p.stdout)
+        self.assertIn("header items, each marked inline", p.stdout)
 
     def test_a_header_item_removed_fails(self):
         s = read(CONFIG)
-        i = s.index("//   7. ")
-        j = s.index("//   8. ")
+        _, items, _ = lint.check(s)
+        n = len(items)  # remove the second-to-last item: its markers become orphans
+        i = s.index("//   %d. " % (n - 1))
+        j = s.index("//   %d. " % n)
         probs, _, _ = lint.check(s[:i] + s[j:])
-        self.assertTrue(any("not 1..7" in p for p in probs), probs)
-        self.assertTrue(any("deviation 7, which the header does not list" in p for p in probs), probs)
+        self.assertTrue(any("not 1..%d" % (n - 1) in p for p in probs), probs)
+        self.assertTrue(any("deviation %d, which the header does not list" % (n - 1) in p for p in probs), probs)
 
     def test_a_marker_naming_item_9_fails(self):
         s = read(CONFIG).replace("-- deviation 4", "-- deviation 9", 1)

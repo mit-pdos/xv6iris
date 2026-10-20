@@ -263,9 +263,9 @@ import Vtest.CVA6.PtTlbSet0Run
 import Vtest.CVA6.ClintMsipPass
 import Vtest.CVA6.ClintTimePass
 import Vtest.CVA6.CoreCsrwidePass
-import Vtest.CVA6.CoreRegsFcsrPass
 import Vtest.CVA6.CoreHartPass
 import Vtest.CVA6.CoreIcachePass
+import Vtest.CVA6.CoreRegsFcsrPass
 import Vtest.CVA6.CoreRegsHpmLivePass
 import Vtest.CVA6.CoreRegsHpmPass
 import Vtest.CVA6.CoreRegsPmpFwPass
