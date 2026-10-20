@@ -13,13 +13,20 @@
 //      software-interrupt sources; MachCSL's PLIC device drives the pins.
 //   2. `extensions.B.supported` := false and `extensions.V.support_level` := "Disabled" together
 //      with the V-dependent extensions (Zvabd Zvbb Zvbc Zvfbfmin Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned
-//      Zvknha Zvknhb Zvksed Zvksh Zvkt): the kernel is rv64gc and never writes misa; `reset_misa`
-//      must produce the tree's MISA_C = 0x800000000014112D, and the model's own `config_is_valid`
-//      rejects V off without its family off.
-//   3. The extensions upstream added after the previous pin, off because they are not part of the
-//      machine the proofs are about and would widen the decoder's U-mode image for nothing:
-//      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd),
-//      Sdtrig (its code is compiled in: `sys` requires the module).  (Zilx and Svukte, also new,
+//      Zvknha Zvknhb Zvksed Zvksh Zvkt): every validated platform reports `misa` without B and V
+//      (0x800000000014112D on the JH7110 and CVA6, QEMU virt the same up to H -- the core_regs_mcsr
+//      and core_csrvals captures), so `reset_misa` must produce the tree's MISA_C =
+//      0x800000000014112D; the model's own `config_is_valid` rejects V off without its family off.
+//      (The kernel is rv64gc and never writes misa; that alone would not be a reason.)
+//   3. The extensions upstream added after the previous pin, off, following the platforms:
+//      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd)
+//      -- the JH7110 and CVA6 report `misa` without H, QEMU virt with it (findings 19/29), so the
+//      configuration follows the boards; Sdtrig (its code is compiled in: `sys` requires the
+//      module) -- QEMU virt and the JH7110 have trigger CSRs, CVA6 does not (core_csrprobe's
+//      scoreboard slot 35, `csrr tselect`), so the platforms disagree and the configuration follows
+//      CVA6; the cost of Sdtrig on (trigger checks in every access and fetch, trigger registers in
+//      the power-on obligations) is not measured, and QEMU/core_csrprobe is its recorded finding.
+//      Both also keep the decoder's U-mode image narrow.  (Zilx and Svukte, also new,
 //      stay at upstream's default: they are experimental, and `Xv6Extras`'s
 //      `sys_enable_experimental_extensions = false` already disables them.)
 //   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
@@ -31,7 +38,9 @@
 //      of unsupported features to be read-only zero (`check_stateen_config`).
 //   7. `memory.misaligned.exceptions.amo` := {"Some": "AccessFault"} (upstream default
 //      {"None": null}), kept from before the bump: a misaligned AMO always faults on the modelled
-//      platform (see the comment at the field).
+//      platform (see the comment at the field).  Spec-permitted either way; the theorems whose
+//      statements fix the cause are MachCSL/UMemAmo.lean's; no capture exercises a misaligned AMO,
+//      so the validated platforms' cause is unwitnessed (policy T0(b)).
 // (A deviation 8 -- F and D off -- existed for one day, 2026-10-19, and was withdrawn on the
 // device-conformance evidence: every validated platform has F and D, and `misa` must read what the
 // boards report; notes/model-policy.md T0(a), notes/model-diffs.md section 4.  F and D are

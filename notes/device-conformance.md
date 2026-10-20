@@ -91,20 +91,28 @@ D off) that lasted one day: every validated platform has F and D, and `misa`
 had come to read a value no platform reports, so the item was withdrawn on
 2026-10-20 and the three runs are green again (the policy's T0(a) now says the
 configuration follows the validated platforms wherever they agree).  The
-fourth, QEMU/CoreCsrprobe, stays red: Sdtrig is the one feature every
-validated platform has that this configuration lacks, kept off for its cost
-(trigger checks in every memory access and fetch, trigger registers with
-power-on obligations), and even with Sdtrig on the run would need `tselect`
-pinned to QEMU's 0 -- its pre-bump green was a `tselect` stub that always
-answered.
+fourth, QEMU/CoreCsrprobe, stays red: Sdtrig is off here (configuration item
+3).  The platforms disagree on it -- this very test's scoreboard, slot 35
+(`csrr tselect`, 1 = trapped), reads 0 on QEMU and the JH7110 and 1 on CVA6 --
+so the configuration follows CVA6 and the policy's T0(a) leaves the choice to
+the integrator; the cost of Sdtrig on (trigger checks in every memory access
+and fetch, trigger registers in the power-on obligations) has not been
+measured.  With Sdtrig on the run would read `tselect = 0` from `zeroRegs`
+without a pin; its pre-bump green was a `tselect` stub that always answered.
+(Corrected 2026-10-20: this note had said every validated platform has
+Sdtrig.)
 
 | Run | Claim | Verdict (`explain`) and first failing obligation | Cause |
 |---|---|---|---|
 | QEMU/CoreRegsFcsr, QEMU/CoreRegsFcsr (hart 1), CVA6/CoreRegsFcsr -- red 2026-10-19 only | agrees | BUDGET at pc 0, mcause 1: the run never reached DONE | the withdrawn item 8 (F and D off): `mstatus.FS` read-only zero and the floating-point CSRs illegal, so the test's `csrr fcsr` trapped to the mtvec it never installed; green again with F and D advertised (their instructions still uncompiled: `fcsr` is a CSR, not an instruction) |
-| QEMU/CoreCsrprobe | agrees | DONE, result differs at slot 35 (`tselect`: model 1 = trapped, QEMU 0), at the trap count (2 vs 1) and in the trap records (an extra mcause 2 at mepc 0x800003c0, mtval 0x7a0023f3 = `csrr t2, tselect`) | configuration item 3, Sdtrig off (upstream default on): reading `tselect` is an illegal instruction; the pre-bump model had a `tselect` stub that always answered |
+| QEMU/CoreCsrprobe | agrees | DONE, result differs at slot 35 (`tselect`: model 1 = trapped, QEMU 0), at the trap count (2 vs 1) and in the trap records (an extra mcause 2 at mepc 0x800003c0, mtval 0x7a0023f3 = `csrr t2, tselect`) | configuration item 3, Sdtrig off (upstream default on; QEMU and the JH7110 have trigger CSRs, CVA6 does not): reading `tselect` is an illegal instruction; the pre-bump model had a `tselect` stub that always answered |
 
 (JH7110/CoreRegsFcsr and the CVA6 and JH7110 CoreCsrprobe runs were red
-before the bump and stay red.)
+before the bump and stay red; CVA6/CoreCsrprobe's slot 35 agrees with the
+model, both trap.)  The one "stuck" run in the QEMU and CVA6 green sets is
+`core_csrwide`, stuck at `csrr mseccfg` as before the bump (the Rocq tree's
+finding 22): `notes/model-diffs.md` section 4 has the mechanism, an uncompiled
+Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
 
 Noted, not a difference: `Virtio.capacity0` is 2000 sectors (xv6's FSSIZE)
 where Rocq's `virtio_capacity0` is 128; a test starts its disk at 128

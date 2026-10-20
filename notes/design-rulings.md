@@ -152,6 +152,25 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   D are advertised again (their instructions still uncompiled, as always), and the policy's T0(a)
   now says the configuration follows the validated platforms wherever they agree; Sdtrig stays off
   with QEMU/CoreCsrprobe recorded as its finding (the pre-bump green was a `tselect` stub).
+- **The user tier's and the kernel's contracts, ratified** (owner, 2026-10-20).  The 2026-10-19
+  changes -- the five 0.16 `mstatus` bits (SDT, GVA, MPV, MDT, TW) in `userMstatusOk`/`trapMstatusOk`,
+  `hTrapCsrs` in the user frames, `TW = 0` in `smFacts` -- were reported when made and are approved;
+  the policy's who-decides table now names such changes the owner's.
+- **`bv_decide`, not `native_decide`** (the enum encodings of `MachCSL/BvEnums.lean`, the literal
+  tables).  Both rest on `Lean.ofReduceBool`; what differs is what is compiled and trusted.
+  `bv_decide` compiles one fixed function, the LRAT certificate checker, whose correctness is proved
+  in Lean, and each call's certificate is data the audit enumerates
+  (`notes/adequacy_axioms_baseline.md`); `native_decide` compiles the goal's own arbitrary decision
+  code and trusts the compiler afresh on each goal.  The vtest harness, in no theorem's cone, uses
+  `native_decide`.
+- **The independent audit** (2026-10-20; a clean-context review of the bump's decisions, kept at
+  `local-plan/model-bump/policy-review/audit-2026-10-20.md`, outside the repository): every
+  soundness-critical decision held; the owner's dispositions are `notes/model-policy.md` section 8,
+  decisions (6)-(10).  Two facts it surfaced, now in the records: the platforms disagree on Sdtrig
+  (CVA6 traps on `csrr tselect`; QEMU and the JH7110 do not: `core_csrprobe` slot 35), so Sdtrig
+  off follows CVA6 rather than, as the notes had said, lacking a feature every platform has; and
+  the one "stuck" green-set run (`core_csrwide`, M-mode `csrr mseccfg`) is the pre-bump finding 22,
+  caused by an uncompiled Zkr clause behind `is_CSR_defined`, which no configuration flag removes.
 
 ## From `notes/briefs/crash_layer.md`
 

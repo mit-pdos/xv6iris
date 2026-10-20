@@ -47,8 +47,8 @@ ladder).
 4. **The Sail platform hooks** (section below): the six realised hooks are definitions in
    `LeanRV64D.Functions`; the fork's 75 root-level axioms (the six shadowed ones, `plat_term_read`,
    `get_16_random_bits`, the 67 of the softfloat family) are declared and reached by no audited theorem.
-   Since sail-riscv 0.16 (F and D off in the configuration, Zkr not compiled) the generated model calls none
-   of the unrealised ones at all.
+   Since sail-riscv 0.16 (the F/D instruction family and Zkr not compiled: `model/sail-modules.txt`, fork
+   commit 5; F and D are advertised, 2026-10-20) the generated model calls none of the unrealised ones at all.
 5. **No `sorryAx` anywhere**: all 85,454 declarations of `MachCSL`/`Xv6` are looked up (Lean 4.32 stores each
    declaration's axioms in its `.olean`, so this is a table scan), and none uses an axiom outside kinds 1-2.
 

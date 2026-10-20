@@ -89,7 +89,7 @@ status.
 
 | Tier | What | Admitted when | Decided by |
 |---|---|---|---|
-| **T0 Configuration** | a value of upstream's config differs from the release default | for one of two reasons, named in the entry: (a) *the platform* -- the configuration follows the validated platforms (QEMU virt, JH7110, CVA6; `notes/device-conformance.md`) wherever they agree: the memory map is the board's, and a feature they have may be turned off only when the kernel never uses it *and* the cost of modelling it is documented as prohibitive, in which case its device-conformance runs are recorded as configuration findings, never removed; "the kernel never uses it" alone is not a reason (amended 2026-10-20: item 8 of 2026-10-19 turned F and D off on that reason alone, made `misa` read a value no validated platform reports, and was withdrawn); or (b) *continuity* -- a release changed a default, the old behaviour is spec-permitted, and a theorem's soundness depends on it (cite the theorem).  "As before" alone is not a reason.  Marked inline and in the file's header; `config_is_valid` re-checked.  Experimental extensions stay at upstream's defaults behind a gate defined `false`. | integrator |
+| **T0 Configuration** | a value of upstream's config differs from the release default | for one of two reasons, named in the entry: (a) *the platform* -- the configuration follows the validated platforms (QEMU virt, JH7110, CVA6; `notes/device-conformance.md`) wherever they agree: the memory map is the board's, and a feature they have may be turned off only when the kernel never uses it *and* the cost of modelling it is documented as prohibitive, in which case its device-conformance runs are recorded as configuration findings, never removed; "the kernel never uses it" alone is not a reason (amended 2026-10-20: item 8 of 2026-10-19 turned F and D off on that reason alone, made `misa` read a value no validated platform reports, and was withdrawn); or (b) *continuity* -- a release changed a default, the old behaviour is spec-permitted, and a stated theorem depends on it (cite it; what the value fixes is the theorem's statement, not its soundness, and a capture that witnesses the platforms' behaviour turns the question into (a); reworded 2026-10-20 on the audit).  "As before" alone is not a reason.  Marked inline and in the file's header; `config_is_valid` re-checked.  Experimental extensions stay at upstream's defaults behind a gate defined `false`. | integrator |
 | **T1 Module selection** | what is compiled (`sail-modules.txt`; an edit to a `requires` list) | it changes only *what* is compiled, never the behaviour of what is; code the selection makes unreachable is argued unreachable in this configuration; extensions advertised by `misa` but not compiled are listed | integrator |
 | **T2 Platform integration** | a fork edit that connects the model to our platform | no configuration value or hook achieves it; the behaviour it adds or restores is spec-permitted; it is written for upstream's stated direction | integrator, reported |
 | **T3 Representation** | a fork edit the Lean target needs, with identical behaviour | behavioural identity is argued in the commit (checked where possible); it is what upstream does for its own prover targets, so it is an upstream candidate | integrator, reported |
@@ -120,6 +120,12 @@ behaviour that is merely surprising, inefficient, or different from a previous r
 bug: a release that changes a default is followed, and the old behaviour is recovered, if at all,
 through T0(b).
 
+*Provenance (recorded 2026-10-20 on the audit):* T4's second clause -- a read of architectural state
+that does not exist in this configuration -- was formulated on 2026-10-19 for fork 6 `f0ef9813`,
+after that fix was made; its commit quotes no spec sentence (none says a disabled extension's CSRs
+are not consulted) and rests on the model's own precedents (`mideleg` without S, `hedeleg` without
+H).  The clause stands, as the test future cases are held to.
+
 ## 5. MachCSL's side: power-on, the driver, nondeterminism
 
 - **Power-on** (`MachCSL/ArchReset.lean`): arbitrary garbage in every register, then the board's
@@ -131,7 +137,8 @@ through T0(b).
   a register with no hardware counterpart, evidence that upstream's own code relies on its
   declared initial value (upstream's reset is "the minimum the spec requires", so such a
   declaration is a power-on assumption in upstream's terms too), in which case the line is flagged
-  as model bookkeeping; (3) never a reset added to the fork for MachCSL's convenience: that edits
+  as model bookkeeping (a third case beside the two above, formulated 2026-10-19 after the
+  `written_trigger_index` line needed it); (3) never a reset added to the fork for MachCSL's convenience: that edits
   the ISA part to serve M1.
 - **Registers the model consults that are architecturally absent in this configuration** (H's
   CSRs with H off): if the read can change behaviour, it is a T4 fix in upstream's style
@@ -145,7 +152,10 @@ through T0(b).
 - **Nondeterminism and failure**: an unspecified value is modelled as *anything*, never as
   nothing; a model failure (`assert`, `exit`, an unrealised hook, lean-sail's failing
   `undefined_*`) is a stuck hart, never excused; a claim that the model cannot do something comes
-  from its definitions, never from a runner's silence.
+  from its definitions, never from a runner's silence.  The one such path known in this
+  configuration, an M-mode `csrr mseccfg` (`notes/model-diffs.md` section 4: an uncompiled Zkr clause
+  behind `is_CSR_defined`), is recorded as a residual -- pre-bump and off every kernel path -- not
+  excused.
 
 ## 6. Process
 
@@ -181,9 +191,17 @@ through T0(b).
   Deviation headers ("Deviations from Rocq", "Deviations from upstream") and the rule that a
   tracked file points at nothing outside the repository are this tree's conventions, not
   inherited ones; they stand.
+- **The green set** (`vtest-lean/Vtest.lean`'s imports; 2026-10-20).  A run leaves the green set
+  only by an owner ruling recorded in `notes/design-rulings.md`; until then a run that went red is a
+  failing check, not a finding.  (Item 8's three runs were moved out about an hour after the item
+  landed and a day and a half before the owner saw the consequence; the rule exists for that.)
+- **Configuration changes** (2026-10-20) are proposed to the owner together with
+  `tools/ci/vtest.sh check-ci`'s result on the changed configuration, never before it: the
+  device-conformance runs are the arbiter of which machine the configuration describes.
 - **Who decides.** T0-T3 and compiler fixes: the integrator, recorded.  T4: the integrator, with
-  the spec quotation, reported to the owner.  T5, every change to M1's board list, and every
-  change to M2's schedule: the owner.
+  the spec quotation, reported to the owner.  T5, every change to M1's board list, every change to
+  M2's schedule, every change to the kernel's and the user tier's contracts (`SpecUser.USER`'s
+  statement, `smFacts`, the user frames), and moving a run out of the green set: the owner.
 
 ## 7. The policies this one rests on, and how far each is adopted
 
@@ -217,14 +235,14 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 | Deviation | Tier | Verdict |
 |---|---|---|
 | fork 1 `2dfb4844`, atomic PTE A/D update (carried since the Rocq era's fork) | **T5** (owner exception, bump decision D3) | keep: `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and `WpPtWalk`/`WpPtWalkOwn` depend on it; the step-7 value compare the spec asks for (and upstream's reviewers asked for on PR #1860) is the recorded residual gap, to be completed in a later lane (decision (2) below) |
-| fork 2 `3fdb4bca`, pins read without the SIG | **T2** | keep: upstream has no knob (the SIG is its only external-interrupt source and the pin registers are private); framed for upstream's external-controller direction |
+| fork 2 `3fdb4bca`, pins read without the SIG | **T2** | keep: platform fidelity -- the validated platforms' external interrupts come from a PLIC that drives the pins, which upstream (the SIG its only source, the pins private) offers no knob for; relocating the SIG's window would avoid the collision but model a device no platform has; framed for upstream's external-controller direction |
 | fork 3 `69ed097e`, fork 4 `9da94b63` | **T3** | keep; upstream candidates |
-| fork 5 `d2cb43fc`, F/D out of `postlude` | **T1** (by a `requires` edit; the dropped arms unreachable with H off) | keep; local (upstream would not take a footprint change) |
+| fork 5 `d2cb43fc`, F/D out of `postlude` | **T1** by a `requires` edit, plus a code edit (two `transformed_instruction` arms dropped) that T1 does not cover and is argued unreachable with H off | keep; local (upstream would not take a footprint change) |
 | fork 6 `f0ef9813`, `hideleg` ignored without H | **T4** (precedents `mideleg`, `hedeleg`; upstream's own Lean emulator admits the read) | keep; upstream candidate |
 | compiler: short-circuit, type-level parens (PRs #1750, #1774 open); keyword escape, `termination_by` (ours) | I5 rule | keep until a release contains them; the two of ours are candidates |
 | patches A, B | I7 rule | keep; both meaning-preserving; retire when the backend allows |
-| config items 1-7 | **T0**: 1, 2, 4 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a) -- Sdtrig off is the one place the configuration lacks a feature every validated platform has (QEMU/CoreCsrprobe is its recorded finding; the cost is the trigger checks in every memory access and the trigger registers' power-on obligations); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep; item 8 (F and D off, 2026-10-19) withdrawn 2026-10-20 |
-| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa` advertises F and D as the validated platforms do, their instructions uncompiled (T1, listed; withdrawal of item 8, 2026-10-20) |
+| config items 1-7 | **T0**: 1, 2, 4 (a) -- 2 by the platforms' `misa`, which all three report without B and V; 3 (a) -- H off follows the boards (QEMU virt alone reports H: findings 19/29), Sdtrig off follows CVA6 where the platforms disagree (`core_csrprobe` slot 35: `csrr tselect` traps on CVA6, not on QEMU or the JH7110; QEMU/CoreCsrprobe is the recorded finding; the cost of Sdtrig on is not measured); 5, 6 forced by `config_is_valid` once H and Sdtrig are off; 7 (b): `MachCSL/UMemAmo.lean`'s rules state the pre-0.13 cause, which the spec permits, unvalidated by any capture | keep; item 8 (F and D off, 2026-10-19) withdrawn 2026-10-20; the Sdtrig justification corrected 2026-10-20 (it had said every platform has Sdtrig) |
+| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa` advertises F and D as the validated platforms do, their instructions uncompiled (T1, listed; withdrawal of item 8, 2026-10-20); the scalar-crypto and Zfh advertisements stay at upstream's defaults, with the M-mode `csrr mseccfg` stuck path recorded (register section 4; owner, 2026-10-20) |
 | board line `written_trigger_index := none` | §5 (model bookkeeping, flagged; upstream relies on the declared `None()`) | keep |
 | `hgeie` existential, `mhartid` pinned in `hwConfig` | §5 | keep |
 | the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | nondeterministic since 2026-10-19 (decision (3)): `riscvStep tick ew` |
@@ -240,3 +258,12 @@ were turned off in the configuration (then T0(a)) on 2026-10-19 and **turned bac
 the device-conformance runs showed every validated platform has F and D and `misa` had come to read a
 value no platform reports; T0(a) was amended accordingly (above), and Sdtrig stays off with its one
 run recorded as a finding.
+
+**Decided by the owner (2026-10-20), on the independent audit** (a clean-context review of the
+bump's decisions; `local-plan/model-bump/policy-review/audit-2026-10-20.md`, outside the
+repository): (6) Sdtrig stays off, justified by the witnessed platform disagreement, not by the
+withdrawn claim that every platform has it; (7) configuration item 7 stays, T0(b) reworded as above;
+(8) no configuration change for the scalar-crypto and Zfh advertisements, the `csrr mseccfg` stuck
+path a recorded residual; (9) the 2026-10-19 changes to the user tier's and the kernel's contracts are
+ratified (`notes/design-rulings.md`); (10) the green-set and configuration-change rules of section 6
+are adopted.  The audit's remaining items were record corrections, made the same day.
