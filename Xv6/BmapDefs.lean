@@ -239,10 +239,10 @@ theorem bm_insert_ent_facts (cov : ExtTreeSet Nat compare) (ls : Nat) (bmI : Blk
       (by simp [hlen]) (by omega) hslot hnz hhome hfresh (fun h => absurd h hindnz)
   · intro i hi hne
     have := hslot i (by omega)
-    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, if_neg hne] at this
+    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, ite_eq_right hne] at this
     exact this
   · have := hslot (NDIRECT + q) (by omega)
-    rw [bmSlot_lt _ _ hmx, if_pos rfl] at this
+    rw [bmSlot_lt _ _ hmx, ite_eq_left rfl] at this
     exact this
 
 /-- `ip->addrs[fbn] = blk` (the direct install). -/
@@ -262,10 +262,10 @@ theorem bm_insert_dir_facts (cov : ExtTreeSet Nat compare) (ls : Nat) (bm : Blkm
       (by omega) hslot hnz hhome hfresh (fun h => blkmapWf_no_ind (bm := bm) hwf h)
   · intro i hi hne
     have := hslot i (by omega)
-    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, if_neg hne] at this
+    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, ite_eq_right hne] at this
     exact this
   · have := hslot fbn (by omega)
-    rw [bmSlot_lt _ _ hmx, if_pos rfl] at this
+    rw [bmSlot_lt _ _ hmx, ite_eq_left rfl] at this
     exact this
 
 /-- `ip->addrs[NDIRECT] = blk` with all-zero entries (the indirect-block
@@ -283,7 +283,7 @@ theorem bm_insert_ind_facts (cov : ExtTreeSet Nat compare) (ls : Nat) (bm : Blkm
       (by simp) (by omega) hslot hnz hhome hfresh (fun h => absurd h hnz)
   · intro i hi
     have := hslot i (by omega)
-    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, if_neg (by omega)] at this
+    rw [bmSlot_lt _ i hi, bmSlot_lt _ i hi, ite_eq_right (by omega)] at this
     exact this
 
 /-! ## The indirect block's entry cell, inside the held buffer -/
@@ -389,13 +389,13 @@ theorem bmPins_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
   obtain ⟨a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- The epilogue's `calleeSaved`: the frame restores `ra`, `s0`..`s3` and
 `sp`; `s4` was restored (or never written) and `s5..s11` never touched. -/

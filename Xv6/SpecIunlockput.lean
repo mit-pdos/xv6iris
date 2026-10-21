@@ -853,7 +853,7 @@ theorem IUNLOCKPUT.wp_iunlockput_dep_sconf_eb (A : IUNLOCKPUT)
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hit Hinv Hesc Hireg Hopen Hslk Hsl Hfl Hcla Hdep
     Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpar Hsb Hsi Hbmi Hpid Hbs Hope
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iempintro
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c' HΦ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops

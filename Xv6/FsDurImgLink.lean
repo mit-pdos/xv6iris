@@ -122,7 +122,7 @@ theorem imgLink_incl (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
     apply fsTickCount_join
     refine List.mem_map.2 ⟨ROOTINO, List.mem_range.2 hnin, ?_⟩
     unfold fsDirTicketsAt
-    simp only [hty, if_true]
+    simp only [hty, ite_true]
   -- THE `"."` ENTRY, peeled off the map
   have hdotv : PartialMap.get? (M := FnameMapF) (dirEntries (imgNode P sb ROOTINO)) DOT =
       some ROOTINO := by
@@ -165,13 +165,13 @@ theorem imgLink_incl (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
     by_cases hzr : ROOTINO = z
     · -- THE ROOT'S KEY: no ticket at all, and multiplicity two
       subst hzr
-      simp only [if_true]
+      simp only [ite_true]
       refine ⟨imgNode P sb ROOTINO, imgNodes_lookup P sb nib ROOTINO
         ((regionInums_spec nib ROOTINO).2 (by omega)), ?_⟩
       have hj := hjoin ROOTINO
       rw [(fsimgWf_rootLink P sb hwf).1] at hj
       rw [hrm]; omega
-    · simp only [hzr, if_false] at hz ⊢
+    · simp only [hzr, ite_false] at hz ⊢
       have hin := fsTickCount_elem _ z hz
       unfold fsDirTickets at hin
       obtain ⟨k, hk, hkt⟩ := List.mem_filterMap.1 hin
@@ -233,7 +233,7 @@ theorem imgLinkElem_ok (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
       | false =>
         exfalso
         unfold dirEntries at hst
-        rw [if_neg (by rw [hd]; decide)] at hst
+        rw [ite_eq_right (by rw [hd]; decide)] at hst
         simp at hst
     subst hroot
     have hty := fsRootWf_type P sb (fsimgWf_root P sb hwf)
@@ -245,13 +245,13 @@ theorem imgLinkElem_ok (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
     · -- the `"."` record: its value is the root's own, and the root's `".."`
       -- names the root, so the pinned parent agrees
       subst hsdot
-      rw [if_pos rfl]
+      rw [ite_eq_left rfl]
       have ht : t = ROOTINO := by
         rw [hents, hdok.fdoDot] at hst; exact (Option.some.inj hst).symm
       subst ht
       intro p q hp hq
       obtain ⟨hrd, -, -, -⟩ := imgRoot_dir P sb hwf
-      simp only [imgV, hrd, if_true] at hp
+      simp only [imgV, hrd, ite_true] at hp
       cases hp
       unfold fnDd at hq
       rw [hents] at hq
@@ -260,11 +260,11 @@ theorem imgLinkElem_ok (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
       rw [hdd] at hq
       cases hq
       rfl
-    rw [if_neg hsdot]
+    rw [ite_eq_right hsdot]
     by_cases hsdd : s = DOTDOT
-    · rw [if_pos hsdd]; trivial
-    rw [if_neg hsdd]
-    simp only [Bool.false_eq_true, if_false]
+    · rw [ite_eq_left hsdd]; trivial
+    rw [ite_eq_right hsdd]
+    simp only [Bool.false_eq_true, ite_false]
     -- a NAME record: its target is not a directory
     have htne : t ≠ ROOTINO := fun e => by
       rw [entTokenless_selfNe ROOTINO _ s t e hsdot] at htl

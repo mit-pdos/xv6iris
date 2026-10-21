@@ -260,7 +260,7 @@ def pidsClear (pids : Nat → BitVec 32) (j : Nat) : Nat → BitVec 32 :=
 
 theorem pidsClear_ne (pids : Nat → BitVec 32) (j i : Nat) (h : i ≠ j) :
     pidsClear pids j i = pids i := by
-  simp only [pidsClear, if_neg h]
+  simp only [pidsClear, ite_eq_right h]
 
 /-- Clearing a pid keeps the table injective. -/
 theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
@@ -347,8 +347,8 @@ theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) (Wk : IProp GF) (pid k
         wordPointsTo (GF := GF) (pPid (procAddr y)) 4 pidLockQ (pidsClear pids j y)) :=
     BigSepL.bigSepL_eq (fun {k y} h => by
       by_cases hk : k = j
-      · rw [if_pos hk, if_pos hk]
-      · rw [if_neg hk, if_neg hk, pidsClear_ne pids j y (by rw [hidx h]; exact hk)])
+      · rw [ite_eq_left hk, ite_eq_left hk]
+      · rw [ite_eq_right hk, ite_eq_right hk, pidsClear_ne pids j y (by rw [hidx h]; exact hk)])
   icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (y : Nat) =>
       wordPointsTo (GF := GF) (pPid (procAddr y)) 4 pidLockQ (pids y)) hget).1 $$ Hlist
     with ⟨Hj, Hrest⟩
@@ -460,9 +460,9 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
   -- `proc_dormant`'s `pv_lazy V = true`, a ghost write -- no cell moves),
   -- and records the generation freeproc was handed (Rocq `pv_gen := g`)
   iexists ({ V with sz := 0#64, pagetable := 0#64, trapframe := 0#64, name := nm, gen := g, pvLazy := true }), 0#32
-  rw [if_pos (rfl : UNUSED = UNUSED)]
+  rw [ite_eq_left (rfl : UNUSED = UNUSED)]
   unfold genHalvesDorm
-  rw [if_neg hUZ]
+  rw [ite_eq_right hUZ]
   isplitl []
   · ipureintro
     refine ⟨hof, hcwd, hroot, ?_, rfl⟩
@@ -477,7 +477,7 @@ theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (Bi
   · ipureintro; rfl
   isplitl [Hxs]
   · iexists 0#32
-    rw [if_neg hUZ]
+    rw [ite_eq_right hUZ]
     iframe Hxs
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
 
@@ -918,14 +918,14 @@ theorem fp_ptarm_neg [CurCtx] (V : ProcPriv) (M : Nat → List (BitVec 8)) (h : 
           procPtAt V.upt M)
       ⊢ ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗
           procPtAt V.upt M := by
-  rw [if_neg h]
+  rw [ite_eq_right h]
 
 /-- The trapframe arm of `freeprocIn`, when the trapframe is present. -/
 theorem fp_tfarm_neg [CurCtx] (V : ProcPriv) (h : V.trapframe ≠ 0#64) :
     (if V.trapframe = 0#64 then (iprop(emp) : IProp GF) else
         ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf)
       ⊢ ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf := by
-  rw [if_neg h]
+  rw [ite_eq_right h]
 
 set_option maxHeartbeats 4000000 in
 /-- From `0x80001b30`: `p->pagetable = 0`, `p->sz = 0`, then the `pid_lock`

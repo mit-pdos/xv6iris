@@ -586,7 +586,7 @@ theorem sys_link_iunlockput_gen (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hops Htx Hslot
   iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hbs Hops Htx Hslot

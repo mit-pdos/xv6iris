@@ -90,7 +90,8 @@ open Lean
 namespace Xv6.CI.Audit
 
 /-- The roots of this tree's own modules: the framework, the kernel proofs,
-the generated Sail model and the vendored Sail library. -/
+the generated Sail model and the Sail library (lean-sail, a git dependency under
+`.lake/packages/Sail`). -/
 def localRoots : List Name := [`MachCSL, `Xv6, `LeanRV64D, `Sail]
 
 def moduleOf? (env : Environment) (c : Name) : Option Name :=

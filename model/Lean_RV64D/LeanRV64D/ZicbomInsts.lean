@@ -1,9 +1,11 @@
+import LeanRV64D.Flow
 import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
+import LeanRV64D.MemAddrtype
 import LeanRV64D.PlatformConfig
 import LeanRV64D.Regs
-import LeanRV64D.SysControl
+import LeanRV64D.SdtrigControl
 import LeanRV64D.Mem
 import LeanRV64D.Vmem
 import LeanRV64D.InstsBegin
@@ -15,12 +17,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -64,6 +66,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -97,10 +101,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -146,6 +153,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -164,17 +172,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -189,12 +204,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -205,7 +223,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -218,7 +239,7 @@ def encdec_cbop_backwards (arg_ : (BitVec 12)) : SailM cbop_zicbom := do
   | 0b000000000000 => (pure CBO_INVAL)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def encdec_cbop_forwards_matches (arg_ : cbop_zicbom) : Bool :=
@@ -241,7 +262,7 @@ def cbop_mnemonic_backwards (arg_ : String) : SailM cbop_zicbom := do
   | "cbo.inval" => (pure CBO_INVAL)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def cbop_mnemonic_forwards_matches (arg_ : cbop_zicbom) : Bool :=
@@ -325,37 +346,48 @@ def cbop_priv_check (p : Privilege) : SailM checked_cbop := do
     if ((← (currentlyEnabled Ext_S)) : Bool)
     then (encdec_cbie_backwards (_get_SEnvcfg_CBIE (← (read_senvcfg ()))))
     else (encdec_cbie_backwards (_get_MEnvcfg_CBIE (← readReg menvcfg))) ) : SailM cbie )
-  match (p, mCBIE, sCBIE) with
-  | (.VirtualUser, _, _) =>
-    (internal_error "extensions/Zicbom/zicbom_insts.sail" 57 "Hypervisor extension not supported")
-  | (.VirtualSupervisor, _, _) =>
-    (internal_error "extensions/Zicbom/zicbom_insts.sail" 58 "Hypervisor extension not supported")
-  | (.Machine, _, _) => (pure CBOP_INVAL_INVAL)
-  | (_, .CBIE_ILLEGAL, _) => (pure CBOP_ILLEGAL)
-  | (.User, _, .CBIE_ILLEGAL) => (pure CBOP_ILLEGAL)
-  | (_, .CBIE_EXEC_FLUSH, _) => (pure CBOP_INVAL_FLUSH)
-  | (.User, _, .CBIE_EXEC_FLUSH) => (pure CBOP_INVAL_FLUSH)
-  | _ => (pure CBOP_INVAL_INVAL)
+  let hCBIE ← (( do
+    if ((← (currentlyEnabled Ext_H)) : Bool)
+    then (encdec_cbie_backwards (_get_HEnvcfg_CBIE (← (read_henvcfg ()))))
+    else (encdec_cbie_backwards (_get_MEnvcfg_CBIE (← readReg menvcfg))) ) : SailM cbie )
+  if ((((bne p Machine) && (mCBIE == CBIE_ILLEGAL)) || ((p == User) && (sCBIE == CBIE_ILLEGAL))) : Bool)
+  then (pure CBOP_ILLEGAL)
+  else
+    (if ((((p == VirtualSupervisor) && (hCBIE == CBIE_ILLEGAL)) || ((p == VirtualUser) && ((hCBIE == CBIE_ILLEGAL) || (sCBIE == CBIE_ILLEGAL)))) : Bool)
+    then (pure CBOP_ILLEGAL_VIRTUAL)
+    else
+      (if ((((bne p Machine) && (mCBIE == CBIE_EXEC_FLUSH)) || (((p == User) && (sCBIE == CBIE_EXEC_FLUSH)) || (((p == VirtualSupervisor) && (hCBIE == CBIE_EXEC_FLUSH)) || ((p == VirtualUser) && ((hCBIE == CBIE_EXEC_FLUSH) || (sCBIE == CBIE_EXEC_FLUSH)))))) : Bool)
+      then (pure CBOP_INVAL_FLUSH)
+      else (pure CBOP_INVAL_INVAL)))
 
-def process_clean_inval (rs1 : regidx) (cbop : cbop_zicbom) : SailM ExecutionResult := do
+def process_clean_inval (rs1 : regidx) (cbop : cbop_zicbom) : SailM ExecutionResult := SailME.run do
   let rs1_val ← do (rX_bits rs1)
   let cache_block_size := (2 ^i plat_cache_block_size_exp)
   let access : (MemoryAccessType mem_payload) := (CacheAccess (CB_manage cbop))
+  let access_info ← do (default_access_info access)
+  let eff_priv := access_info.eff_privilege
   let negative_offset :=
     ((rs1_val &&& (Complement.complement
           (zero_extend (m := 64) (ones (n := plat_cache_block_size_exp))))) - rs1_val)
-  match (← (get_transformed_data_addr rs1 negative_offset access cache_block_size)) with
+  match (← (get_transformed_data_addr rs1 negative_offset access access_info cache_block_size)) with
   | .Ext_DataAddr_Error e => (pure (Ext_DataAddr_Check_Failure e))
   | .Ext_DataAddr_OK vaddr =>
     (do
       let vaddr_for_error := (sub_virtaddr_xlenbits vaddr negative_offset)
-      match (← (translateAddr vaddr access)) with
+      match (← (match_memory_trigger_before (← readReg cur_privilege)
+          (TriggerAddress (TriggerAddress_Store, (bits_of_virtaddr vaddr), cache_block_size)))) with
+      | .some pti => SailME.throw ((PendingTrigger pti) : ExecutionResult)
+      | none => (pure ())
+      match (← (translateAddr vaddr access eff_priv)) with
       | .Ok (paddr, pbmt, _) =>
         (do
-          let ep ← do
-            (effectivePrivilege access (← readReg mstatus) (← readReg cur_privilege))
-          match (← (phys_access_check access pbmt ep paddr cache_block_size false)) with
-          | .Err e => (memory_exception vaddr_for_error e)
+          match (← (phys_access_check access pbmt eff_priv paddr cache_block_size false)) with
+          | .Err e =>
+            (do
+              let paddr_for_error := (sub_physaddr_xlenbits paddr negative_offset)
+              let exc_vaddr ← do
+                (exception_vaddr access_info vaddr_for_error paddr_for_error paddr_for_error)
+              (memory_exception e exc_vaddr access_info))
           | .Ok _ => (pure RETIRE_SUCCESS))
-      | .Err (e, _) => (memory_exception vaddr_for_error e))
+      | .Err (e, _) => (trap { e with excinfo := (bits_of_virtaddr vaddr_for_error) }))
 

@@ -252,13 +252,13 @@ instance pdep_timeless (w : Wid) (s : List (BitVec 8)) : Timeless (pdep D w s) :
 theorem pdep_unfold (w : Wid) (s : List (BitVec 8)) (hs : s ≠ [])
     (hf : fireSrc D.fcR D.pr (lfilts D.lR) D.L w s) : pdep D w s = D.pdepNe w s := by
   unfold pdep
-  rw [if_neg hs, if_pos hf]
+  rw [ite_eq_right hs, ite_eq_left hf]
 
 /-- **Rocq `pdep_gsrc`**. -/
 theorem pdep_gsrc (w : Wid) (s : List (BitVec 8)) (h : gsrc D.fcR D.pr (lfilts D.lR) D.L w s) :
     pdep D w s ⊢ False := by
   unfold pdep
-  rw [if_neg h.1, if_neg h.2]
+  rw [ite_eq_right h.1, ite_eq_right h.2]
 
 /-- **Rocq `pdep_cases`**: a deposit, read at a source some process commits,
 or refuted. -/
@@ -277,7 +277,7 @@ theorem pdep_cases (w : Wid) (s : List (BitVec 8)) (hs : s ≠ []) :
 /-- **Rocq `pdep_nil`**. -/
 theorem pdep_nil (w : Wid) : ⊢ pdep D w [] := by
   unfold pdep
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   ipureintro; trivial
 
 /-- **Rocq `panic_src_ne`**. -/
@@ -297,7 +297,7 @@ theorem pdep_sh_pend (j : Nat) (s : List (BitVec 8)) (hs : panicSrc s) :
     iframe Hs HF
     iintro -
     iexact HG
-  · simp only [PdRound.pdepNe, if_neg altForkc_ne_pipe, ite_true]
+  · simp only [PdRound.pdepNe, ite_eq_right altForkc_ne_pipe, ite_true]
     iintro ⟨Hs, HF⟩
     iframe Hs HF
     iintro %hq

@@ -121,12 +121,12 @@ theorem ulinesOf_out (h : List Obs) (i : UartId) (b : BitVec 8) (hsh : traceShap
 theorem ulinesOf_power (h : List Obs) (on : Bool) :
     ulinesOf (h ++ [if on then .powerOff else .powerOn]) = ulinesOf h := by
   cases on
-  · simp only [ulinesOf, cyclesOf_on, Bool.false_eq_true, if_false, List.map_append,
+  · simp only [ulinesOf, cyclesOf_on, Bool.false_eq_true, ite_false, List.map_append,
       List.flatten_append, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
       List.append_nil]
     have : ulinesCyc [] = [] := rfl
     rw [this, List.append_nil]
-  · simp only [ulinesOf, if_true, cyclesOf_off]
+  · simp only [ulinesOf, ite_true, cyclesOf_off]
 
 /-- Rocq `ulines_before_cut`. -/
 theorem ulinesBefore_cut (h : List Obs) (cs : List (List Obs)) (o : List Obs)

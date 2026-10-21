@@ -63,10 +63,10 @@ theorem curKept_of (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) 
     P k d ⊢ curKept vom P k d := by
   unfold curKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro _
     iempintro
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     exact .rfl
 
 end CurKept
@@ -95,11 +95,11 @@ theorem plainTruncKey (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec
       (if omTrunc vom then truncTermAt pl P i else iprop(emp))) $$ [HP]
   · unfold curKept truncTermAt
     by_cases hv : omTrunc vom = true
-    · simp only [if_pos hv]
+    · simp only [ite_eq_left hv]
       isplitr
       · iempintro
       · iexact HP
-    · simp only [if_neg hv]
+    · simp only [ite_eq_right hv]
       isplitl [HP]
       · iexact HP
       · iempintro
@@ -116,13 +116,13 @@ theorem plainCur_of_kept (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (Bit
       P (pathElems pl).length i := by
   unfold curKept plainTruncKept openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt creFtKept truncTermAt
     dsimp only
     iintro _ Ht
     icases Ht with ⟨-, ⟨-, Hk⟩⟩
     iexact Hk
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro Hc _
     iexact Hc
 
@@ -145,7 +145,7 @@ theorem plainTruncKept_pure (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (
       iprop(⌜φ i⌝ ∗ plainTruncKept Γ vom pl P i Ft) := by
   unfold curKept plainTruncKept openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro _ Ht
     ihave %hi : ⌜φ i⌝ $$ [Ht]
     · unfold pfAt creFtKept truncTermAt
@@ -155,7 +155,7 @@ theorem plainTruncKept_pure (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (
     isplitr
     · ipureintro; exact hi
     · iexact Ht
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro Hc Ht
     ihave %hi := (hφ _ i) $$ Hc
     isplitr
@@ -224,10 +224,10 @@ theorem creRcptKept_of (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname �
     F.pfRecv av d nm i ⊢ creRcptKept vom F av d nm i := by
   unfold creRcptKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro _
     iempintro
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     exact .rfl
 
 /-- WHAT THE "name existed" FAILURE ARM HANDS BACK (Rocq `cre_fail_kept`),
@@ -262,11 +262,11 @@ theorem creFailKept_of_piece (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List 
       creFailKept Γ vom pl P Farm Fun Fok Fex i Ft := by
   unfold creFailKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro Ht Hcl
     iright
     iframe Ht Hcl
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _ Hcl
     iexact Hcl
 
@@ -281,11 +281,11 @@ theorem creFailKept_of_at (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (Bi
       creFailKept Γ vom pl P Farm Fun Fok Fex i Ft := by
   unfold creFailKept creChildKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro Ht Hcl
     ileft
     iframe Ht Hcl
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _ Hcl
     ileft
     iexact Hcl

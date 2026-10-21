@@ -256,7 +256,7 @@ theorem elfSeq_disj (a1 a2 : Nat) (l1 l2 : List (BitVec 8)) (h : a1 + l1.length 
   by_cases h2 : a2 ≤ x
   · left
     by_cases h1 : a1 ≤ x
-    · simp only [h1, if_true]; exact List.getElem?_eq_none (by omega)
+    · simp only [h1, ite_true]; exact List.getElem?_eq_none (by omega)
     · simp [h1]
   · right; simp [h2]
 
@@ -482,7 +482,7 @@ theorem lookup_segZeroMap (p : ElfPhdr) (a : Nat) (b : BitVec 8) (hm : p.filesz 
     · cases hl
   · rintro ⟨⟨hge, hlt⟩, rfl⟩
     refine ⟨hge, ?_⟩
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
 
 /-- Rocq `seg_file_zero_disjoint`. -/
 theorem segFileZero_disjoint (f : ElfBytes) (p : ElfPhdr) (hok : PhdrOk f p) :

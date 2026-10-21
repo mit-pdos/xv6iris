@@ -153,13 +153,13 @@ theorem bitMask_getLsbD (k i : Nat) :
 theorem bmByte_and_pow2 (u : BitSet) (j k : Nat) (hk : k < 8) :
     bmByte u j &&& bitMask k = if 8 * j + k ∈ u then bitMask k else 0#8 := by
   by_cases hp : 8 * j + k ∈ u
-  · rw [if_pos hp, BitVec.eq_of_getLsbD_eq_iff]
+  · rw [ite_eq_left hp, BitVec.eq_of_getLsbD_eq_iff]
     intro i hi
     rw [BitVec.getLsbD_and, bitMask_getLsbD, bmByte_getLsbD u j i hi]
     by_cases hki : k = i
     · subst hki; simp [hk, hp]
     · simp [hki]
-  · rw [if_neg hp, BitVec.eq_of_getLsbD_eq_iff]
+  · rw [ite_eq_right hp, BitVec.eq_of_getLsbD_eq_iff]
     intro i hi
     rw [BitVec.getLsbD_and, bitMask_getLsbD, bmByte_getLsbD u j i hi, BitVec.getLsbD_zero]
     by_cases hki : k = i
@@ -213,8 +213,8 @@ theorem bmByte_and_pow2_64 (u : BitSet) (j k : Nat) (hk : k < 8) :
       = if 8 * j + k ∈ u then (1#64 <<< k) else 0#64 := by
   rw [← setWidth64_bitMask k hk, ← BitVec.setWidth_and, bmByte_and_pow2 u j k hk]
   by_cases hp : 8 * j + k ∈ u
-  · rw [if_pos hp, if_pos hp, setWidth64_bitMask k hk]
-  · rw [if_neg hp, if_neg hp]
+  · rw [ite_eq_left hp, ite_eq_left hp, setWidth64_bitMask k hk]
+  · rw [ite_eq_right hp, ite_eq_right hp]
     rfl
 
 theorem bmByte_lor_pow2_64 (u : BitSet) (j k : Nat) (hk : k < 8) :

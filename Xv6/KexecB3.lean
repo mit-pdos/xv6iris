@@ -237,7 +237,7 @@ theorem kxcB3_rows_load {f ef g : ElfBytes} {i : Nat} {szv newsz sz1 x : BitVec 
     have hFs' : leAt g 32 4 = (kxbPhdr f ef i).filesz := by
       unfold kxbPhdr; rw [hFs4]; exact Nat.mod_eq_of_lt (by unfold kxbPhdr at hw1; omega)
     have hs1 : sz1 = newsz := by
-      rw [hsz1, if_neg (by rw [hnw, hsz]; rw [hV'] at hle; omega)]
+      rw [hsz1, ite_eq_right (by rw [hnw, hsz]; rw [hV'] at hle; omega)]
     rw [hs1]
     refine KexecBuilt.kxbAt_step_load hw (by omega) hty' (hat hw) hok (kxc_um_free_above szv newsz P hbelow)
       (by rw [hnw, hV', hM']) (fun a ha => ?_) hcov hlen (by rw [← hO', hV', ← hFs']; exact hwin)
@@ -1178,8 +1178,8 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   · -- ---- ... but returned 0: +0x184 beqz taken, the +0x34c stub ----
     have hsz0 : R2 10#5 = szv := by
       by_cases hlt : newsz.toNat < szv.toNat
-      · rw [hret, if_pos hlt]
-      · rw [if_neg hlt] at hret
+      · rw [hret, ite_eq_left hlt]
+      · rw [ite_eq_right hlt] at hret
         have h0 : newsz.toNat = 0 := by rw [← hret, hz]; rfl
         have h1 : szv.toNat = 0 := by omega
         rw [hz]
@@ -1209,8 +1209,8 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
   iintro Hk Hpc
   have hnew1 : leAt g 16 8 + leAt g 40 8 ≤ (R2 10#5).toNat := by
     by_cases hlt : newsz.toNat < szv.toNat
-    · rw [hret, if_pos hlt]; omega
-    · rw [hret, if_neg hlt]; omega
+    · rw [hret, ite_eq_left hlt]; omega
+    · rw [hret, ite_eq_right hlt]; omega
   ihave Hfr := Hfb $$ %(R2 10#5) Hg F65 F67
   iapply (kxcB3_load RD WA PA IUP EO PFP Γ Q QF cpu k { A with V := A.V.updEv kv } spie2 spp2 _ kf qf sf
       gyf loyf tlyf inumf dnf bmf

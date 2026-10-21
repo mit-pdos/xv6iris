@@ -265,7 +265,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     obtain ⟨-, -, h1, -⟩ := hf
     subst hok
     have : walkSpend w ≤ 1 := by unfold walkSpend; split <;> omega
-    simp only [if_true] at h1
+    simp only [ite_true] at h1
     unfold MAXOPBLOCKS iputUnits at *
     omega
   cases ok with

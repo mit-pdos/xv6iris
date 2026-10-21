@@ -314,7 +314,7 @@ theorem fwr_beq_cw : bcond bop.BEQ KA.«consolewrite» 0#64 = false := by decide
 theorem fwr_dev_env_in (γl : GName) (γu : UartNames) (mj : Nat) (h : mj ≤ NDEV_max) :
     filewriteDevEnv (GF := GF) γl γu mj ⊢
       wordPointsTo (aDevswWrite mj) 8 DFrac.discard (devswWriteVal mj) ∗ uartPort .uart0 γl γu := by
-  unfold filewriteDevEnv; rw [if_pos h]
+  unfold filewriteDevEnv; rw [ite_eq_left h]
 
 set_option maxHeartbeats 8000000 in
 /-- The FD_DEVICE arm's two `-1` exits (`+0x11e` out of range, `+0x122`

@@ -175,7 +175,7 @@ theorem lmPsLenOk_blk_w (B : LmByteLaws M) (so : GStage M) (a : Nat) (w' : List 
   · exact hne hz
   · have heq : lmProIdx M (so.gsCs ++ [a]) (nlines (so.gsE.map Prod.snd))
         = lmProIdx M so.gsCs (nlines (so.gsE.map Prod.snd)) + 1 := by
-      rw [hsnoc, hold, if_pos h3]
+      rw [hsnoc, hold, ite_eq_left h3]
     simp only [lmPsRound] at hne2
     rw [heq] at hne2
     apply hne2
@@ -483,7 +483,7 @@ theorem gclPureO_blkN_file (K : LmHooks M) (B : LmByteLaws M) (k : Nat) (ho : Li
       List.getElem?_append_left (by rw [hqq, hIeq]; omega)]
   have hpendA : lmPending M so.gsPs (so.gsCs ++ [a]) (gsState M sd so) so.gsE = pre0 ++ uPrompt := by
     unfold lmPending lmPendingAt
-    rw [if_neg hnn, if_pos hrr, lmNContAt_nopanic M _ _ _ _ _ (by rw [hat]; exact hpan), hat,
+    rw [ite_eq_right hnn, ite_eq_left hrr, lmNContAt_nopanic M _ _ _ _ _ (by rw [hat]; exact hpan), hat,
       hIeq, hfst, ← hreq]
     exact hcont
   refine ⟨rfl, hpre0, hwp', ?_, ?_, ?_⟩

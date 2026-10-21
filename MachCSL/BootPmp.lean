@@ -22,8 +22,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## §3a The entry algebra
@@ -112,7 +111,7 @@ theorem bootFin_pmpLoop (body : (i : Int) → i ∈ pmpRange → Unit → SailM 
     rw [IntRange.loop_unfold]
     have hni : ¬ i ∈ pmpRange := by
       simp [Membership.mem]; omega
-    rw [dif_neg hni]
+    rw [dite_eq_right hni]
     refine bootFin_pure _ _ _ ⟨BootFrameExcept.refl _ _, fun j h1 h2 => ?_, fun _ _ => rfl⟩
     omega
   | succ n ih =>
@@ -120,7 +119,7 @@ theorem bootFin_pmpLoop (body : (i : Int) → i ∈ pmpRange → Unit → SailM 
     rw [IntRange.loop_unfold]
     have hin : i ∈ pmpRange := by
       simp [Membership.mem]; omega
-    rw [dif_pos hin]
+    rw [dite_eq_left hin]
     refine bootFin_seq _ _ _ _ _ (hb i hin f) ?_
     rintro s f₁ ⟨rfl, hfr₁, hoff₁, hne₁⟩
     have ih' := ih (i + pmpRange.step) (by simp) f₁ (by simp; omega) (by simp; omega)

@@ -1,7 +1,10 @@
+import LeanRV64D.LeanRV64D
+import LeanRV64D.Vector
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
+import LeanRV64D.MemAddrtype
 import LeanRV64D.MemMetadata
-import LeanRV64D.ReadWriteV1
+import LeanRV64D.VmemTypes
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -9,12 +12,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -58,6 +61,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -91,10 +96,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -140,6 +148,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -158,17 +167,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -183,12 +199,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -199,7 +218,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -230,30 +252,28 @@ def num_of_write_kind (arg_ : write_kind) : Int :=
 
 def undefined_read_kind (_ : Unit) : SailM read_kind := do
   (internal_pick
-    [Read_plain, Read_ifetch, Read_ttw, Read_RISCV_acquire, Read_RISCV_strong_acquire, Read_RISCV_reserved, Read_RISCV_reserved_acquire, Read_RISCV_reserved_strong_acquire])
+    [Read_plain, Read_ifetch, Read_RISCV_acquire, Read_RISCV_strong_acquire, Read_RISCV_reserved, Read_RISCV_reserved_acquire, Read_RISCV_reserved_strong_acquire])
 
-/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 7 -/
+/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 6 -/
 def read_kind_of_num (arg_ : Nat) : read_kind :=
   match arg_ with
   | 0 => Read_plain
   | 1 => Read_ifetch
-  | 2 => Read_ttw
-  | 3 => Read_RISCV_acquire
-  | 4 => Read_RISCV_strong_acquire
-  | 5 => Read_RISCV_reserved
-  | 6 => Read_RISCV_reserved_acquire
+  | 2 => Read_RISCV_acquire
+  | 3 => Read_RISCV_strong_acquire
+  | 4 => Read_RISCV_reserved
+  | 5 => Read_RISCV_reserved_acquire
   | _ => Read_RISCV_reserved_strong_acquire
 
 def num_of_read_kind (arg_ : read_kind) : Int :=
   match arg_ with
   | .Read_plain => 0
   | .Read_ifetch => 1
-  | .Read_ttw => 2
-  | .Read_RISCV_acquire => 3
-  | .Read_RISCV_strong_acquire => 4
-  | .Read_RISCV_reserved => 5
-  | .Read_RISCV_reserved_acquire => 6
-  | .Read_RISCV_reserved_strong_acquire => 7
+  | .Read_RISCV_acquire => 2
+  | .Read_RISCV_strong_acquire => 3
+  | .Read_RISCV_reserved => 4
+  | .Read_RISCV_reserved_acquire => 5
+  | .Read_RISCV_reserved_strong_acquire => 6
 
 def undefined_barrier_kind (_ : Unit) : SailM barrier_kind := do
   (internal_pick
@@ -288,88 +308,65 @@ def num_of_barrier_kind (arg_ : barrier_kind) : Int :=
   | .Barrier_RISCV_tso => 9
   | .Barrier_RISCV_i => 10
 
-def undefined_RISCV_strong_access (_ : Unit) : SailM RISCV_strong_access := do
-  (pure { variety := ← (undefined_Access_variety ()) })
-
 /-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
-def write_ram (wk : write_kind) (app_1 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta' : Unit) : SailM Bool := do
-  let .Physaddr addr := app_1
+def write_ram (wk : write_kind) (access : (MemoryAccessType mem_payload)) (app_2 : physaddr) (width : Nat) (data : (BitVec (8 * width))) (meta' : Unit) : SailM Bool := do
+  let .Physaddr addr := app_2
   let request ← (( do
     (pure { access_kind := ← match wk with
-              | .Write_plain =>
-                (pure (AK_explicit
-                    { variety := AV_plain
-                      strength := AS_normal }))
               | .Write_RISCV_release =>
-                (internal_error "core/phys_mem_interface.sail" 91 "Write_RISCV_release is unused")
+                (internal_error "core/phys_mem_interface.sail" 146 "Write_RISCV_release is unused")
               | .Write_RISCV_strong_release =>
-                (internal_error "core/phys_mem_interface.sail" 92
+                (internal_error "core/phys_mem_interface.sail" 147
                   "Write_RISCV_strong_release is unused")
-              | .Write_RISCV_conditional =>
-                (pure (AK_explicit
-                    { variety := AV_exclusive
-                      strength := AS_normal }))
-              | .Write_RISCV_conditional_release =>
-                (pure (AK_explicit
-                    { variety := AV_exclusive
-                      strength := AS_rel_or_acq }))
-              | .Write_RISCV_conditional_strong_release =>
-                (pure (AK_arch { variety := AV_exclusive }))
-            va := none
-            pa := addr
-            translation := ()
+              | _ => (pure (AK_Write (wk, access)))
+            address := addr
+            address_space := ()
             size := width
-            value := (some data)
-            tag := none }) ) : SailM
-    (Mem_write_request width 64 physaddrbits Unit RISCV_strong_access) )
-  match (← (sail_mem_write request)) with
+            num_tag := 0 }) ) : SailM (Mem_request width 0 physaddrbits_len Unit access_kind) )
+  match (← (sail_mem_write request (to_bytes_le (n := width) data) #v[])) with
   | .Ok _ =>
     (let _ : Unit := (__WriteRAM_Meta addr width meta')
     (pure true))
   | .Err () => (pure false)
 
-/-- Type quantifiers: _width : Nat, 0 < _width ∧ _width ≤ max_mem_access -/
-def write_ram_ea (_wk : write_kind) (app_1 : physaddr) (_width : Nat) : Unit :=
-  let .Physaddr _addr := app_1
-  ()
+/-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+def write_ram_ea (wk : write_kind) (access : (MemoryAccessType mem_payload)) (app_2 : physaddr) (width : Nat) : SailM Unit := do
+  let .Physaddr addr := app_2
+  let request ← (( do
+    (pure { access_kind := ← match wk with
+              | .Write_RISCV_release =>
+                (internal_error "core/phys_mem_interface.sail" 183 "Write_RISCV_release is unused")
+              | .Write_RISCV_strong_release =>
+                (internal_error "core/phys_mem_interface.sail" 184
+                  "Write_RISCV_strong_release is unused")
+              | _ => (pure (AK_Write (wk, access)))
+            address := addr
+            address_space := ()
+            size := width
+            num_tag := 0 }) ) : SailM (Mem_request width 0 physaddrbits_len Unit access_kind) )
+  (sail_mem_address_announce request)
 
-/-- Type quantifiers: k_ex672315_ : Bool, width : Nat, width ≥ 0, 0 < width ∧
+/-- Type quantifiers: k_ex1172836_ : Bool, width : Nat, width ≥ 0, 0 < width ∧
   width ≤ max_mem_access -/
-def read_ram (rk : read_kind) (app_1 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
-  let .Physaddr addr := app_1
+def read_ram (rk : read_kind) (access : (MemoryAccessType mem_payload)) (app_2 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
+  let .Physaddr addr := app_2
   let meta' :=
     if (read_meta : Bool)
     then (__ReadRAM_Meta addr width)
     else default_meta
   let request ← (( do
     (pure { access_kind := ← match rk with
-              | .Read_plain =>
-                (pure (AK_explicit
-                    { variety := AV_plain
-                      strength := AS_normal }))
-              | .Read_ifetch => (pure (AK_ifetch ()))
-              | .Read_ttw => (pure (AK_ttw ()))
               | .Read_RISCV_acquire =>
-                (internal_error "core/phys_mem_interface.sail" 133 "Read_RISCV_acquire is unused")
+                (internal_error "core/phys_mem_interface.sail" 219 "Read_RISCV_acquire is unused")
               | .Read_RISCV_strong_acquire =>
-                (internal_error "core/phys_mem_interface.sail" 134
+                (internal_error "core/phys_mem_interface.sail" 220
                   "Read_RISCV_strong_acquire is unused")
-              | .Read_RISCV_reserved =>
-                (pure (AK_explicit
-                    { variety := AV_exclusive
-                      strength := AS_normal }))
-              | .Read_RISCV_reserved_acquire =>
-                (pure (AK_explicit
-                    { variety := AV_exclusive
-                      strength := AS_rel_or_acq }))
-              | .Read_RISCV_reserved_strong_acquire => (pure (AK_arch { variety := AV_exclusive }))
-            va := none
-            pa := addr
-            translation := ()
+              | _ => (pure (AK_Read (rk, access)))
+            address := addr
+            address_space := ()
             size := width
-            tag := false }) ) : SailM
-    (Mem_read_request width 64 physaddrbits Unit RISCV_strong_access) )
+            num_tag := 0 }) ) : SailM (Mem_request width 0 physaddrbits_len Unit access_kind) )
   match (← (sail_mem_read request)) with
-  | .Ok (value, _) => (pure (value, meta'))
+  | .Ok (value, _) => (pure ((from_bytes_le (n := width) value), meta'))
   | .Err () => throw Error.Exit
 

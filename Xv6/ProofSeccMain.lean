@@ -142,7 +142,7 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   rw [hb]
   by_cases hle : na ≤ 1
   · -- THE USAGE LINE: 0x4c  c.sdsp s1,8(sp)
-    rw [if_pos (by simp [hle]), show BitVec.ofNat 64 0xa + BitVec.signExtend 64 0x42#13 = BitVec.ofNat 64 0x4c
+    rw [ite_eq_left (by simp [hle]), show BitVec.ofNat 64 0xa + BitVec.signExtend 64 0x42#13 = BitVec.ofNat 64 0x4c
       from by decide]
     ihave Hi := secc_uis N.t 0x4c true (.STORE (8#12, .Regidx 9#5, .Regidx 2#5, 8)) udec%
       (by decide) $$ Hc
@@ -153,7 +153,7 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
     iapply wp_ksecc_usage UL HS HF N h7 m3 n l $$ Hq Hc Hwd Hstd Hrun
   -- ARGUMENTS: 0xe  c.sdsp s1,8(sp)
-  rw [if_neg (by simp [hle]), ukPc 0xa 0xe false rfl]
+  rw [ite_eq_right (by simp [hle]), ukPc 0xa 0xe false rfl]
   ihave Hi := secc_uis N.t 0xe true (.STORE (8#12, .Regidx 9#5, .Regidx 2#5, 8)) udec%
     (by decide) $$ Hc
   iapply wp_uk_sd UL N h6 m3 (BitVec.ofNat 64 0xe) true 8#12 2#5 9#5 _ w3 _ hC (by omega) $$ Hi Hw3 Hrun

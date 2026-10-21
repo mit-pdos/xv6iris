@@ -16,7 +16,7 @@ import MachCSL.WpSmodeCycle
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -45,7 +45,7 @@ theorem remu_val (x y : BitVec 64) (hy : y ≠ 0#64) :
   have hc : ¬ (((Sail.BitVec.toNatInt y == 0) : Bool) = true) := by
     simp [Sail.BitVec.toNatInt, hy0]
   have hlt : x.toNat % y.toNat < 2 ^ 64 := Nat.lt_of_le_of_lt (Nat.mod_le _ _) x.isLt
-  rw [if_neg hc, show Int.tmod (Sail.BitVec.toNatInt x) (Sail.BitVec.toNatInt y)
+  rw [ite_eq_right hc, show Int.tmod (Sail.BitVec.toNatInt x) (Sail.BitVec.toNatInt y)
       = Int.ofNat (x.toNat % y.toNat) from rfl, to_bits_truncate64_ofNat (x.toNat % y.toNat) hlt]
   apply BitVec.eq_of_toNat_eq
   simp [BitVec.toNat_umod]
@@ -63,7 +63,7 @@ theorem divu_val (x y : BitVec 64) (hy : y ≠ 0#64) :
   have hc : ¬ (((Sail.BitVec.toNatInt y == 0) : Bool) = true) := by
     simp [Sail.BitVec.toNatInt, hy0]
   have hlt : x.toNat / y.toNat < 2 ^ 64 := Nat.lt_of_le_of_lt (Nat.div_le_self _ _) x.isLt
-  rw [if_neg hc, show Int.tdiv (Sail.BitVec.toNatInt x) (Sail.BitVec.toNatInt y)
+  rw [ite_eq_right hc, show Int.tdiv (Sail.BitVec.toNatInt x) (Sail.BitVec.toNatInt y)
       = Int.ofNat (x.toNat / y.toNat) from rfl, to_bits_truncate64_ofNat (x.toNat / y.toNat) hlt]
   apply BitVec.eq_of_toNat_eq
   simp [BitVec.toNat_udiv]

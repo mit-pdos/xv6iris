@@ -251,8 +251,8 @@ instance filereadDevEnv_persistent (mj : Nat) : Persistent (filereadDevEnv (GF :
 theorem filereadDevEnv_of_ready (mj : Nat) : consoleReadyApp (GF := GF) ⊢ filereadDevEnv mj := by
   unfold filereadDevEnv
   by_cases hm : mj ≤ NDEV_max
-  · rw [if_pos hm]
-  · rw [if_neg hm]; iintro -; iempintro
+  · rw [ite_eq_left hm]
+  · rw [ite_eq_right hm]; iintro -; iempintro
 
 /-- It is only READ, so it comes back as it went in (Rocq
 `fileread_dev_out`). -/
@@ -494,7 +494,7 @@ theorem filereadExtraCore_m1_why (rb : Bool) (n : Int) (r : BitVec 64) (M' : Nat
         filereadExtraCore gn pt (.open true rb (.device CONSOLE)) n F Rd Rin Rp Rpe r M' addr := by
   unfold filereadExtraCore
   dsimp only
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   exact consoleReceipt_m1_why gn pt Rd Rin n r M' addr hnb hr
 
 /-- Rocq `fileread_in_inode_of`. -/
@@ -547,7 +547,7 @@ theorem filereadExtra_dev_console (wb : Bool) (n : Int) (r : BitVec 64)
       filereadExtra gn pt (.open true wb (.device CONSOLE)) n F Rd Rin Rp Rpe P r M' addr := by
   unfold filereadExtra filereadExtraCore
   dsimp only
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   iintro HP H
   iframe HP H
 
@@ -564,7 +564,7 @@ theorem filereadExtra_dev_m1 (rb wb : Bool) (mj : Nat) (n : Int) (M' : Nat → L
     ihave H := H $$ HP
     iframe H
     try (ipureintro; first | rfl | trivial)
-  · simp only [filereadIn, filereadExtra, filereadExtraCore, if_neg hne]
+  · simp only [filereadIn, filereadExtra, filereadExtraCore, ite_eq_right hne]
     iintro H HP
     ihave H := H $$ HP
     iframe H
@@ -584,7 +584,7 @@ theorem filereadIn_dev_console (st : FdState) (n : Int) (wb : Bool) (mj : Nat)
       consAcc fscCons (appRdcred (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
         consReadPay (genId (GF := GF) + 1) Rin := by
   subst h hmj
-  simp only [filereadIn, if_pos]
+  simp only [filereadIn, ite_eq_left]
   iintro H HP
   iapply H $$ HP
 
@@ -667,7 +667,7 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
       iintro H HP; ihave H := H $$ HP; imodintro; iframe H
       try (ipureintro; first | rfl | trivial)
     · by_cases hmj : mj = CONSOLE
-      · simp only [filereadIn, filereadExtra, filereadExtraCore, if_pos hmj]
+      · simp only [filereadIn, filereadExtra, filereadExtraCore, ite_eq_left hmj]
         iintro H HP
         icases H $$ HP with ⟨Hacc, -⟩
         imod consAcc_ret _ _ _ $$ Hacc with ⟨%cur, %dc, HP, Hrd⟩
@@ -675,7 +675,7 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
         iframe HP
         iapply consoleReceipt_m1 gn pt Rd Rin n cur dc M' addr $$ Hrd
         ileft; ipureintro; exact hn
-      · simp only [filereadIn, filereadExtra, filereadExtraCore, if_neg hmj]
+      · simp only [filereadIn, filereadExtra, filereadExtraCore, ite_eq_right hmj]
         iintro H HP; ihave H := H $$ HP; imodintro; iframe H
 
 end Keyed

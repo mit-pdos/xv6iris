@@ -80,18 +80,18 @@ theorem sys_sbrk_trapframe_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by deci
 
 theorem sys_sbrk_beq_pos {α : Type _} (x y : BitVec 64) (h : x = y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, beq_iff_eq]; exact h)]
 theorem sys_sbrk_beq_neg {α : Type _} (x y : BitVec 64) (h : x ≠ y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 theorem sys_sbrk_bltz_pos {α : Type _} (x : BitVec 64) (h : x.toInt < 0) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = p := by
-  refine if_pos ?_
+  refine ite_eq_left ?_
   simp only [bcond, BitVec.slt, decide_eq_true_eq]
   simpa using h
 theorem sys_sbrk_bltz_neg {α : Type _} (x : BitVec 64) (h : ¬ x.toInt < 0) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, BitVec.slt, decide_eq_true_eq]
   simpa using h
 

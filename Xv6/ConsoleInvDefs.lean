@@ -844,7 +844,7 @@ theorem devswRest_intro [X : CurCtx] :
   unfold devswRest
   rw [show List.range (NDEV_max + 1) = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] from rfl]
   simp only [bigSepL, Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, CONSOLE]
-  simp only [Nat.reduceEqDiff, if_true, if_false]
+  simp only [Nat.reduceEqDiff, ite_true, ite_false]
   iframe H0r H0w H2r H2w H3r H3w H4r H4w H5r H5w H6r H6w H7r H7w H8r H8w H9r H9w
 
 /-- A single byte cell is publishable (deviation 10). -/
@@ -901,7 +901,7 @@ theorem devswTable_of_rest [X : CurCtx] :
     rw [devswReadVal_console, devswWriteVal_console]
     imodintro
     iframe Hr Hw
-  · simp only [hc, if_false, devswReadVal_other i hc, devswWriteVal_other i hc]
+  · simp only [hc, ite_false, devswReadVal_other i hc, devswWriteVal_other i hc]
     icases H with ⟨Hzr, Hzw⟩
     imod consWord_persist _ 8 _ _ $$ Hzr with #Hzr
     imod consWord_persist _ 8 _ _ $$ Hzw with #Hzw

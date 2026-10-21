@@ -79,7 +79,7 @@ theorem uroundOk_ecall {tf : List (BitVec 64)} {M M' : ElfMem} {π π' : Nat →
     (usysEff secc tf ≠ USYS_exit ∧ ∃ r : BitVec 64, uroundBumpOk tf tf' r ∧
       usysMemOk (usysEff secc tf) tf r M π szv lz M' π' szv' lz' ∧ usysCwdOk (usysEff secc tf) r cw cw' ∧
       usysSeccOk (usysEff secc tf) tf secc secc' r) := by
-  unfold uroundOk at H; rwa [if_pos rfl] at H
+  unfold uroundOk at H; rwa [ite_eq_left rfl] at H
 
 /-- Rocq `uround_ok_transparent`. -/
 theorem uroundOk_transparent {sc : BitVec 64} {tf : List (BitVec 64)} {M M' : ElfMem}
@@ -87,7 +87,7 @@ theorem uroundOk_transparent {sc : BitVec 64} {tf : List (BitVec 64)} {M M' : El
     {tf' : List (BitVec 64)}
     (hne : sc ≠ uecallScause) (H : uroundOk sc tf M π szv cw lz secc tf' M' π' szv' cw' lz' secc') :
     uroundIdOk tf tf' ∧ M' = M ∧ π' = π ∧ szv' = szv ∧ cw' = cw ∧ lz' = lz ∧ secc' = secc := by
-  unfold uroundOk at H; rwa [if_neg hne] at H
+  unfold uroundOk at H; rwa [ite_eq_right hne] at H
 
 /-! ## §4 THE CONGRUENCES
 
@@ -108,7 +108,7 @@ theorem uroundOk_ueq_l {sc : BitVec 64} {tf tfa : List (BitVec 64)} {M M' : ElfM
   unfold uroundOk at H ⊢
   split
   · rename_i hsc
-    rw [if_pos hsc] at H
+    rw [ite_eq_left hsc] at H
     rcases H with ⟨hx, hcw, hsc⟩ | ⟨hnx, r, ⟨hb1, hb2⟩, hm, hc, hs⟩
     · exact Or.inl ⟨hn ▸ hx, hcw, hsc⟩
     · refine Or.inr ⟨hn ▸ hnx, r, ⟨?_, ?_⟩, ?_, ?_, ?_⟩
@@ -118,7 +118,7 @@ theorem uroundOk_ueq_l {sc : BitVec 64} {tf tfa : List (BitVec 64)} {M M' : ElfM
       · rw [← hn]; exact hc
       · rw [← hn]; exact usysSeccOk_argCong ha0 hs
   · rename_i hsc
-    rw [if_neg hsc] at H
+    rw [ite_eq_right hsc] at H
     obtain ⟨⟨hi1, hi2⟩, hrest⟩ := H
     exact ⟨⟨hi1.trans hg, hi2.trans hp⟩, hrest⟩
 
@@ -133,12 +133,12 @@ theorem uroundOk_ueq_r {sc : BitVec 64} {tf : List (BitVec 64)} {M M' : ElfMem}
   unfold uroundOk at H ⊢
   split
   · rename_i hsc
-    rw [if_pos hsc] at H
+    rw [ite_eq_left hsc] at H
     rcases H with hx | ⟨hnx, r, ⟨hb1, hb2⟩, hm⟩
     · exact Or.inl hx
     · exact Or.inr ⟨hnx, r, ⟨hg ▸ hb1, hp ▸ hb2⟩, hm⟩
   · rename_i hsc
-    rw [if_neg hsc] at H
+    rw [ite_eq_right hsc] at H
     obtain ⟨⟨hi1, hi2⟩, hrest⟩ := H
     exact ⟨⟨hg ▸ hi1, hp ▸ hi2⟩, hrest⟩
 

@@ -527,7 +527,7 @@ theorem create_ok_of_found (Î“ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname â
   unfold creOkArms
   iintro HP Hex Hcre
   iexists d, nm
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iframe HP Hex Hcre
   ipureintro; exact hlast
 

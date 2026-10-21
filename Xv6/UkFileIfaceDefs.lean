@@ -111,7 +111,7 @@ theorem fifDq_wr (h : fifWr X.D0 X.w0 = true) : ⊢ X.fifDq := by
 
 /-- The credential is `True` at the write mode (Rocq's `rewrite /fif_cred Hwr`). -/
 theorem fifCred_wr (h : fifWr X.D0 X.w0 = true) : ⊢ X.fifCred := by
-  unfold fifCred; rw [if_pos h]; exact BI.true_intro
+  unfold fifCred; rw [ite_eq_left h]; exact BI.true_intro
 
 /-- **Rocq `fif_cred_rd`**. -/
 theorem fifCred_rd (h : fifWr X.D0 X.w0 = false) :
@@ -396,7 +396,7 @@ theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) (l : 
       rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)]
     rw [hsig]
     have hoh : openHeld fdm (fd : Int) = fun y => y = (fd : Int) ∨ fdDom fdm y := by
-      unfold openHeld; rw [if_pos (by omega)]
+      unfold openHeld; rw [ite_eq_left (by omega)]
     rw [hoh]
     unfold fifEnv
     icases He with ⟨-, #Hk, #Hpay, -, -⟩
@@ -447,7 +447,7 @@ theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) (l : 
         intro x hx
         rcases hx with rfl | hx
         · refine ⟨⟨by omega, by omega⟩, Or.inr ⟨by omega, ?_⟩⟩
-          rw [LawfulPartialMap.get?_insert, if_pos rfl]; rfl
+          rw [LawfulPartialMap.get?_insert, ite_eq_left rfl]; rfl
         · obtain ⟨hb, hc⟩ := hho x hx
           refine ⟨hb, ?_⟩
           rcases hc with hc | ⟨hs, hsm⟩
@@ -463,7 +463,7 @@ theorem fif_open_taint (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r) (l : 
         · iexact Hm
   · have hm1 : ret.toInt = -1 := by rw [hr]; decide
     rw [hm1]
-    have hoh : openHeld fdm (-1) = fdDom fdm := by unfold openHeld; rw [if_neg (by omega)]
+    have hoh : openHeld fdm (-1) = fdDom fdm := by unfold openHeld; rw [ite_eq_right (by omega)]
     rw [hoh]
     iapply X.fif_taint_of_fds heq fdm l vs hok $$ Htn He Hstd Hhs
 

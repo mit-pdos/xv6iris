@@ -169,7 +169,7 @@ theorem nodeAtNondir (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
       some (.NFile (fileBytes (fsDataOf P (fsDinode P sb i)) (fsDinode P sb i).diSize.toNat)) := by
   rw [nodeAt_live P sb i h0]
   unfold nodeOf
-  rw [if_neg hd]
+  rw [ite_eq_right hd]
   rfl
 
 /-- Rocq `nfile_bytes`. -/

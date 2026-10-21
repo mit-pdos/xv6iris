@@ -176,7 +176,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot
     Hside
@@ -496,7 +496,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   unfold createPost
   iapply Hpost $$ %spie3 %spp3 %R' %false %false %0 %1 %1 %g %(0#32) %dp %bmp %n6 %Sb6
     %(1 + 1 + (ns - 2)) %hcsf Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbs %hns' Hsl %hled Hop
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iframe Htx Hcf
   ipureintro
   rw [ha0f]

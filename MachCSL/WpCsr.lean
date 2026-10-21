@@ -14,13 +14,14 @@ import MachCSL.WpGpr
 import MachCSL.PmpXv6Defs
 import MachCSL.ModelFacts
 import MachCSL.WpCsrFacts
+import MachCSL.WpCsrS
 
 noncomputable section
 
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -29,157 +30,57 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ### The written values, as pure functions
 
-Where the model's legalisation is pure (`legalize_xepc`, `legalize_medeleg`,
-`legalize_sie`, `legalize_mcounteren`) the lemmas use it directly; where it is
-monadic (it consults `misa`), the value below is what it computes under the
-boot `misa` (extracted from the symbolic run). -/
+Where the model's legalisation is pure (`legalize_xepc`, `legalize_mcounteren`)
+the lemmas use it directly; where it is monadic (it consults `misa` or the
+extension gates; since sail-riscv 0.16 also `legalize_medeleg` and
+`legalize_sie`), the value below is what it computes on this platform
+(extracted from the symbolic run). -/
 
-/-- `legalize_mstatus o v` with `MPP(v) = S` (the only case xv6 writes). -/
-def mstatusWrite (o v : BitVec 64) : BitVec 64 :=
-  (_update_Mstatus_SD
-  (_update_Mstatus_SIE
-  (_update_Mstatus_MIE
-  (_update_Mstatus_SPIE
-  (_update_Mstatus_MPIE
-  (_update_Mstatus_SPP
-  (_update_Mstatus_MPP
-  (_update_Mstatus_VS
-  (_update_Mstatus_FS
-  (_update_Mstatus_XS
-  (_update_Mstatus_MPRV
-  (_update_Mstatus_SUM
-  (_update_Mstatus_MXR
-  (_update_Mstatus_TVM
-  (_update_Mstatus_TW
-  (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
-  (_get_Mstatus_TSR v))
-  (_get_Mstatus_TW v))
-  (_get_Mstatus_TVM v))
-  (_get_Mstatus_MXR v))
-  (_get_Mstatus_SUM v))
-  (_get_Mstatus_MPRV v))
-  (extStatus_map_forwards ExtStatus.Off))
-  (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v)))
-  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v)))
-  1#2)
-  (_get_Mstatus_SPP v))
-  (_get_Mstatus_MPIE v))
-  (_get_Mstatus_SPIE v))
-  (_get_Mstatus_MIE v))
-  (_get_Mstatus_SIE v))
-  (bool_to_bit
-  (extStatus_map_backwards
-  (_get_Mstatus_FS
-  (_update_Mstatus_SIE
-  (_update_Mstatus_MIE
-  (_update_Mstatus_SPIE
-  (_update_Mstatus_MPIE
-  (_update_Mstatus_SPP
-  (_update_Mstatus_MPP
-  (_update_Mstatus_VS
-  (_update_Mstatus_FS
-  (_update_Mstatus_XS
-  (_update_Mstatus_MPRV
-  (_update_Mstatus_SUM
-  (_update_Mstatus_MXR
-  (_update_Mstatus_TVM
-  (_update_Mstatus_TW
-  (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
-  (_get_Mstatus_TSR v))
-  (_get_Mstatus_TW v))
-  (_get_Mstatus_TVM v))
-  (_get_Mstatus_MXR v))
-  (_get_Mstatus_SUM v))
-  (_get_Mstatus_MPRV v))
-  (extStatus_map_forwards ExtStatus.Off))
-  (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v)))
-  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v)))
-  1#2)
-  (_get_Mstatus_SPP v))
-  (_get_Mstatus_MPIE v))
-  (_get_Mstatus_SPIE v))
-  (_get_Mstatus_MIE v))
-  (_get_Mstatus_SIE v))) ==
-  ExtStatus.Dirty ||
-  (extStatus_map_backwards
-  (_get_Mstatus_XS
-  (_update_Mstatus_SIE
-  (_update_Mstatus_MIE
-  (_update_Mstatus_SPIE
-  (_update_Mstatus_MPIE
-  (_update_Mstatus_SPP
-  (_update_Mstatus_MPP
-  (_update_Mstatus_VS
-  (_update_Mstatus_FS
-  (_update_Mstatus_XS
-  (_update_Mstatus_MPRV
-  (_update_Mstatus_SUM
-  (_update_Mstatus_MXR
-  (_update_Mstatus_TVM
-  (_update_Mstatus_TW
-  (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP
-  (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
-  (_get_Mstatus_TSR v))
-  (_get_Mstatus_TW v))
-  (_get_Mstatus_TVM v))
-  (_get_Mstatus_MXR v))
-  (_get_Mstatus_SUM v))
-  (_get_Mstatus_MPRV v))
-  (extStatus_map_forwards ExtStatus.Off))
-  (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v)))
-  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v)))
-  1#2)
-  (_get_Mstatus_SPP v))
-  (_get_Mstatus_MPIE v))
-  (_get_Mstatus_SPIE v))
-  (_get_Mstatus_MIE v))
-  (_get_Mstatus_SIE v))) ==
-  ExtStatus.Dirty ||
-  extStatus_map_backwards
-  (_get_Mstatus_VS
-  (_update_Mstatus_SIE
-  (_update_Mstatus_MIE
-  (_update_Mstatus_SPIE
-  (_update_Mstatus_MPIE
-  (_update_Mstatus_SPP
-  (_update_Mstatus_MPP
-  (_update_Mstatus_VS
-  (_update_Mstatus_FS
-  (_update_Mstatus_XS
-  (_update_Mstatus_MPRV
-  (_update_Mstatus_SUM
-  (_update_Mstatus_MXR
-  (_update_Mstatus_TVM
-  (_update_Mstatus_TW
-  (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP
-  (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
-  (_get_Mstatus_TSR v))
-  (_get_Mstatus_TW v))
-  (_get_Mstatus_TVM v))
-  (_get_Mstatus_MXR v))
-  (_get_Mstatus_SUM v))
-  (_get_Mstatus_MPRV v))
-  (extStatus_map_forwards ExtStatus.Off))
-  (legalize_extStatus plat_mstatus_legal_fs (_get_Mstatus_FS v)))
-  (legalize_extStatus plat_mstatus_legal_vs (_get_Mstatus_VS v)))
-  1#2)
-  (_get_Mstatus_SPP v))
-  (_get_Mstatus_MPIE v))
-  (_get_Mstatus_SPIE v))
-  (_get_Mstatus_MIE v))
-  (_get_Mstatus_SIE v))) ==
-  ExtStatus.Dirty))))
+/-- `legalize_mstatus o v` with `MPP(v) = S` (the only case xv6 writes): since
+sail-riscv 0.16 this is `mstatusLegalize` of `MachCSL.WpCsrS` (which also clears
+`MDT`/`MPV`/`GVA`/`SDT`). -/
+def mstatusWrite (o v : BitVec 64) : BitVec 64 := mstatusLegalize o v
 
-/-- `legalize_mideleg _ v`. -/
+/-- `mstatusLegalize` clears `SDT`, so `read_mstatus` (which clears it on this
+platform) reads the written value back. -/
+theorem mstatusLegalize_SDT (o L : BitVec 64) :
+    _update_Mstatus_SDT (mstatusLegalize o L) 0#1 = mstatusLegalize o L := by
+  unfold mstatusLegalize
+  dsimp only
+  generalize (bool_to_bit _) = d
+  generalize extStatus_map_forwards ExtStatus.Off = x0
+  generalize legalize_extStatus plat_mstatus_legal_fs _ = x1
+  generalize legalize_extStatus plat_mstatus_legal_vs _ = x2
+  simp only [_update_Mstatus_SIE, _update_Mstatus_MIE, _update_Mstatus_SPIE, _update_Mstatus_MPIE,
+    _update_Mstatus_SPP, _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS,
+    _update_Mstatus_MPRV, _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW,
+    _update_Mstatus_TSR, _update_Mstatus_SPELP, _update_Mstatus_SDT, _update_Mstatus_GVA, _update_Mstatus_MPV,
+    _update_Mstatus_MPELP, _update_Mstatus_MDT, _update_Mstatus_SD,
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+  dsimp only [Int.reduceSub, Int.reduceAdd, Int.reduceNeg, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]
+  generalize _get_Mstatus_MPELP _ = a1
+  generalize _get_Mstatus_SPELP _ = a2
+  generalize _get_Mstatus_TSR _ = a3
+  generalize _get_Mstatus_TW _ = a4
+  generalize _get_Mstatus_TVM _ = a5
+  generalize _get_Mstatus_MXR _ = a6
+  generalize _get_Mstatus_SUM _ = a7
+  generalize _get_Mstatus_MPRV _ = a8
+  generalize _get_Mstatus_MPP _ = a9
+  generalize _get_Mstatus_SPP _ = a10
+  generalize _get_Mstatus_MPIE _ = a11
+  generalize _get_Mstatus_SPIE _ = a12
+  generalize _get_Mstatus_MIE _ = a13
+  generalize _get_Mstatus_SIE _ = a14
+  bv_decide
+
+/-- `legalize_mideleg _ v` (H absent: since sail-riscv 0.16 the hypervisor
+interrupts `VSEI`/`VSTI`/`VSSI`/`SGEI` are cleared too). -/
 def midelegWrite (v : BitVec 64) : BitVec 64 :=
+  (_update_Minterrupts_SGEI
+  (_update_Minterrupts_VSSI
+  (_update_Minterrupts_VSTI
+  (_update_Minterrupts_VSEI
   (_update_Minterrupts_SSI
   (_update_Minterrupts_STI
   (_update_Minterrupts_SEI
@@ -188,11 +89,49 @@ def midelegWrite (v : BitVec 64) : BitVec 64 :=
   (_get_Minterrupts_SEI (Mk_Minterrupts (v &&& plat_mideleg_delegatable_bits))))
   (_get_Minterrupts_STI (Mk_Minterrupts (v &&& plat_mideleg_delegatable_bits))))
   (_get_Minterrupts_SSI (Mk_Minterrupts (v &&& plat_mideleg_delegatable_bits))))
+  0#1)
+  0#1)
+  0#1)
+  0#1)
 
-/-- `legalize_menvcfg o v` with `CBIE(v) = 0` and `PMM(v) = 0`. -/
+/-- `legalize_medeleg _ v` (monadic since sail-riscv 0.16: it asks for H, absent,
+so the hypervisor causes are cleared; `MEnvCall` and `Double_Trap` are never
+delegatable, `Breakpoint` is, Sdtrig being absent). -/
+def medelegWrite (v : BitVec 64) : BitVec 64 :=
+  (_update_Medeleg_Breakpoint
+  (_update_Medeleg_MEnvCall
+  (_update_Medeleg_Double_Trap
+  (_update_Medeleg_VSEnvCall
+  (_update_Medeleg_Fetch_GPage_Fault
+  (_update_Medeleg_Load_GPage_Fault
+  (_update_Medeleg_Virtual_Instr
+  (_update_Medeleg_SAMO_GPage_Fault (Mk_Medeleg (v &&& plat_medeleg_delegatable_bits)) 0#1)
+  0#1) 0#1) 0#1) 0#1) 0#1) 0#1)
+  (_get_Medeleg_Breakpoint (Mk_Medeleg (v &&& plat_medeleg_delegatable_bits))))
+
+/-- `legalize_sie m d v` (monadic since sail-riscv 0.16: the interrupts the
+platform supports, `supported_interrupts_mask`, mask the lifted value). -/
+def sieWrite (m d v : BitVec 64) : BitVec 64 :=
+  Mk_Minterrupts
+    ((_update_Minterrupts_LCOFI
+        (_update_Minterrupts_SGEI
+          (_update_Minterrupts_STI
+            (_update_Minterrupts_SSI
+              (_update_Minterrupts_SEI
+                (_update_Minterrupts_MTI
+                  (_update_Minterrupts_MSI
+                    (_update_Minterrupts_MEI (Mk_Minterrupts (ones (n := 64)))
+                      (bool_to_bit plat_has_mei)) (bool_to_bit plat_has_msi))
+                  (bool_to_bit plat_has_mti)) (bool_to_bit plat_has_sei))
+              (bool_to_bit plat_has_ssi)) (bool_to_bit plat_has_sti)) (bool_to_bit true))
+        1#1) &&& lift_sie m d (Mk_Sinterrupts v))
+
+/-- `legalize_menvcfg o v` with `CBIE(v) = 0` and `PMM(v) = 0` (since sail-riscv 0.16 it
+also clears `DTE`: `Ssdbltrp` absent). -/
 def menvcfgWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_MEnvcfg_PBMTE
   (_update_MEnvcfg_ADUE
+  (_update_MEnvcfg_DTE
   (_update_MEnvcfg_PMM
   (_update_MEnvcfg_STCE
   (_update_MEnvcfg_CBIE
@@ -206,12 +145,28 @@ def menvcfgWrite (o v : BitVec 64) : BitVec 64 :=
   0#2)
   (_get_MEnvcfg_STCE v))
   0#2)
+  0#1)
   (_get_MEnvcfg_ADUE v))
   (_get_MEnvcfg_PBMTE v))
 
 -- `xv6Pmpcfg` / `xv6Pmpaddr` (the tables after `start()`) live in `MachCSL.PmpXv6Defs`.
 
 /-! ### `write_CSR` -/
+
+/-- Outside a virtual privilege `inVirtualPrivilege ()` answers `false` (one
+read of `cur_privilege`; sail-riscv 0.16 asks it before the supervisor CSRs). -/
+theorem swp_inVirtualPrivilege_bind (cpu : CPU) {X : Type} (dp : DFrac) (p : Privilege)
+    (hp : privLevel_is_virtual p = false) (f : Bool → SailM X) (Φ : X → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ swp cpu (f false) Φ)
+    ⊢ swp cpu (inVirtualPrivilege () >>= f) Φ := by
+  iintro ⟨H, HΦ⟩
+  unfold inVirtualPrivilege
+  rw [bind_assoc]
+  iapply (swp_readReg_bind cpu Register.cur_privilege dp p)
+  iframe H
+  simp only [pure_bind, hp]
+  iexact HΦ
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw mstatus` with `MPP = S`. -/
@@ -221,14 +176,15 @@ theorem swp_write_CSR_mstatus (cpu : CPU) (o v : BitVec 64)
     ▷ (Register.mstatus ↦ᵣ[cpu] mstatusWrite o v -∗ Φ (.Ok (mstatusWrite o v)))
     ⊢ swp cpu (write_CSR 0x300#12 v) Φ := by
   iintro ⟨#Hhw, Hmstatus, HΦ⟩
-  swp_run 120
+  rw [write_CSR_mstatus]
+  swp_run 1
+  iapply swp_bind
+  iapply (swp_legalize_mstatus cpu o v (by rw [hMPP]; decide))
+  iframe Hhw
+  inext
+  swp_run 10
+  rw [mstatusLegalize_SDT]
   unfold mstatusWrite
-  -- Lean ≥ 4.34: `unfold` fails on a constant that does not occur, and the executor may
-  -- already have unfolded these.
-  try unfold Mk_Mstatus
-  try unfold _get_Mstatus_MPP
-  try sail_norm
-  try simp only [hMPP]
   iapply HΦ $$ Hmstatus
 
 set_option maxHeartbeats 4000000 in
@@ -242,17 +198,24 @@ theorem swp_write_CSR_mepc (cpu : CPU) (e v : BitVec 64)
   iapply HΦ $$ Hmepc
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw satp, zero` (the value xv6 writes) with `SXL = 64`. -/
-theorem swp_write_CSR_satp0 (cpu : CPU) (dq : DFrac) (ms s : BitVec 64)
+/-- `csrw satp, zero` (the value xv6 writes) with `SXL = 64`, outside a
+virtual privilege (since sail-riscv 0.16 the write asks `cur_privilege`). -/
+theorem swp_write_CSR_satp0 (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
+    (dq : DFrac) (ms s : BitVec 64)
     (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    hwConfig cpu ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
+    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
     Register.satp ↦ᵣ[cpu] s ∗
-    ▷ (∀ x, Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
+    ▷ (∀ x, Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
         Register.satp ↦ᵣ[cpu] x -∗ ⌜x = 0#64⌝ -∗ Φ (.Ok x))
     ⊢ swp cpu (write_CSR 0x180#12 0#64) Φ := by
-  iintro ⟨#Hhw, Hmstatus, Hsatp, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hsatp, HΦ⟩
+  rw [write_CSR_satp]
+  iapply (swp_inVirtualPrivilege_bind cpu dp p hp)
+  iframe Hcur_privilege
+  inext
+  iintro Hcur_privilege
   swp_run 120
-  iapply HΦ $$ %_ Hmstatus Hsatp []
+  iapply HΦ $$ %_ Hcur_privilege Hmstatus Hsatp []
   ipureintro
   decide
 
@@ -260,10 +223,11 @@ set_option maxHeartbeats 4000000 in
 theorem swp_write_CSR_medeleg (cpu : CPU) (d v : BitVec 64)
     (Φ : Result (BitVec 64) Unit → IProp GF) :
     hwConfig cpu ∗ Register.medeleg ↦ᵣ[cpu] d ∗
-    ▷ (Register.medeleg ↦ᵣ[cpu] legalize_medeleg d v -∗ Φ (.Ok (legalize_medeleg d v)))
+    ▷ (Register.medeleg ↦ᵣ[cpu] medelegWrite v -∗ Φ (.Ok (medelegWrite v)))
     ⊢ swp cpu (write_CSR 0x302#12 v) Φ := by
   iintro ⟨#Hhw, Hmedeleg, HΦ⟩
   swp_run 40
+  unfold medelegWrite
   iapply HΦ $$ Hmedeleg
 
 set_option maxHeartbeats 4000000 in
@@ -278,17 +242,25 @@ theorem swp_write_CSR_mideleg (cpu : CPU) (d v : BitVec 64)
   iapply HΦ $$ Hmideleg
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw sie`: writes `mie` through the delegation mask. -/
-theorem swp_write_CSR_sie (cpu : CPU) (dq : DFrac) (m d v : BitVec 64)
+/-- `csrw sie`: writes `mie` through the delegation mask, outside a virtual
+privilege (since sail-riscv 0.16 the write asks `cur_privilege`). -/
+theorem swp_write_CSR_sie (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
+    (dq : DFrac) (m d v : BitVec 64)
     (Φ : Result (BitVec 64) Unit → IProp GF) :
-    hwConfig cpu ∗ Register.mie ↦ᵣ[cpu] m ∗
+    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.mie ↦ᵣ[cpu] m ∗
     Register.mideleg ↦ᵣ[cpu]{dq} d ∗
-    ▷ (Register.mie ↦ᵣ[cpu] legalize_sie m d v -∗ Register.mideleg ↦ᵣ[cpu]{dq} d -∗
-        Φ (.Ok (lower_mie (legalize_sie m d v) d)))
+    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ Register.mie ↦ᵣ[cpu] sieWrite m d v -∗
+        Register.mideleg ↦ᵣ[cpu]{dq} d -∗ Φ (.Ok (lower_mie (sieWrite m d v) d)))
     ⊢ swp cpu (write_CSR 0x104#12 v) Φ := by
-  iintro ⟨#Hhw, Hmie, Hmideleg, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmie, Hmideleg, HΦ⟩
+  rw [write_CSR_sie]
+  iapply (swp_inVirtualPrivilege_bind cpu dp p hp)
+  iframe Hcur_privilege
+  inext
+  iintro Hcur_privilege
   swp_run 40
-  iapply HΦ $$ Hmie Hmideleg
+  unfold sieWrite
+  iapply HΦ $$ Hcur_privilege Hmie Hmideleg
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw menvcfg` with the CBIE and PMM fields of the value clear. -/
@@ -316,25 +288,49 @@ theorem swp_write_CSR_mcounteren (cpu : CPU) (c : BitVec 32) (v : BitVec 64)
   swp_run 40
   iapply HΦ $$ Hmcounteren
 
+/-- Writing all 64 bits. -/
+theorem updateSubrange_63_0 (s v : BitVec 64) : Sail.BitVec.updateSubrange s 63 0 v = v := by
+  simp [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+
 set_option maxHeartbeats 4000000 in
-/-- `csrw stimecmp` with `STCE` set: the register takes the value and the
-CLINT refreshes the pending bits (`mip` at some value). -/
-theorem swp_write_CSR_stimecmp (cpu : CPU) (dq : DFrac) (s v mt mtc mip me : BitVec 64)
+/-- `csrw stimecmp`, outside a virtual privilege: the register takes the value.
+(sail-riscv 0.16: the write no longer runs the CLINT's `clint_dispatch`, so
+`mip`, `mtime`, `mtimecmp` and `menvcfg` are untouched.) -/
+theorem swp_write_CSR_stimecmp' (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
+    (s v : BitVec 64) (Φ : Result (BitVec 64) Unit → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.stimecmp ↦ᵣ[cpu] s ∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ Register.stimecmp ↦ᵣ[cpu] v -∗ Φ (.Ok v))
+    ⊢ swp cpu (write_CSR 0x14D#12 v) Φ := by
+  iintro ⟨Hcur_privilege, Hstimecmp, HΦ⟩
+  rw [write_CSR_stimecmp]
+  iapply (swp_inVirtualPrivilege_bind cpu dp p hp)
+  iframe Hcur_privilege
+  inext
+  iintro Hcur_privilege
+  swp_run 60
+  rw [updateSubrange_63_0]
+  iapply HΦ $$ Hcur_privilege Hstimecmp
+
+set_option maxHeartbeats 4000000 in
+/-- `csrw stimecmp` in the pre-0.16 shape (the `mtime`/`mtimecmp`/`mip`/`menvcfg`
+cells and `STCE` are now only framed; `mip'` is the old `mip`), outside a virtual
+privilege. -/
+theorem swp_write_CSR_stimecmp (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
+    (dq : DFrac) (s v mt mtc mip me : BitVec 64)
     (hstce : BitVec.extractLsb' 63 1 me = 1#1) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    hwConfig cpu ∗ Register.stimecmp ↦ᵣ[cpu] s ∗
+    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.stimecmp ↦ᵣ[cpu] s ∗
     Register.mtime ↦ᵣ[cpu]{dq} mt ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc ∗ Register.mip ↦ᵣ[cpu] mip ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} me ∗
-    ▷ (∀ mip', Register.stimecmp ↦ᵣ[cpu] v -∗
+    ▷ (∀ mip', Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ Register.stimecmp ↦ᵣ[cpu] v -∗
         Register.mtime ↦ᵣ[cpu]{dq} mt -∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc -∗ Register.mip ↦ᵣ[cpu] mip' -∗
         Register.menvcfg ↦ᵣ[cpu]{dq} me -∗ Φ (.Ok v))
     ⊢ swp cpu (write_CSR 0x14D#12 v) Φ := by
-  iintro ⟨#Hhw, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, HΦ⟩
-  swp_run 120
-  split
-  · swp_run 60
-    iapply HΦ $$ %_ Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
-  · swp_run 60
-    iapply HΦ $$ %_ Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
+  iintro ⟨#Hhw, Hcur_privilege, Hstimecmp, Hmtime, Hmtimecmp, Hmip, Hmenvcfg, HΦ⟩
+  iapply (swp_write_CSR_stimecmp' cpu dp p hp s v)
+  iframe Hcur_privilege Hstimecmp
+  inext
+  iintro Hcur_privilege Hstimecmp
+  iapply HΦ $$ %_ Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
 
 /-- A disabled entry is not locked, and so not TOR-locked. -/
 theorem pmpTORLocked_of_off {e : BitVec 8} (h : pmpEntryOff e) : pmpTORLocked e = false := by
@@ -442,11 +438,11 @@ macro "csrr_run" hrd:ident h:ident : tactic =>
 /-- `start()`: `mstatus := (mstatus & ~MPP) | MPP_S` from the reset value. -/
 theorem mstatusWrite_xv6 : mstatusWrite 0xA00000000#64 0xA00000800#64 = 0xA00000800#64 := by decide
 /-- `w_medeleg(0xffff)`: the delegatable bits. -/
-theorem legalize_medeleg_xv6 : legalize_medeleg 0#64 0xffff#64 = 0xb3ff#64 := by decide
+theorem legalize_medeleg_xv6 : medelegWrite 0xffff#64 = 0xb3ff#64 := by decide
 /-- `w_mideleg(0xffff)`: the supervisor interrupt bits (SSI, STI, SEI, LCOFI). -/
 theorem midelegWrite_xv6 : midelegWrite 0xffff#64 = 0x2222#64 := by decide
 /-- `w_sie(r_sie() | SIE_SEIE | SIE_STIE)` with `mie = 0`. -/
-theorem legalize_sie_xv6 : legalize_sie 0#64 0x2222#64 0x220#64 = 0x220#64 := by decide
+theorem legalize_sie_xv6 : sieWrite 0#64 0x2222#64 0x220#64 = 0x220#64 := by decide
 theorem lower_mie_xv6 : lower_mie 0#64 0x2222#64 = 0#64 := by decide
 /-- `w_menvcfg(r_menvcfg() | MENVCFG_ADUE)` from 0, then `| MENVCFG_STCE` in `timerinit`. -/
 theorem menvcfgWrite_adue : menvcfgWrite 0#64 0x2000000000000000#64 = 0x2000000000000000#64 := by decide

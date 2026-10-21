@@ -43,7 +43,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## Agents -/
@@ -196,11 +196,11 @@ theorem exists_bv_of_bytes : ∀ (n : Nat) (bs : Nat → BitVec 8),
     by_cases hjn : j < n
     · have := congrArg (fun b : BitVec 8 => b.getLsbD i) (hw j hjn)
       simp only [nthByte, BitVec.getLsbD_extractLsb', hi, decide_true, Bool.true_and] at this
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
       exact this
     · have hj' : j = n := by omega
       subst hj'
-      rw [if_neg (by omega)]
+      rw [ite_eq_right (by omega)]
       congr 1
       omega
 
@@ -230,7 +230,7 @@ theorem Mem.foldl_insert_get? (m : Mem) (pa : PAddr) (bs : Nat → BitVec 8) :
         simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at h1
         rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (a := j) (by omega)] at h1
         omega
-      rw [if_neg hne]
+      rw [ite_eq_right hne]
       exact Mem.foldl_insert_get? m pa bs n (by omega) j hlt
 
 theorem Mem.writeBytes_get?_in {n : Nat} (m : Mem) (pa : PAddr) (w : BitVec (8 * n)) (hn : n < 2 ^ 64)
@@ -372,31 +372,59 @@ def fenceIfetch : barrier_kind → Bool
 
 /-! ## Access kinds -/
 
-/-- The architecture-specific access kind of the RISC-V model. -/
-abbrev AK := Access_kind RISCV_strong_access
+/-- The access kind of the RISC-V model (concurrency interface v2): the read or write kind the
+model's `read_ram`/`write_ram` chose, with the access type that caused it
+(`AK_Read (rk, Load Data)`, `AK_Read (rk, InstructionFetch ())`, `AK_Write (wk, Atomic …)`, …). -/
+abbrev AK := access_kind
 
-/-- An exclusive or read-modify-write access. -/
+/-- An exclusive access: the read half of an AMO, an LR, the atomic A/D re-read
+(`Read_RISCV_reserved*`), or a conditional write (`Write_RISCV_conditional*`, the write half of an
+AMO, an SC, the A/D write-back).  Exactly the kinds the V1 interface tagged `AV_exclusive`. -/
 def akExcl : AK → Bool
-  | .AK_explicit e => match e.variety with | .AV_plain => false | _ => true
-  | .AK_arch a => match a.variety with | .AV_plain => false | _ => true
-  | _ => false
+  | .AK_Read (rk, _) => match rk with
+      | .Read_RISCV_reserved | .Read_RISCV_reserved_acquire | .Read_RISCV_reserved_strong_acquire => true
+      | _ => false
+  | .AK_Write (wk, _) => match wk with
+      | .Write_RISCV_conditional | .Write_RISCV_conditional_release
+      | .Write_RISCV_conditional_strong_release => true
+      | _ => false
 
-/-- An acquire access (`.aq`, `.aqrl`; the strong `AK_arch` kinds). -/
+/-- An acquire access (`.aq`, `.aqrl`; on writes the release kinds, which the AMO's write half
+carries when the AMO is `.rl`/`.aqrl`).  The V1 `AS_rel_or_acq`/`AK_arch` kinds. -/
 def akAcq : AK → Bool
-  | .AK_explicit e => match e.strength with | .AS_normal => false | _ => true
-  | .AK_arch _ => true
-  | _ => false
+  | .AK_Read (rk, _) => match rk with
+      | .Read_RISCV_acquire | .Read_RISCV_strong_acquire | .Read_RISCV_reserved_acquire
+      | .Read_RISCV_reserved_strong_acquire => true
+      | _ => false
+  | .AK_Write (wk, _) => match wk with
+      | .Write_RISCV_release | .Write_RISCV_strong_release | .Write_RISCV_conditional_release
+      | .Write_RISCV_conditional_strong_release => true
+      | _ => false
 
-/-- An instruction fetch. -/
+/-- An instruction fetch: a non-reserved read whose access type is `InstructionFetch` (upstream's
+`read_ram` gives fetches `Read_plain`; the old fork tagged them `Read_ifetch`). -/
 def akIfetch : AK → Bool
-  | .AK_ifetch _ => true
+  | .AK_Read (.Read_plain, .InstructionFetch _) => true
+  | .AK_Read (.Read_ifetch, .InstructionFetch _) => true
   | _ => false
 
 /-- A plain data read: explicit non-exclusive, or a page-table walk. -/
 def akPlain (k : AK) : Bool := !akIfetch k && !akExcl k
 
 theorem akExcl_of_ifetch (k : AK) (h : akIfetch k = true) : akExcl k = false := by
-  cases k <;> simp_all [akIfetch, akExcl]
+  rcases k with ⟨wk, acc⟩ | ⟨rk, acc⟩ <;> cases acc <;> simp_all [akIfetch, akExcl] <;>
+    cases rk <;> simp_all
+
+/-! ### Finer classes (not used by the safety semantics; the liveness `Lang` drop keys on them) -/
+
+/-- The read or write half of an AMO (`Atomic …` access type). -/
+def akRmw (k : AK) : Bool := ak_is_atomic_rmw k
+
+/-- An LR or SC (`LoadReserved …`/`StoreConditional …` access type). -/
+def akLR (k : AK) : Bool := ak_is_exclusive k
+
+/-- The atomic A/D update's exclusive re-read or conditional write-back of a PTE. -/
+def akPteRe (k : AK) : Bool := akExcl k && ak_is_ttw k
 
 /-! ## Well-formed histories -/
 

@@ -44,7 +44,7 @@ theorem grepScan_line_nl (pat : Bytes) (sk : Bool) (line r : Bytes) (hl : ∀ b 
       (((if sk then [] else if matchRe pat line then [line ++ [wlNl]] else []) ++ (scan pat false [] r).1.1,
         (scan pat false [] r).1.2), (scan pat false [] r).2) := by
   rw [scan_clean_app _ _ _ _ _ hl, List.nil_append]
-  simp only [scan, bdec_true _ _ rfl, if_true]
+  simp only [scan, bdec_true _ _ rfl, ite_true]
 
 /-- **Rocq `scan_line_stop`**. -/
 theorem grepScan_line_stop (pat : Bytes) (sk : Bool) (line r : Bytes) (hl : ∀ b ∈ line, clean b)
@@ -52,7 +52,7 @@ theorem grepScan_line_stop (pat : Bytes) (sk : Bool) (line r : Bytes) (hl : ∀ 
   rw [scan_clean_app _ _ _ _ _ hl, List.nil_append]
   rcases hr with rfl | ⟨r', rfl⟩
   · simp [scan]
-  · simp only [scan, bdec_false _ _ grep_nul_ne_nl, bdec_true _ _ rfl, Bool.false_eq_true, if_false, if_true]
+  · simp only [scan, bdec_false _ _ grep_nul_ne_nl, bdec_true _ _ rfl, Bool.false_eq_true, ite_false, ite_true]
 
 /-- **Rocq `grep_k`**: the read's continuation and the rest of a round, as
 one function of the scan's result. -/
@@ -95,26 +95,26 @@ theorem grepK_cons (pat : Bytes) (fd : Int) (rest : Proc) (o : Bytes) (os : List
 theorem grepK_short (pat : Bytes) (fd : Int) (rest : Proc) (l : Bytes) (s : Bool) (hl : l.length < 1023) :
     grepK pat fd rest (([], l), s) = grepGo pat fd s [] l rest := by
   unfold grepK
-  rw [if_neg (by simp [grepBufsz]; omega)]
+  rw [ite_eq_right (by simp [grepBufsz]; omega)]
 
 /-- **Rocq `grep_k_full`**. -/
 theorem grepK_full (pat : Bytes) (fd : Int) (rest : Proc) (l : Bytes) (s : Bool) (hl : l.length = 1023) :
     grepK pat fd rest (([], l), s) = grepGo pat fd true [] [] rest := by
   unfold grepK
-  rw [if_pos (by simp [grepBufsz]; omega)]
+  rw [ite_eq_left (by simp [grepBufsz]; omega)]
 
 /-- **Rocq `grep_k_step_skip`**: ONE STEP OF THE SCAN, skipping. -/
 theorem grepK_step_skip (pat : Bytes) (fd : Int) (rest : Proc) (line r : Bytes) (hl : ∀ b ∈ line, clean b) :
     grepK pat fd rest (scan pat true [] (line ++ wlNl :: r)) = grepK pat fd rest (scan pat false [] r) := by
   rw [grepScan_line_nl _ _ _ _ hl]
-  simp only [if_true, List.nil_append]
+  simp only [ite_true, List.nil_append]
 
 /-- **Rocq `grep_k_step_nomatch`**. -/
 theorem grepK_step_nomatch (pat : Bytes) (fd : Int) (rest : Proc) (line r : Bytes) (hl : ∀ b ∈ line, clean b)
     (hm : matchRe pat line = false) :
     grepK pat fd rest (scan pat false [] (line ++ wlNl :: r)) = grepK pat fd rest (scan pat false [] r) := by
   rw [grepScan_line_nl _ _ _ _ hl, hm]
-  simp only [Bool.false_eq_true, if_false, List.nil_append]
+  simp only [Bool.false_eq_true, ite_false, List.nil_append]
 
 /-- **Rocq `grep_k_step_match`**. -/
 theorem grepK_step_match (pat : Bytes) (fd : Int) (rest : Proc) (line r : Bytes) (hl : ∀ b ∈ line, clean b)
@@ -122,7 +122,7 @@ theorem grepK_step_match (pat : Bytes) (fd : Int) (rest : Proc) (line r : Bytes)
     grepK pat fd rest (scan pat false [] (line ++ wlNl :: r)) =
       .vis (.EWrite 1 (line ++ [wlNl])) (fun _ => grepK pat fd rest (scan pat false [] r)) := by
   rw [grepScan_line_nl _ _ _ _ hl, hm]
-  simp only [Bool.false_eq_true, if_false, if_true, List.singleton_append]
+  simp only [Bool.false_eq_true, ite_false, ite_true, List.singleton_append]
   exact grepK_cons _ _ _ _ _ _ _
 
 /-- **Rocq `grep_k_step_stop`**: ...and at the stop, the terminating NUL or
@@ -198,11 +198,11 @@ theorem grepFread_lo (F g : Nat → BitVec 8) (L w j : Nat) (hj : j < L) : grepF
   simp [grepFread, hj]
 
 theorem grepFread_mid (F g : Nat → BitVec 8) (L w j : Nat) (hj : j < w) : grepFread F g L w (L + j) = g j := by
-  simp only [grepFread, show ¬ L + j < L by omega, if_false, show L + j < L + w by omega, if_true]
+  simp only [grepFread, show ¬ L + j < L by omega, ite_false, show L + j < L + w by omega, ite_true]
   congr 1; omega
 
 theorem grepFread_hi (F g : Nat → BitVec 8) (L w j : Nat) : grepFread F g L w (L + w + j) = F (L + w + j) := by
-  simp only [grepFread, show ¬ L + w + j < L by omega, show ¬ L + w + j < L + w by omega, if_false]
+  simp only [grepFread, show ¬ L + w + j < L by omega, show ¬ L + w + j < L + w by omega, ite_false]
 
 /-- **Rocq `head_bytes`**: what the scan sees after the read and the
 `buf[m] = 0` store. -/
@@ -214,11 +214,11 @@ theorem grepHead_bytes (F g : Nat → BitVec 8) (L w nb : Nat) (left : Bytes) (b
   · rw [← hl]
     apply grepMapRange_ext
     intro j hj
-    simp only [grepFset, show ¬ j = L + nb by omega, if_false]
+    simp only [grepFset, show ¬ j = L + nb by omega, ite_false]
     exact grepFread_lo F g L w j hj
   · apply grepMapRange_ext
     intro j hj
-    simp only [grepFset, show ¬ L + j = L + nb by omega, if_false]
+    simp only [grepFset, show ¬ L + j = L + nb by omega, ite_false]
     exact grepFread_mid F g L w j (by omega)
 
 /-- **Rocq `grep_words`**: THE STACK A CALL OF grep NEEDS -- its 14-word

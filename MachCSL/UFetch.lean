@@ -6,17 +6,18 @@ MachCSL: **the instruction fetch at User privilege** (lane U2-F; brief
 The model's `fetch ()` at User, as fetch-walk equations (`UFetchRun.uftRun`,
 stepped by `UFetchWalk.uft_run`), by the geometry of the PC:
 
-* ODD (`pc % 2 = 1`): `F_Error (E_Fetch_Addr_Align, pc)` before any
+* ODD (`pc % 2 = 1`): `F_Error (uftCtx E_Fetch_Addr_Align pc)` before any
   translation, nothing moves (`uft_fetch_odd`; Rocq `exec_fetch_align_fault`);
+  since sail-riscv 0.16 a fetch fault carries an `ExceptionContext`;
 * 4-ALIGNED: ONE translation of `pc` and a 4-byte read: a word
   (`F_Base w`, or `F_RVC` of its low half when that is compressed), or the
-  translation's fault `F_Error (e, pc)` (`uft_fetch4_ok`/`_err`; Rocq
+  translation's fault `F_Error e`, `e` the context the chunk reported (`uft_fetch4_ok`/`_err`; Rocq
   `exec_fetch_ok_4`/`exec_fetch_fault_4`);
 * 2 MOD 4: a translation of `pc` and a 2-byte read: a compressed halfword
   is the instruction (`uft_fetch2_rvc`); otherwise a SECOND translation, of
   `pc + 2` (possibly another page), from where the first one landed, and a
   second 2-byte read: `F_Base (hi ++ lo)` (`uft_fetch2_base`), or either
-  translation's fault, reported at `pc` or `pc + 2`
+  translation's fault (its context reports `pc` or `pc + 2`)
   (`uft_fetch2_err1`/`_err2`; Rocq `exec_fetch_rvc_2`, `exec_fetch_base_2`,
   `exec_fetch_fault_2_first`/`_second`).
 
@@ -45,7 +46,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -74,6 +75,12 @@ theorem uftExc_utrTexc (f : PTW_Error) (hf : ∀ x, f ≠ .PTW_Ext_Error x) :
   | PTW_No_Access => exact Or.inr (Or.inl rfl)
   | PTW_Ext_Error x => exact absurd rfl (hf x)
   | _ => exact Or.inr (Or.inr rfl)
+
+/-- The exception context a user fetch reports (sail-riscv 0.16's `exception_context e a` at
+User: not a guest address). -/
+def uftCtx (e : ExceptionType) (a : BitVec 64) : ExceptionContext :=
+  { trap := e, excinfo_is_gva := false, excinfo := a, excinfo2 := none, excinst := none,
+    excinst_offset := 0#5, ext := none }
 
 theorem uft_bit0_clear (pc : BitVec 64) (h : pc.toNat % 2 = 0) : (Sail.BitVec.access pc 0 != 0#1) = false :=
   bit0_clear_of_even pc h
@@ -148,14 +155,15 @@ macro "uft_phys" hp:term:max n:num hram:term:max hal:term:max : tactic => `(tact
   have hclint := within_clint_ram _ $n $hram
   have halign := is_aligned_paddr_of _ $n (by decide) $hal
   uft_run -bv
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full16, MachCSL.updateSubrange_full32]))
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full16, MachCSL.updateSubrange_full32,
+    MachCSL.from_bytes_le_vecbytes_2, MachCSL.from_bytes_le_vecbytes_4]))
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A 2-byte instruction read** of owned RAM: the oracle's halfword. -/
 theorem uft_memRead2 (D : UFoot) (orc : UOrc) (s : UWSt) (hP : UftPins D s) (pa : BitVec 64)
     (hram : inRam pa 2) (hal : pa.toNat % 2 = 0) (hown : bmOwned s.mm pa 2 = true) :
-    uftRun D orc s (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) 2 false false false) =
+    uftRun D orc s (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) 2 false false false) =
       some (.Ok ((orc 0).ch (.bitvector (8 * 2))), s, orc.tail) := by
   have hdms := hP.dms; have hdcp := hP.dcp; have hcp := hP.cp
   uft_phys hP.wk 2 hram hal
@@ -165,7 +173,7 @@ set_option maxRecDepth 100000 in
 /-- **A 4-byte instruction read** of owned RAM: the oracle's word. -/
 theorem uft_memRead4 (D : UFoot) (orc : UOrc) (s : UWSt) (hP : UftPins D s) (pa : BitVec 64)
     (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (hown : bmOwned s.mm pa 4 = true) :
-    uftRun D orc s (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) 4 false false false) =
+    uftRun D orc s (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) 4 false false false) =
       some (.Ok ((orc 0).ch (.bitvector (8 * 4))), s, orc.tail) := by
   have hdms := hP.dms; have hdcp := hP.dcp; have hcp := hP.cp
   uft_phys hP.wk 4 hram hal
@@ -176,23 +184,25 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- A chunk whose translation faults: the fault, where the translation
 landed. -/
-theorem uft_fetchBytes_err (D : UFoot) (orc : UOrc) (s s1 : UWSt) (fs gs : BitVec 64) (n : Nat)
-    (e : ExceptionType)
-    (htr : runRW D orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ())) = some (.Err (e, ()), s1, orc)) :
+theorem uft_fetchBytes_err (D : UFoot) (orc : UOrc) (s s1 : UWSt) (hP : UftPins D s) (fs gs : BitVec 64)
+    (n : Nat) (e : ExceptionContext)
+    (htr : runRW D orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ()) .User) = some (.Err (e, ()), s1, orc)) :
     runRW D orc s (fetch_bytes fs gs n) = some (.FetchBytes_Exception e, s1, orc) := by
+  have hdms := hP.dms; have hdcp := hP.dcp; have hcp := hP.cp
   uwk_run -bv
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- A chunk whose translation succeeds: the read at the page, from where
 the translation landed. -/
-theorem uft_fetchBytes_ok (D : UFoot) (orc orc' : UOrc) (s s1 : UWSt) (fs gs pa : BitVec 64) (n : Nat)
-    (w : BitVec (8 * n))
-    (htr : uftRun D orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ())) =
+theorem uft_fetchBytes_ok (D : UFoot) (orc orc' : UOrc) (s s1 : UWSt) (hP : UftPins D s) (fs gs pa : BitVec 64)
+    (n : Nat) (w : BitVec (8 * n))
+    (htr : uftRun D orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ()) .User) =
       some (.Ok (.Physaddr pa, .PBMT_PMA, ()), s1, orc))
-    (hmr : uftRun D orc s1 (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) n false false false) =
+    (hmr : uftRun D orc s1 (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) n false false false) =
       some (.Ok w, s1, orc')) :
     uftRun D orc s (fetch_bytes fs gs n) = some (.FetchBytes_Success w, s1, orc') := by
+  have hdms := hP.dms; have hdcp := hP.dcp; have hcp := hP.cp
   uft_run -bv
 
 /-! ## §3 The geometry arms (Rocq `UserFetch` §2, §5, §6) -/
@@ -210,8 +220,9 @@ set_option maxRecDepth 100000 in
 before any translation; nothing moves. -/
 theorem uft_fetch_odd (D : UFoot) (orc : UOrc) (s : UWSt) (hP : UftPins D s) (pc : BitVec 64)
     (hpcv : s.file .PC = pc) (hodd : pc.toNat % 2 = 1) :
-    uftRun D orc s (fetch ()) = some (.F_Error (.E_Fetch_Addr_Align (), pc), s, orc) := by
+    uftRun D orc s (fetch ()) = some (.F_Error (uftCtx (.E_Fetch_Addr_Align ()) pc), s, orc) := by
   uft_gates hP
+  have hdcp := hP.dcp; have hcp := hP.cp
   have hb0 := uft_bit0_set pc hodd
   uft_run -bv
 
@@ -219,9 +230,9 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A 4-aligned PC, its translation faulting** (Rocq `exec_fetch_fault_4`). -/
 theorem uft_fetch4_err (D : UFoot) (orc : UOrc) (s s1 : UWSt) (hP : UftPins D s) (pc : BitVec 64)
-    (hpcv : s.file .PC = pc) (hal : pc.toNat % 4 = 0) (e : ExceptionType) (hpc1 : s1.file .PC = pc)
+    (hpcv : s.file .PC = pc) (hal : pc.toNat % 4 = 0) (e : ExceptionContext) (hpc1 : s1.file .PC = pc)
     (hfb : uftRun D orc s (fetch_bytes pc pc 4) = some (.FetchBytes_Exception e, s1, orc)) :
-    uftRun D orc s (fetch ()) = some (.F_Error (e, pc), s1, orc) := by
+    uftRun D orc s (fetch ()) = some (.F_Error e, s1, orc) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
   have hb1 := uft_bit1_clear pc (by omega)
@@ -262,9 +273,9 @@ set_option maxRecDepth 100000 in
 /-- **A PC at 2 mod 4, the first translation faulting** (Rocq
 `exec_fetch_fault_2_first`). -/
 theorem uft_fetch2_err1 (D : UFoot) (orc : UOrc) (s s1 : UWSt) (hP : UftPins D s) (pc : BitVec 64)
-    (hpcv : s.file .PC = pc) (hmid : pc.toNat % 4 = 2) (e : ExceptionType) (hpc1 : s1.file .PC = pc)
+    (hpcv : s.file .PC = pc) (hmid : pc.toNat % 4 = 2) (e : ExceptionContext) (hpc1 : s1.file .PC = pc)
     (hfb : uftRun D orc s (fetch_bytes pc pc 2) = some (.FetchBytes_Exception e, s1, orc)) :
-    uftRun D orc s (fetch ()) = some (.F_Error (e, pc), s1, orc) := by
+    uftRun D orc s (fetch ()) = some (.F_Error e, s1, orc) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
   have hb1 := uft_bit1_set pc (by omega)
@@ -292,9 +303,9 @@ set_option maxRecDepth 100000 in
 theorem uft_fetch2_err2 (D : UFoot) (orc orc1 : UOrc) (s s1 s2 : UWSt) (hP : UftPins D s) (pc : BitVec 64)
     (hpcv : s.file .PC = pc) (hmid : pc.toNat % 4 = 2) (lo : BitVec 16)
     (hfb : uftRun D orc s (fetch_bytes pc pc 2) = some (.FetchBytes_Success lo, s1, orc1))
-    (hrvc : isRVC lo = false) (hpc1 : s1.file .PC = pc) (e : ExceptionType) (hpc2 : s2.file .PC = pc)
+    (hrvc : isRVC lo = false) (hpc1 : s1.file .PC = pc) (e : ExceptionContext) (hpc2 : s2.file .PC = pc)
     (hfb2 : uftRun D orc1 s1 (fetch_bytes pc (BitVec.addInt pc 2) 2) = some (.FetchBytes_Exception e, s2, orc1)) :
-    uftRun D orc s (fetch ()) = some (.F_Error (e, BitVec.addInt pc 2), s2, orc1) := by
+    uftRun D orc s (fetch ()) = some (.F_Error e, s2, orc1) := by
   uft_gates hP
   have hb0 := uft_bit0_clear pc (by omega)
   have hb1 := uft_bit1_set pc (by omega)

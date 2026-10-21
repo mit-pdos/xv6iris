@@ -13,7 +13,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -36,7 +36,7 @@ theorem swp_checked_mem_read_load4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (si
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_au cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_au cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAU_wand cpu pa 4 K ts Ψ $$ HAU
@@ -63,7 +63,7 @@ theorem swp_checked_mem_read_load8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (si
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_au cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_au cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAU_wand cpu pa 8 K ts Ψ $$ HAU
@@ -90,7 +90,7 @@ theorem swp_checked_mem_write_store4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_au cpu) data (vecbytes_to_bitvec_to_bytes_le_4 _) rfl r
   iframe Hfrag
   iapply writeAU_wand cpu pa 4 data Ψ $$ HAU
   inext
@@ -116,7 +116,7 @@ theorem swp_checked_mem_write_store8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_au cpu) data (vecbytes_to_bitvec_to_bytes_le_8 _) rfl r
   iframe Hfrag
   iapply writeAU_wand cpu pa 8 data Ψ $$ HAU
   inext
@@ -146,7 +146,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide) r)
+  mem_iapply (swp_sail_mem_read_excl_au cpu) true rfl rfl (by decide) r
   iframe Hfrag
   iapply exclReadAU_wand pa 4 _ _ $$ HAU
   inext
@@ -173,7 +173,7 @@ theorem swp_checked_mem_write_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_excl_au cpu _ w0 data true rfl rfl (by decide))
+  mem_iapply (swp_sail_mem_write_excl_au cpu) w0 data true (vecbytes_to_bitvec_to_bytes_le_4 _) rfl (by decide)
   iframe Hfrag
   iapply exclWriteAU_wand cpu pa 4 true w0 data Ψ $$ HAU
   inext

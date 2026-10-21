@@ -115,9 +115,9 @@ theorem ush_bytes_upd (γd : GName) (a n : Nat) (g : Nat → BitVec 8) (j : Nat)
     iintro %k %y %hk %hne H
     obtain ⟨-, hy⟩ := uRange_get hk
     subst hy
-    simp only [ushpSetb, hne, if_false]
+    simp only [ushpSetb, hne, ite_false]
     iexact H
-  · simp only [ushpSetb, if_true]
+  · simp only [ushpSetb, ite_true]
     iexact Hc
 
 omit [MachGS GF] in
@@ -335,7 +335,7 @@ theorem shNul_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p :
     have hq14 : q ≠ 14#5 := ucs_ne q 14#5 hq (by decide)
     have hq15 : q ≠ 15#5 := ucs_ne q 15#5 hq (by decide)
     show m10.get q = _
-    simp (config := {zetaDelta := true}) only [ukWr_get, hq14, hq15, hq9, hq8, hqs, false_and, if_false]
+    simp (config := {zetaDelta := true}) only [ukWr_get, hq14, hq15, hq9, hq8, hqs, false_and, ite_false]
 
 /-! ## §5 The common tail (Rocq `wp_kshp_nul_fin`) -/
 

@@ -443,7 +443,7 @@ theorem fsLinks_gather (g : GName) (I : RegMapF FsNode) (x : FsLinkUR) :
         f j = (fun z => if z = i then (DD, (vv, P)) else f z) j := by
       intro j ⟨m, hj⟩
       have hji : j ≠ i := fun e => by subst e; rw [hi] at hj; cases hj
-      simp only [hji, if_false]
+      simp only [hji, ite_false]
     isplitr
     · ipureintro
       intro j m hj
@@ -451,13 +451,13 @@ theorem fsLinks_gather (g : GName) (I : RegMapF FsNode) (x : FsLinkUR) :
       · subst hji
         rw [get?_insert_eq rfl] at hj
         cases hj
-        simp only [lcD, lcV, lcTyf, if_true]
+        simp only [lcD, lcV, lcTyf, ite_true]
         exact Hok
       · rw [get?_insert_ne (fun e => hji e.symm)] at hj
-        simp only [lcD, lcV, lcTyf, hji, if_false]
+        simp only [lcD, lcV, lcTyf, hji, ite_false]
         exact Hf j m hj
     · rw [linkElem_insert I i n _ hi, ← linkElem_ext I f _ hext]
-      simp only [lcV, lcTyf, if_true]
+      simp only [lcV, lcTyf, ite_true]
       rw [Op.assoc]
       iexact Hr
 

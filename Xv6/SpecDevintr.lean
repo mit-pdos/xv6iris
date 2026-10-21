@@ -71,7 +71,7 @@ theorem devintrRet_ne_zero (sc : BitVec 64) (h : sCauseOk sc) : devintrRet sc â‰
 theorem devintrRet_none (sc : BitVec 64) (h : Â¬ sCauseOk sc) : devintrRet sc = 0#64 := by
   unfold sCauseOk at h
   unfold devintrRet
-  rw [if_neg (fun he => h (Or.inr he)), if_neg (fun he => h (Or.inl he))]
+  rw [ite_eq_right (fun he => h (Or.inr he)), ite_eq_right (fun he => h (Or.inl he))]
 
 /-- The stack devintr's cone needs (the Rocq `devintr_stack`): its own
 four-slot frame over the deepest callee, `uartintr`'s 30. -/

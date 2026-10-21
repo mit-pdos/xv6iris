@@ -1,9 +1,12 @@
-# The Sail modules model-xv6iris/{rv64d.v,rv64d_types.v} are generated from.
+# The Sail modules model/Lean_RV64D is generated from (sail-riscv 0.16 + the xv6 fork commits).
 #
-# This is sail-riscv's own SAIL_MODULES list for the rv64d build -- a curated
-# subset of riscv.sail_project's modules, NOT `--all-modules`.  It is recorded
-# here because it is a build input for the generated model: change it and the
-# model gains or loses whole instruction families.  tools/regen_sail_model.sh
+# This is xv6iris's own selection -- a curated subset of riscv.sail_project's
+# modules, NOT `--all-modules` (upstream 0.16's default).  It is the pre-0.16
+# selection plus Sdtrig; what it leaves out, and the fork commit that keeps the
+# F/D instructions out despite 0.16's `postlude` dependency, are in
+# notes/model-diffs.md.  It is recorded here because it is a build input for the
+# generated model: change it and the model gains or loses whole instruction
+# families.  tools/regen_sail_model.sh
 # reads this file (comments and blank lines ignored; whitespace-separated
 # module names), so a regen no longer depends on a cmake cache sitting in
 # somebody's sail-riscv build directory.
@@ -12,8 +15,12 @@
 # V_core/V_types ARE compiled into the model, and are then disabled by
 # `sail-config-rv64d.json` (see its header).  Whether an extension is compiled
 # and whether `hartSupports` answers true for it are independent axes.
+# Conversely, F and D (and, per the configuration, Zfh and scalar crypto) are
+# advertised but NOT compiled: `misa`/`hartSupports` report them, yet their
+# opcodes decode as illegal (notes/model-diffs.md section 4).
 
 prelude core exceptions pmp sys postlude
+Sdtrig   # required by `sys` since 0.15; compiled in, disabled by the config (hartSupports Ext_Sdtrig = false)
 
 I_insts I_types
 M_insts M_types

@@ -69,7 +69,7 @@ def matchstar (c : BitVec 8) (re : Bytes) : Bytes → Bool
 
 theorem matchhere_star (c : BitVec 8) (re text : Bytes) :
     matchhere (c :: cStar :: re) text = matchstar c re text := by
-  rw [matchhere, if_pos (by simp [bdec])]
+  rw [matchhere, ite_eq_left (by simp [bdec])]
   induction text with
   | nil => rfl
   | cons t ts ih => rw [matchstarAux, matchstar, ih]

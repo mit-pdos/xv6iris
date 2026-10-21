@@ -10,7 +10,7 @@ import MachCSL.WpPmp
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -42,7 +42,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 @[sail_facts] theorem is_CSR_accessible_sie (p : Privilege) (a : CSRAccessType) :
     is_CSR_accessible 0x104#12 p a = currentlyEnabled extension.Ext_S := rfl
 @[sail_facts] theorem is_CSR_accessible_satp (p : Privilege) (a : CSRAccessType) :
-    is_CSR_accessible 0x180#12 p a = satp_accessible p := rfl
+    is_CSR_accessible 0x180#12 p a = is_satp_accessible p := rfl
 @[sail_facts] theorem is_CSR_accessible_stimecmp (p : Privilege) (a : CSRAccessType) :
     is_CSR_accessible 0x14D#12 p a = is_stimecmp_accessible p := rfl
 @[sail_facts] theorem is_CSR_accessible_time (p : Privilege) (a : CSRAccessType) :
@@ -95,37 +95,47 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 -- the `read_CSR` arms
 @[sail_facts] theorem read_CSR_mstatus : read_CSR 0x300#12 =
-    (do let x ← readReg Register.mstatus; pure (Sail.BitVec.extractLsb x 63 0)) := rfl
+    (do let x ← read_mstatus (); pure (Sail.BitVec.extractLsb x 63 0)) := rfl
 @[sail_facts] theorem read_CSR_menvcfg : read_CSR 0x30A#12 =
     (do let x ← readReg Register.menvcfg; pure (Sail.BitVec.extractLsb x 63 0)) := rfl
 @[sail_facts] theorem read_CSR_mcounteren : read_CSR 0x306#12 =
     (do let x ← readReg Register.mcounteren; pure (zero_extend (m := 64) x)) := rfl
 @[sail_facts] theorem read_CSR_sie : read_CSR 0x104#12 =
-    (do let m ← readReg Register.mie; let d ← readReg Register.mideleg; pure (lower_mie m d)) := rfl
+    (do if (← inVirtualPrivilege ()) then pure (lower_mie_to_vsie (← readReg Register.mie) (← readReg Register.hideleg))
+        else pure (lower_mie (← readReg Register.mie) (← readReg Register.mideleg))) := rfl
 @[sail_facts] theorem read_CSR_time : read_CSR 0xC01#12 =
-    (do let x ← readReg Register.mtime; pure (Sail.BitVec.extractLsb x 63 0)) := rfl
+    (do pure ((Sail.BitVec.extractLsb (← get_mtime ()) 63 0) +
+        (← do if (← inVirtualPrivilege ()) then pure (Sail.BitVec.extractLsb (← readReg Register.htimedelta) 63 0)
+              else pure (zeros (n := 64))))) := rfl
 
 -- the `write_CSR` arms
 @[sail_facts] theorem write_CSR_mstatus (v : BitVec 64) : write_CSR 0x300#12 v =
     (do let o ← readReg Register.mstatus; let n ← legalize_mstatus o v; writeReg Register.mstatus n
-        let r ← readReg Register.mstatus; pure (.Ok r)) := rfl
+        let r ← read_mstatus (); pure (.Ok r)) := rfl
 @[sail_facts] theorem write_CSR_mepc (v : BitVec 64) : write_CSR 0x341#12 v =
     (do let r ← set_xepc Privilege.Machine v; pure (.Ok r)) := rfl
 @[sail_facts] theorem write_CSR_satp (v : BitVec 64) : write_CSR 0x180#12 v =
-    (do let a ← architecture Privilege.Supervisor; let o ← readReg Register.satp
-        let n ← legalize_satp a o v; writeReg Register.satp n
-        let r ← readReg Register.satp; pure (.Ok r)) := rfl
+    (do if (← inVirtualPrivilege ()) then
+          (do writeReg Register.vsatp (← legalize_satp (← architecture (← readReg Register.cur_privilege)) true
+                (← readReg Register.vsatp) v)
+              pure (.Ok (← readReg Register.vsatp)))
+        else
+          (do writeReg Register.satp (← legalize_satp (← architecture Privilege.Supervisor) false
+                (← readReg Register.satp) v)
+              pure (.Ok (← readReg Register.satp)))) := rfl
 @[sail_facts] theorem write_CSR_medeleg (v : BitVec 64) : write_CSR 0x302#12 v =
-    (do let o ← readReg Register.medeleg; writeReg Register.medeleg (legalize_medeleg o v)
+    (do let o ← readReg Register.medeleg; let n ← legalize_medeleg o v; writeReg Register.medeleg n
         let r ← readReg Register.medeleg; pure (.Ok r)) := rfl
 @[sail_facts] theorem write_CSR_mideleg (v : BitVec 64) : write_CSR 0x303#12 v =
     (do let o ← readReg Register.mideleg; let n ← legalize_mideleg o v; writeReg Register.mideleg n
         let r ← readReg Register.mideleg; pure (.Ok r)) := rfl
 @[sail_facts] theorem write_CSR_sie (v : BitVec 64) : write_CSR 0x104#12 v =
-    (do let m ← readReg Register.mie; let d ← readReg Register.mideleg
-        writeReg Register.mie (legalize_sie m d v)
-        let m' ← readReg Register.mie; let d' ← readReg Register.mideleg
-        pure (.Ok (lower_mie m' d'))) := rfl
+    (do if (← inVirtualPrivilege ()) then
+          (do writeReg Register.mie (← legalize_vsie (← readReg Register.mie) (← readReg Register.hideleg) v)
+              pure (.Ok (lower_mie_to_vsie (← readReg Register.mie) (← readReg Register.hideleg))))
+        else
+          (do writeReg Register.mie (← legalize_sie (← readReg Register.mie) (← readReg Register.mideleg) v)
+              pure (.Ok (lower_mie (← readReg Register.mie) (← readReg Register.mideleg))))) := rfl
 @[sail_facts] theorem write_CSR_menvcfg (v : BitVec 64) : write_CSR 0x30A#12 v =
     (do let o ← readReg Register.menvcfg; let n ← legalize_menvcfg o v; writeReg Register.menvcfg n
         let r ← readReg Register.menvcfg; pure (.Ok r)) := rfl
@@ -133,9 +143,14 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
     (do let o ← readReg Register.mcounteren; writeReg Register.mcounteren (legalize_mcounteren o v)
         let r ← readReg Register.mcounteren; pure (.Ok (zero_extend (m := 64) r))) := rfl
 @[sail_facts] theorem write_CSR_stimecmp (v : BitVec 64) : write_CSR 0x14D#12 v =
-    (do let o ← readReg Register.stimecmp
-        writeReg Register.stimecmp (Sail.BitVec.updateSubrange o 63 0 v); clint_dispatch false
-        let r ← readReg Register.stimecmp; pure (.Ok (Sail.BitVec.extractLsb r 63 0))) := rfl
+    (do if (← inVirtualPrivilege ()) then
+          (do let o ← readReg Register.vstimecmp
+              writeReg Register.vstimecmp (Sail.BitVec.updateSubrange o 63 0 v)
+              let r ← readReg Register.vstimecmp; pure (.Ok (Sail.BitVec.extractLsb r 63 0)))
+        else
+          (do let o ← readReg Register.stimecmp
+              writeReg Register.stimecmp (Sail.BitVec.updateSubrange o 63 0 v)
+              let r ← readReg Register.stimecmp; pure (.Ok (Sail.BitVec.extractLsb r 63 0)))) := rfl
 @[sail_facts] theorem write_CSR_pmpcfg0 (v : BitVec 64) : write_CSR 0x3A0#12 v =
     (do pmpWriteCfgReg 0 v; let r ← pmpReadCfgReg 0; pure (.Ok r)) := rfl
 @[sail_facts] theorem write_CSR_pmpaddr0 (v : BitVec 64) : write_CSR 0x3B0#12 v =

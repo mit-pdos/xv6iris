@@ -105,8 +105,8 @@ theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
     rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl,
     usysSeccOk_refl _ _ _ _ (hn 23 h23), ?_, Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
-      if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
+    rw [ite_eq_right (hn USYS_exec h7), ite_eq_right (hn USYS_sbrk h12), ite_eq_right (hn USYS_wait h3),
+      ite_eq_right (hn USYS_pipe h4), ite_eq_right (hn USYS_read h5), ite_eq_right (hn USYS_fstat h8)]
     rfl
   · exact syscFdOk_refl_at V _ sts n hnum h21 h10 h15 h4
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 h4)
@@ -130,9 +130,9 @@ theorem syscRows_secc (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
     rfl, Or.inr rfl, Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
     syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_, Or.inl (hn 14 (by decide)), Or.inl (hn 3 (by decide))⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
-      if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),
-      if_neg (hn USYS_read (by decide)), if_neg (hn USYS_fstat (by decide))]
+    rw [ite_eq_right (hn USYS_exec (by decide)), ite_eq_right (hn USYS_sbrk (by decide)),
+      ite_eq_right (hn USYS_wait (by decide)), ite_eq_right (hn USYS_pipe (by decide)),
+      ite_eq_right (hn USYS_read (by decide)), ite_eq_right (hn USYS_fstat (by decide))]
     rfl
   · exact syscFdOk_refl_at V _ sts 23 hnum (by decide) (by decide) (by decide) (by decide)
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide))

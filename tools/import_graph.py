@@ -21,9 +21,9 @@ Usage:
              first-come order (the one a cut has to improve; see
              claude-notes/optimization.md "Build shape").
 
-Sources: every .lean under MachCSL/, Xv6/, model/Lean_RV64D/LeanRV64D,
-vendor/lean-sail/Sail and the packages in .lake/packages (Iris, Batteries,
-Qq). Init/Lean/Std/Lake modules are toolchain modules with time 0.
+Sources: every .lean under MachCSL/, Xv6/, model/Lean_RV64D/LeanRV64D and the
+packages in .lake/packages (Sail = lean-sail, Iris, Batteries, Qq).
+Init/Lean/Std/Lake modules are toolchain modules with time 0.
 """
 import argparse, collections, heapq, json, os, re, subprocess, sys
 
@@ -32,7 +32,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_ROOTS = [  # (dir relative to repo root, module prefix dir)
     ("", ["MachCSL", "Xv6", "MachCSL.lean", "Xv6.lean"]),
     ("model/Lean_RV64D", ["LeanRV64D", "LeanRV64D.lean"]),
-    ("vendor/lean-sail", ["Sail", "Sail.lean"]),
+    (".lake/packages/Sail", ["Sail", "Sail.lean"]),
 ]
 IMPORT_RE = re.compile(r"^\s*(?:public\s+|meta\s+|private\s+)*import\s+(?:all\s+)?([^\s-]+)")
 

@@ -581,17 +581,17 @@ theorem uaRegs_set (k : KCtx) (R : RegMap) (newsz : BitVec 64) (root : BitVec 44
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (fun hh => j2 hh.symm)]; exact g2)
-      | (rw [if_neg (fun hh => j18 hh.symm)]; exact g18)
-      | (rw [if_neg (fun hh => j19 hh.symm)]; exact g19)
-      | (rw [if_neg (fun hh => j20 hh.symm)]; exact g20)
-      | (rw [if_neg (fun hh => j21 hh.symm)]; exact g21)
-      | (rw [if_neg (fun hh => j22 hh.symm)]; exact g22)
-      | (rw [if_neg (fun hh => j23 hh.symm)]; exact g23)
-      | (rw [if_neg (fun hh => j24 hh.symm)]; exact g24)
-      | (rw [if_neg (fun hh => j25 hh.symm)]; exact g25)
-      | (rw [if_neg (fun hh => j26 hh.symm)]; exact g26)
-      | (rw [if_neg (fun hh => j27 hh.symm)]; exact g27)
+      | (rw [ite_eq_right (fun hh => j2 hh.symm)]; exact g2)
+      | (rw [ite_eq_right (fun hh => j18 hh.symm)]; exact g18)
+      | (rw [ite_eq_right (fun hh => j19 hh.symm)]; exact g19)
+      | (rw [ite_eq_right (fun hh => j20 hh.symm)]; exact g20)
+      | (rw [ite_eq_right (fun hh => j21 hh.symm)]; exact g21)
+      | (rw [ite_eq_right (fun hh => j22 hh.symm)]; exact g22)
+      | (rw [ite_eq_right (fun hh => j23 hh.symm)]; exact g23)
+      | (rw [ite_eq_right (fun hh => j24 hh.symm)]; exact g24)
+      | (rw [ite_eq_right (fun hh => j25 hh.symm)]; exact g25)
+      | (rw [ite_eq_right (fun hh => j26 hh.symm)]; exact g26)
+      | (rw [ite_eq_right (fun hh => j27 hh.symm)]; exact g27)
 
 /-- What one iteration of the loop leaves behind. -/
 def uaOut [CurCtx] (k : KCtx) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
@@ -986,11 +986,11 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       have hcomp : (t.fill 2 (vpnOf (R2 18#5)) fresh).1.complete 2 (vpnOf (R2 18#5)) := by
         by_cases hc : (t.fill 2 (vpnOf (R2 18#5)) fresh).1.complete 2 (vpnOf (R2 18#5))
         · exact hc
-        · rw [ua_mapRun_one, if_neg hc] at hcount; simp at hcount
+        · rw [ua_mapRun_one, ite_eq_right hc] at hcount; simp at hcount
       have htree_eq : (t.mapRun (vpnOf (R2 18#5)) (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1
           = (t.fill 2 (vpnOf (R2 18#5)) fresh).1.setLeaf 2 (vpnOf (R2 18#5))
               (leafOf (BitVec.extractLsb' 12 44 (R1 10#5)) perm) := by
-        rw [ua_mapRun_one, if_pos hcomp]
+        rw [ua_mapRun_one, ite_eq_left hcomp]
       have hrepfill : ptRep (t.fill 2 (vpnOf (R2 18#5)) fresh).1 Pi.leaves :=
         ptRep_fill t Pi.leaves (vpnOf (R2 18#5)) fresh hrep hfrnd hfrpg
       have hrepset : ptRep ((t.fill 2 (vpnOf (R2 18#5)) fresh).1.setLeaf 2 (vpnOf (R2 18#5))
@@ -1039,10 +1039,10 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       ihave Hn := Hrc2 $$ %hm1
       icases Hn with #Hn
       have hnc : ¬ (t.fill 2 (vpnOf (R2 18#5)) fresh).1.complete 2 (vpnOf (R2 18#5)) := by
-        intro hc; rw [ua_mapRun_one, if_pos hc] at hlt1; simp at hlt1
+        intro hc; rw [ua_mapRun_one, ite_eq_left hc] at hlt1; simp at hlt1
       have htree_eq : (t.mapRun (vpnOf (R2 18#5)) (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1
           = (t.fill 2 (vpnOf (R2 18#5)) fresh).1 := by
-        rw [ua_mapRun_one, if_neg hnc]
+        rw [ua_mapRun_one, ite_eq_right hnc]
       have hrepMap : ptRep (t.mapRun (vpnOf (R2 18#5))
           (BitVec.extractLsb' 12 44 (R1 10#5)) perm 1 fresh).1 Pi.leaves := by
         rw [htree_eq]; exact ptRep_fill t Pi.leaves (vpnOf (R2 18#5)) fresh hrep hfrnd hfrpg
@@ -1359,7 +1359,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       (hp3 h).trans ((hp2 h).trans (hp1 h))
     ihave HΦ' := wpNext_at _ _ _ c3 _ hpin $$ HΦ Hlc
     have hnp : uvmaNp (k.regs 11#5) (k.regs 12#5) = 0 := by
-      unfold uvmaNp; rw [if_pos (by omega)]
+      unfold uvmaNp; rw [ite_eq_left (by omega)]
     rw [ua_setReg_spie k 10#5 (k.regs 11#5)]
     have hcs : calleeSaved k.regs (k.regs.set 10#5 (k.regs 11#5)) := by
       unfold calleeSaved
@@ -1369,7 +1369,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       (k.regs.set 10#5 (k.regs 11#5) 10#5)
       (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
       (ua_ok_id P M _ _ _ hnp)
-      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [if_pos hlt])
+      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; rw [ite_eq_left hlt])
       $$ HP
     iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hres %hcs
   case neg =>
@@ -1444,8 +1444,8 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       have hnp : uvmaNp (k.regs 11#5) (k.regs 12#5) = 0 := by
         unfold uvmaNp
         by_cases hc : (k.regs 12#5).toNat < pgRoundUpN (k.regs 11#5).toNat
-        · rw [if_pos hc]
-        · rw [if_neg hc]
+        · rw [ite_eq_left hc]
+        · rw [ite_eq_right hc]
           omega
       k_step_gen (wp_s_branch c17 _ (KA.«uvmalloc» + 0x26#64) false 128#13 18#5 12#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1475,7 +1475,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
           (ua_ok_id P M _ _ _ hnp)
           (by rw [hpost.2]
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-              rw [if_neg hlt])
+              rw [ite_eq_right hlt])
           $$ HP
         iapply HΦ $$ %k.spie %k.spp %R' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hres %hpost.1
       case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -1499,12 +1499,12 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
           pgRoundUpN (k.regs 11#5).toNat + 4096 * j < (k.regs 12#5).toNat := by
         intro j hj
         unfold uvmaNp at hj
-        rw [if_neg (by omega)] at hj
+        rw [ite_eq_right (by omega)] at hj
         omega
       have hhi : (k.regs 12#5).toNat ≤ pgRoundUpN (k.regs 11#5).toNat
           + 4096 * uvmaNp (k.regs 11#5) (k.regs 12#5) := by
         unfold uvmaNp
-        rw [if_neg (by omega)]
+        rw [ite_eq_right (by omega)]
         omega
       -- bgeu s2,a2 : not taken (the run is non-empty)
       k_step_gen (wp_s_branch c17 _ (KA.«uvmalloc» + 0x26#64) false 128#13 18#5 12#5 (by decide) bop.BGEU)
@@ -1591,7 +1591,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
                 (k.regs 13#5) (ua_perm_eq (k.regs 13#5)).symm hfree hinv_np)
               (by rw [hpost'.2]
                   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-                  rw [if_neg hlt]) $$ HPr
+                  rw [ite_eq_right hlt]) $$ HPr
             iapply HΦ $$ %spie2 %spp2 %R' %hsp2 Hk Hpc Hlend Hres %hpost'.1
           case f2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; exact e2
           case f9 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

@@ -51,7 +51,7 @@ theorem lmDiscInput_U_no_cr (I : List (BitVec 8)) (j : Nat) (hd : lmDiscInput ul
     exact List.getElem_mem hj
   have hv := lmDiscInput_byte_val (ulm_byte_laws admUG admSOn) I _ hd hin
   unfold consXlate
-  rw [if_neg]
+  rw [ite_eq_right]
   intro h
   rw [h] at hv
   revert hv

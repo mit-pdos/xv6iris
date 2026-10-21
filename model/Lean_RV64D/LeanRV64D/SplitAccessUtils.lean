@@ -10,12 +10,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -59,6 +59,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -92,10 +94,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -141,6 +146,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -159,17 +165,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -184,12 +197,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -200,7 +216,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -227,7 +246,7 @@ def split_access (addr : (BitVec k_n)) (width : Nat) : SailM (Int × Int) := do
   let width_align := (BitVec.countTrailingZeros (to_bits (l := (12 +i 1)) width))
   let bytes_per_access := (2 ^i (Min.min addr_align width_align))
   let num_accesses := (Int.tdiv width bytes_per_access)
-  (assert (width == (num_accesses *i bytes_per_access)) "sys/split_access_utils.sail:53.49-53.50")
+  sail_assert (width == (num_accesses *i bytes_per_access)) "sys/split_access_utils.sail:53.49-53.50"
   (pure (num_accesses, bytes_per_access))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
@@ -273,7 +292,7 @@ def misaligned_order (n : Int) : (Int × Int × Int) :=
   else (0, (n -i 1), 1)
 
 /-- Type quantifiers: k_n : Nat, k_n ≥ 0, width : Nat, 13 ≤ k_n ∧ k_n ≤ 64 ∧
-  is_mem_width(width) -/
+  (is_mem_width width) -/
 def split_on_page_boundary (addr : (BitVec k_n)) (width : Nat) : SailM (Int × Int) := do
   let page_mask :=
     (Sail.BitVec.updateSubrange ((ones (n := (Sail.BitVec.length addr))) : (BitVec k_n))
@@ -286,10 +305,10 @@ def split_on_page_boundary (addr : (BitVec k_n)) (width : Nat) : SailM (Int × I
     (do
       let nbytes_to_boundary :=
         ((2 ^i 3) -i (BitVec.toNatInt (Sail.BitVec.extractLsb addr (3 -i 1) 0)))
-      (assert (nbytes_to_boundary <b width) "sys/split_access_utils.sail:111.37-111.38")
+      sail_assert (nbytes_to_boundary <b width) "sys/split_access_utils.sail:111.37-111.38"
       (pure (nbytes_to_boundary, (width -i nbytes_to_boundary))))
 
-/-- Type quantifiers: width : Nat, is_mem_width(width) -/
+/-- Type quantifiers: width : Nat, (is_mem_width width) -/
 def prop_access_in_same_page (addr : (BitVec 16)) (width : Nat) : SailM Bool := do
   let (p, q) ← do (split_on_page_boundary addr width)
   let page_mask : (BitVec 16) := 0xF000#16
@@ -298,7 +317,7 @@ def prop_access_in_same_page (addr : (BitVec 16)) (width : Nat) : SailM Bool := 
         ((addr &&& page_mask) == ((BitVec.subInt (BitVec.addInt addr width) 1) &&& page_mask))
         (q == 0))))
 
-/-- Type quantifiers: width : Nat, is_mem_width(width) -/
+/-- Type quantifiers: width : Nat, (is_mem_width width) -/
 def prop_access_across_page_boundary (addr : (BitVec 16)) (width : Nat) : SailM Bool := do
   let (p, q) ← do (split_on_page_boundary addr width)
   let page_mask : (BitVec 16) := 0xF000#16

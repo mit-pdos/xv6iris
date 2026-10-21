@@ -162,7 +162,7 @@ theorem argPathOf_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List
       simpa using hzero
     have hva : umemByte M (va + i) = 0#8 := by
       have h := umemRead_getElem? M va max i
-      rw [hgi, if_pos hi] at h
+      rw [hgi, ite_eq_left hi] at h
       exact (Option.some.inj h).symm
     refine ⟨(umemRead M va max).take i, ?_, ?_, ?_, ?_⟩
     · rw [← hs, List.take_add_one, hgi]; rfl
@@ -173,7 +173,7 @@ theorem argPathOf_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List
           obtain ⟨h', -⟩ := List.getElem?_eq_some_iff.mp hb
           rw [List.length_take, umemRead_length] at h'
           omega
-        rw [List.getElem?_take, if_pos hj,
+        rw [List.getElem?_take, ite_eq_left hj,
           List.getElem?_eq_getElem (by rw [umemRead_length]; omega)] at hb
         rw [← Option.some.inj hb]
         simpa using hmin j hj
@@ -182,9 +182,9 @@ theorem argPathOf_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List
         obtain ⟨h', -⟩ := List.getElem?_eq_some_iff.mp hb
         rw [List.length_take, umemRead_length] at h'
         omega
-      rw [List.getElem?_take, if_pos hj] at hb
+      rw [List.getElem?_take, ite_eq_left hj] at hb
       have h := umemRead_getElem? M va max j
-      rw [hb, if_pos (show j < max by omega)] at h
+      rw [hb, ite_eq_left (show j < max by omega)] at h
       exact (Option.some.inj h).symm
     · rw [List.length_take, umemRead_length, Nat.min_eq_left (by omega)]
       exact hva

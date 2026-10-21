@@ -1,17 +1,18 @@
 /-
 MachCSL: the clock tick (`tick_clock`), proved once.
 
-`tick_clock` is `should_inc_mcycle` + an optional `mcycle` bump, the `mtime`
-bump, and `clint_dispatch false`.  Run as one symbolic execution, every
-branch point multiplies the paths behind it: the privilege, the two
-`mcountinhibit`/`mcyclecfg` gates, the `menvcfg.STCE` test and the "did `mip`
-change" test (which the model's join point copies into both STCE arms, each
-copy reaching the `csr_name_write_callback "mip"` string lookup) -- some
-two dozen leaves, 13 s per proof, and the tree proved it three times
-(machine/supervisor, supervisor/user, parked hart).  Here each piece is its
-own lemma with its own (two or four) branches, the privilege and the hart
-state are parameters the tick never inspects, and the variants are
-corollaries of `swp_tick_clock_hs`.
+Since sail-riscv 0.16 `tick_clock` is `clint_tick_clock`: `should_inc_mcycle`
++ an optional `mcycle` bump and the `mtime` bump -- nothing else.  The old
+model's trailing `clint_dispatch false` (which refreshed the timer-pending bits
+of `mip` from `mtimecmp`/`stimecmp` and, when `mip` changed, called the
+`csr_name_write_callback "mip"` lookup) is gone: 0.16 refreshes the timer
+bits of `mip` from the compares at the start of every cycle (`update_mip`,
+`swp_update_mip` in `MachCSL.WpStepHooks`), so the tick no longer reads
+`menvcfg`/`mtimecmp`/`stimecmp` nor writes `mip`.
+`swp_clint_tick_clock` is the tick over the cells it actually touches; the
+historical forms (`swp_tick_clock_core` and the corollaries over the
+configuration cells) are kept, with `mip` handed back unchanged.  The
+privilege and the hart state are parameters the tick never inspects.
 -/
 import MachCSL.MConf
 import MachCSL.PlatformFacts
@@ -23,34 +24,12 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The pieces -/
-
-set_option maxHeartbeats 4000000 in
-/-- `clint_dispatch false`: the timer-pending bits of `mip` are refreshed from
-the compares (whatever they are). -/
-theorem swp_clint_dispatch_off (cpu : CPU) (dq : DFrac) (envcfg tcmp scmp mtime mip : BitVec 64)
-    (Φ : Unit → IProp GF) :
-    hwConfig cpu ∗ Register.menvcfg ↦ᵣ[cpu]{dq} envcfg ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} tcmp ∗
-    Register.stimecmp ↦ᵣ[cpu]{dq} scmp ∗ Register.mtime ↦ᵣ[cpu] mtime ∗ Register.mip ↦ᵣ[cpu] mip ∗
-    ▷ (∀ mip', Register.menvcfg ↦ᵣ[cpu]{dq} envcfg -∗ Register.mtimecmp ↦ᵣ[cpu]{dq} tcmp -∗
-        Register.stimecmp ↦ᵣ[cpu]{dq} scmp -∗ Register.mtime ↦ᵣ[cpu] mtime -∗
-        Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
-    ⊢ swp cpu (clint_dispatch false) Φ := by
-  iintro ⟨#Hhw, Hmenvcfg, Hmtimecmp, Hstimecmp, Hmtime, Hmip, HΦ⟩
-  unfold clint_dispatch
-  swp_run 60
-  split
-  all_goals
-    swp_run 60
-    split
-    all_goals
-      swp_run 60
-      iapply HΦ $$ %_ Hmenvcfg Hmtimecmp Hstimecmp Hmtime Hmip
 
 /-- `should_inc_mcycle` at any privilege: the counter configuration is
 existential (`hwAny`), so the answer is arbitrary. -/
@@ -69,10 +48,36 @@ theorem swp_should_inc_mcycle (cpu : CPU) (p : Privilege) (Φ : Bool → IProp G
 
 /-! ## The tick over its own cells, at any privilege -/
 
-set_option maxHeartbeats 4000000 in
-/-- **The clock tick**, at any privilege and any configuration: `mcycle`
-(maybe) and `mtime` advance, the timer-pending bits are refreshed, no
-interrupt is taken. -/
+/-- **The clock tick** over the cells it touches (sail-riscv 0.16), at any
+privilege and any counter configuration: `mcycle` (maybe) and `mtime`
+advance, nothing else is read or written. -/
+theorem swp_clint_tick_clock (cpu : CPU) (dq : DFrac) (p : Privilege) (mcycle mtime : BitVec 64)
+    (Φ : Unit → IProp GF) :
+    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
+    Register.mcycle ↦ᵣ[cpu] mcycle ∗ Register.mtime ↦ᵣ[cpu] mtime ∗
+    ▷ (∀ mcycle' mtime', Register.cur_privilege ↦ᵣ[cpu]{dq} p -∗
+        Register.mcycle ↦ᵣ[cpu] mcycle' -∗ Register.mtime ↦ᵣ[cpu] mtime' -∗ Φ ())
+    ⊢ swp cpu (tick_clock ()) Φ := by
+  iintro ⟨#Hhw, Hcur_privilege, Hmcycle, Hmtime, HΦ⟩
+  unfold tick_clock clint_tick_clock
+  -- `swp_run` must stop in front of `should_inc_mcycle` rather than unfold it
+  generalize hsi : should_inc_mcycle = si
+  swp_run 10
+  iapply swp_bind
+  rw [← hsi]
+  iapply swp_should_inc_mcycle
+  iframe Hhw
+  inext
+  iintro %b
+  cases b
+  all_goals
+    swp_run 20
+    iapply HΦ $$ %_ %_ Hcur_privilege Hmcycle Hmtime
+
+/-- **The clock tick**, at any privilege and any configuration, over the
+historical cell set (the pre-0.16 tick also refreshed `mip` from the
+compares): `mcycle` (maybe) and `mtime` advance, the other cells are handed
+back (`mip` at its old value), no interrupt is taken. -/
 theorem swp_tick_clock_core (cpu : CPU) (dq : DFrac) (p : Privilege)
     (envcfg tcmp scmp mcycle mtime mip : BitVec 64) (Φ : Unit → IProp GF) :
     hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
@@ -86,27 +91,11 @@ theorem swp_tick_clock_core (cpu : CPU) (dq : DFrac) (p : Privilege)
         Register.mip ↦ᵣ[cpu] mip' -∗ Φ ())
     ⊢ swp cpu (tick_clock ()) Φ := by
   iintro ⟨#Hhw, Hcur_privilege, Hmenvcfg, Hmtimecmp, Hstimecmp, Hmcycle, Hmtime, Hmip, HΦ⟩
-  unfold tick_clock
-  -- `swp_run` must stop in front of the two pieces rather than unfold them
-  generalize hcd : clint_dispatch false = cd
-  generalize hsi : should_inc_mcycle = si
-  swp_run 10
-  iapply swp_bind
-  rw [← hsi]
-  iapply swp_should_inc_mcycle
-  iframe Hhw
+  iapply swp_clint_tick_clock
+  iframe Hhw Hcur_privilege Hmcycle Hmtime
   inext
-  iintro %b
-  cases b
-  all_goals
-    swp_run 20
-    subst hcd
-    iapply swp_clint_dispatch_off
-    iframe
-    iframe Hhw
-    inext
-    iintro %mip' Hmenvcfg Hmtimecmp Hstimecmp Hmtime Hmip
-    iapply HΦ $$ %_ %_ %_ Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
+  iintro %mcycle' %mtime' Hcur_privilege Hmcycle Hmtime
+  iapply HΦ $$ %_ %_ %mip Hcur_privilege Hmenvcfg Hmtimecmp Hstimecmp Hmcycle Hmtime Hmip
 
 /-! ## The configuration cells at an arbitrary hart state
 

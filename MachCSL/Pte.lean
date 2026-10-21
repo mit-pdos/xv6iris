@@ -9,12 +9,13 @@ model's decoders (`PPN_of_PTE`, the flag getters, `pte_is_non_leaf`,
 these forms, so the tree spec never mentions raw bit positions.
 -/
 import LeanRV64D.VmemPte
+import MachCSL.SailFree
 
 noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## Layout -/
@@ -200,22 +201,31 @@ def accPlain (acc : MemoryAccessType mem_payload) : Prop := is_prefetch_access a
 
 /-- `update_PTE_Bits` on any entry whose `A`/`D` bits are `a`/`d`: it sets
 `A`, and sets `D` on a write, reporting `none` when there is nothing to do.
-This is the one place that inspects the access's constructor. -/
+This is the one place that inspects the access's constructor.
+
+Since sail-riscv 0.16 (the H extension) `update_PTE_Bits` is a `SailM` computation taking the
+translation stage: its only effectful branch (an implicit VS-stage PTE read setting the G-stage
+`D`, `hw_updates_pte`) is behind the configuration constant
+`sys_implicit_vs_pte_access_sets_gstage_d`, which is `false` on this platform, so at every stage
+it is the pure computation it was. -/
 theorem update_PTE_Bits_pteSetAD (p : BitVec 64) (a d : BitVec 1)
-    (acc : MemoryAccessType mem_payload) (hpl : accPlain acc) :
-    update_PTE_Bits (pteSetAD p a d) acc =
-      if ((d == 0#1) && accWrites acc) || (a == 0#1) then
+    (acc : MemoryAccessType mem_payload) (hpl : accPlain acc) (stage : TranslationStage) :
+    update_PTE_Bits (pteSetAD p a d) acc stage =
+      pure (if ((d == 0#1) && accWrites acc) || (a == 0#1) then
         some (pteSetAD p 1#1 (if (d == 0#1) && accWrites acc then 1#1 else d))
-      else none := by
+      else none) := by
   unfold accPlain at hpl
   cases acc with
   | CacheAccess c =>
     cases c <;>
       simp_all [update_PTE_Bits, Mk_PTE_Flags, A_of_pteSetAD, D_of_pteSetAD,
-        updateSubrange_pteSetAD, accWrites, is_prefetch_access, Functions.not]
+        updateSubrange_pteSetAD, accWrites, is_prefetch_access, LeanRV64D.not] <;>
+      (repeat' split) <;> simp_all <;> rfl
   | _ =>
     simp_all [update_PTE_Bits, Mk_PTE_Flags, A_of_pteSetAD, D_of_pteSetAD,
-      updateSubrange_pteSetAD, accWrites, is_prefetch_access, Functions.not]
+      updateSubrange_pteSetAD, accWrites, is_prefetch_access, LeanRV64D.not,
+      sys_implicit_vs_pte_access_sets_gstage_d] <;>
+    (repeat' split) <;> simp_all <;> rfl
 
 /-- A leaf's page and permission are determined by its value, at any A/D. -/
 theorem kLeaf_inj {ppn ppn' : BitVec 44} {perm perm' : KPerm} {a d a' d' : BitVec 1}

@@ -107,11 +107,11 @@ theorem grepMemmove_fstep (UL : UK_LEAVES) (N : UkNames GF) (dst d len : Nat) (f
       else BitVec.ofNat 64 0x464 + instrLen false) =
       (if i + 1 = len then BitVec.ofNat 64 0x468 else BitVec.ofNat 64 0x458) := by
     by_cases hl : i + 1 = len
-    · rw [decide_eq_true (show dst + len = dst + i + 1 by omega), if_pos hl]
-      simp only [Bool.not_true, Bool.false_eq_true, if_false]
+    · rw [decide_eq_true (show dst + len = dst + i + 1 by omega), ite_eq_left hl]
+      simp only [Bool.not_true, Bool.false_eq_true, ite_false]
       exact ukPc 0x464 0x468 false rfl
-    · rw [decide_eq_false (show ¬ dst + len = dst + i + 1 by omega), if_neg hl]
-      simp only [Bool.not_false, if_true]
+    · rw [decide_eq_false (show ¬ dst + len = dst + i + 1 by omega), ite_eq_right hl]
+      simp only [Bool.not_false, ite_true]
       decide
   rw [e]
   iapply Hcont $$ Hw %h5 %m3 [] [] [] [] Hrun
@@ -144,7 +144,7 @@ theorem grepMemmove_fwd (UL : UK_LEAVES) (N : UkNames GF) (dst d len : Nat) (f :
     iapply grepMemmove_fstep UL N dst d len f hd hhi i h mc n (by omega) ha1 ha4 ha5 $$ Hc Hw Hrun
     iintro Hw %h' %mc' %h11 %h14 %h15 %hk Hrun
     have hl : i + 1 = len := by omega
-    rw [if_pos hl]
+    rw [ite_eq_left hl]
     rw [hl]
     iapply Hcont $$ Hw %h' %mc' [] Hrun
     ipureintro; exact hk
@@ -153,7 +153,7 @@ theorem grepMemmove_fwd (UL : UK_LEAVES) (N : UkNames GF) (dst d len : Nat) (f :
     iintro #Hc Hw Hrun Hcont
     iapply grepMemmove_fstep UL N dst d len f hd hhi i h mc n (by omega) ha1 ha4 ha5 $$ Hc Hw Hrun
     iintro Hw %h' %mc' %h11 %h14 %h15 %hk Hrun
-    rw [if_neg (show ¬ i + 1 = len by omega)]
+    rw [ite_eq_right (show ¬ i + 1 = len by omega)]
     iapply ih (i + 1) h' mc' n (by omega) h11 h14 (h15.trans ha5) $$ Hc Hw Hrun
     iintro Hw %h'' %mc'' %hk' Hrun
     iapply Hcont $$ Hw %h'' %mc'' [] Hrun
@@ -236,11 +236,11 @@ theorem grepMemmove_bstep (UL : UK_LEAVES) (N : UkNames GF) (dst len : Nat) (f :
       else BitVec.ofNat 64 0x494 + instrLen false) =
       (if j = 0 then BitVec.ofNat 64 0x498 else BitVec.ofNat 64 0x488) := by
     by_cases hl : j = 0
-    · rw [decide_eq_true (show dst + j = dst by omega), if_pos hl]
-      simp only [Bool.not_true, Bool.false_eq_true, if_false]
+    · rw [decide_eq_true (show dst + j = dst by omega), ite_eq_left hl]
+      simp only [Bool.not_true, Bool.false_eq_true, ite_false]
       exact ukPc 0x494 0x498 false rfl
-    · rw [decide_eq_false (show ¬ dst + j = dst by omega), if_neg hl]
-      simp only [Bool.not_false, if_true]
+    · rw [decide_eq_false (show ¬ dst + j = dst by omega), ite_eq_right hl]
+      simp only [Bool.not_false, ite_true]
       decide
   rw [e]
   iapply Hcont $$ Hw %h5 %m3 [] [] [] [] Hrun
@@ -271,7 +271,7 @@ theorem grepMemmove_bwd (UL : UK_LEAVES) (N : UkNames GF) (dst len : Nat) (f : N
     iintro #Hc Hw Hrun Hcont
     iapply grepMemmove_bstep UL N dst len f hhi 0 h mc n hj ha1 ha4 ha5 $$ Hc Hw Hrun
     iintro Hw %h' %mc' %h11 %h14 %h15 %hk Hrun
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     iapply Hcont $$ Hw %h' %mc' [] Hrun
     ipureintro; exact hk
   | succ j ih =>
@@ -279,7 +279,7 @@ theorem grepMemmove_bwd (UL : UK_LEAVES) (N : UkNames GF) (dst len : Nat) (f : N
     iintro #Hc Hw Hrun Hcont
     iapply grepMemmove_bstep UL N dst len f hhi (j + 1) h mc n hj ha1 ha4 ha5 $$ Hc Hw Hrun
     iintro Hw %h' %mc' %h11 %h14 %h15 %hk Hrun
-    rw [if_neg (show ¬ j + 1 = 0 by omega)]
+    rw [ite_eq_right (show ¬ j + 1 = 0 by omega)]
     iapply ih h' mc' n (by omega) h11 h14 (h15.trans ha5) $$ Hc Hw Hrun
     iintro Hw %h'' %mc'' %hk' Hrun
     iapply Hcont $$ Hw %h'' %mc'' [] Hrun
@@ -353,7 +353,7 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   · -- ================= dst = src: the backward arm =================
     subst hd0
     rw [ha01, ha11, Nat.add_zero, show ukBtaken .BGEU (BitVec.ofNat 64 dst) (BitVec.ofNat 64 dst) = true by
-      simp [ukBtaken, zopz0zKzJ_u], if_pos rfl]
+      simp [ukBtaken, zopz0zKzJ_u], ite_eq_left rfl]
     rw [show BitVec.ofNat 64 0x446 + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0x470 from by decide]
     rw [Nat.zero_add] at hbnd ⊢
     -- 0x470  blez a2,0x468
@@ -366,13 +366,13 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     by_cases hl0 : len = 0
     · -- nothing to move
       subst hl0
-      rw [decide_eq_true (rfl : (0 : Nat) = 0), if_pos rfl]
+      rw [decide_eq_true (rfl : (0 : Nat) = 0), ite_eq_left rfl]
       rw [show BitVec.ofNat 64 0x470 + BitVec.signExtend 64 8184#13 = BitVec.ofNat 64 0x468 from by decide]
       iapply hTail h3 m1 hk1' hsp1 $$ Hc Hwra Hws0 Hrun
       iapply Hcont
       iapply (grepUbytesq_ext N.d (DFrac.own 1) dst 0 _ _ (fun j _ => (grepMmPost_0 0 f j).symm)).1 $$ Hw
     · rw [decide_eq_false hl0]
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       rw [ukPc 0x470 0x474 false rfl]
       have hb := hbnd (by omega)
       -- 0x474  add a4,a0,a2
@@ -464,7 +464,7 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
       inext
       iintro %h12 Hrun
       rw [show BitVec.ofNat 64 0x498 + BitVec.signExtend 64 2097104#21 = BitVec.ofNat 64 0x468 from by decide]
-      have e0 : ukWr mc 0#5 (BitVec.ofNat 64 0x498 + instrLen true) = mc := by unfold ukWr; rw [if_pos rfl]
+      have e0 : ukWr mc 0#5 (BitVec.ofNat 64 0x498 + instrLen true) = mc := by unfold ukWr; rw [ite_eq_left rfl]
       rw [e0]
       have gk : grepRkeep ([2, 8] ++ grepWcaller) m mc :=
         grepRkeep_trans _ _ _ _ fk (grepRkeep_weaken _ _ _ _ (by decide) hkc)
@@ -475,7 +475,7 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     have h38 := hbnd (by omega)
     rw [ha01, ha11, Xv6.bgeu_nat _ _ (by omega) (by omega)]
     rw [decide_eq_false (show ¬ dst + d ≤ dst by omega)]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     rw [ukPc 0x446 0x44a false rfl]
     -- 0x44a  blez a2,0x468
     gfetch 0x44a false (.BTYPE (30#13, .Regidx 12#5, .Regidx 0#5, .BGE))
@@ -487,13 +487,13 @@ theorem wp_grepMemmove (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     by_cases hl0 : len = 0
     · -- nothing to move
       subst hl0
-      rw [decide_eq_true (rfl : (0 : Nat) = 0), if_pos rfl]
+      rw [decide_eq_true (rfl : (0 : Nat) = 0), ite_eq_left rfl]
       rw [show BitVec.ofNat 64 0x44a + BitVec.signExtend 64 30#13 = BitVec.ofNat 64 0x468 from by decide]
       iapply hTail h3 m1 hk1' hsp1 $$ Hc Hwra Hws0 Hrun
       iapply Hcont
       iapply (grepUbytesq_ext N.d (DFrac.own 1) dst (d + 0) _ _ (fun j _ => (grepMmPost_0 d f j).symm)).1 $$ Hw
     · rw [decide_eq_false hl0]
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       rw [ukPc 0x44a 0x44e false rfl]
       have hb := hbnd (by omega)
       -- 0x44e  c.slli a2,a2,32

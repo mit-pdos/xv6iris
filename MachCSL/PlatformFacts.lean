@@ -8,6 +8,8 @@ the closed forms the stage specifications rewrite with.
 import MachCSL.Platform
 import MachCSL.TsoMem
 import LeanRV64D.Pma
+import LeanRV64D.Platform
+import MachCSL.SailFree
 import LeanRV64D.ZicsrInsts
 import LeanRV64D.Arithmetic
 import LeanRV64D.BaseInsts
@@ -16,7 +18,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The RAM region of the platform's PMA table. -/
@@ -36,9 +38,9 @@ theorem matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0 < n
     omega
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_left (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The I/O region of the platform's PMA table: `[0x2000000, 0x12000000)`,
@@ -58,35 +60,44 @@ theorem matching_pma_io (pa : BitVec 64) (n : Nat) (h1 : 0x2000000 ≤ pa.toNat)
     omega
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_left (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The CLINT window's configured base and size. -/
 @[sail_facts] theorem plat_clint_base_eq : plat_clint_base = 0x2000000#64 := by decide
-@[sail_facts] theorem plat_clint_size_eq : plat_clint_size = 0xC0000#64 := by decide
+@[sail_facts] theorem plat_clint_size_eq : plat_clint_size = 0xC000#64 := by decide
 @[sail_facts] theorem plat_sig_base_eq : plat_sig_base = 0xC000000#64 := by decide
 
-/-- A RAM access is outside the CLINT window. -/
+/-- A RAM access is outside the CLINT window.  Since sail-riscv 0.16 the check first reads
+`mhartid` (a hart id of 4095 or more has no CLINT slot); the answer is `false` either way. -/
 theorem within_clint_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) :
-    within_clint (physaddr.Physaddr pa) n = pure false := by
+    within_clint (physaddr.Physaddr pa) n = (readReg Register.mhartid >>= fun _ => pure false) := by
   obtain ⟨h1, h2⟩ := h
   simp only [ramBase, ramEnd] at h1 h2
   simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
-    Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
+    LeanRV64D.not, Bool.not_true, Bool.false_eq_true, ite_false]
   congr 1
-  simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
-  bv_omega
+  funext hid
+  split
+  · rfl
+  · congr 1
+    simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
+    bv_omega
 
 /-- An access past the CLINT window (the PLIC, the UARTs, the virtio window)
 is outside it. -/
 theorem within_clint_io (pa : BitVec 64) (n : Nat) (h : 0x20C0000 < pa.toNat) :
-    within_clint (physaddr.Physaddr pa) n = pure false := by
+    within_clint (physaddr.Physaddr pa) n = (readReg Register.mhartid >>= fun _ => pure false) := by
   simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
-    Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
+    LeanRV64D.not, Bool.not_true, Bool.false_eq_true, ite_false]
   congr 1
-  simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
-  bv_omega
+  funext hid
+  split
+  · rfl
+  · congr 1
+    simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
+    bv_omega
 
 /-- Alignment of a symbolic address. -/
 theorem is_aligned_paddr_of (pa : BitVec 64) (n : Nat) (hn : 0 < n) (h : pa.toNat % n = 0) :
@@ -98,7 +109,7 @@ end MachCSL
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 theorem is_aligned_vaddr_of (va : BitVec 64) (n : Nat) (h : va.toNat % n = 0) :
@@ -183,7 +194,7 @@ theorem split_on_page_boundary_8 (va : BitVec 64) (h : va.toNat % 8 = 0) :
     omega
   unfold split_on_page_boundary
   dsimp only
-  rw [if_pos]
+  rw [ite_eq_left]
   · rfl
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
@@ -250,14 +261,12 @@ write callbacks (no-ops) at those names; the tactic never unfolds the maps. -/
     bits_of_physaddr (physaddr.Physaddr pa) = pa := rfl
 @[sail_facts] theorem zero_extend_64 (x : BitVec 64) : zero_extend (m := 64) x = x := by
   simp [zero_extend, Sail.BitVec.zeroExtend]
-@[sail_facts] theorem physaddrbits_zero_extend_eq (x : BitVec 64) : physaddrbits_zero_extend x = x := by
-  simp [physaddrbits_zero_extend, zero_extend, Sail.BitVec.zeroExtend]
 
 end MachCSL
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The CSR-name lookup the write callbacks perform is a long string match;

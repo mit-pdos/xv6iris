@@ -130,7 +130,7 @@ theorem fsCfgSnap_topRoute [Icfg] (γfs : FsNames) (S : FsStateRec) (D : BlockMa
     have hbare := (hloc z _ (hnode z hz1)).inlBareFree hty
     unfold iregTopBoot
     dsimp only
-    rw [if_pos (show (fpNode S z).fnRec.diType.toNat = 0 from hty), ← freeNode_of_bare _ hbare]
+    rw [ite_eq_left (show (fpNode S z).fnRec.diType.toNat = 0 from hty), ← freeNode_of_bare _ hbare]
 
 /-! ## Staging 2.  The inode region -/
 

@@ -418,7 +418,7 @@ noncomputable def stripGt (N b : List (BitVec 8)) : Option (List (BitVec 8)) :=
 
 theorem stripGt_app (N c : List (BitVec 8)) : stripGt N (c ++ sufGt N) = some c := by
   unfold stripGt
-  rw [if_pos (List.suffix_append c _)]
+  rw [ite_eq_left (List.suffix_append c _)]
   simp
 
 theorem stripGt_some (N b c : List (BitVec 8)) (h : stripGt N b = some c) : b = c ++ sufGt N := by
@@ -426,7 +426,7 @@ theorem stripGt_some (N b c : List (BitVec 8)) (h : stripGt N b = some c) : b = 
   · obtain ⟨k, rfl⟩ := hs
     rw [stripGt_app] at h
     cases h; rfl
-  · unfold stripGt at h; rw [if_neg hs] at h; cases h
+  · unfold stripGt at h; rw [ite_eq_right hs] at h; cases h
 
 /-- the LAST WORD of a body: the file a redirect or a `cat` line names -/
 def lastw (b : List (BitVec 8)) : List (BitVec 8) := (wlWords b).getLast?.getD []
@@ -641,7 +641,7 @@ theorem parseLine_body (l : Uline) (hnp : ulineNopipe l) (hok : ulineOk l) :
     have hlw := lastw_gt ws N hok' hu
     simp only [lineBody]
     unfold parseLine
-    rw [hlw, if_pos hu]
+    rw [hlw, ite_eq_left hu]
     split
     · rename_i heq
       exfalso
@@ -659,7 +659,7 @@ theorem parseLine_body (l : Uline) (hnp : ulineNopipe l) (hok : ulineOk l) :
     have hu : uname N := hok
     simp only [lineBody]
     unfold parseLine
-    rw [lastw_cat N (uname_lex N hu), if_pos hu, if_pos rfl]
+    rw [lastw_cat N (uname_lex N hu), ite_eq_left hu, ite_eq_left rfl]
 
 theorem ulineOf_body (l : Uline) (hnp : ulineNopipe l) (hok : ulineOk l) :
     ulineOf (lineBody l) = l := by
@@ -723,7 +723,7 @@ theorem seccParse_body (ws : List (List (BitVec 8))) (hok : seccOk ws) :
   have hw := wlWords_body_fn _ (seccOk_wf ws hok)
   simp only [lineBody] at hw ⊢
   unfold seccParse
-  rw [if_pos ⟨by rw [hw], by rw [hw]; rfl, by rw [hw]; exact hok⟩, hw]
+  rw [ite_eq_left ⟨by rw [hw], by rw [hw]; rfl, by rw [hw]; exact hok⟩, hw]
   rfl
 
 /-- ONLY A SECCOMP LINE HAS `seccomp` FOR ITS FIRST WORD -/
@@ -757,7 +757,7 @@ theorem fbodyOk_not_secc (b : List (BitVec 8)) (hf : fbodyOk b) : ¬ seccBody b 
   exact (ulineOf_nopipe b).2.1 ws hws
 
 theorem seccParse_fbody (b : List (BitVec 8)) (hf : fbodyOk b) : seccParse b = none := by
-  unfold seccParse; rw [if_neg (fbodyOk_not_secc b hf)]
+  unfold seccParse; rw [ite_eq_right (fbodyOk_not_secc b hf)]
 
 /-! ### The sync line's parse (Rocq b23e6791f, drift SY2)
 

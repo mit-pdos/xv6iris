@@ -76,7 +76,7 @@ theorem grepMain_loop (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
     iintro %h2 Hrun
     rw [hs2, hs3, show av + 8 * (i + 1) = av + 8 * args.length by omega,
       show ukBtaken .BNE (BitVec.ofNat 64 (av + 8 * args.length)) (BitVec.ofNat 64 (av + 8 * args.length)) = false
-        from by simp [ukBtaken], if_neg (show ¬ (false = true) from by decide), ukPc 0x224 0x228 false rfl,
+        from by simp [ukBtaken], ite_eq_right (show ¬ (false = true) from by decide), ukPc 0x224 0x228 false rfl,
       List.drop_eq_nil_of_le (show args.length ≤ i + 1 by omega)]
     simp only [List.map_nil, grepFiles]
     -- 0x228  c.li a0,0 ; 0x22a  jal exit
@@ -103,7 +103,7 @@ theorem grepMain_loop (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
       rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
       omega
     rw [hs2, hs3, show ukBtaken .BNE (BitVec.ofNat 64 (av + 8 * (i + 1))) (BitVec.ofNat 64 (av + 8 * args.length))
-        = true from by simp [ukBtaken, hne], if_pos rfl,
+        = true from by simp [ukBtaken, hne], ite_eq_left rfl,
       show BitVec.ofNat 64 0x224 + BitVec.signExtend 64 8160#13 = BitVec.ofNat 64 0x204 from by decide]
     iapply ih (i + 1) h2 m1 f1 na (by omega) hwn h28 hinv1 $$ Ht Hc Hargv Hbuf Hrun
 
@@ -207,13 +207,13 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
   rw [show m3.get 15#5 = BitVec.ofNat 64 1 from by ureg, h3a0, Xv6.ushGets_bge 1 _ (by decide) h31]
   by_cases hL : args.length ≤ 1
   · -- NO PATTERN: the usage line
-    rw [decide_eq_true hL, if_pos rfl,
+    rw [decide_eq_true hL, ite_eq_left rfl,
       show BitVec.ofNat 64 0x1e2 + BitVec.signExtend 64 76#13 = BitVec.ofNat 64 0x22e from by decide,
       grepTree_usage _ (by rw [List.length_map]; exact hL)]
     rw [grepMainWords_usage args hL] at hneed
     iapply grepMain_usage UL N h10 m3 na (by omega) $$ Ht Hc Hrun
   -- A PATTERN: s4 := argv[1]
-  rw [decide_eq_false hL, if_neg (show ¬ (false = true) from by decide), ukPc 0x1e2 0x1e6 false rfl]
+  rw [decide_eq_false hL, ite_eq_right (show ¬ (false = true) from by decide), ukPc 0x1e2 0x1e6 false rfl]
   obtain ⟨g1, hg1⟩ : ∃ g, args[1]? = some g := ⟨args[1]'(by omega), List.getElem?_eq_getElem (by omega)⟩
   obtain ⟨gl, hgl⟩ : ∃ g, args[args.length - 1]? = some g :=
     ⟨args[args.length - 1]'(by omega), List.getElem?_eq_getElem (by omega)⟩
@@ -254,7 +254,7 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
   by_cases hL2 : args.length ≤ 2
   · -- THE PATTERN ALONE: grep the standard input
     have hl2 : args.length = 2 := by omega
-    rw [decide_eq_true hL2, if_pos rfl,
+    rw [decide_eq_true hL2, ite_eq_left rfl,
       show BitVec.ofNat 64 0x1ec + BitVec.signExtend 64 86#13 = BitVec.ofNat 64 0x242 from by decide,
       grepTree_stdin args g1 hl2 hg1]
     rw [grepMainWords_stdin args g1 hl2 hg1] at hneed
@@ -264,7 +264,7 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
   rw [grepMainWords_files args g1 hl3 hg1] at hneed
   obtain ⟨hwn, h28⟩ : grepWords (uargBytes g1) ≤ na ∧ 28 ≤ na :=
     Nat.max_le.mp (Nat.le_of_add_le_add_left hneed)
-  rw [decide_eq_false hL2, if_neg (show ¬ (false = true) from by decide), ukPc 0x1ec 0x1f0 false rfl,
+  rw [decide_eq_false hL2, ite_eq_right (show ¬ (false = true) from by decide), ukPc 0x1ec 0x1f0 false rfl,
     grepTree_files args g1 hl3 hg1]
   -- 0x1f0  addi s2,a1,16 : &argv[2]
   gfetch 0x1f0 false (.ITYPE (16#12, .Regidx 11#5, .Regidx 18#5, .ADDI))

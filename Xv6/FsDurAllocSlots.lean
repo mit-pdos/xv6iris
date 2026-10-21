@@ -140,18 +140,18 @@ theorem fpIndb_bs (S : FsStateRec) (D : BlockMap) (i : Nat) (n : FsNode)
     (hi : PartialMap.get? S.fssInodes i = some n) (hnz : fnIndb n ≠ 0) :
     fpBs S D (.ind i) = indBytes n.fnEnt := by
   show (if fnIndb (fpNode S i) = 0 then [] else indBytes (fpNode S i).fnEnt) = _
-  rw [fpNode_of S i n hi, if_neg hnz]
+  rw [fpNode_of S i n hi, ite_eq_right hnz]
 
 theorem fpPool_blk (S : FsStateRec) (b : Nat) : fpBlk S (.pool b) = b := rfl
 theorem fpPool_off (b : Nat) : fpOff (.pool b) = 0 := rfl
 theorem fpPool_bs_used (S : FsStateRec) (D : BlockMap) (b : Nat) (hu : b ∈ S.fssUsed) :
     fpBs S D (.pool b) = [] := by
   show (if b ∈ S.fssUsed then [] else (PartialMap.get? D b).getD []) = _
-  rw [if_pos hu]
+  rw [ite_eq_left hu]
 theorem fpPool_bs_free (S : FsStateRec) (D : BlockMap) (b : Nat) (bs : List (BitVec 8))
     (hu : b ∉ S.fssUsed) (hb : PartialMap.get? D b = some bs) : fpBs S D (.pool b) = bs := by
   show (if b ∈ S.fssUsed then [] else (PartialMap.get? D b).getD []) = _
-  rw [if_neg hu, hb]; rfl
+  rw [ite_eq_right hu, hb]; rfl
 
 /-- The index is in range: the only thing the family's members owe (Rocq's
 `fp_valid`). -/
@@ -253,7 +253,7 @@ theorem fpOk (S : FsStateRec) (D : BlockMap) (x : FpSlot) (hb : SnapBytes S D)
     by_cases hz : fnIndb n = 0
     · have : fpBs S D (.ind i) = [] := by
         show (if fnIndb (fpNode S i) = 0 then [] else indBytes (fpNode S i).fnEnt) = _
-        rw [fpNode_of S i n hn, if_pos hz]
+        rw [fpNode_of S i n hn, ite_eq_left hz]
       rw [this, fpIndb_off]; exact hnil _
     · rw [fpIndb_blk S i n hn, fpIndb_off, fpIndb_bs S D i n hn hz]
       exact fpRun_ofBlock D _ _ hlen (hb.skInd i n hn hz)
@@ -327,7 +327,7 @@ theorem fpNode_ownsOf (S : FsStateRec) (D : BlockMap) (i : Nat) (x : FpSlot) (hv
       intro hz
       apply h0
       show (if fnIndb (fpNode S i) = 0 then [] else indBytes (fpNode S i).fnEnt) = _
-      rw [fpNode_of S i n hn, if_pos hz]
+      rw [fpNode_of S i n hn, ite_eq_left hz]
     exact ⟨n, hn, fpOwns_ind S i n hn hnz⟩
 
 /-- Rocq's `fp_pool_free`. -/
@@ -407,7 +407,7 @@ theorem fpSep_nodes (S : FsStateRec) (D : BlockMap) (x y : FpSlot) (hb : SnapByt
       have hnz : fnIndb n ≠ 0 := by
         intro hz; apply hy0
         show (if fnIndb (fpNode S ix) = 0 then [] else indBytes (fpNode S ix).fnEnt) = _
-        rw [fpNode_of S ix n hn, if_pos hz]
+        rw [fpNode_of S ix n hn, ite_eq_left hz]
       rw [fpDat_blk S ix n kx hn, fpIndb_blk S ix n hn] at heq
       exact fnSlot_ind_ne n kx (hb.skSlot ix n hn) hrx hnz heq
     | pool c =>
@@ -425,7 +425,7 @@ theorem fpSep_nodes (S : FsStateRec) (D : BlockMap) (x y : FpSlot) (hb : SnapByt
       have hnz : fnIndb n ≠ 0 := by
         intro hz; apply hx0
         show (if fnIndb (fpNode S ix) = 0 then [] else indBytes (fpNode S ix).fnEnt) = _
-        rw [fpNode_of S ix n hn, if_pos hz]
+        rw [fpNode_of S ix n hn, ite_eq_left hz]
       rw [fpDat_blk S ix n ky hn, fpIndb_blk S ix n hn] at heq
       exact fnSlot_ind_ne n ky (hb.skSlot ix n hn) hry hnz heq.symm
     | ind iy =>

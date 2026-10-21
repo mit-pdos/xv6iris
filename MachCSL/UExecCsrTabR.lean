@@ -6,7 +6,7 @@ import MachCSL.UExecCsrTabDefs
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 theorem uxr_tab_R0 (f : RegFile) : uxrQuarter f .CSRRead 0 = true := by kernel_rfl

@@ -69,7 +69,7 @@ theorem skipelem_name (p : List (BitVec 8)) (hne : p ≠ []) (hns : noslash p)
     simpa using this
   obtain ⟨he, hr⟩ := peElemRest_ns p hns
   unfold skipelem
-  rw [hsk, if_neg hne, he, hr, List.take_of_length_le hl]
+  rw [hsk, ite_eq_right hne, he, hr, List.take_of_length_le hl]
   rfl
 
 theorem uname_pos (nm : List (BitVec 8)) (hu : uname nm) : 0 < nm.length :=
@@ -103,7 +103,7 @@ theorem uname_last (nm : List (BitVec 8)) (hu : uname nm) : (pathElems nm).getLa
 theorem uname_start (nm : List (BitVec 8)) (hu : uname nm) (rt cw : Nat) :
     umStartOf rt cw nm = cw := by
   unfold umStartOf
-  rw [if_neg]
+  rw [ite_eq_right]
   intro hs
   exact fnByte_not_slash SLASH (uname_byte nm hu 0 SLASH hs) rfl
 

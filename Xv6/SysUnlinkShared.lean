@@ -60,21 +60,21 @@ theorem sys_unlink_nondir_node (n : FsNode) (hd : fnIsDir n = false) :
   intro es heq
   exfalso
   unfold absRow absNode at heq
-  simp only [hd, Bool.false_eq_true, if_false] at heq
+  simp only [hd, Bool.false_eq_true, ite_false] at heq
   split at heq <;> cases heq
 
 /-- Rocq's `su_au_nondir_dec`. -/
 theorem sys_unlink_nondir_dec (n : FsNode) (hd : fnIsDir n = false) :
     unlDec (absRow n).anNode = 0 := by
   unfold absRow absNode
-  simp only [hd, Bool.false_eq_true, if_false]
+  simp only [hd, Bool.false_eq_true, ite_false]
   split <;> rfl
 
 /-- Rocq's `su_au_dir_dec`. -/
 theorem sys_unlink_dir_dec (n : FsNode) (hd : fnIsDir n = true) :
     unlDec (absRow n).anNode = 1 := by
   unfold absRow absNode
-  simp only [hd, if_true]
+  simp only [hd, ite_true]
   rfl
 
 /-- the walked liveness, as an `fnNlink` bound (Rocq's `su_au_nl1`). -/

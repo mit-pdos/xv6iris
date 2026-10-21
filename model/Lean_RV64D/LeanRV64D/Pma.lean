@@ -1,4 +1,6 @@
+import LeanRV64D.Option
 import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
 import LeanRV64D.Xlen
@@ -14,12 +16,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -63,6 +65,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -96,10 +100,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -145,6 +152,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -163,17 +171,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -188,12 +203,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -204,7 +222,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -322,35 +343,43 @@ def pma_misaligned_exception (pma : PMA) (access : (MemoryAccessType mem_payload
   let exceptions := pma.misaligned_exceptions
   match access with
   | .Load .Data => (pure exceptions.load_store)
+  | .LoadExecute .Data => (pure exceptions.load_store)
   | .Store .Data => (pure exceptions.load_store)
   | .Load .Vector => (pure exceptions.vector)
   | .Store .Vector => (pure exceptions.vector)
   | .Atomic _ => (pure (some exceptions.amo))
+  | .LoadReserved (_, _, .Data) => (pure (some exceptions.lrsc))
+  | .StoreConditional (_, _, .Data) => (pure (some exceptions.lrsc))
   | .InstructionFetch () =>
-    (internal_error "sys/pma.sail" 153 "PMA: Invalid misaligned instruction fetch.")
+    (internal_error "sys/pma.sail" 158 "PMA: Invalid misaligned instruction fetch.")
   | .Load .PageTableEntry =>
-    (internal_error "sys/pma.sail" 154 "PMA: Invalid misaligned load of page-table entry.")
+    (internal_error "sys/pma.sail" 159 "PMA: Invalid misaligned load of page-table entry.")
   | .Store .PageTableEntry =>
-    (internal_error "sys/pma.sail" 155 "PMA: Invalid misaligned store of page-table entry.")
+    (internal_error "sys/pma.sail" 160 "PMA: Invalid misaligned store of page-table entry.")
   | .LoadReserved (_, _, p) =>
-    (internal_error "sys/pma.sail" 156
+    (internal_error "sys/pma.sail" 161
       (HAppend.hAppend "PMA: Invalid misaligned load-reserved ("
         (HAppend.hAppend (mem_payload_name_forwards p) ").")))
   | .StoreConditional (_, _, p) =>
-    (internal_error "sys/pma.sail" 157
+    (internal_error "sys/pma.sail" 162
       (HAppend.hAppend "PMA: Invalid misaligned store-conditional ("
         (HAppend.hAppend (mem_payload_name_forwards p) ").")))
   | .Load .ShadowStack =>
-    (internal_error "sys/pma.sail" 158 "PMA: Invalid misaligned shadow-stack load.")
+    (internal_error "sys/pma.sail" 163 "PMA: Invalid misaligned shadow-stack load.")
   | .Store .ShadowStack =>
-    (internal_error "sys/pma.sail" 159 "PMA: Invalid misaligned shadow-stack store.")
-  | .CacheAccess _ => (internal_error "sys/pma.sail" 160 "PMA: Invalid misaligned cache-access.")
+    (internal_error "sys/pma.sail" 164 "PMA: Invalid misaligned shadow-stack store.")
+  | .CacheAccess _ => (internal_error "sys/pma.sail" 165 "PMA: Invalid misaligned cache-access.")
+  | .LoadExecute p =>
+    (internal_error "sys/pma.sail" 166
+      (HAppend.hAppend "PMA: Invalid misaligned load-execute ("
+        (HAppend.hAppend (mem_payload_name_forwards p) ").")))
 
 /-- Type quantifiers: width : Nat, 0 ≤ width -/
 def is_mag_applicable_access (access : (MemoryAccessType mem_payload)) (width : Nat) : SailM Bool := do
   match access with
   | .Load .Data => (pure (width ≤b xlen_bytes))
   | .Store .Data => (pure (width ≤b xlen_bytes))
+  | .LoadExecute .Data => (pure (width ≤b xlen_bytes))
   | .Load .Vector => (pure true)
   | .Store .Vector => (pure true)
   | .Load .PageTableEntry => (pure false)
@@ -358,26 +387,30 @@ def is_mag_applicable_access (access : (MemoryAccessType mem_payload)) (width : 
   | .Load .ShadowStack => (pure false)
   | .Store .ShadowStack => (pure false)
   | .Atomic (_, _, _, .Data, .Data) => (pure true)
-  | .Atomic (_, _, _, .ShadowStack, .ShadowStack) => (pure true)
+  | .Atomic (_, _, _, .ShadowStack, .ShadowStack) => (pure false)
   | .InstructionFetch () => (pure false)
   | .LoadReserved (_, _, .Data) => (pure false)
   | .StoreConditional (_, _, .Data) => (pure false)
   | .CacheAccess _ => (pure false)
   | .Atomic (_, _, _, rp, wp) =>
-    (internal_error "sys/pma.sail" 192
+    (internal_error "sys/pma.sail" 199
       (HAppend.hAppend "Invalid payloads ("
         (HAppend.hAppend (mem_payload_name_forwards rp)
           (HAppend.hAppend ", " (HAppend.hAppend (mem_payload_name_forwards wp) ") for Atomic.")))))
   | .LoadReserved (_, _, p) =>
-    (internal_error "sys/pma.sail" 193
+    (internal_error "sys/pma.sail" 200
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadReserved.")))
   | .StoreConditional (_, _, p) =>
-    (internal_error "sys/pma.sail" 194
+    (internal_error "sys/pma.sail" 201
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for StoreConditional.")))
+  | .LoadExecute p =>
+    (internal_error "sys/pma.sail" 202
+      (HAppend.hAppend "Invalid payload ("
+        (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadExecute.")))
 
-/-- Type quantifiers: k_ex673337_ : Bool -/
+/-- Type quantifiers: k_ex1173126_ : Bool -/
 def mag_of_pma (pma : PMA) (is_vector : Bool) : (Option Nat) :=
   let mag :=
     if (is_vector : Bool)
@@ -387,7 +420,7 @@ def mag_of_pma (pma : PMA) (is_vector : Bool) : (Option Nat) :=
   then none
   else (some mag)
 
-/-- Type quantifiers: k_ex673338_ : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
+/-- Type quantifiers: k_ex1173127_ : Bool, width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_pma_mag (pma : PMA) (typ_1 : physaddr) (width : Nat) (is_vector : Bool) : Bool :=
   let .Physaddr addr : physaddr := typ_1
   match (mag_of_pma pma is_vector) with
@@ -421,4 +454,9 @@ def matching_pma_region_bits_range (regions : (List PMA_Region)) (base : (BitVec
 def matching_pma_region (regions : (List PMA_Region)) (addr : physaddr) (width : Nat) : (Option PMA_Region) :=
   (matching_pma_region_bits_range regions (zero_extend (m := 64) (bits_of_physaddr addr))
     (to_bits (l := 64) width))
+
+def is_valid_physaddr (regions : (List PMA_Region)) (addr : physaddr) : Bool :=
+  (is_some
+    (matching_pma_region_bits_range regions (zero_extend (m := 64) (bits_of_physaddr addr))
+      (zero_extend (m := 64) 1#1)))
 

@@ -41,8 +41,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 section Fixed
@@ -157,9 +156,9 @@ theorem wireBody_take (cpu : CPU) :
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
-    simp only [updCpu, hy, if_false]
+    simp only [updCpu, hy, ite_false]
     iexact Hy
-  · simp only [updCpu, if_true]
+  · simp only [updCpu, ite_true]
     iframe Hs' Hm'
 
 end MachCSL

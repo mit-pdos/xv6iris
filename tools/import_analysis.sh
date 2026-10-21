@@ -13,7 +13,9 @@ mkdir -p "$OUT"
 REVH=$(git rev-parse "$REV")
 # sources at REV for the text checks (open/namespace scan, name mentions)
 rm -rf "$OUT/src" && mkdir -p "$OUT/src"
-git archive "$REVH" MachCSL Xv6 model/Lean_RV64D/LeanRV64D vendor/lean-sail/Sail | tar -x -C "$OUT/src"
+git archive "$REVH" MachCSL Xv6 model/Lean_RV64D/LeanRV64D | tar -x -C "$OUT/src"
+# lean-sail is a git dependency (not in the tree): take the fetched package's sources
+mkdir -p "$OUT/src/.lake/packages/Sail" && cp -r .lake/packages/Sail/Sail .lake/packages/Sail/Sail.lean "$OUT/src/.lake/packages/Sail/"
 
 lake env lean --run "$T/ImportNeeds.lean" Xv6 MachCSL > "$OUT/needs.tsv" 2> "$OUT/needs.err"
 lake env lean --run "$T/ConstDeps.lean"   Xv6 MachCSL > "$OUT/constdeps.tsv"

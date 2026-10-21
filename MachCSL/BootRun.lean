@@ -5,8 +5,9 @@ symbolic-run kit (Rocq `RiscvExec.exec` restricted to the register side, and
 
 * `bootRun m f` -- the deterministic register-only interpreter: register reads
   answer from `f`, register writes update it, the silent events the language
-  answers without moving the machine (`evStep`: message, cache/TLB ops,
-  translation markers, exception markers, cycle counts) are skipped, and
+  answers without moving the machine (`evStep`: message, the store's write
+  announcement, cache/TLB ops, translation markers, exception markers, cycle
+  counts) are skipped, and
   everything else (memory, barriers, choices, failures) is stuck (`none`).
   The boot program (`MachCSL.bootProg`) emits only register events and
   messages, so this is exactly its semantics; Rocq's `exec` additionally
@@ -27,13 +28,13 @@ power-on arm as a run of the boot program), and every statement below
 applies to them verbatim.
 -/
 import LeanRV64D.Defs
+import MachCSL.SailFree
 
 noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-- One hart's register file (= `MachCSL.RegFile`). -/
@@ -53,23 +54,28 @@ theorem BootRegs.set_other (f : BootRegs) (r r' : Register) (v : RegisterType r)
 
 /-! ## The register-only interpreter -/
 
-/-- Run `m` over the register file `f` (Rocq `exec`, register side). -/
+/-- Run `m` over the register file `f` (Rocq `exec`, register side).  Concurrency interface
+v2: an event node is `.impure (.inl (.ok o)) k`, a failure `.impure (.inl (.error _)) _`, a finite
+choice `.impure (.inr n) k` (stuck, as the V1 `choose` event was); register events carry an access
+type (`readReg`/`writeReg` pass `none`), ignored; the write announce is silent, as in `evStep`. -/
 def bootRun {X : Type} : SailM X → BootRegs → Option (X × BootRegs)
   | .pure x, f => some (x, f)
-  | .impure (.error _) _, _ => none
-  | .impure (.ok o) k, f =>
+  | .impure (.inl (.error _)) _, _ => none
+  | .impure (.inr _) _, _ => none
+  | .impure (.inl (.ok o)) k, f =>
     match o, k with
-    | .regRead r, k => bootRun (k (f r)) f
-    | .regWrite r v, k => bootRun (k PUnit.unit) (f.set r v)
+    | .regRead r _, k => bootRun (k (f r)) f
+    | .regWrite r _ v, k => bootRun (k ()) (f.set r v)
+    | .memWriteAnnounce _, k => bootRun (k ()) f
     | .cacheOp _, k => bootRun (k ()) f
-    | .tlbi _, k => bootRun (k ()) f
+    | .tlbOp _, k => bootRun (k ()) f
     | .translationStart _, k => bootRun (k ()) f
     | .translationEnd _, k => bootRun (k ()) f
-    | .takeException _, k => bootRun (k ()) f
-    | .returnException _, k => bootRun (k ()) f
-    | .cycleCount, k => bootRun (k ()) f
+    | .archException _, k => bootRun (k ()) f
+    | .returnException, k => bootRun (k ()) f
+    | .clockCycle, k => bootRun (k ()) f
     | .getCycleCount, k => bootRun (k (0 : Nat)) f
-    | .message _, k => bootRun (k ()) f
+    | .printMessage _, k => bootRun (k ()) f
     | _, _ => none
 
 section
@@ -77,8 +83,9 @@ variable {X Y : Type}
 
 @[simp] theorem bootRun_pure (x : X) (f : BootRegs) : bootRun (FreeM.pure x) f = some (x, f) := rfl
 
-theorem bootRun_regRead (r : Register) (k : RegisterType r → SailM X) (f : BootRegs) :
-    bootRun (FreeM.impure (.ok (.regRead r)) k) f = bootRun (k (f r)) f := rfl
+theorem bootRun_regRead (r : Register) (a : Option Arch.sys_reg_id) (k : RegisterType r → SailM X)
+    (f : BootRegs) :
+    bootRun (FreeM.impure (.inl (.ok (.regRead r a))) k) f = bootRun (k (f r)) f := rfl
 
 /-- Composition (Rocq `exec_bind_Some`). -/
 theorem bootRun_bind (m : SailM X) (g : X → SailM Y) (f f₁ : BootRegs) (x : X)
@@ -88,16 +95,16 @@ theorem bootRun_bind (m : SailM X) (g : X → SailM Y) (f f₁ : BootRegs) (x : 
     simp only [bootRun, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h; rfl
   | impure call k ih =>
-    cases call with
-    | error e => simp [bootRun] at h
-    | ok o =>
-      cases o <;> simp only [bootRun, reduceCtorEq] at h
+    rcases call with (e | o) | n
+    · simp [bootRun] at h
+    · cases o <;> simp only [bootRun, reduceCtorEq] at h
       all_goals exact ih _ _ h
+    · simp [bootRun] at h
 
 /-- Associativity at the interpreter (Rocq `exec_assoc`). -/
 theorem bootRun_assoc {Z : Type} (m : SailM X) (g : X → SailM Y) (h : Y → SailM Z) (f : BootRegs) :
     bootRun (FreeM.bind (FreeM.bind m g) h) f = bootRun (FreeM.bind m (fun x => FreeM.bind (g x) h)) f := by
-  rw [Sail.ConcurrencyInterfaceV1.FreeMLemmas.bind_assoc]
+  rw [MachCSL.FreeMLemmas.bind_assoc]
 
 end
 
@@ -113,22 +120,24 @@ section
 variable {X Y : Type}
 
 /-- Rocq `px_rr`, with the read value resolved by the caller (`hv`). -/
-theorem bootFin_regRead (Q : X → BootRegs → Prop) (r : Register) (k : RegisterType r → SailM X)
+theorem bootFin_regRead (Q : X → BootRegs → Prop) (r : Register) (a : Option Arch.sys_reg_id)
+    (k : RegisterType r → SailM X)
     (f : BootRegs) (v : RegisterType r) (hv : f r = v) (h : BootFin Q (k v) f) :
-    BootFin Q (FreeM.impure (.ok (.regRead r)) k) f := by
+    BootFin Q (FreeM.impure (.inl (.ok (.regRead r a))) k) f := by
   obtain ⟨x, f', h1, h2⟩ := h
   exact ⟨x, f', by rw [bootRun_regRead, hv]; exact h1, h2⟩
 
 /-- Rocq `px_rw`. -/
-theorem bootFin_regWrite (Q : X → BootRegs → Prop) (r : Register) (v : RegisterType r)
-    (k : PUnit → SailM X) (f : BootRegs) (h : BootFin Q (k PUnit.unit) (f.set r v)) :
-    BootFin Q (FreeM.impure (.ok (.regWrite r v)) k) f := by
+theorem bootFin_regWrite (Q : X → BootRegs → Prop) (r : Register) (a : Option Arch.sys_reg_id)
+    (v : RegisterType r)
+    (k : Unit → SailM X) (f : BootRegs) (h : BootFin Q (k ()) (f.set r v)) :
+    BootFin Q (FreeM.impure (.inl (.ok (.regWrite r a v))) k) f := by
   obtain ⟨x, f', h1, h2⟩ := h
   exact ⟨x, f', h1, h2⟩
 
 /-- Rocq `px_msg`. -/
 theorem bootFin_message (Q : X → BootRegs → Prop) (s : String) (k : Unit → SailM X) (f : BootRegs)
-    (h : BootFin Q (k ()) f) : BootFin Q (FreeM.impure (.ok (.message s)) k) f := by
+    (h : BootFin Q (k ()) f) : BootFin Q (FreeM.impure (.inl (.ok (.printMessage s))) k) f := by
   obtain ⟨x, f', h1, h2⟩ := h
   exact ⟨x, f', h1, h2⟩
 

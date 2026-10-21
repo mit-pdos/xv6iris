@@ -1,8 +1,9 @@
 import LeanRV64D.Flow
 import LeanRV64D.Prelude
 import LeanRV64D.PlatformConfig
-import LeanRV64D.Regs
 import LeanRV64D.AddrChecks
+import LeanRV64D.SyncException
+import LeanRV64D.SysControl
 import LeanRV64D.SplitAccessUtils
 import LeanRV64D.Mem
 import LeanRV64D.Vmem
@@ -14,12 +15,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -63,6 +64,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -96,10 +99,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -145,6 +151,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -163,17 +170,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -188,12 +202,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -204,7 +221,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -213,21 +233,23 @@ open AmocasOddRegisterReservedBehavior
 def isRVC (h : (BitVec 16)) : Bool :=
   (not ((Sail.BitVec.extractLsb h 1 0) == 0b11#2))
 
-/-- Type quantifiers: width : Nat, width ∈ {2, 4} -/
+/-- Type quantifiers: width : Nat, List.elem width [2, 4] -/
 def fetch_bytes (fetch_start : (BitVec 64)) (granule_start : (BitVec 64)) (width : Nat) : SailM (FetchBytes_Result width) := SailME.run do
   match (ext_fetch_check_pc fetch_start granule_start) with
   | .some e => SailME.throw ((FetchBytes_Ext_Error e) : (FetchBytes_Result width))
   | none => (pure ())
+  let access : (MemoryAccessType mem_payload) := (InstructionFetch ())
+  let eff_priv ← do (effectivePrivilege access (← readReg mstatus) (← readReg cur_privilege))
   let (paddr, pbmt) ← (( do
-    match (← (translateAddr (Virtaddr granule_start) (InstructionFetch ()))) with
+    match (← (translateAddr (Virtaddr granule_start) access eff_priv)) with
     | .Err (e, _) => SailME.throw ((FetchBytes_Exception e) : (FetchBytes_Result width))
     | .Ok (paddr, pbmt, _) => (pure (paddr, pbmt)) ) : SailME (FetchBytes_Result width)
     (physaddr × page_based_mem_type) )
-  match (← (mem_read (InstructionFetch ()) pbmt paddr width false false false)) with
+  match (← (mem_read access pbmt eff_priv paddr width false false false)) with
   | .Err (exc_addr, e) =>
     (do
-      (assert (exc_addr == paddr) "postlude/fetch.sail:44.30-44.31")
-      (pure (FetchBytes_Exception e)))
+      sail_assert (exc_addr == paddr) "postlude/fetch.sail:47.30-47.31"
+      (pure (FetchBytes_Exception (← (exception_context e granule_start)))))
   | .Ok bytes => (pure (FetchBytes_Success bytes))
 
 def fetch (_ : Unit) : SailM FetchResult := SailME.run do
@@ -246,7 +268,7 @@ def fetch (_ : Unit) : SailM FetchResult := SailME.run do
                if (((BitVec.access (← readReg PC) 1) != 0#1) : Bool)
                then (pure (not (← (currentlyEnabled Ext_Zca))))
                else (pure false))) : Bool)
-      then (pure (F_Error ((E_Fetch_Addr_Align ()), (← readReg PC))))
+      then (pure (F_Error (← (exception_context (E_Fetch_Addr_Align ()) (← readReg PC)))))
       else
         (do
           if ((← do
@@ -257,7 +279,7 @@ def fetch (_ : Unit) : SailM FetchResult := SailME.run do
             (do
               match (← (fetch_bytes (← readReg PC) (← readReg PC) 4)) with
               | .FetchBytes_Ext_Error e => (pure (F_Ext_Error e))
-              | .FetchBytes_Exception e => (pure (F_Error (e, (← readReg PC))))
+              | .FetchBytes_Exception e => (pure (F_Error e))
               | .FetchBytes_Success bytes =>
                 (if ((isRVC (Sail.BitVec.extractLsb bytes 15 0)) : Bool)
                 then (pure (F_RVC (Sail.BitVec.extractLsb bytes 15 0)))
@@ -266,7 +288,7 @@ def fetch (_ : Unit) : SailM FetchResult := SailME.run do
             (do
               match (← (fetch_bytes (← readReg PC) (← readReg PC) 2)) with
               | .FetchBytes_Ext_Error e => (pure (F_Ext_Error e))
-              | .FetchBytes_Exception e => (pure (F_Error (e, (← readReg PC))))
+              | .FetchBytes_Exception e => (pure (F_Error e))
               | .FetchBytes_Success ilo =>
                 (do
                   if ((isRVC ilo) : Bool)
@@ -275,7 +297,6 @@ def fetch (_ : Unit) : SailM FetchResult := SailME.run do
                     (do
                       match (← (fetch_bytes (← readReg PC) (BitVec.addInt (← readReg PC) 2) 2)) with
                       | .FetchBytes_Ext_Error e => (pure (F_Ext_Error e))
-                      | .FetchBytes_Exception e =>
-                        (pure (F_Error (e, (BitVec.addInt (← readReg PC) 2))))
+                      | .FetchBytes_Exception e => (pure (F_Error e))
                       | .FetchBytes_Success ihi => (pure (F_Base (ihi +++ ilo))))))))
 

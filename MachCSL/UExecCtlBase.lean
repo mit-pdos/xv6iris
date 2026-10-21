@@ -45,7 +45,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -154,10 +154,7 @@ variable (D : UFoot)
 theorem uxc_runME_liftBind {A R : Type} (orc : UOrc) (s : UWSt) (m : SailM A) (f : A → SailME R R) :
     runRW D orc s (SailME.run (liftM m >>= f)) =
       (runRW D orc s m).bind (fun r => runRW D r.2.2 r.2.1 (SailME.run (f r.1))) := by
-  have : SailME.run (liftM m >>= f) = m >>= fun a => SailME.run (f a) := by
-    simp only [SailME.run, PreSail.PreSailME.run, ExceptT.run_bind, liftM, monadLift,
-      MonadLift.monadLift, ExceptT.lift, ExceptT.run_mk, bind_assoc, map_eq_pure_bind, pure_bind]
-  rw [this, runRW_bind]
+  rw [show SailME.run (liftM m >>= f) = m >>= fun a => SailME.run (f a) from run_lift_bind m f, runRW_bind]
 
 /-- A form that `execute`s to a redirect walks as its target (the one
 `ExecuteAs` of `run_hart_active`, U1-X1's `uxaExecAs`). -/
@@ -180,8 +177,9 @@ theorem uxc_set_next_pc (orc : UOrc) (s : UWSt) (t : BitVec 64) (h : D.Dw .nextP
   simp only [set_next_pc]
   exact (uxa_writeReg_bind D orc s .nextPC t _ h).trans rfl
 
-/-- `trap`: reads the privilege and `PC`, changes nothing. -/
-theorem uxc_trap (orc : UOrc) (s : UWSt) (e : sync_exception) (hp : D.Dr .cur_privilege = true)
+/-- `trap`: reads the privilege and `PC`, changes nothing (sail-riscv 0.16: the trap carries an
+`ExceptionContext`). -/
+theorem uxc_trap (orc : UOrc) (s : UWSt) (e : ExceptionContext) (hp : D.Dr .cur_privilege = true)
     (hpc : D.Dr .PC = true) :
     runRW D orc s (trap e) =
       some (.Trap (s.file .cur_privilege, e, s.file .PC), s, orc) := by
@@ -210,9 +208,9 @@ theorem uxc_access1 (t : BitVec 64) : Sail.BitVec.access t 1 = BitVec.ofBool (t.
 theorem uxc_ofBool_false_beq : (BitVec.ofBool false == 0#1) = true := rfl
 
 theorem uxc_assert_true (D : UFoot) (orc : UOrc) (s : UWSt) (msg : String) :
-    runRW D orc s (assert true msg) = some ((), s, orc) := rfl
+    runRW D orc s (sail_assert true msg) = some ((), s, orc) := rfl
 
-@[simp] theorem uxc_not_eq (b : Bool) : Functions.not b = !b := rfl
+@[simp] theorem uxc_not_eq (b : Bool) : LeanRV64D.not b = !b := rfl
 
 /-! ## `jump_to` -/
 

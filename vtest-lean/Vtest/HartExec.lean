@@ -21,7 +21,7 @@ import Vtest.XState
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 open Sail.ArchSem (FreeM Effect)
 
 /-! ## The decidable forms of the relation's premises -/
@@ -190,17 +190,23 @@ theorem XState.devWrite_sound (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8
 structure HPol where
   /-- take the clock-ticking branch at the cycle boundary -/
   tick : Bool := false
+  /-- the model's `exit_wait` input at the cycle boundary (a hart waiting in WFI is forced out of
+  its wait); `false` is the schedule the pre-0.16 harness ran (`try_step 0 false`) -/
+  ew : Bool := false
   /-- fetch at the hart's instruction view rather than at the top of the order -/
   staleFetch : Bool := false
   /-- load at the lowest view the relation admits rather than at the top -/
   staleLoad : Bool := false
 
-/-! ## Memory events -/
+/-! ## Memory events
 
-abbrev ReadReq (n vs : Nat) := Mem_read_request n vs Arch.pa Arch.translation Arch.arch_ak
-abbrev WriteReq (n vs : Nat) := Mem_write_request n vs Arch.pa Arch.translation Arch.arch_ak
-abbrev ReadAns (n : Nat) := Result (BitVec (8 * n) × Option Bool) Arch.abort
-abbrev WriteAns := Result (Option Bool) Arch.abort
+Concurrency interface v2 (sail-riscv 0.16, lean-sail v7): a request is a `MemRequest`
+(`req.pa`, `req.size`, `req.accessKind`); a read answers the bits and an empty tag vector,
+`.ok (w, 0#req.numTag)`; a write carries its bits in the event and answers `.ok ()`; a store's
+footprint is announced first (`memWriteAnnounce`, silent). -/
+
+/-- The answer type of a read. -/
+abbrev ReadAns (req : MemRequest) := InstructionEffect.ret (.memRead req)
 
 /-- The lowest view a plain load of the footprint may read at. -/
 def lowView (h : XHart) (pa : PAddr) (n : Nat) : Nat :=
@@ -213,45 +219,46 @@ def fetchView (pol : HPol) (h : XHart) (top : Nat) : Nat := if pol.staleFetch th
 def loadView (pol : HPol) (h : XHart) (pa : PAddr) (n : Nat) (top : Nat) : Nat :=
   if pol.staleLoad then lowView h pa n else top
 
-def memReadExec (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (req : ReadReq n vs) :
-    Option (ReadAns n × XState) :=
+def memReadExec (pol : HPol) (cpu : CPU) (x : XState) (req : MemRequest) :
+    Option (ReadAns req × XState) :=
   let pa : PAddr := req.pa
+  let n := req.size
   let h := x.hart cpu
   if devBytesB pa n then
     match x.devRead pa n with
-    | some (w, x') => some (.Ok (w, none), x')
+    | some (w, x') => some (.ok (w, 0#req.numTag), x')
     | none => none
   else if ramBytesB pa n then
-    if akIfetch req.access_kind then
+    if akIfetch req.accessKind then
       let tvn := fetchView pol h x.log.length
       let w := gather n fun j => x.mem.read (ifetchAgent cpu) tvn (pa + BitVec.ofNat 64 j)
       if decide (h.itv ≤ tvn) && decide (tvn ≤ x.log.length) &&
           readBytesB x.mem (ifetchAgent cpu) tvn pa n w then
-        some (.Ok (w, none), x)
+        some (.ok (w, 0#req.numTag), x)
       else none
-    else if akExcl req.access_kind then
+    else if akExcl req.accessKind then
       if othersReserveB x cpu pa n then none
       else
         let w := gather n fun j => (x.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top
         if topBytesB x.mem pa n w then
-          some (.Ok (w, none), x.afterExcl cpu pa n w (akAcq req.access_kind))
+          some (.ok (w, 0#req.numTag), x.afterExcl cpu pa n w (akAcq req.accessKind))
         else none
     else
       let tvn := loadView pol h pa n x.log.length
       let w := gather n fun j => x.mem.read (hartAgent cpu) tvn (pa + BitVec.ofNat 64 j)
       if decide (h.tv ≤ tvn) && decide (tvn ≤ x.log.length) && cohOkB h.hr pa n tvn &&
           readBytesB x.mem (hartAgent cpu) tvn pa n w then
-        some (.Ok (w, none), x.afterLoad cpu pa n tvn)
+        some (.ok (w, 0#req.numTag), x.afterLoad cpu pa n tvn)
       else none
   else none
 
-theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (req : ReadReq n vs)
-    (v : ReadAns n) (x' : XState) (h : memReadExec pol cpu x n vs req = some (v, x')) :
-    evStep cpu (.memRead n vs req) x.abs v x'.abs := by
+theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (req : MemRequest)
+    (v : ReadAns req) (x' : XState) (h : memReadExec pol cpu x req = some (v, x')) :
+    evStep cpu (.memRead req) x.abs v x'.abs := by
   unfold memReadExec at h
   simp only at h
-  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _) ∨
-    (ramBytes req.pa n ∧ _)
+  show (devBytes req.pa req.size ∧ _) ∨ (ramBytes req.pa req.size ∧ _) ∨
+    (ramBytes req.pa req.size ∧ _) ∨ (ramBytes req.pa req.size ∧ _)
   split at h
   · -- MMIO
     rename_i hdev
@@ -259,9 +266,9 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
     refine ⟨(devBytesB_iff _ _).1 hdev, ?_⟩
     split at h
     · rename_i w x1 hrd
-      simp only [Option.some.injEq, Prod.mk.injEq] at h
-      obtain ⟨rfl, rfl⟩ := h
-      obtain ⟨h1, h2⟩ := XState.devRead_sound x _ n w x1 hrd
+      simp only [Option.some.injEq] at h
+      obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+      obtain ⟨h1, h2⟩ := XState.devRead_sound x _ _ w x1 hrd
       exact ⟨w, x1.abs.devs, h1, rfl, h2⟩
     · exact absurd h (by simp)
   · split at h
@@ -273,8 +280,8 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
         right; left
         split at h
         · rename_i hc
-          simp only [Option.some.injEq, Prod.mk.injEq] at h
-          obtain ⟨rfl, rfl⟩ := h
+          simp only [Option.some.injEq] at h
+          obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
           simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
           obtain ⟨⟨h1, h2⟩, h3⟩ := hc
           exact ⟨hram', hif, _, _, h1, h2, (readBytesB_iff _ _ _ _ _ _).1 h3, rfl, rfl⟩
@@ -289,8 +296,8 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
           · rename_i hoth
             split at h
             · rename_i hc
-              simp only [Option.some.injEq, Prod.mk.injEq] at h
-              obtain ⟨rfl, rfl⟩ := h
+              simp only [Option.some.injEq] at h
+              obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
               refine ⟨hram', hex, ?_, _, (topBytesB_iff _ _ _ _).1 hc, rfl, ?_⟩
               · intro ho
                 exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
@@ -301,11 +308,11 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
           right; right; left
           split at h
           · rename_i hc
-            simp only [Option.some.injEq, Prod.mk.injEq] at h
-            obtain ⟨rfl, rfl⟩ := h
+            simp only [Option.some.injEq] at h
+            obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
             simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
             obtain ⟨⟨⟨h1, h2⟩, h3⟩, h4⟩ := hc
-            have hpl : akPlain req.access_kind = true := by
+            have hpl : akPlain req.accessKind = true := by
               simp only [akPlain, Bool.and_eq_true, Bool.not_eq_true']
               exact ⟨by simpa using hif, by simpa using hex⟩
             exact ⟨hram', hpl, _, _, h1, h2, (cohOkB_iff _ _ _ _).1 h3,
@@ -313,118 +320,114 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
           · exact absurd h (by simp)
     · exact absurd h (by simp)
 
-def memWriteExec (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs) :
+/-- The answer type of a write. -/
+abbrev WriteAns := Except Arch.abort Unit
+
+def memWriteExec (cpu : CPU) (x : XState) (req : MemRequest) (w : BitVec (8 * req.size)) :
     Option (WriteAns × XState) :=
   let pa : PAddr := req.pa
-  match req.value with
-  | none => none
-  | some w =>
-    if devBytesB pa n then
-      match x.devWrite pa n w with
-      | some x' => some (.Ok (some true), x')
-      | none => none
-    else if ramBytesB pa n then
-      if othersReserveB x cpu pa n then none
-      else some (.Ok (some true), x.store cpu pa n w (akExcl req.access_kind))
-    else none
+  let n := req.size
+  if devBytesB pa n then
+    match x.devWrite pa n w with
+    | some x' => some (.ok (), x')
+    | none => none
+  else if ramBytesB pa n then
+    if othersReserveB x cpu pa n then none
+    else some (.ok (), x.store cpu pa n w (akExcl req.accessKind))
+  else none
 
-theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs)
-    (v : WriteAns) (x' : XState) (h : memWriteExec cpu x n vs req = some (v, x')) :
-    evStep cpu (.memWrite n vs req) x.abs v x'.abs := by
+theorem memWriteExec_sound (cpu : CPU) (x : XState) (req : MemRequest) (w : BitVec (8 * req.size))
+    (tags : BitVec req.numTag) (v : WriteAns) (x' : XState)
+    (h : memWriteExec cpu x req w = some (v, x')) :
+    evStep cpu (.memWrite req w tags) x.abs v x'.abs := by
   unfold memWriteExec at h
   simp only at h
-  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _)
+  show (devBytes req.pa req.size ∧ _) ∨ (ramBytes req.pa req.size ∧ _)
   split at h
-  · exact absurd h (by simp)
-  · rename_i w hval
+  · rename_i hdev
+    left
+    refine ⟨(devBytesB_iff _ _).1 hdev, ?_⟩
     split at h
-    · rename_i hdev
-      left
-      refine ⟨(devBytesB_iff _ _).1 hdev, ?_⟩
+    · rename_i x1 hwr
+      simp only [Option.some.injEq] at h
+      obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+      obtain ⟨h1, h2⟩ := XState.devWrite_sound x _ _ w x1 hwr
+      exact ⟨x1.abs.devs, h1, rfl, h2⟩
+    · exact absurd h (by simp)
+  · split at h
+    · rename_i hram
+      right
       split at h
-      · rename_i x1 hwr
-        simp only [Option.some.injEq, Prod.mk.injEq] at h
-        obtain ⟨rfl, rfl⟩ := h
-        obtain ⟨h1, h2⟩ := XState.devWrite_sound x _ n w x1 hwr
-        exact ⟨w, x1.abs.devs, hval, h1, rfl, h2⟩
       · exact absurd h (by simp)
-    · split at h
-      · rename_i hram
-        right
-        split at h
-        · exact absurd h (by simp)
-        · rename_i hoth
-          simp only [Option.some.injEq, Prod.mk.injEq] at h
-          obtain ⟨rfl, rfl⟩ := h
-          refine ⟨(ramBytesB_iff _ _).1 hram, w, hval, ?_, rfl, XState.abs_store ..⟩
-          intro ho
-          exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
-      · exact absurd h (by simp)
+      · rename_i hoth
+        simp only [Option.some.injEq] at h
+        obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+        refine ⟨(ramBytesB_iff _ _).1 hram, ?_, rfl, XState.abs_store ..⟩
+        intro ho
+        exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
+    · exact absurd h (by simp)
 
 /-! ## One event -/
 
 /-- Answer one event from the executable state. -/
 def evExec (pol : HPol) (cpu : CPU) (x : XState) :
-    (o : Outcome Register RegisterType) → Option (o.ret × XState)
-  | .regRead r => some ((x.hart cpu).regs.get r, x)
-  | .regWrite r v => some (PUnit.unit, x.setReg cpu r v)
-  | .memRead n vs req => memReadExec pol cpu x n vs req
-  | .memWrite n vs req => memWriteExec cpu x n vs req
-  | .readRam .. => none
-  | .writeRam .. => none
+    (o : InstructionEffect) → Option (InstructionEffect.ret o × XState)
+  | .regRead r _ => some ((x.hart cpu).regs.get r, x)
+  | .regWrite r _ v => some ((), x.setReg cpu r v)
+  | .memRead req => memReadExec pol cpu x req
+  | .memWrite req w _ => memWriteExec cpu x req w
+  | .memWriteAnnounce _ => some ((), x)
   | .barrier b => some ((), x.fence cpu b)
   | .cacheOp _ => some ((), x)
-  | .tlbi _ => some ((), x)
+  | .tlbOp _ => some ((), x)
+  | .clockCycle => some ((), x)
+  | .getCycleCount => some ((0 : Nat), x)
   | .translationStart _ => some ((), x)
   | .translationEnd _ => some ((), x)
-  | .takeException _ => some ((), x)
-  | .returnException _ => some ((), x)
-  | .cycleCount => some ((), x)
-  | .getCycleCount => some ((0 : Nat), x)
-  | .message _ => some ((), x)
-  | .choose p => some (trivialChoiceSource.choose p (), x)
+  | .archException _ => some ((), x)
+  | .returnException => some ((), x)
+  | .printMessage _ => some ((), x)
 
-theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : Outcome Register RegisterType)
-    (v : o.ret) (x' : XState) (h : evExec pol cpu x o = some (v, x')) :
+theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : InstructionEffect)
+    (v : InstructionEffect.ret o) (x' : XState) (h : evExec pol cpu x o = some (v, x')) :
     evStep cpu o x.abs v x'.abs := by
   cases o with
-  | regRead r =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
+  | regRead r a =>
+    simp only [evExec, Option.some.injEq] at h
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
     exact ⟨rfl, rfl⟩
-  | regWrite r w =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨-, rfl⟩ := h
+  | regWrite r a w =>
+    simp only [evExec, Option.some.injEq] at h
+    obtain ⟨-, rfl⟩ := Prod.mk.inj h
     exact XState.abs_setReg ..
-  | memRead n vs req => exact memReadExec_sound pol cpu x n vs req v x' h
-  | memWrite n vs req => exact memWriteExec_sound cpu x n vs req v x' h
-  | readRam a b c => simp [evExec] at h
-  | writeRam a b c d => simp [evExec] at h
+  | memRead req => exact memReadExec_sound pol cpu x req v x' h
+  | memWrite req w tags => exact memWriteExec_sound cpu x req w tags v x' h
   | barrier b =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨-, rfl⟩ := h
+    simp only [evExec, Option.some.injEq] at h
+    obtain ⟨-, rfl⟩ := Prod.mk.inj h
     exact XState.abs_fence ..
   | getCycleCount =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨rfl, rfl⟩ := h
+    simp only [evExec, Option.some.injEq] at h
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
     exact ⟨rfl, rfl⟩
   | _ =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨-, rfl⟩ := h
+    simp only [evExec, Option.some.injEq] at h
+    obtain ⟨-, rfl⟩ := Prod.mk.inj h
     rfl
 
 /-- The event is blocked by another hart's reservation: the state the
 self-loop leaves. -/
-def blockedExec (cpu : CPU) (x : XState) : Outcome Register RegisterType → Option XState
-  | .memRead n _ req =>
-    if akExcl req.access_kind && othersReserveB x cpu req.pa n then some (x.dropResv cpu) else none
-  | .memWrite n _ req => if othersReserveB x cpu req.pa n then some x else none
+def blockedExec (cpu : CPU) (x : XState) : InstructionEffect → Option XState
+  | .memRead req =>
+    if akExcl req.accessKind && othersReserveB x cpu req.pa req.size then some (x.dropResv cpu)
+    else none
+  | .memWrite req _ _ => if othersReserveB x cpu req.pa req.size then some x else none
   | _ => none
 
-theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register RegisterType)
+theorem blockedExec_sound (cpu : CPU) (x : XState) (o : InstructionEffect)
     (x' : XState) (h : blockedExec cpu x o = some x') : blockedStep cpu o x.abs x'.abs := by
   cases o with
-  | memRead n vs req =>
+  | memRead req =>
     simp only [blockedExec] at h
     split at h
     · rename_i hc
@@ -433,7 +436,7 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register Registe
       subst h
       exact ⟨hc.1, (othersReserveB_iff _ _ _ _).1 hc.2, XState.abs_dropResv ..⟩
     · exact absurd h (by simp)
-  | memWrite n vs req =>
+  | memWrite req w tags =>
     simp only [blockedExec] at h
     split at h
     · rename_i hc
@@ -445,18 +448,22 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register Registe
 
 /-! ## One step of a hart -/
 
-/-- One step of hart `cpu`, whose remaining computation is `m`. -/
+/-- One step of hart `cpu`, whose remaining computation is `m`.  A finite choice
+(`FinChoice`: lean-sail v7's `undefined_*` and `internal_pick`) takes its first
+alternative. -/
 def hartExec (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) : Option (SailM Unit × XState) :=
   match m with
-  | .pure _ => some (riscvStep pol.tick, x)
-  | .impure (.error _) _ => none
-  | .impure (.ok o) k =>
+  | .pure _ => some (riscvStep pol.tick pol.ew, x)
+  | .impure (.inl (.error _)) _ => none
+  | .impure (.inl (.ok o)) k =>
     match evExec pol cpu x o with
     | some (v, x') => some (k v, x')
     | none =>
       match blockedExec cpu x o with
-      | some x' => some (.impure (.ok o) k, x')
+      | some x' => some (.impure (.inl (.ok o)) k, x')
       | none => none
+  | .impure (.inr n) k =>
+    if h : 0 < (show Nat from n) then some (k (⟨0, h⟩ : Fin n), x) else none
 
 /-- THE BRIDGE: a step of the interpreter is a step of the language. -/
 theorem hartExec_sound (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) (m' : SailM Unit)
@@ -465,31 +472,43 @@ theorem hartExec_sound (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) (m
   | pure u =>
     simp only [hartExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨pol.tick, rfl, rfl⟩
+    exact ⟨pol.tick, pol.ew, rfl, rfl⟩
   | impure call k =>
     cases call with
-    | error e => simp [hartExec] at h
-    | ok o =>
+    | inl e =>
+      cases e with
+      | error e => simp [hartExec] at h
+      | ok o =>
+        simp only [hartExec] at h
+        show (∃ v : InstructionEffect.ret o, m' = k v ∧ evStep cpu o x.abs v x'.abs) ∨
+          (blockedStep cpu o x.abs x'.abs ∧ m' = FreeM.impure (.inl (.ok o)) k)
+        split at h
+        · rename_i v x1 hev
+          simp only [Option.some.injEq] at h
+          obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+          exact Or.inl ⟨v, rfl, evExec_sound pol cpu x o v _ hev⟩
+        · split at h
+          · rename_i x1 hb
+            simp only [Option.some.injEq] at h
+            obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+            exact Or.inr ⟨blockedExec_sound cpu x o _ hb, rfl⟩
+          · exact absurd h (by simp)
+    | inr n =>
       simp only [hartExec] at h
-      show (∃ v : o.ret, m' = k v ∧ evStep cpu o x.abs v x'.abs) ∨
-        (blockedStep cpu o x.abs x'.abs ∧ m' = FreeM.impure (.ok o) k)
+      show ∃ v : Fin n, m' = k v ∧ x'.abs = x.abs
       split at h
-      · rename_i v x1 hev
-        simp only [Option.some.injEq, Prod.mk.injEq] at h
-        obtain ⟨rfl, rfl⟩ := h
-        exact Or.inl ⟨v, rfl, evExec_sound pol cpu x o v _ hev⟩
-      · split at h
-        · rename_i x1 hb
-          simp only [Option.some.injEq, Prod.mk.injEq] at h
-          obtain ⟨rfl, rfl⟩ := h
-          exact Or.inr ⟨blockedExec_sound cpu x o _ hb, rfl⟩
-        · exact absurd h (by simp)
+      · rename_i hn
+        simp only [Option.some.injEq] at h
+        obtain ⟨rfl, rfl⟩ := Prod.mk.inj h
+        exact ⟨⟨0, hn⟩, rfl, rfl⟩
+      · exact absurd h (by simp)
 
 /-- A hart at a failed assertion (an `error` node of the model) has no step
 at all: what makes a stuck run a pass. -/
 theorem hartStep_error_false (cpu : CPU) (e : Sail.Error exception)
-    (k : Effect.ret (Except.error e : Eff RegisterType exception) → SailM Unit) (σ : MState)
-    (m' : SailM Unit) (σ' : MState) :
-    ¬ hartStep cpu (FreeM.impure (.error e) k) σ m' σ' := fun h => h
+    (k : Effect.ret (Sum.inl (Except.error e) :
+      (Except (Sail.Error exception) InstructionEffect) ⊕ FinChoice) → SailM Unit)
+    (σ : MState) (m' : SailM Unit) (σ' : MState) :
+    ¬ hartStep cpu (FreeM.impure (.inl (.error e)) k) σ m' σ' := fun h => h
 
 end Vtest

@@ -104,7 +104,7 @@ theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (
     iintro %h4 Hrun
     iapply Hk $$ Hb %h4 %_ %r3 %(e9 _ _ _) [] [Hrun]
     · ipureintro; rw [e15, Xv6.ushG_zext]
-    · rw [if_pos (Or.inl h32)]; iexact Hrun
+    · rw [ite_eq_left (Or.inl h32)]; iexact Hrun
   iapply ushS_brN UL N (ushMI_94a N.t) 0x94c h3 _ (16 + n)
     (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz32]; simpa using h32) $$ Hc Hrun
   iintro %h4 Hrun
@@ -124,13 +124,13 @@ theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (
     iintro %h6 Hrun
     iapply Hk $$ Hb %h6 %_ %r4 %(e9' _ _ _ _) [] [Hrun]
     · ipureintro; rw [e15', Xv6.ushG_zext]
-    · rw [if_pos (Or.inr h9)]; iexact Hrun
+    · rw [ite_eq_left (Or.inr h9)]; iexact Hrun
   iapply ushS_brN UL N (ushMI_950 N.t) 0x952 h5 _ (16 + n)
     (by rw [RegMap.get_zero, ukWr_get_same _ _ _ (by decide), ushScan_eqz9]; simpa using h9) $$ Hc Hrun
   iintro %h6 Hrun
   iapply Hk $$ Hb %h6 %_ %r4 %(e9' _ _ _ _) [] [Hrun]
   · ipureintro; rw [e15', Xv6.ushG_zext]
-  · rw [if_neg (by omega)]; iexact Hrun
+  · rw [ite_eq_right (by omega)]; iexact Hrun
 
 /-- **Rocq `wp_ksh_scan`**: the scan as a whole, under the NUL's measure. -/
 theorem ushScan (UL : UK_LEAVES) (N : UkNames GF) (f : Nat → BitVec 8) (i2 : Nat) :
@@ -151,7 +151,7 @@ theorem ushScan (UL : UK_LEAVES) (N : UkNames GF) (f : Nat → BitVec 8) (i2 : N
     iapply ushScan_step UL N h mc k (f (k + 1)) n hregs hs1 (by omega) $$ Hc Hb Hrun
     iintro Hb %h1 %mc' %hr %hs %ha Hrun
     ihave Hbs := Hcl $$ Hb
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     iapply Hk $$ %h1 %mc' %(k + 1) %(by omega) %hr %hs %ha Hbs Hrun
   | succ d IH =>
     intro k h mc n hi2 hlt hnul hregs hs1
@@ -161,11 +161,11 @@ theorem ushScan (UL : UK_LEAVES) (N : UkNames GF) (f : Nat → BitVec 8) (i2 : N
     iintro Hb %h1 %mc' %hr %hs %ha Hrun
     ihave Hbs := Hcl $$ Hb
     by_cases hbl : (f (k + 1)).toNat = 32 ∨ (f (k + 1)).toNat = 9
-    · rw [if_pos hbl]
+    · rw [ite_eq_left hbl]
       iapply IH (k + 1) h1 mc' n (by omega) hlt hnul hr hs $$ Hc Hbs Hrun
       iintro %h2 %mc'' %k' %hk' %hr' %hs' %ha' Hbs Hrun
       iapply Hk $$ %h2 %mc'' %k' %hk' %hr' %hs' %ha' Hbs Hrun
-    · rw [if_neg hbl]
+    · rw [ite_eq_right hbl]
       iapply Hk $$ %h1 %mc' %(k + 1) %(by omega) %hr %hs %ha Hbs Hrun
 
 /-- **Rocq `wp_ksh_die`**: the loop's only exit, `exit(0)` at 0x9a6; the

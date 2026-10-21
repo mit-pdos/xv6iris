@@ -1,9 +1,12 @@
 import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
+import LeanRV64D.Xlen
 import LeanRV64D.Vlen
 import LeanRV64D.PlatformConfig
 import LeanRV64D.Types
 import LeanRV64D.Callbacks
+import LeanRV64D.SysRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,12 +14,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -60,6 +63,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -93,10 +98,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -142,6 +150,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -160,17 +169,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -185,12 +201,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -201,7 +220,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -311,7 +333,7 @@ def vreg_name_raw_backwards (arg_ : String) : SailM (BitVec 5) := do
   | "v31" => (pure 0b11111#5)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def vreg_name_raw_forwards_matches (arg_ : (BitVec 5)) : Bool :=
@@ -403,7 +425,7 @@ def vreg_name_backwards (arg_ : String) : SailM vregidx := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def vreg_name_forwards_matches (arg_ : vregidx) : Bool :=
@@ -462,11 +484,20 @@ def rV (app_0 : vregno) : SailM (BitVec (2 ^ 8)) := do
   | _ => readReg vr31
 
 def dirty_v_context (_ : Unit) : SailM Unit := do
-  (assert (hartSupports Ext_Zve32x) "extensions/V/vext_regs.sail:138.33-138.34")
+  sail_assert (hartSupports Ext_Zve32x) "extensions/V/vext_regs.sail:138.33-138.34"
   writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) 10 9
     (extStatus_map_forwards Dirty))
   writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) (64 -i 1) (64 -i 1) 1#1)
-  (long_csr_write_callback "mstatus" "mstatush" (← readReg mstatus))
+  (long_csr_write_callback "mstatus" "mstatush" (← (read_mstatus ())))
+  if ((← (inVirtualPrivilege ())) : Bool)
+  then
+    (do
+      writeReg vsstatus (Sail.BitVec.updateSubrange (← readReg vsstatus) 10 9
+        (extStatus_map_forwards Dirty))
+      writeReg vsstatus (Sail.BitVec.updateSubrange (← readReg vsstatus) (64 -i 1) (64 -i 1) 1#1)
+      (csr_name_write_callback "vsstatus"
+        (Sail.BitVec.extractLsb (← readReg vsstatus) (xlen -i 1) 0)))
+  else (pure ())
 
 def wV (typ_0 : vregno) (v : (BitVec (2 ^ 8))) : SailM Unit := do
   let .Vregno r : vregno := typ_0
@@ -633,7 +664,7 @@ def is_invalid_lmul_pow (v : (BitVec 3)) : Bool :=
 
 def get_sew_pow (_ : Unit) : SailM Nat := do
   let sew_pow ← do (pure (BitVec.toNatInt (_get_Vtype_vsew (← readReg vtype))))
-  (assert (sew_pow <b 4) "Reserved SEW stored in vtype register. This should be impossible.")
+  sail_assert (sew_pow <b 4) "Reserved SEW stored in vtype register. This should be impossible."
   (pure (sew_pow +i 3))
 
 def get_sew (_ : Unit) : SailM Int := do
@@ -644,7 +675,7 @@ def get_sew_bytes (_ : Unit) : SailM Int := do
 
 def get_lmul_pow (_ : Unit) : SailM Int := do
   let lmul_pow ← do (pure (BitVec.toInt (_get_Vtype_vlmul (← readReg vtype))))
-  (assert (lmul_pow >b (Neg.neg 4)) "Reserved LMUL stored in vtype register. This should be impossible.")
+  sail_assert (lmul_pow >b (Neg.neg 4)) "Reserved LMUL stored in vtype register. This should be impossible."
   (pure lmul_pow)
 
 def undefined_agtype (_ : Unit) : SailM agtype := do

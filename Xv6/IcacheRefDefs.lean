@@ -557,15 +557,15 @@ private theorem foldrConst_get {V : Type _} (x : V) (L : List Nat) (k : Nat) :
     get? (L.foldr (fun z m => PartialMap.insert m z x) (∅ : RegMapF V)) k =
       if k ∈ L then some x else none := by
   induction L with
-  | nil => simp only [List.foldr_nil, List.not_mem_nil, if_false]; exact get?_empty k
+  | nil => simp only [List.foldr_nil, List.not_mem_nil, ite_false]; exact get?_empty k
   | cons z L ih =>
     simp only [List.foldr_cons, List.mem_cons]
     by_cases hz : z = k
-    · rw [get?_insert_eq hz, if_pos (Or.inl hz.symm)]
+    · rw [get?_insert_eq hz, ite_eq_left (Or.inl hz.symm)]
     · rw [get?_insert_ne hz, ih]
       by_cases hk : k ∈ L
-      · rw [if_pos hk, if_pos (Or.inr hk)]
-      · rw [if_neg hk, if_neg]
+      · rw [ite_eq_left hk, ite_eq_left (Or.inr hk)]
+      · rw [ite_eq_right hk, ite_eq_right]
         rintro (h | h)
         · exact hz h.symm
         · exact hk h
@@ -575,8 +575,8 @@ theorem gsetToGmap_get {V : Type _} (x : V) (P : ExtTreeSet Nat compare) (k : Na
   unfold gsetToGmap
   rw [foldrConst_get]
   by_cases h : k ∈ P
-  · rw [if_pos (ExtTreeSet.mem_toList.mpr h), if_pos h]
-  · rw [if_neg (fun h' => h (ExtTreeSet.mem_toList.mp h')), if_neg h]
+  · rw [ite_eq_left (ExtTreeSet.mem_toList.mpr h), ite_eq_left h]
+  · rw [ite_eq_right (fun h' => h (ExtTreeSet.mem_toList.mp h')), ite_eq_right h]
 
 private theorem foldrConst_bigOp {A : Type _} [CMRA A] (x : A) (L : List Nat) (hL : L.Nodup) :
     L.foldr (fun z m => PartialMap.insert m z x) (∅ : RegMapF A) =
@@ -586,7 +586,7 @@ private theorem foldrConst_bigOp {A : Type _} [CMRA A] (x : A) (L : List Nat) (h
   | cons z L ih =>
     rw [List.nodup_cons] at hL
     simp only [List.foldr_cons]
-    rw [Heap.insert_eq_singleton_op_singleton (by rw [foldrConst_get, if_neg hL.1]), ih hL.2]
+    rw [Heap.insert_eq_singleton_op_singleton (by rw [foldrConst_get, ite_eq_right hL.1]), ih hL.2]
     rfl
 
 private theorem toList_nodup (P : ExtTreeSet Nat compare) : P.toList.Nodup :=
@@ -789,19 +789,19 @@ theorem seqSingletons_get {A : Type _} [CMRA A] (v : A) (n m i : Nat) :
       if n ≤ i ∧ i < n + m then some v else none := by
   induction m generalizing n with
   | zero =>
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     exact get?_empty i
   | succ m ih =>
     rw [List.range'_succ, BigOpL.bigOpL_cons, Heap.get?_op, ih (n + 1)]
     by_cases hi : n = i
     · subst hi
-      rw [LawfulPartialMap.get?_singleton_eq rfl, if_neg (by omega), if_pos (by omega)]
+      rw [LawfulPartialMap.get?_singleton_eq rfl, ite_eq_right (by omega), ite_eq_left (by omega)]
       rfl
     · rw [show get? (PartialMap.singleton n v : RegMapF A) i = none from
           LawfulPartialMap.get?_singleton_ne hi]
       by_cases h : n + 1 ≤ i ∧ i < n + 1 + m
-      · rw [if_pos h, if_pos (by omega)]; rfl
-      · rw [if_neg h, if_neg (by omega)]; rfl
+      · rw [ite_eq_left h, ite_eq_left (by omega)]; rfl
+      · rw [ite_eq_right h, ite_eq_right (by omega)]; rfl
 
 /-- ...and its validity (replaces `live_seq_valid` / `hpn_seq_valid`). -/
 theorem seqSingletons_valid {A : Type _} [CMRA A] (v : A) (hv : ✓ v) (n m : Nat) :
@@ -914,7 +914,7 @@ theorem icFunAlloc {A : Type} (d : A) (P : Nat → A → IProp GF)
       intro i j hj
       have hm := List.mem_range.mp (List.mem_of_getElem? hj)
       show P j (f j) ⊢ P j (if j = n then a else f j)
-      rw [if_neg (by omega)]
+      rw [ite_eq_right (by omega)]
     · iapply BigSepL.bigSepL_singleton.2
       simp only [reduceIte]
       iexact Ha
@@ -1145,7 +1145,7 @@ deposit RETURN the arm it was handed. -/
 def iregRegime [Icfg] (rg : Bool) : IProp GF := if rg then iregOpen else iregBoot
 
 instance iregRegime_timeless [Icfg] (rg : Bool) : Timeless (iregRegime (GF := GF) rg) := by
-  unfold iregRegime; cases rg <;> simp only [Bool.false_eq_true, if_false, if_true] <;>
+  unfold iregRegime; cases rg <;> simp only [Bool.false_eq_true, ite_false, ite_true] <;>
     infer_instance
 
 theorem iregRegime_true [Icfg] : iregRegime (GF := GF) true = iregOpen := rfl
@@ -1162,7 +1162,7 @@ theorem iregRegime_boot_excl [Icfg] (rg : Bool) :
     iframe Hb Ho
   | false =>
     unfold iregRegime iregBoot
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     exact ityPending_excl icfgBoot
 
 end IcacheRegime

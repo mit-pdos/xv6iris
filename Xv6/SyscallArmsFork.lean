@@ -64,7 +64,7 @@ theorem syscArmFork_ans (rv : BitVec 32) (h : kforkAns rv) :
     have hP : PIDMAX = 1000 := rfl
     rw [BitVec.toInt_eq_toNat_cond]
     have : 2 * rv.toNat < 2 ^ 32 := by omega
-    simp only [this, if_true]
+    simp only [this, ite_true]
     omega
 
 /-- **The rows of fork's arm** (Rocq `sysc_arm_fork`'s premises of
@@ -84,9 +84,9 @@ theorem syscRows_fork (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
     usysSeccOk_refl _ _ _ _ (hn 23 (by decide)), Or.inl (hn 14 (by decide)),
     Or.inl (hn 3 (by decide))⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
-      if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),
-      if_neg (hn USYS_read (by decide)), if_neg (hn USYS_fstat (by decide))]
+    rw [ite_eq_right (hn USYS_exec (by decide)), ite_eq_right (hn USYS_sbrk (by decide)),
+      ite_eq_right (hn USYS_wait (by decide)), ite_eq_right (hn USYS_pipe (by decide)),
+      ite_eq_right (hn USYS_read (by decide)), ite_eq_right (hn USYS_fstat (by decide))]
     rfl
   · exact syscFdOk_refl_at V _ sts 1 hnum (by decide) (by decide) (by decide) (by decide)
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide))
@@ -178,7 +178,7 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
     fun h' => absurd (hn.symm.trans h') (by decide)⟩
   · unfold usysForkAns usysForkPid
-    rw [if_pos hok]
+    rw [ite_eq_left hok]
     show tfW V'.tf (tfArgIdx 0) = BitVec.signExtend 64 (BitVec.ofNat 32 (pidPick PIDMAX h))
     rw [hrv]; exact ha
   · rw [hgen]
@@ -221,7 +221,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
-    rw [if_neg hnok]
+    rw [ite_eq_right hnok]
     exact ha
   · unfold sFullRcpt slotLedLb
     icases Hs with ⟨%hs, %k0, #Hs, %-⟩
@@ -240,7 +240,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
       fun h' => absurd (hn.symm.trans h') (by decide), fun h' => absurd (hn.symm.trans h') (by decide),
       fun h' => absurd (hn.symm.trans h') (by decide)⟩
     unfold usysForkAns
-    rw [if_neg hnok]
+    rw [ite_eq_right hnok]
     exact ha
 
 /-- The syscall side's park rows (the park world, the ticks and nextpid

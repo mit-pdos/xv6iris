@@ -32,7 +32,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
-  LeanRV64D.Functions.virtual_memory_supported
 
 /-! ## §1 The instruction catalog -/
 
@@ -210,18 +209,18 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
   rcases hall i hi with h | h | h | h
   · simp [h]
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_left h]; rfl
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
     have hC : i ∉ uvSavesC := by
       intro hc; revert hc h; generalize i = x; revert x; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_right hC, uvSaveSeq_hi _ _ _ i l2, ite_eq_left h]; rfl
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
     have hC : i ∉ uvSavesC := by
       intro hc; revert hc h; generalize i = x; revert x; decide
     have hB : i ∉ uvSavesB := by
       intro hc; revert hc h; generalize i = x; revert x; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_neg hB,
-      uvSaveSeq_hi _ _ _ i l1, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_right hC, uvSaveSeq_hi _ _ _ i l2, ite_eq_right hB,
+      uvSaveSeq_hi _ _ _ i l1, ite_eq_left h]; rfl
 
 /-! ## §3 The trapped machine, opened -/
 
@@ -242,18 +241,19 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+        hTrapCsrs cpu ∗
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P Mp ∗ Rut P ∗
         uExitTok (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) := by
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
-  iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
+  iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, Hh, HF, ⟨%Mp, HP, %hM⟩,
     ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR, Hrc⟩
   icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
   unfold userPmp
   icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
   iexists mepc, stc, ⟨mc, mtc, cfg, paddr⟩, Mp
-  iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR Hrc
+  iframe Hpc Hclock HF Hsep Hsc Hstv Hh Hstvec Hslot Hum HR Hrc
   isplit
   · ipureintro; exact ⟨trapMstatusOk_smFacts ms hms, hM, htm, h0⟩
   isplit

@@ -169,7 +169,7 @@ theorem inodeDats_runs (Γ : FsViewNames GF) (n : FsNode) :
   ihave Hd := blkMap_runs Γ n $$ Hd
   unfold indOwned xrInd
   by_cases hz : fnIndb n = 0
-  · simp only [hz, if_true]
+  · simp only [hz, ite_true]
     isplitr
     · ipureintro
       exact ⟨hlen, fun h => absurd hz h⟩
@@ -177,7 +177,7 @@ theorem inodeDats_runs (Γ : FsViewNames GF) (n : FsNode) :
       iframe Hd
       iapply (phiRuns_nil Γ).2
       iempintro
-  · simp only [hz, if_false]
+  · simp only [hz, ite_false]
     unfold FsView.blkOwned
     icases Hi with ⟨%hil, Hi⟩
     isplitr
@@ -200,10 +200,10 @@ theorem inodeDats_ofRuns (Γ : FsViewNames GF) (n : FsNode) (hl : nodeLens n) :
   iframe Hd
   unfold indOwned xrInd
   by_cases hz : fnIndb n = 0
-  · simp only [hz, if_true]
+  · simp only [hz, ite_true]
     iclear Hi
     iempintro
-  · simp only [hz, if_false]
+  · simp only [hz, ite_false]
     ihave Hi := (phiRuns_singleton Γ _).1 $$ Hi
     unfold FsView.blkOwned
     isplitr
@@ -290,7 +290,7 @@ theorem freePool_listPm (Γ : FsViewNames GF) (u : BitSet) (l : List Nat) (hnd :
     obtain ⟨hdom, hlens⟩ := hpm
     unfold poolElt
     by_cases hbu : b ∈ u
-    · simp only [hbu, if_true]
+    · simp only [hbu, ite_true]
       iexists PM
       iframe HPM
       ipureintro
@@ -302,7 +302,7 @@ theorem freePool_listPm (Γ : FsViewNames GF) (u : BitSet) (l : List Nat) (hnd :
         rcases List.mem_cons.mp hx with rfl | hx
         · exact absurd hbu hxu
         · exact ⟨hx, hxu⟩
-    · simp only [hbu, if_false]
+    · simp only [hbu, ite_false]
       icases Hb with ⟨%bs, Hb⟩
       have hPMb : get? PM b = none := by
         cases h : get? PM b with

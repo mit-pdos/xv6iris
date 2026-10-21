@@ -171,7 +171,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       (fun h => by rw [hbt] at h; exact absurd h (by decide)) $$ Hi Hrun
     inext
     iintro %h11 Hrun
-    rw [hbt, if_neg (by decide), ukPc 0x1a 0x1e false rfl]
+    rw [hbt, ite_eq_right (by decide), ukPc 0x1a 0x1e false rfl]
     ihave #Hxsl := Hw $$ HC
     iapply wp_kinit_main_from_1e UL HS HP hpsok N hpayfree T stc Cr cn szv h11 m10 n hne hkt $$ Hdeps Hblaw
       Hdlaw Hc Hxsl Hargv Hsz [Hstd] Hcwd Hch Htk Hrun
@@ -182,7 +182,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       (fun _ => by decide) $$ Hi Hrun
     inext
     iintro %h11 Hrun
-    rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x4a#13 = BitVec.ofNat 64 0x64
+    rw [hbt, ite_eq_left rfl, show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x4a#13 = BitVec.ofNat 64 0x64
       from by decide]
     iapply wp_kinit_main_repair UL HS HP hpsok N hpayfree T Cns stc Cr cn szv h11 m10 n hne hkt $$ Hdeps Hblaw
       Hdlaw Hc [] Hmk Hargv Hsz [Hstd] Hcwd Hch Htk Hrun
@@ -196,7 +196,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun _ => by decide) $$ Hi Hrun
       inext
       iintro %h11 Hrun
-      rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x4a#13 = BitVec.ofNat 64 0x64
+      rw [hbt, ite_eq_left rfl, show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x4a#13 = BitVec.ofNat 64 0x64
         from by decide]
       iapply wp_kinit_main_repair UL HS HP hpsok N hpayfree T Cns stc Cr cn szv h11 m10 n hne hkt $$ Hdeps Hblaw
         Hdlaw Hc [] Hmk Hargv Hsz [Hstd] Hcwd Hch Htk Hrun
@@ -209,7 +209,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun h => by rw [hbf] at h; exact absurd h (by decide)) $$ Hi Hrun
       inext
       iintro %h11 Hrun
-      rw [hbf, if_neg (by decide), ukPc 0x1a 0x1e false rfl]
+      rw [hbf, ite_eq_right (by decide), ukPc 0x1a 0x1e false rfl]
       ihave #Hxsl := initConsSup_taint cn T Cns stc Cr $$ [] HT
       · unfold initConsSup
         iframe Hw Ht

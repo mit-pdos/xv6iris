@@ -612,7 +612,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
     · -- NUL found at position d + j
       k_step_gen (wp_s_branch c3 _ (KA.«copyinstr» + 0xb0#64) true 8080#13 13#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [cs_ite_beq_byte, hpb0, if_pos rfl] next c4 hp4 £ Hlc
+        with [cs_ite_beq_byte, hpb0, ite_eq_left rfl] next c4 hp4 £ Hlc
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans (hpinA h)) $$ HΦ Hlc
       iapply HΦ' $$ %_ %_ %(d + j) Hk Hpc HP Hdst
@@ -635,7 +635,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
     · -- non-NUL: store and continue
       k_step_gen (wp_s_branch c3 _ (KA.«copyinstr» + 0xb0#64) true 8080#13 13#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [cs_ite_beq_byte, hpb0, if_neg hpb0] next c4 hp4
+        with [cs_ite_beq_byte, hpb0, ite_eq_right hpb0] next c4 hp4
       iintro Hk Hpc
       -- sb a3,0(a5): store pb to dst[d+j]
       have hbufget : (umemRead (viewFaulted P P2 M) A (d + j) ++ old.drop (d + j))[d + j]?
@@ -661,7 +661,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
       · -- chunk done
         k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0xb8#64) false 8174#13 15#5 12#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [h12, co_ite_bne, if_pos (cs_step_eq dst0 d j n (by omega))] next c7 hp7
+          with [h12, co_ite_bne, ite_eq_left (cs_step_eq dst0 d j n (by omega))] next c7 hp7
         iintro Hk Hpc
         k_step_gen (wp_s_j c7 _ (KA.«copyinstr» + 0xbc#64) true 2097068#21)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
@@ -692,7 +692,7 @@ theorem cstr_inner [Xv6G GF] [CurCtx]
         k_step_gen (wp_s_branch c6 _ (KA.«copyinstr» + 0xb8#64) false 8174#13 15#5 12#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
           with [h12, co_ite_bne,
-            if_neg (cs_step_ne dst0 d j n (by omega) (by omega) (by omega))] next c7 hp7
+            ite_eq_right (cs_step_ne dst0 d j n (by omega) (by omega) (by omega))] next c7 hp7
         iintro Hk Hpc
         ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp7 h).trans ((hp6 h).trans
           ((hp5 h).trans ((hp4 h).trans (hpinA h))))) $$ HΦ
@@ -958,7 +958,7 @@ theorem cs_noNul_of_read_eq (V1 V2 : Nat → List (BitVec 8)) (A d : Nat)
   have e1 := UMemL.umemRead_getElem? V2 A d i
   have e2 := UMemL.umemRead_getElem? V1 A d i
   rw [heq, e2] at e1
-  simp only [if_pos hi, Option.some.injEq] at e1
+  simp only [ite_eq_left hi, Option.some.injEq] at e1
   rw [← e1]; exact h i hi
 
 /-! ## Tail arithmetic -/

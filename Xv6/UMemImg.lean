@@ -39,10 +39,10 @@ theorem writerImg_fault (Pv P P' : UPtd) (M : Nat → List (BitVec 8)) (hv : Pv.
   | some w =>
     have h1 := hsub kp w h0
     rw [h1]
-    simp only [Option.isNone_some, Bool.false_eq_true, false_and, if_false, Option.isSome_some,
-      if_true]
+    simp only [Option.isNone_some, Bool.false_eq_true, false_and, ite_false, Option.isSome_some,
+      ite_true]
   | none =>
-    simp only [Option.isSome_none, Bool.false_eq_true, if_false]
+    simp only [Option.isSome_none, Bool.false_eq_true, ite_false]
     split <;> rfl
 
 /-- At the entry table the image agrees with the view on every mapped page. -/

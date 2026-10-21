@@ -19,7 +19,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## §1 The board's writes -/
@@ -37,14 +37,15 @@ def bootBoardOk (hid : BitVec 64) (pma : List PMA_Region) (f : BootRegs) : Prop 
   f .mie = 0#64 ∧
   f .mideleg = 0#64 ∧
   f .senvcfg = 0#64 ∧
-  f .sstateen0 = 0#32
+  f .sstateen0 = 0#32 ∧
+  f .written_trigger_index = none
 
 /-- Rocq `exec_board_init`: the board's writes, from ANY file. -/
 theorem bootFin_boardInit (hid : BitVec 64) (pma : List PMA_Region) (f : BootRegs) :
     BootFin (fun _ f' => bootBoardOk hid pma f') (boardInit hid pma) f := by
   unfold boardInit
   boot_peel
-  refine bootFin_pure _ _ _ ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine bootFin_pure _ _ _ ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals boot_lk
   all_goals first | rfl | decide
 

@@ -168,7 +168,7 @@ theorem sltiu_zext (c n : BitVec 8) :
     have e : BitVec.setWidth 64 c + -BitVec.setWidth 64 c = 0#64 := by bv_decide
     simp [e]
   · have : BitVec.setWidth 64 c ≠ BitVec.setWidth 64 n := fun e => h ((setWidth64_inj c n).1 e)
-    rw [if_neg h, if_neg]
+    rw [ite_eq_right h, ite_eq_right]
     intro hlt
     apply this
     bv_decide
@@ -183,7 +183,7 @@ theorem ite_bne_sub {α : Type} (c n : BitVec 8) (x y : α) :
     have e : BitVec.setWidth 64 c + -BitVec.setWidth 64 c = 0#64 := by bv_decide
     simp [e]
   · have : BitVec.setWidth 64 c ≠ BitVec.setWidth 64 n := fun e => h ((setWidth64_inj c n).1 e)
-    rw [if_neg h]
+    rw [ite_eq_right h]
     have hne : BitVec.setWidth 64 c + -(BitVec.setWidth 64 n) ≠ 0#64 := by
       intro e; apply this; bv_decide
     simp [hne]
@@ -358,9 +358,9 @@ theorem pkRegsN_set (R0 R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : pkRegsN 
     pkRegsN R0 (R.set r v) := by
   unfold pkRegsN pkConsts at *
   obtain ⟨n2, n8, n18, n19, n22, n23, n24, n26, n27⟩ := hr
-  simp only [RegMap.set_apply, if_neg (Ne.symm n2), if_neg (Ne.symm n8), if_neg (Ne.symm n18),
-    if_neg (Ne.symm n19), if_neg (Ne.symm n22), if_neg (Ne.symm n23), if_neg (Ne.symm n24),
-    if_neg (Ne.symm n26), if_neg (Ne.symm n27)]
+  simp only [RegMap.set_apply, ite_eq_right (Ne.symm n2), ite_eq_right (Ne.symm n8), ite_eq_right (Ne.symm n18),
+    ite_eq_right (Ne.symm n19), ite_eq_right (Ne.symm n22), ite_eq_right (Ne.symm n23), ite_eq_right (Ne.symm n24),
+    ite_eq_right (Ne.symm n26), ite_eq_right (Ne.symm n27)]
   exact h
 
 theorem pkRegs_set (R0 R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : pkRegs R0 R)
@@ -369,7 +369,7 @@ theorem pkRegs_set (R0 R : RegMap) (r : BitVec 5) (v : BitVec 64) (h : pkRegs R0
     pkRegs R0 (R.set r v) := by
   obtain ⟨n2, n8, n18, n19, n22, n23, n24, n25, n26, n27⟩ := hr
   refine ⟨pkRegsN_set R0 R r v h.1 ⟨n2, n8, n18, n19, n22, n23, n24, n26, n27⟩, ?_⟩
-  simp only [RegMap.set_apply, if_neg (Ne.symm n25)]
+  simp only [RegMap.set_apply, ite_eq_right (Ne.symm n25)]
   exact h.2
 
 theorem pkRegs_set25 (R0 R : RegMap) (h : pkRegsN R0 R) : pkRegs R0 (R.set 25#5 (R0 25#5)) :=
@@ -698,23 +698,23 @@ theorem pkDir_none (c0 c1 c2 : BitVec 8)
       (c0 = chL ∧ (c1 = chD ∨ c1 = chU ∨ c1 = chX ∨ (c1 = chL ∧ (c2 = chD ∨ c2 = chU ∨ c2 = chX)))))) :
     pkDir c0 c1 c2 = (none, 0) := by
   unfold pkDir
-  rw [if_neg (fun e => h (Or.inl e)), if_neg (fun e => h (Or.inr (Or.inl e))),
-    if_neg (fun e => h (Or.inr (Or.inr (Or.inl e)))), if_neg (fun e => h (Or.inr (Or.inr (Or.inr (Or.inl e))))),
-    if_neg (fun e => h (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl e)))))),
-    if_neg (fun e => h (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl e)))))))]
+  rw [ite_eq_right (fun e => h (Or.inl e)), ite_eq_right (fun e => h (Or.inr (Or.inl e))),
+    ite_eq_right (fun e => h (Or.inr (Or.inr (Or.inl e)))), ite_eq_right (fun e => h (Or.inr (Or.inr (Or.inr (Or.inl e))))),
+    ite_eq_right (fun e => h (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl e)))))),
+    ite_eq_right (fun e => h (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl e)))))))]
   by_cases hl : c0 = chL
-  · rw [if_pos hl]
+  · rw [ite_eq_left hl]
     have h' : ¬ (c1 = chD ∨ c1 = chU ∨ c1 = chX ∨ (c1 = chL ∧ (c2 = chD ∨ c2 = chU ∨ c2 = chX))) :=
       fun e => h (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨hl, e⟩))))))
-    rw [if_neg (fun e => h' (Or.inl e)), if_neg (fun e => h' (Or.inr (Or.inl e))),
-      if_neg (fun e => h' (Or.inr (Or.inr (Or.inl e))))]
+    rw [ite_eq_right (fun e => h' (Or.inl e)), ite_eq_right (fun e => h' (Or.inr (Or.inl e))),
+      ite_eq_right (fun e => h' (Or.inr (Or.inr (Or.inl e))))]
     by_cases hll : c1 = chL
-    · rw [if_pos hll]
+    · rw [ite_eq_left hll]
       have h'' : ¬ (c2 = chD ∨ c2 = chU ∨ c2 = chX) := fun e => h' (Or.inr (Or.inr (Or.inr ⟨hll, e⟩)))
-      rw [if_neg (fun e => h'' (Or.inl e)), if_neg (fun e => h'' (Or.inr (Or.inl e))),
-        if_neg (fun e => h'' (Or.inr (Or.inr e)))]
-    · rw [if_neg hll]
-  · rw [if_neg hl]
+      rw [ite_eq_right (fun e => h'' (Or.inl e)), ite_eq_right (fun e => h'' (Or.inr (Or.inl e))),
+        ite_eq_right (fun e => h'' (Or.inr (Or.inr e)))]
+    · rw [ite_eq_right hll]
+  · rw [ite_eq_right hl]
 
 theorem fmtByte_ge (f : List (BitVec 8)) (j : Nat) (hj : f.length ≤ j) : fmtByte f j = 0#8 := by
   unfold fmtByte
@@ -880,9 +880,10 @@ theorem kernelData_nullBody : kmapStatic (GF := GF) ⊢ kernelData -∗ cstr KSt
 end
 
 
-/-! ## `k_step` with `if_true`/`if_false` instead of `ite_true`/`ite_false`: the
-latter pin the `Decidable` instance, and the kernel loops checking that
-instance once the register file holds symbolic flag bits -/
+/-! ## `k_step` with `ite_true`/`ite_false` at an arbitrary `Decidable` instance (before Lean
+4.34 these were `if_true`/`if_false`, preferred because the `ite_*` lemmas of that time pinned the
+instance, and the kernel loops checking that instance once the register file holds symbolic
+flag bits) -/
 
 syntax "k_norm_noite" : tactic
 syntax "k_norm_noite" " [" term,* "]" : tactic
@@ -910,7 +911,7 @@ macro_rules
       KCtx.withLocks_withLocks, KCtx.setReg_withLocks, KCtx.rget_withLocks, KCtx.withLocks_self,
       KCtx.withLocks_regs, KCtx.withLocks_sie, KCtx.withLocks_avail, KCtx.withLocks_noff, KCtx.withLocks_intena,
       KCtx.withLocks_locks, KCtx.withLocks_tier, KCtx.withLocks_root, KCtx.withLocks_proc, KCtx.sp_withLocks,
-      BitVec.reduceEq, if_true, if_false, instrLen,
+      BitVec.reduceEq, ite_true, ite_false, instrLen,
       BitVec.sub_eq_add_neg, BitVec.reduceNeg, BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero,
       BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.reduceSignExtend, BitVec.reduceSetWidth,
       BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,
@@ -933,7 +934,7 @@ macro_rules
       KCtx.withLocks_withLocks, KCtx.setReg_withLocks, KCtx.rget_withLocks, KCtx.withLocks_self,
       KCtx.withLocks_regs, KCtx.withLocks_sie, KCtx.withLocks_avail, KCtx.withLocks_noff, KCtx.withLocks_intena,
       KCtx.withLocks_locks, KCtx.withLocks_tier, KCtx.withLocks_root, KCtx.withLocks_proc, KCtx.sp_withLocks,
-      BitVec.reduceEq, if_true, if_false, instrLen,
+      BitVec.reduceEq, ite_true, ite_false, instrLen,
       BitVec.sub_eq_add_neg, BitVec.reduceNeg, BitVec.add_assoc, BitVec.reduceAdd, BitVec.add_zero,
       BitVec.zero_add, BitVec.reduceMul, BitVec.reduceOfNat, BitVec.reduceSignExtend, BitVec.reduceSetWidth,
       BitVec.reduceExtractLsb', BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr, BitVec.reduceNot,

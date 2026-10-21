@@ -128,7 +128,7 @@ theorem strncmp_loop (kb : KCtx)
     · -- a NUL in p: stop here
       ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
-          pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [if_pos hz]) $$ Hpc
+          pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [ite_eq_left hz]) $$ Hpc
       ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro; intro r _ _ _ _ h15; simp [RegMap.set_apply, h15]
@@ -140,7 +140,7 @@ theorem strncmp_loop (kb : KCtx)
           by simp [RegMap.set_apply, h10], by simp [RegMap.set_apply, h11]⟩
     · ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
-          pcIs c2 (KA.«strncmp» + 0x10#64) from by rw [if_neg hz]) $$ Hpc
+          pcIs c2 (KA.«strncmp» + 0x10#64) from by rw [ite_eq_right hz]) $$ Hpc
       -- lbu a4,0(a1)
       icases byteBuf_acc s2 dq2 bs2 i bs2[i] hb $$ Hbuf2 with ⟨Hb2, Hclose2⟩
       k_step_gen (wp_s_lbu c2 _ (KA.«strncmp» + 0x10#64) false 0#12 14#5 11#5 (by decide) (by decide) dq2 bs2[i])
@@ -156,7 +156,7 @@ theorem strncmp_loop (kb : KCtx)
       · -- the bytes agree: the count runs out here
         ihave Hpc := (show pcIs (GF := GF) c4
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
-            pcIs c4 (KA.«strncmp» + 0x18#64) from by rw [if_pos hab]) $$ Hpc
+            pcIs c4 (KA.«strncmp» + 0x18#64) from by rw [ite_eq_left hab]) $$ Hpc
         k_step_gen (wp_s_addiw c4 _ (KA.«strncmp» + 0x18#64) true 4095#12 12#5 12#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
           with [RegMap.set_apply, h12, sn_addiw_dec (n - i) (by omega) (by omega)] next c5 hp5
@@ -176,7 +176,7 @@ theorem strncmp_loop (kb : KCtx)
         iintro Hk Hpc
         ihave Hpc := (show pcIs (GF := GF) c8
             (if n - i - 1 = 0 then (KA.«strncmp» + 0x20#64) else (KA.«strncmp» + 0xa#64)) ⊢
-            pcIs c8 (KA.«strncmp» + 0x20#64) from by rw [if_pos hzero]) $$ Hpc
+            pcIs c8 (KA.«strncmp» + 0x20#64) from by rw [ite_eq_left hzero]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c8 _
           (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
             ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ Hlc
@@ -196,7 +196,7 @@ theorem strncmp_loop (kb : KCtx)
       · -- the bytes differ: stop here
         ihave Hpc := (show pcIs (GF := GF) c4
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
-            pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [if_neg hab]) $$ Hpc
+            pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [ite_eq_right hab]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c4 _
           (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
         iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
@@ -227,7 +227,7 @@ theorem strncmp_loop (kb : KCtx)
     by_cases hz : bs1[i] = 0#8
     · ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
-          pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [if_pos hz]) $$ Hpc
+          pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [ite_eq_left hz]) $$ Hpc
       ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro; intro r _ _ _ _ h15; simp [RegMap.set_apply, h15]
@@ -239,7 +239,7 @@ theorem strncmp_loop (kb : KCtx)
           by simp [RegMap.set_apply, h10], by simp [RegMap.set_apply, h11]⟩
     · ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
-          pcIs c2 (KA.«strncmp» + 0x10#64) from by rw [if_neg hz]) $$ Hpc
+          pcIs c2 (KA.«strncmp» + 0x10#64) from by rw [ite_eq_right hz]) $$ Hpc
       icases byteBuf_acc s2 dq2 bs2 i bs2[i] hb $$ Hbuf2 with ⟨Hb2, Hclose2⟩
       k_step_gen (wp_s_lbu c2 _ (KA.«strncmp» + 0x10#64) false 0#12 14#5 11#5 (by decide) (by decide) dq2 bs2[i])
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [RegMap.set_apply, h11] next c3 hp3
@@ -252,7 +252,7 @@ theorem strncmp_loop (kb : KCtx)
       by_cases hab : bs2[i] = bs1[i]
       · ihave Hpc := (show pcIs (GF := GF) c4
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
-            pcIs c4 (KA.«strncmp» + 0x18#64) from by rw [if_pos hab]) $$ Hpc
+            pcIs c4 (KA.«strncmp» + 0x18#64) from by rw [ite_eq_left hab]) $$ Hpc
         k_step_gen (wp_s_addiw c4 _ (KA.«strncmp» + 0x18#64) true 4095#12 12#5 12#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
           with [RegMap.set_apply, h12, sn_addiw_dec (n - i) (by omega) (by omega)] next c5 hp5
@@ -272,7 +272,7 @@ theorem strncmp_loop (kb : KCtx)
         iintro Hk Hpc
         ihave Hpc := (show pcIs (GF := GF) c8
             (if n - i - 1 = 0 then (KA.«strncmp» + 0x20#64) else (KA.«strncmp» + 0xa#64)) ⊢
-            pcIs c8 (KA.«strncmp» + 0xa#64) from by rw [if_neg hpos]) $$ Hpc
+            pcIs c8 (KA.«strncmp» + 0xa#64) from by rw [ite_eq_right hpos]) $$ Hpc
         ihave HΦ := wpNext_shift _ _ _ _ _
           (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
             ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ
@@ -305,7 +305,7 @@ theorem strncmp_loop (kb : KCtx)
         · iexact Hpost
       · ihave Hpc := (show pcIs (GF := GF) c4
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
-            pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [if_neg hab]) $$ Hpc
+            pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [ite_eq_right hab]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c4 _
           (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
         iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2

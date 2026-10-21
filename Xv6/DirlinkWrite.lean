@@ -68,7 +68,7 @@ theorem dirlink_ret_arms (a0 : BitVec 64) (tot : Nat) (htot : tot ≤ 16)
     by_cases ht : tot = 16
     · subst ht; left; exact ⟨rfl, rfl⟩
     · right
-      rw [if_neg (fun e => ht ((dirlink_ofNat_16 tot htot).mp e))]
+      rw [ite_eq_right (fun e => ht ((dirlink_ofNat_16 tot htot).mp e))]
       exact ⟨rfl, by omega⟩
   · subst h; right; exact ⟨by decide, by omega⟩
 
@@ -102,7 +102,7 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
            w16 := fun _ => ⟨hout.w16any hb, hout.w16at hb, fun hpos => (hout.w16 hpos hb).2⟩,
            foundSpend := fun h => absurd h (by decide), cap := hout.cap, sized := hout.sized,
            arms := ?_ }
-  rw [if_neg (by decide)]
+  rw [ite_eq_right (by decide)]
   refine ⟨hnone, hout.wf, hout.holes, hout.addrs, hout.size31, hout.covers, ?_, ?_, htot, ?_, ?_⟩
   · rcases hwiok with ⟨_, _, h, _⟩ | ⟨_, h0, hb', _, hd, _⟩
     · exact h
@@ -114,9 +114,9 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
     rw [hout.range x]
     by_cases hx : 16 * dirSlot data (dirNrec dn.diSize.toNat) ≤ x ∧
         x < 16 * dirSlot data (dirNrec dn.diSize.toNat) + tot
-    · rw [if_pos hx, if_pos hx]
+    · rw [ite_eq_left hx, ite_eq_left hx]
       exact hout.ker rfl _ (by omega)
-    · rw [if_neg hx, if_neg hx, if_neg (by omega)]
+    · rw [ite_eq_right hx, ite_eq_right hx, ite_eq_right (by omega)]
   · exact dirlink_ret_arms a0 tot htot (by
       rcases hwiok with ⟨h, _⟩ | ⟨h, h0, _⟩
       · exact Or.inl h
@@ -192,9 +192,9 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     data dn dn0 false off 16 sbs readiKVp (fun _ => []) ncount Sb pidv dqp (DFrac.own 1) dqd dqn
     dqi dqb dqz hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0
-    (by simp only [Bool.false_eq_true, if_false]; exact ha1) ha3 (by rw [ha4])
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha1) ha3 (by rw [ha4])
   unfold wp_writei_gen_eb_body at h
-  simp only [writeiAddr, Bool.false_eq_true, if_false] at h
+  simp only [writeiAddr, Bool.false_eq_true, ite_false] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, Hdev, Hin, Hmeta, Hmap,
     Hblk, Hsi, Hss, Hsb, #Hbmi, #Hinv, Hdi, Hsrc, Hpid, Hbs, Hop, Hnext⟩
   iapply h

@@ -242,23 +242,23 @@ def inodeOwned (Γ : FsViewNames GF) (sb : FsSb) (i : Nat) (n : FsNode) : IProp 
 theorem entTokAt_tokenless (Γ : FsViewNames GF) (self : Nat) (orph : Bool) (s : Fname)
     (t : Nat) (ty : Ity) (h : entTokenless self orph s t = true) :
     entTokAt Γ self orph s t ty = emp := by
-  simp only [entTokAt, h, if_true]
+  simp only [entTokAt, h, ite_true]
 
 theorem entTokAt_open (Γ : FsViewNames GF) (self : Nat) (orph : Bool) (s : Fname)
     (t : Nat) (ty : Ity) (h : entTokenless self orph s t = false) :
     entTokAt Γ self orph s t ty = linkTok Γ (t : Int) ty := by
-  simp only [entTokAt, h, Bool.false_eq_true, if_false]
+  simp only [entTokAt, h, Bool.false_eq_true, ite_false]
 
 theorem entTok_tokenless (Γ : FsViewNames GF) (self : Nat) (dd : Option Nat) (orph isd : Bool)
     (s : Fname) (t : Nat) (h : entTokenless self orph s t = true) :
     entTok Γ self dd orph isd s t = emp := by
-  simp only [entTok, h, if_true]
+  simp only [entTok, h, ite_true]
 
 /-- Rocq's `ent_tok_open`. -/
 theorem entTok_open (Γ : FsViewNames GF) (self : Nat) (dd : Option Nat) (orph isd : Bool)
     (s : Fname) (t : Nat) (h : entTokenless self orph s t = false) :
     entTok Γ self dd orph isd s t ⊣⊢ ∃ ty, linkTok Γ (t : Int) ty ∗ ⌜entTyOk self dd isd s ty⌝ := by
-  simp only [entTok, h, Bool.false_eq_true, if_false]
+  simp only [entTok, h, Bool.false_eq_true, ite_false]
   exact .rfl
 
 /-! ## 5.  Timelessness, and the congruences -/
@@ -313,7 +313,7 @@ theorem entToks_dsetExt (Γ : FsViewNames GF) (i : Nat) (n : FsNode)
 theorem entToks_notDir (Γ : FsViewNames GF) (i : Nat) (n : FsNode)
     (D : Std.ExtTreeSet Fname compare) (h : fnIsDir n = false) : ⊢ entToks Γ i n D := by
   unfold entToks dirEntries
-  rw [if_neg (by rw [h]; decide)]
+  rw [ite_eq_right (by rw [h]; decide)]
   exact BigSepM.bigSepM_empty.2
 
 theorem entToksX_notDir (Γ : FsViewNames GF) (i : Nat) (n : FsNode) (h : fnIsDir n = false) :
@@ -388,8 +388,8 @@ theorem entToks_choose {M : Type _ → Type _} [LawfulFiniteMap M Fname] (Γ : F
       · ipureintro
         intro s' t' hl hnt
         by_cases hs : s' = k
-        · subst hs; simp only [if_true]; exact Hty
-        · simp only [if_neg hs]
+        · subst hs; simp only [ite_true]; exact Hty
+        · simp only [ite_eq_right hs]
           rw [LawfulPartialMap.get?_insert_ne (Ne.symm hs)] at hl
           exact Hok s' t' hl hnt
       · iapply (BigSepM.bigSepM_insert hk).2
@@ -553,7 +553,7 @@ theorem entTyOk_dot (self : Nat) (dd : Option Nat) (isd : Bool) (ty : Ity)
     (h : ∀ (p : Int) (q : Nat), ty = .tDir p → dd = some q → (q : Int) = p) :
     entTyOk self dd isd DOT ty := by
   unfold entTyOk
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   exact h
 
 theorem entTyOk_dotNone (self : Nat) (isd : Bool) (ty : Ity) : entTyOk self none isd DOT ty :=
@@ -562,7 +562,7 @@ theorem entTyOk_dotNone (self : Nat) (isd : Bool) (ty : Ity) : entTyOk self none
 theorem entTyOk_dotdot (self : Nat) (dd : Option Nat) (isd : Bool) (ty : Ity) :
     entTyOk self dd isd DOTDOT ty := by
   unfold entTyOk
-  rw [if_neg (fun h => dot_ne_dotdot h.symm), if_pos rfl]
+  rw [ite_eq_right (fun h => dot_ne_dotdot h.symm), ite_eq_left rfl]
   trivial
 
 theorem entTyOk_name (self : Nat) (dd : Option Nat) (s : Fname) (isd : Bool) (ty : Ity)
@@ -570,7 +570,7 @@ theorem entTyOk_name (self : Nat) (dd : Option Nat) (s : Fname) (isd : Bool) (ty
     (hp : if isd then ty = .tDir (self : Int) else ty = .tFile) :
     entTyOk self dd isd s ty := by
   unfold entTyOk
-  rw [if_neg hd, if_neg hdd]
+  rw [ite_eq_right hd, ite_eq_right hdd]
   exact hp
 
 /-- THE FORM A WALK HANDS IN: every entry BUT `"."` is blind to the home's
@@ -578,7 +578,7 @@ theorem entTyOk_name (self : Nat) (dd : Option Nat) (s : Fname) (isd : Bool) (ty
 theorem entTyOk_ddNe (self : Nat) (dd dd' : Option Nat) (isd : Bool) (s : Fname) (ty : Ity)
     (hne : s ≠ DOT) (h : entTyOk self dd isd s ty) : entTyOk self dd' isd s ty := by
   unfold entTyOk at h ⊢
-  rw [if_neg hne] at h ⊢
+  rw [ite_eq_right hne] at h ⊢
   exact h
 
 theorem entTok_ddNe (Γ : FsViewNames GF) (self : Nat) (dd dd' : Option Nat) (orph isd : Bool)
@@ -647,7 +647,7 @@ theorem entTok_ne (Γ : FsViewNames GF) (self : Nat) (dd : Option Nat) (orph isd
       ∃ ty, linkTok Γ (t : Int) ty ∗ ⌜if isd then ty = .tDir (self : Int) else ty = .tFile⌝ := by
   refine (entTok_open Γ self dd orph isd s t (entTokenless_name self orph s t hd hdd hts)).trans ?_
   unfold entTyOk
-  simp only [if_neg hd, if_neg hdd]
+  simp only [ite_eq_right hd, ite_eq_right hdd]
   exact .rfl
 
 /-- Rocq's `ent_tok_dotdot`. -/
@@ -658,7 +658,7 @@ theorem entTok_dotdot (Γ : FsViewNames GF) (self : Nat) (dd : Option Nat) (orph
   cases h : orph || decide (t = self)
   · have Etl : entTokenless self orph DOTDOT t = false := by rw [entTokenless_dotdot, h]
     refine (entTok_open Γ self dd orph isd DOTDOT t Etl).trans ?_
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     constructor
     · iintro ⟨%ty, Ht, _⟩
       iexists ty
@@ -669,7 +669,7 @@ theorem entTok_dotdot (Γ : FsViewNames GF) (self : Nat) (dd : Option Nat) (orph
       ipureintro
       exact entTyOk_dotdot self dd isd ty
   · have Etl : entTokenless self orph DOTDOT t = true := by rw [entTokenless_dotdot, h]
-    rw [entTok_tokenless Γ self dd orph isd DOTDOT t Etl, if_pos rfl]
+    rw [entTok_tokenless Γ self dd orph isd DOTDOT t Etl, ite_eq_left rfl]
     exact .rfl
 
 /-- Rocq's `ent_tok_dot`. -/
@@ -725,7 +725,7 @@ theorem entToks_orphan (Γ : FsViewNames GF) (i : Nat) (n n' : FsNode)
     (sep_mono (entTok_dot Γ i (fnDd n) false _ i).1
       (BigSepM.bigSepM_mono fun {k v} _ =>
         entTok_orphUp Γ i (fnDd n) (decide (k ∈ D)) k v))).trans ?_
-  simp only [Bool.false_or, hnd, Bool.false_eq_true, if_false]
+  simp only [Bool.false_or, hnd, Bool.false_eq_true, ite_false]
   iintro ⟨Hdd, Hdt, H⟩
   iframe Hdd Hdt
   isplitr

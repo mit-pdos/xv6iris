@@ -266,14 +266,14 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
     case' _ => iframe
     try unfold diskLend
     rcases h with ⟨rfl, rfl, rfl⟩ | ⟨hne, rfl, hσ'⟩
-    · have hif : (if (rootTask : TaskId) = rootTask then Cr else iprop(True)) = Cr := if_pos rfl
+    · have hif : (if (rootTask : TaskId) = rootTask then Cr else iprop(True)) = Cr := ite_eq_left rfl
       have hend' : C ⊢ Cr := by rw [← hif]; exact hend
       iframe Hσ Hdk Hst
       isplitl [HC]
       · iapply hmk _ Cr (by rw [hif]; exact hloc.1) $$ IH
         iapply hend' $$ HC
       · exact BigSepL.bigSepL_nil_intro
-    · have hif : (if tid = rootTask then Cr else iprop(True)) = iprop(True) := if_neg hne
+    · have hif : (if tid = rootTask then Cr else iprop(True)) = iprop(True) := ite_eq_right hne
       rw [hσ']
       split
       · iframe Hσ Hdk Hst
@@ -630,7 +630,7 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
       · iapply BigSepL.bigSepL_singleton.2
         unfold devWP
         iapply IH $$ %((σ.devrt .virtio).next) %((devSig .virtio).task t) %(Lt t)
-          %(by rw [if_neg hne']; exact hloc.2 t) HLt
+          %(by rw [ite_eq_right hne']; exact hloc.2 t) HLt
     · rw [hσ]
       ihave Hcl := Hclose $$ [Hfrag HR]
       case' _ => inext; iexists (σ.devs.st .virtio); iframe Hfrag HR
@@ -655,7 +655,7 @@ theorem wpDev_dmaD_root (N : Namespace) (Env : IProp GF) [Persistent Env]
   ihave H := wpDev_dmaD N Env R Lt Cr hloc $$ [Hinv Hcert HEnv]
   case' _ => iframe Hinv Hcert HEnv
   iapply H $$ %rootTask %(DevM.pure ()) %Cr
-    %(by rw [if_pos rfl]; exact DevM.LeaseD.pure _ () .rfl) HCr
+    %(by rw [ite_eq_left rfl]; exact DevM.LeaseD.pure _ () .rfl) HCr
 
 end
 
@@ -677,14 +677,14 @@ theorem Virtio.kd_pure {α : Type} {dk : VirtioState → Nat → BitVec 8} (a : 
 theorem Virtio.ite_some_eq {α : Type} {c : Prop} [Decidable c] {x y : α}
     (h : (if c then some x else none) = some y) : y = x := by
   by_cases hc : c
-  · rw [if_pos hc] at h; exact (Option.some.inj h).symm
-  · rw [if_neg hc] at h; cases h
+  · rw [ite_eq_left hc] at h; exact (Option.some.inj h).symm
+  · rw [ite_eq_right hc] at h; cases h
 theorem Virtio.map_ite_some_eq {α β : Type} {c : Prop} [Decidable c] {x y : α} {b b' : β}
     (h : Option.map (fun s' => (s', b)) (if c then some x else none) = some (y, b')) : y = x := by
   by_cases hc : c
-  · rw [if_pos hc] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+  · rw [ite_eq_left hc] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
     exact h.1.symm
-  · rw [if_neg hc] at h; cases h
+  · rw [ite_eq_right hc] at h; cases h
 
 set_option hygiene false in
 local macro "kd_fin" : tactic => `(tactic| first

@@ -99,7 +99,7 @@ theorem rpSlot_nonzero (p ip v0 : BitVec 64) (hp : p ≠ 0#64) (hnz : rpSlot p i
     v0 ≠ 0#64 := by
   intro hv0; subst hv0
   unfold rpSlot at hnz
-  rw [if_neg (Ne.symm hp)] at hnz
+  rw [ite_eq_right (Ne.symm hp)] at hnz
   exact hnz rfl
 
 /-! ## The pure half of the wait-lock invariant
@@ -270,7 +270,7 @@ def genHalves (ps : Nat → BitVec 64) (gs : Nat → GName) : IProp GF :=
 
 omit [MachGS GF] in
 theorem genHalvesEnt_zero (k : Nat) (g : GName) : genHalvesEnt (GF := GF) k 0#64 g = iprop(emp) := by
-  unfold genHalvesEnt; rw [if_pos rfl]
+  unfold genHalvesEnt; rw [ite_eq_left rfl]
 
 omit [MachGS GF] in
 /-- AT BOOT EVERY CELL IS ZERO and the whole row is `emp` -/
@@ -293,8 +293,8 @@ theorem genHalves_acc (ps : Nat → BitVec 64) (gs : Nat → GName) (k : Nat) (h
   unfold genHalves
   refine (waitInv_range_acc NPROC k hk (fun i => genHalvesEnt (GF := GF) i (ps i) (gs i))
     (fun v' i => genHalvesEnt i (if i = k then v' else ps i) (gs i)) ?_).trans ?_
-  · intro v' i hi; simp only [hi, if_false]
-  · simp only [if_true]; exact .rfl
+  · intro v' i hi; simp only [hi, ite_false]
+  · simp only [ite_true]; exact .rfl
 
 omit [MachGS GF] in
 /-- ...AND THE REAP'S FORM OF IT, with the give-back already made: the cell
@@ -322,7 +322,7 @@ theorem genHalves_no_entry (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Na
   unfold genHalvesEnt
   by_cases hv : ps j = 0#64
   · ipureintro; exact hv
-  · rw [if_neg hv]
+  · rw [ite_eq_right hv]
     icases He with ⟨%pid, Hsg', -, -, -⟩
     iexfalso
     iapply slotGen_tq_excl (procAddr j) g (gs j)
@@ -345,7 +345,7 @@ theorem genHalves_gen_uniq (ps : Nat → BitVec 64) (gs : Nat → GName) (g : GN
     unfold genHalvesEnt
     by_cases hv : ps k = 0#64
     · ipureintro; intro hne; exact absurd hv hne
-    · rw [if_neg hv]
+    · rw [ite_eq_right hv]
       icases He with ⟨%pid, -, -, #Hgs0, -⟩
       by_cases hgk : gs k = g
       · rw [hgk]
@@ -379,13 +379,13 @@ theorem genHalves_rpMap (p ip : BitVec 64) (ps : Nat → BitVec 64) (gs : Nat �
   refine BigSepL.bigSepL_mono (fun {j k} _ => ?_)
   unfold rpMap rpSlot
   by_cases hk : ps k = p
-  · rw [if_pos hk]
+  · rw [ite_eq_left hk]
     unfold genHalvesEnt
-    rw [hk, if_neg hp]
+    rw [hk, ite_eq_right hp]
     by_cases hip : ip = 0#64
-    · rw [if_pos hip]; exact affine
-    · rw [if_neg hip]
-  · rw [if_neg hk]
+    · rw [ite_eq_left hip]; exact affine
+    · rw [ite_eq_right hip]
+  · rw [ite_eq_right hk]
 
 omit [MachGS GF] in
 /-- ...AND THE GENERATION COLUMN MOVES AT AN UNOCCUPIED SLOT FOR FREE
@@ -397,7 +397,7 @@ theorem genHalves_gs_insert (ps : Nat → BitVec 64) (gs : Nat → GName) (j : N
   refine BigSepL.bigSepL_mono (fun {i k} _ => ?_)
   by_cases hk : k = j
   · subst hk; rw [hj, genHalvesEnt_zero, genHalvesEnt_zero]
-  · simp only [hk, if_false]; exact .rfl
+  · simp only [hk, ite_false]; exact .rfl
 
 /-- the parent cells AND the boot shape: every cell zero (Rocq
 `parents_res_at`) -/

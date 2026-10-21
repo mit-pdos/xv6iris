@@ -67,7 +67,7 @@ open Std (ExtTreeSet)
 
 /-- A write to a nonzero register is `RegMap.set`. -/
 theorem ukWr_ne0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h : rd ≠ 0#5) : ukWr m rd v = m.set rd v := by
-  unfold ukWr; rw [if_neg h]
+  unfold ukWr; rw [ite_eq_right h]
 
 /-- A write to sp is `RegMap.set`. -/
 theorem ukWr_sp (m : RegMap) (v : BitVec 64) : ukWr m spIdx v = m.set spIdx v :=
@@ -95,14 +95,14 @@ theorem ukWr_get (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (r : BitVec 5) :
   · subst h
     by_cases h0 : r = 0#5
     · subst h0; simp [ukWr]
-    · rw [ukWr_get_same _ _ _ h0, if_pos ⟨rfl, h0⟩]
-  · rw [ukWr_get_other _ _ _ _ h, if_neg (fun hh => h hh.1)]
+    · rw [ukWr_get_same _ _ _ h0, ite_eq_left ⟨rfl, h0⟩]
+  · rw [ukWr_get_other _ _ _ _ h, ite_eq_right (fun hh => h hh.1)]
 
 /-- The fall-through pc at a `Nat` address (the walks' pc arithmetic). -/
 theorem ukPc (a b : Nat) (r : Bool) (h : a + (if r then 2 else 4) = b) :
     BitVec.ofNat 64 a + instrLen r = BitVec.ofNat 64 b := by
   subst h
-  cases r <;> simp only [instrLen, Bool.false_eq_true, if_false, if_true] <;> rw [BitVec.ofNat_add] <;> rfl
+  cases r <;> simp only [instrLen, Bool.false_eq_true, ite_false, ite_true] <;> rw [BitVec.ofNat_add] <;> rfl
 
 /-- `subw` at a difference that fits (the model's value function at `Nat`
 operands; Rocq `moi_subw` at the leaf's value). -/
@@ -131,8 +131,8 @@ theorem ukAddi (x d : Nat) (imm : BitVec 12) (h : BitVec.signExtend 64 imm = Bit
 
 /-- **The walks' register algebra**: reads past `ukWr` writes at literal
 indices, decided (let-bound register files unfold). -/
-macro "ureg" : tactic => `(tactic| simp (config := {decide := true, zetaDelta := true}) only [ukWr_get, if_false,
-  if_true, _root_.ne_eq, _root_.and_true, _root_.and_false, _root_.not_false_eq_true, _root_.false_and,
+macro "ureg" : tactic => `(tactic| simp (config := {decide := true, zetaDelta := true}) only [ukWr_get, ite_false,
+  ite_true, _root_.ne_eq, _root_.and_true, _root_.and_false, _root_.not_false_eq_true, _root_.false_and,
   _root_.true_and, _root_.not_true_eq_false])
 
 section UkRunLeaf
@@ -338,7 +338,7 @@ theorem wp_uk_ret (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc :
       urun N h m pc avail -∗
       ▷ (∀ h' : CPU, urun N h' m (retPc (m.get rs1)) avail -∗ wpLoop h') -∗
       wpLoop h := by
-  have e1 : ukWr m 0#5 (pc + instrLen isRvc) = m := by unfold ukWr; rw [if_pos rfl]
+  have e1 : ukWr m 0#5 (pc + instrLen isRvc) = m := by unfold ukWr; rw [ite_eq_left rfl]
   have e2 : m.get rs1 + BitVec.signExtend 64 (0#12) = m.get rs1 := by
     rw [show BitVec.signExtend 64 (0#12) = 0#64 from by decide, BitVec.add_zero]
   have H := wp_uk_jalr UL N h m pc isRvc 0#12 rs1 0#5 avail (by unfold unotSp spIdx; decide)

@@ -192,9 +192,9 @@ theorem fsRestrict_foldl (P : Nat → List (BitVec 8)) (s : List Nat) (m0 : Bloc
     · simp [hs]
     · by_cases hb : b = a
       · subst hb
-        simp only [hs, if_false, List.mem_cons, true_or, if_true]
+        simp only [hs, ite_false, List.mem_cons, true_or, ite_true]
         rw [get?_insert_eq rfl]
-      · simp only [hs, if_false, List.mem_cons, hb, false_or, if_false]
+      · simp only [hs, ite_false, List.mem_cons, hb, false_or, ite_false]
         rw [get?_insert_ne (fun h => hb h.symm)]
 
 theorem fsRestrict_lookup (P : Nat → List (BitVec 8)) (s : List Nat) (b : Nat) :
@@ -208,8 +208,8 @@ theorem fsRestrict_ext (P P' : Nat → List (BitVec 8)) (s : List Nat)
   refine equiv_iff_eq.1 (fun b => ?_)
   rw [fsRestrict_lookup, fsRestrict_lookup]
   by_cases hb : b ∈ s
-  · rw [if_pos hb, if_pos hb, h b hb]
-  · rw [if_neg hb, if_neg hb]
+  · rw [ite_eq_left hb, ite_eq_left hb, h b hb]
+  · rw [ite_eq_right hb, ite_eq_right hb]
 
 /-- Installing the on-disk log over the home map: entry `i` of the write
 set takes its content from log slot `i` (Rocq's `fs_install_step`). -/

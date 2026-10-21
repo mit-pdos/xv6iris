@@ -48,26 +48,26 @@ theorem strImg_lookup (pv n : Nat) (f : Nat → BitVec 8) (a : Nat) (b : BitVec 
     (a = pv + n ∧ b = ubyte0) ∨ ∃ j, j < n ∧ a = pv + j ∧ b = f j := by
   unfold strImg at h
   by_cases h1 : a = pv + n
-  · rw [if_pos h1] at h
+  · rw [ite_eq_left h1] at h
     exact Or.inl ⟨h1, (Option.some.inj h).symm⟩
-  · rw [if_neg h1] at h
+  · rw [ite_eq_right h1] at h
     by_cases h2 : pv ≤ a ∧ a < pv + n
-    · rw [if_pos h2] at h
+    · rw [ite_eq_left h2] at h
       exact Or.inr ⟨a - pv, by omega, by omega, (Option.some.inj h).symm⟩
-    · rw [if_neg h2] at h
+    · rw [ite_eq_right h2] at h
       cases h
 
 /-- **Rocq `str_img_byte`**. -/
 theorem strImg_byte (pv n : Nat) (f : Nat → BitVec 8) (j : Nat) (hj : j < n) :
     strImg pv n f (pv + j) = some (f j) := by
   unfold strImg
-  rw [if_neg (by omega), if_pos (by omega), Nat.add_sub_cancel_left]
+  rw [ite_eq_right (by omega), ite_eq_left (by omega), Nat.add_sub_cancel_left]
 
 /-- **Rocq `str_img_nul`**. -/
 theorem strImg_nul (pv n : Nat) (f : Nat → BitVec 8) :
     strImg pv n f (pv + n) = some ubyte0 := by
   unfold strImg
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
 
 /-- **Rocq `str_img_path`** (deviations 3, 4): THE READING -- any image
 containing the string's image reads the path, through any agreeing page

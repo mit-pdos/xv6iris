@@ -93,13 +93,13 @@ theorem srdRegs_set (k : KCtx) (R : RegMap) (i : BitVec 5) (v : BitVec 64) (h : 
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption) | (rw [if_neg (Ne.symm n8)]; assumption)
-      | (rw [if_neg (Ne.symm n9)]; assumption) | (rw [if_neg (Ne.symm n18)]; assumption)
-      | (rw [if_neg (Ne.symm n19)]; assumption) | (rw [if_neg (Ne.symm n20)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption) | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption) | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption) | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption) | (rw [ite_eq_right (Ne.symm n8)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n9)]; assumption) | (rw [ite_eq_right (Ne.symm n18)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n19)]; assumption) | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption) | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption) | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption) | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 theorem srd_cs_epi (k : KCtx) (R : RegMap) (h : srdRegs k R) :
     calleeSaved k.regs (((R.set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 2#5 (k.regs 2#5)) := by

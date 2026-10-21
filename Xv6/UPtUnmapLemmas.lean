@@ -105,8 +105,8 @@ theorem wfU_setLeaf_zero : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
     refine ⟨(hwf j).1, ?_⟩
     simp only [PTree.setLeaf, PTree.setEnt, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn 0
-    · rw [if_pos hj]; exact Or.inl rfl
-    · rw [if_neg hj]; exact (hwf j).2
+    · rw [ite_eq_left hj]; exact Or.inl rfl
+    · rw [ite_eq_right hj]; exact (hwf j).2
   | lvl+1, t, vpn, hwf, hc => by
     obtain ⟨c, hk, hcc⟩ := (PtRun.complete_succ_iff lvl t vpn).mp hc
     have hwc := hwf (vpnIdx vpn (lvl+1))
@@ -115,9 +115,9 @@ theorem wfU_setLeaf_zero : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
     intro j
     simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn (lvl+1)
-    · rw [if_pos hj, hj, hwc.1]
+    · rw [ite_eq_left hj, hj, hwc.1]
       exact ⟨by rw [PTree.base_setLeaf], wfU_setLeaf_zero lvl c vpn hwc.2 hcc⟩
-    · rw [if_neg hj]; exact hwf j
+    · rw [ite_eq_right hj]; exact hwf j
 
 /-- **Clearing a mapped leaf**: writing `0` into the level-0 entry of a
 complete path removes exactly that key from the map the tree represents. -/
@@ -141,7 +141,7 @@ theorem ptRep_setLeaf_zero {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec 2
   · intro vpn' hw
     by_cases he : vpn = vpn'
     · subst he
-      rw [PTree.walk_eq, PTree.entAt_setLeaf_self, if_pos rfl]
+      rw [PTree.walk_eq, PTree.entAt_setLeaf_self, ite_eq_left rfl]
     · rw [PtRun.walk_setLeaf_ne t vpn vpn' 0#64 hc he]
       exact hnone vpn' (by rw [get?_delete_ne (fun hc2 => he (BitVec.eq_of_toNat_eq hc2))] at hw; exact hw)
 

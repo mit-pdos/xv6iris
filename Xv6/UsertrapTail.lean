@@ -71,6 +71,7 @@ theorem ut_exit (A : UtArgs GF) (c : CPU) (R1 : RegMap) (V2 : ProcPriv) (M2 : Na
     kctx c (((A.k.intrOff true false).pushed 4).withRegs R1) ∗ pcIs c (utPc 0xb2#64) ∗ utFrame A ∗
     Register.sepc ↦ᵣ[c] (tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) ∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
+    hTrapCsrs c ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr A.j) ∗ utCaps A.N ∗
     utOwn (utRsys PT Γ A) A.N (utPrep V2 rt c) M2 sts2 cs2 A.pid ∗
     utOuts A V2 M2 sts2 cs2 ∗ utKillOut A.sc A.Wk ∗ utKont PT Γ A
@@ -80,7 +81,7 @@ theorem ut_exit (A : UtArgs GF) (c : CPU) (R1 : RegMap) (V2 : ProcPriv) (M2 : Na
   obtain ⟨p2, p9, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   have hK4 : 4 ≤ (A.k.intrOff true false).avail := by
     simp only [KCtx.intrOff_avail]; rw [hok.havail]; omega
-  iintro ⟨Hk, Hpc, Hframe, Hsepc, Hsc, Htv, Hstv, Hcl, #Hcaps, Hown, Hout, Hko, Hkont⟩
+  iintro ⟨Hk, Hpc, Hframe, Hsepc, Hsc, Htv, Hh, Hstv, Hcl, #Hcaps, Hown, Hout, Hko, Hkont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases utOwn_priv _ _ _ _ _ _ _ $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hback⟩
   icases ut_priv_copy hct _ _ _ _ _ $$ Hpv with ⟨Hsz, Hpg, Hpt, Hcopy⟩
@@ -161,6 +162,7 @@ theorem ut_prep_call (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ : FileNames
       Register.sepc ↦ᵣ[cpu'] (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗
       (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
       (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
+      hTrapCsrs cpu' -∗
       Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
       procPrivFd γ pa pid
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
@@ -214,7 +216,7 @@ theorem usertrap_ret_proof (PR : PREPARE_RETURN) : UT_RET (GF := GF) PT Γ := by
   iintro %c %hpin
   have hpin' : kb.sie = false → c = c1 := fun h => hpin (Or.inl h)
   ihave Hce := cpuClaimExt_move c1 c _ _ hpin' $$ Hce
-  iintro %R' Hk Hpc %hcs Hpay Hsepc Hsc Htv Hstv Hpv
+  iintro %R' Hk Hpc %hcs Hpay Hsepc Hsc Htv Hh Hstv Hpv
   ihave Hpay := (show prepareReturnPay (GF := GF) c kb.sie kb.proc ⊢ prepareReturnPay c kb.sie A.k.proc from by
     rw [utBase_proc hb]) $$ Hpay
   ihave Hcl := ut_ret_claim c kb.sie A.k.proc $$ [Hce Hpay]

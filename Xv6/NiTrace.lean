@@ -743,8 +743,8 @@ theorem niDetRow_wait {sc : BitVec 64} {W W' : Uvis} {k : Nat} {ι : UIota}
     obtain ⟨_, pid, xs, γ⟩ := v
     dsimp only
     by_cases hwin : uwaitWin (uvisRun W).perm (tfW (uvisRun W).tf (tfArgIdx 0)) = 4
-    · rw [if_pos hwin, if_pos hwin]; intro he; exact ukeyEq_bump_a0 he
-    · rw [if_neg hwin, if_neg hwin]; intro he; exact ukeyEq_bump_a0 he
+    · rw [ite_eq_left hwin, ite_eq_left hwin]; intro he; exact ukeyEq_bump_a0 he
+    · rw [ite_eq_right hwin, ite_eq_right hwin]; intro he; exact ukeyEq_bump_a0 he
 
 /-- **M0's row at the cited ι gives fork's answer** (NI joint fork lane F3;
 `usysDet_fork`, `usysDetFork`): at every key, `usysForkAns` of the cited
@@ -914,7 +914,7 @@ theorem niStepOf_law {h : List Obs} {f : NiEntry} {s : NiStep} (hf : niEntryOk h
             rw [← gprsA0_tfGprs, hans, uwriteCntOf_ansAt, gprsA2_tfGprs,
               uvisRun_arg W 1 (by decide)] at ho
             unfold uwriteOut uwriteCon
-            rw [if_pos hwc]
+            rw [ite_eq_left hwc]
             exact ho
           · cases hd
 
@@ -1324,7 +1324,7 @@ theorem niTwoRunObs_trace (q : NiInc) : ∀ (tr₁ tr₂ : List NiStep), NiClass
       have hx' : exitView x' = some (uecallScause, ep, xg) := by rw [← hin.1.2.2.2, hx]
       have hr := hrd.1
       simp only [NiStep.classReading, hx, hx'] at hr
-      rw [if_pos ⟨trivial, hcond.2⟩, if_pos ⟨trivial, hcond'⟩, Option.some.injEq] at hr
+      rw [ite_eq_left ⟨trivial, hcond.2⟩, ite_eq_left ⟨trivial, hcond'⟩, Option.some.injEq] at hr
       rw [← enterA0_of_view he₁, ← enterA0_of_view he₂, hr]
     · exact niTwoRunObs_trace q tr₁ tr₂ (fun s hs => h₁ s (List.mem_cons_of_mem _ hs))
         (fun s hs => h₂ s (List.mem_cons_of_mem _ hs))
@@ -1444,7 +1444,7 @@ theorem NiStep.outBytes_of_law {pid : BitVec 32} {s : NiStep} (hl : s.law pid) :
     cases hoc : (NiStep.round secc lz win sz wcon wout x e c).outClass with
     | false => simp only [NiStep.outBytes, hoc]; rfl
     | true =>
-      simp only [if_true]
+      simp only [ite_true]
       obtain ⟨sc, ep, xg, pc', eg, hx, he, -, -, hb⟩ := hl
       have hcl : sc = uecallScause ∧ gprsNum secc xg = USYS_write ∧ lz = false ∧ wcon.isSome := by
         simp only [NiStep.outClass, hx, decide_eq_true_eq] at hoc
@@ -1987,7 +1987,7 @@ theorem filter_skel_filterMap {h : List Obs} :
       simp only [List.filter_cons, hk, hfk, ih]
       try rfl
     · rw [hfk] at hk
-      simp only [List.filter_cons, hk, hfk, ih, if_true, List.filterMap_cons, hs]
+      simp only [List.filter_cons, hk, hfk, ih, ite_true, List.filterMap_cons, hs]
       try rfl
 
 theorem filterMap_map_eq {α β γ : Type _} (g : α → Option β) (v : β → γ) (v' : α → γ) :

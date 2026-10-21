@@ -494,7 +494,7 @@ theorem ap_pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
     pageAddr (BitVec.extractLsb' 12 44 p) = p := by
   obtain ⟨h1, -, h3⟩ := h
   unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   revert h1 h3
   bv_decide
 
@@ -559,8 +559,8 @@ theorem ap_bigop_rest_eq (Φ Ψ : Nat → IProp GF) (n : Nat) (h : ∀ j, j ≠ 
     · rw [List.getElem?_eq_none (by simp; omega)] at hx; exact absurd hx (by simp)
   subst hk
   by_cases he : x = n
-  · rw [if_pos he, if_pos he]
-  · rw [if_neg he, if_neg he, h x he]
+  · rw [ite_eq_left he, ite_eq_left he]
+  · rw [ite_eq_right he, ite_eq_right he, h x he]
 
 omit [MachGS GF] in
 /-- Read one element of the big-op and put it back. -/
@@ -915,7 +915,7 @@ theorem apKeep_set (R R' : RegMap) (i : BitVec 5) (v : BitVec 64)
     (hi : i = 14#5 ∨ i = 15#5) (h : apKeep R R') : apKeep R (R'.set i v) := by
   intro j h14 h15
   have hij : ¬ (j = i) := by rcases hi with rfl | rfl <;> assumption
-  simp only [RegMap.set_apply, if_neg hij]
+  simp only [RegMap.set_apply, ite_eq_right hij]
   exact h j h14 h15
 
 /-! ## The inner scan of `allocpid` -/
@@ -959,14 +959,14 @@ theorem ap_pidscan {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13, ap_bcond_pid]
     iintro Hk Hpc
     by_cases hmatch : pids m = cand
-    · rw [if_pos (by simp only [hmatch, decide_true])]
+    · rw [ite_eq_left (by simp only [hmatch, decide_true])]
       k_norm
       iapply Hmatch $$ %_ %m [] Hk Hpc Hcells HF
       ipureintro
       refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_, hmatch⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact h15
-    · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
+    · rw [ite_eq_right (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
       k_norm
       -- addi a5,a5,376
       k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 376#12 15#5 15#5 (by decide))
@@ -1003,14 +1003,14 @@ theorem ap_pidscan {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13, ap_bcond_pid]
     iintro Hk Hpc
     by_cases hmatch : pids m = cand
-    · rw [if_pos (by simp only [hmatch, decide_true])]
+    · rw [ite_eq_left (by simp only [hmatch, decide_true])]
       k_norm
       iapply Hmatch $$ %_ %m [] Hk Hpc Hcells HF
       ipureintro
       refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_, hmatch⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact h15
-    · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
+    · rw [ite_eq_right (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
       k_norm
       -- addi a5,a5,376
       k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 376#12 15#5 15#5 (by decide))
@@ -1065,8 +1065,8 @@ theorem apNewPid_bounds (cand : BitVec 32) (h1 : 1 ≤ cand.toNat) (h2 : cand.to
     1 ≤ (pidNext cand).toNat ∧ (pidNext cand).toNat ≤ 1000 := by
   unfold pidNext
   by_cases h : cand = 1000#32
-  · rw [if_pos h]; exact ⟨by decide, by decide⟩
-  · rw [if_neg h]
+  · rw [ite_eq_left h]; exact ⟨by decide, by decide⟩
+  · rw [ite_eq_right h]
     have hlt : cand.toNat < 1000 := by
       rcases Nat.lt_or_ge cand.toNat 1000 with hlt | hge
       · exact hlt
@@ -1091,7 +1091,7 @@ theorem apKeepPid_set (R R' : RegMap) (i : BitVec 5) (v : BitVec 64)
     (h : apKeepPid R R') : apKeepPid R (R'.set i v) := by
   intro j h10 h11 h12 h13 h14 h15 h16
   have hij : ¬ (j = i) := by rcases hi with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> assumption
-  simp only [RegMap.set_apply, if_neg hij]
+  simp only [RegMap.set_apply, ite_eq_right hij]
   exact h j h10 h11 h12 h13 h14 h15 h16
 
 /-! ## The outer `allocpid` loop -/
@@ -1196,9 +1196,9 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
           intro hb
           exact absurd (by rw [hmcand]; exact hcand1 hb) (hB hb m' hm')
         · intro i a b cc d e f g
-          simp only [RegMap.set_apply, if_neg d]
+          simp only [RegMap.set_apply, ite_eq_right d]
           rw [hkeepm i (by exact e) (by exact f)]
-          simp only [RegMap.set_apply, if_neg f]
+          simp only [RegMap.set_apply, ite_eq_right f]
           exact kkeep i a b cc d e f g
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hm10
@@ -1225,7 +1225,7 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
         refine ⟨hlo, hhi, hall, hcand1, hd13, hd11, ?_, ⟨k, hcyc, hfirst⟩⟩
         intro i a b cc d e f g
         rw [hkeepd i (by exact e) (by exact f)]
-        simp only [RegMap.set_apply, if_neg f]
+        simp only [RegMap.set_apply, ite_eq_right f]
         exact kkeep i a b cc d e f g
     case hs15 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
     case hs13 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact ka13
@@ -1240,20 +1240,20 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
   iintro Hk Hpc
   by_cases hpm : cand = 1000#32
   · -- wrap: a1 stays 1, jump to 0x80001bde
-    rw [if_pos (show decide (cand = 1000#32) = true by rw [decide_eq_true_eq]; exact hpm)]
+    rw [ite_eq_left (show decide (cand = 1000#32) = true by rw [decide_eq_true_eq]; exact hpm)]
     k_norm
     iapply Htail $$ %(R.set 11#5 1#64) [] Hk Hpc Hcells Hexit
     ipureintro
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
-      rw [pidNext, if_pos hpm]; decide
+      rw [pidNext, ite_eq_left hpm]; decide
     · exact apKeepPid_set R0 R 11#5 _ (by decide) hkeep0
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h13
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h16
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h12
   · -- 0x80001bda addiw a1,a3,1 : a1 = pid + 1
-    rw [if_neg (show ¬ (decide (cand = 1000#32) = true) by rw [decide_eq_true_eq]; exact hpm)]
+    rw [ite_eq_right (show ¬ (decide (cand = 1000#32) = true) by rw [decide_eq_true_eq]; exact hpm)]
     k_step (wp_s_addiw c _ (KA.«allocproc» + 0x68#64) false 1#12 11#5 13#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13]
     iintro Hk Hpc
@@ -1262,9 +1262,9 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
     ipureintro
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
-      rw [pidNext, if_neg hpm]; bv_decide
+      rw [pidNext, ite_eq_right hpm]; bv_decide
     · intro i a b cc d e f g
-      simp only [RegMap.set_apply, if_neg b]
+      simp only [RegMap.set_apply, ite_eq_right b]
       exact hkeep0 i a b cc d e f g
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h13
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
@@ -1291,7 +1291,7 @@ theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
       stackOwn (V.kstack + 4096#64) 512 := by
   have hz : ¬ ((UNUSED : BitVec 32) = ZOMBIE) := by decide
   unfold procDormant dormantSpace genHalvesDorm
-  simp only [if_neg hz, if_pos (rfl : (UNUSED : BitVec 32) = UNUSED), ite_true]
+  simp only [ite_eq_right hz, ite_eq_left (rfl : (UNUSED : BitVec 32) = UNUSED), ite_true]
   iintro ⟨_, %V, %pidd, %⟨hof, hcwd, hroot, _, hlz⟩, Hpid, Hfields, Hal, Hch, Hev, ⟨_, Hsg⟩, ⟨%xsv, Hxs, _⟩,
     ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩⟩
   subst hpd
@@ -1541,9 +1541,9 @@ theorem ap_slots_unused_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
       @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       (slotFree Γ pa ∨ slotUsed Γ pa) ∗ zsElem pa none := by
   unfold procSlotsAt
-  rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
-    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  rw [ite_eq_right (by decide : ¬ needsCtx UNUSED), ite_eq_right (by decide : ¬ isRunning UNUSED),
+    ite_eq_left (by decide : invDormant UNUSED), ite_eq_left (by decide : notRunning UNUSED),
+    ite_eq_right (by decide : ¬ UNUSED = ZOMBIE)]
   iintro ⟨_, _, Hd, Hh, Hp, Hz⟩
   ihave Hp := pavSlot_unused_elim Γ pa $$ Hp
   iframe Hd Hh Hp Hz
@@ -1555,10 +1555,10 @@ def apPidsSet (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) : Nat → Bit
   fun i => if i = n then v else pids i
 
 @[simp] theorem apPidsSet_self (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) :
-    apPidsSet pids n v n = v := by simp only [apPidsSet, if_pos]
+    apPidsSet pids n v n = v := by simp only [apPidsSet, ite_eq_left]
 
 theorem apPidsSet_other (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) {i : Nat} (h : i ≠ n) :
-    apPidsSet pids n v i = pids i := by simp only [apPidsSet, if_neg h]
+    apPidsSet pids n v i = pids i := by simp only [apPidsSet, ite_eq_right h]
 
 theorem apPidsOk_set (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) (hn : n < NPROC)
     (hv : v ≠ 0#32) (hno : ∀ j, j < NPROC → pids j ≠ v) (hok : pidsOk pids) :
@@ -1587,7 +1587,7 @@ theorem ap_pstate_used (Γ : SchedNames) (pa : BitVec 64) :
   ihave Hw : pstateWhole (GF := GF) Γ pa UNUSED $$ [H]
   case _ =>
     iapply (pstateWhole_split Γ pa UNUSED).2
-    rw [if_pos (show unclaimed UNUSED from by decide)]
+    rw [ite_eq_left (show unclaimed UNUSED from by decide)]
     isplitl [H]
     · iexact H
     · iempintro
@@ -1612,9 +1612,9 @@ theorem ap_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
       (slotFree Γ pa ∨ slotUsed Γ pa) ∗ zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
-  rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
-    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  rw [ite_eq_right (by decide : ¬ needsCtx UNUSED), ite_eq_right (by decide : ¬ isRunning UNUSED),
+    ite_eq_left (by decide : invDormant UNUSED), ite_eq_left (by decide : notRunning UNUSED),
+    ite_eq_right (by decide : ¬ UNUSED = ZOMBIE)]
   iintro ⟨Hd, Hh, Hp, Hz⟩
   ihave Hp := pavSlot_unused_intro Γ pa $$ Hp
   isplitl []
@@ -2174,7 +2174,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       $$ [HpidPriv Hfields Hal Hch Hev Hstack]
     case _ =>
       unfold freeprocIn
-      rw [if_pos hV0tf, if_pos hV0pt]
+      rw [ite_eq_left hV0tf, ite_eq_left hV0pt]
       isplitl []
       · ipureintro; exact ⟨hV0of, hV0cwd, hV0rt⟩
       iframe HpidPriv Hfields Hal Hch Hev Hstack
@@ -2886,8 +2886,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         $$ [HpidPriv Hfields Hal Hch Hev Hstack Htfpage]
       case _ =>
         unfold freeprocIn
-        rw [if_neg (show ¬ (V1.trapframe = 0#64) from by rw [hV1tf]; exact hRk10ne),
-          if_pos (show V1.pagetable = 0#64 from by rw [hV1pt]; exact hr0pp)]
+        rw [ite_eq_right (show ¬ (V1.trapframe = 0#64) from by rw [hV1tf]; exact hRk10ne),
+          ite_eq_left (show V1.pagetable = 0#64 from by rw [hV1pt]; exact hr0pp)]
         isplitl []
         · ipureintro; exact ⟨hV1of, hV1cwd, hV1rt0⟩
         rw [hV1ks, hV1chg, hV1ev]
@@ -3191,7 +3191,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       exact ⟨e1.trans e3, e2.trans e4⟩
     by_cases hst : st = UNUSED
     · subst hst
-      rw [if_pos (rfl : (UNUSED : BitVec 32) = UNUSED)]
+      rw [ite_eq_left (rfl : (UNUSED : BitVec 32) = UNUSED)]
       iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav tk Q n hn hwf hnoff hK hlk hlp hlq htier
         spie2 spp2 hspc R2 (hcs2.1.trans hR2) h9'
         (hcs2.2.2.2.2.1.trans h19) (hcs2.2.2.2.2.2.1.trans h20) (hcs2.2.2.2.2.2.2.1.trans h21)
@@ -3202,7 +3202,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       iclear Hsc
       iframe Hk Hpc Hav Hpav Hframe Hlocked Hstate Hpl Hchan Hrest Hslots Harm Hlend HΦ
       iframe #
-    · rw [if_neg hst]
+    · rw [ite_eq_right hst]
       -- the slot is allocated: keep its marker, and the scan now holds them all
       icases procSlots_used Γ curCtx (procAddr n) st hst $$ Hslots with ⟨Hused, Hslots⟩
       ihave Hmarks : ([∗list] j ∈ List.range NPROC, slotUsed (GF := GF) Γ (procAddr j))
@@ -3366,7 +3366,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       exact ⟨e1.trans e3, e2.trans e4⟩
     by_cases hst : st = UNUSED
     · subst hst
-      rw [if_pos (rfl : (UNUSED : BitVec 32) = UNUSED)]
+      rw [ite_eq_left (rfl : (UNUSED : BitVec 32) = UNUSED)]
       iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav tk Q n hn hwf hnoff hK hlk hlp hlq htier
         spie2 spp2 hspc R2 (hcs2.1.trans hR2) h9'
         (hcs2.2.2.2.2.1.trans h19) (hcs2.2.2.2.2.2.1.trans h20) (hcs2.2.2.2.2.2.2.1.trans h21)
@@ -3377,7 +3377,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       iclear Hsc
       iframe Hk Hpc Hav Hpav Hframe Hlocked Hstate Hpl Hchan Hrest Hslots Harm Hlend HΦ
       iframe #
-    · rw [if_neg hst]
+    · rw [ite_eq_right hst]
       -- the slot is allocated: keep its marker
       icases procSlots_used Γ curCtx (procAddr n) st hst $$ Hslots with ⟨Hused, Hslots⟩
       ihave Hmarks : ([∗list] j ∈ List.range (n + 1), slotUsed (GF := GF) Γ (procAddr j))

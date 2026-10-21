@@ -16,7 +16,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## Entry addresses and page-table indices -/
@@ -291,7 +291,7 @@ theorem PTree.setLeaf_path_eq (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
     refine ⟨?_, ?_⟩
     · simp only [setLeaf, setEnt, slot, PTree.base_node]
     · simp only [setLeaf, setEnt, entAt, PTree.ents_node]
-      rw [if_pos h.symm]
+      rw [ite_eq_left h.symm]
   | succ lvl ih =>
     simp only [path] at h
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
@@ -305,10 +305,10 @@ theorem PTree.setLeaf_path_eq (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
         subst hcc
         refine ⟨?_, ?_⟩
         · simp only [setLeaf, hk, setKid, slot, PTree.kids_node, PTree.base_node, hk']
-          rw [if_pos h.1.symm]
+          rw [ite_eq_left h.1.symm]
           exact (ih c h.2).1
         · simp only [setLeaf, hk, setKid, entAt, PTree.kids_node, PTree.ents_node]
-          rw [if_pos h.1.symm]
+          rw [ite_eq_left h.1.symm]
           exact (ih c h.2).2
       | none =>
         rw [hk'] at h
@@ -327,7 +327,7 @@ theorem PTree.setLeaf_path_eq (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
         refine ⟨?_, ?_⟩
         · simp only [setLeaf, hk, setEnt, slot, PTree.kids_node, PTree.base_node, hk']
         · simp only [setLeaf, hk, setEnt, entAt, PTree.kids_node, PTree.ents_node, hk']
-          rw [if_pos h.symm]
+          rw [ite_eq_left h.symm]
 
 theorem PTree.slot_setLeaf_self (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64) :
     (t.setLeaf lvl vpn v).slot lvl vpn = t.slot lvl vpn :=
@@ -348,7 +348,7 @@ theorem PTree.setLeaf_path_ne (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
     refine ⟨?_, ?_⟩
     · simp only [setLeaf, setEnt, slot, PTree.base_node]
     · simp only [setLeaf, setEnt, entAt, PTree.ents_node]
-      rw [if_neg fun hc => hne hc.symm]
+      rw [ite_eq_right fun hc => hne hc.symm]
   | succ lvl ih =>
     simp only [path] at hne
     cases hk : t.kids (vpnIdx vpn (lvl+1)) with
@@ -360,16 +360,16 @@ theorem PTree.setLeaf_path_ne (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
         have hcp : c.path lvl vpn ≠ c.path lvl vpn' := fun hc => hne (by rw [hii, hc])
         refine ⟨?_, ?_⟩
         · simp only [setLeaf, hk, setKid, slot, PTree.kids_node, PTree.base_node, hk']
-          rw [if_pos hii]
+          rw [ite_eq_left hii]
           exact (ih c hcp).1
         · simp only [setLeaf, hk, setKid, entAt, PTree.kids_node, PTree.ents_node, hk']
-          rw [if_pos hii]
+          rw [ite_eq_left hii]
           exact (ih c hcp).2
       · refine ⟨?_, ?_⟩
         · simp only [setLeaf, hk, setKid, slot, PTree.kids_node, PTree.base_node]
-          rw [if_neg hii]
+          rw [ite_eq_right hii]
         · simp only [setLeaf, hk, setKid, entAt, PTree.kids_node, PTree.ents_node]
-          rw [if_neg hii]
+          rw [ite_eq_right hii]
     | none =>
       rw [hk] at hne
       cases hk' : t.kids (vpnIdx vpn' (lvl+1)) with
@@ -382,7 +382,7 @@ theorem PTree.setLeaf_path_ne (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27) (v 
         refine ⟨?_, ?_⟩
         · simp only [setLeaf, hk, setEnt, slot, PTree.kids_node, PTree.base_node, hk']
         · simp only [setLeaf, hk, setEnt, entAt, PTree.kids_node, PTree.ents_node, hk']
-          rw [if_neg fun hc => hne (by rw [hc])]
+          rw [ite_eq_right fun hc => hne (by rw [hc])]
 
 /-- What a successful walk returns, in terms of `slot` and `entAt`. -/
 theorem PTree.walk_addr (lvl : Nat) (t : PTree) (vpn : BitVec 27) (addr pv : BitVec 64)
@@ -406,7 +406,7 @@ theorem PTree.walk_setLeaf_path_eq (lvl : Nat) (t : PTree) (vpn vpn' : BitVec 27
     (h : t.walk lvl vpn' = some (addr, pv)) :
     (t.setLeaf lvl vpn v).walk lvl vpn' = some (addr, v) := by
   obtain ⟨h1, h2⟩ := setLeaf_path_eq lvl t vpn vpn' v hp
-  rw [walk_eq, h1, h2, if_neg hv, (walk_addr lvl t vpn' addr pv h).1]
+  rw [walk_eq, h1, h2, ite_eq_right hv, (walk_addr lvl t vpn' addr pv h).1]
 
 /-- The walk of `vpn` reads back the value written. -/
 theorem PTree.walk_setLeaf_self (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64)
@@ -434,8 +434,8 @@ theorem PTree.pages_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVe
       simp only [setKid, PTree.base_node, PTree.kids_node, List.cons.injEq, true_and]
       refine congrArg (fun g => List.flatMap g allIdx) (funext fun j => ?_)
       by_cases hj : j = vpnIdx vpn (lvl+1)
-      · rw [if_pos hj, hj, h]; exact ih c
-      · rw [if_neg hj]
+      · rw [ite_eq_left hj, hj, h]; exact ih c
+      · rw [ite_eq_right hj]
 
 theorem PTree.pagesNodup_setLeaf (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec 64)
     (h : t.pagesNodup lvl) : (t.setLeaf lvl vpn v).pagesNodup lvl := by
@@ -551,7 +551,7 @@ theorem PTree.walk_succ_some (lvl : Nat) (t : PTree) (vpn : BitVec 27) (addr v :
     have hz := hwf (vpnIdx vpn (lvl+1))
     rw [hk] at hz
     simp only [hk] at hw
-    rw [if_pos hz] at hw
+    rw [ite_eq_left hz] at hw
     exact absurd hw (by simp)
   | some c =>
     have h := hwf (vpnIdx vpn (lvl+1))
@@ -616,21 +616,24 @@ theorem PTree.walk_levels (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hw
 /-- The `tlb` register: 64 slots (`num_tlb_entries_exp = 6`). -/
 abbrev Tlb := Vector (Option TLB_Entry) (2 ^ 6)
 
-/-- The slot `vpn` hashes to. -/
+/-- The slot `vpn` hashes to (for supervisor-stage translation, whose stage code is 0). -/
 def tlbHash (vpn : BitVec 27) : Nat := (Sail.BitVec.extractLsb vpn 5 0).toNat
 
-theorem tlbHash_eq (vpn : BitVec 27) : tlb_hash 39 vpn = tlbHash vpn := by
+theorem tlbHash_eq (vpn : BitVec 27) :
+    tlb_hash 39 vpn TranslationStage.S_Stage = tlbHash vpn := by
   unfold tlb_hash tlbHash Sail.BitVec.toNatInt Functions.num_tlb_entries_exp
-  simp
+  simp [zero_extend, Sail.BitVec.zeroExtend]
 
 theorem tlbHash_lt (vpn : BitVec 27) : tlbHash vpn < 2 ^ 6 :=
   (Sail.BitVec.extractLsb vpn 5 0).isLt
 
-/-- The entry `add_to_TLB` builds for a level-0 walk, non-global. -/
+/-- The entry `add_to_TLB` builds for a level-0 supervisor-stage walk, non-global
+(`get_vmid S_Stage = 0`). -/
 def tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte : BitVec 64)
     (addr : BitVec 64) : TLB_Entry :=
-  { asid := asid, global := false, pte := pte, pteAddr := physaddr.Physaddr addr,
-    levelMask := 0#45, vpn := sign_extend (m := 45) vpn, ppn := ppn }
+  { asid := asid, vmid := 0#14, stage := TranslationStage.S_Stage, global := false, pte := pte,
+    pteAddr := physaddr.Physaddr addr, levelMask := 0#47, vpn := sign_extend (m := 47) vpn,
+    ppn := ppn }
 
 theorem zext64_self (x : BitVec 64) : zero_extend (m := 64) x = x := by
   unfold zero_extend Sail.BitVec.zeroExtend; simp
@@ -657,7 +660,7 @@ theorem tlb_get_ppn_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVe
   simp
 
 /-- A cached level-0 entry has an empty level mask, so its level is 0. -/
-theorem tlb_get_level_zero (ent : TLB_Entry) (h : ent.levelMask = 0#45) :
+theorem tlb_get_level_zero (ent : TLB_Entry) (h : ent.levelMask = 0#47) :
     tlb_get_level 39 ent = 0 := by
   unfold tlb_get_level; simp only [h]; decide +kernel
 
@@ -665,12 +668,14 @@ theorem tlb_get_level_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : Bit
     (pte addr : BitVec 64) : tlb_get_level 39 (tlbEntryOf asid vpn ppn pte addr) = 0 :=
   tlb_get_level_zero _ rfl
 
-/-- A cached entry matches exactly its own `vpn` (ASID 0, not global). -/
+/-- A cached entry matches exactly its own `vpn` (ASID 0, not global), under the
+supervisor-stage lookup (VMID 0, stage `S_Stage`). -/
 theorem match_tlbEntryOf (vpn vpn' : BitVec 27) (ppn : BitVec 44) (pte addr : BitVec 64) :
-    match_TLB_Entry (tlbEntryOf 0#16 vpn ppn pte addr) 0#16 (sign_extend (m := 45) vpn')
-      = decide (vpn' = vpn) := by
+    match_TLB_Entry (tlbEntryOf 0#16 vpn ppn pte addr) 0#16 0#14 (sign_extend (m := 47) vpn')
+      TranslationStage.S_Stage = decide (vpn' = vpn) := by
   unfold match_TLB_Entry tlbEntryOf
-  simp only [sign_extend, Sail.BitVec.signExtend]
+  simp only [show (TranslationStage.S_Stage == TranslationStage.S_Stage) = true from rfl,
+    Bool.and_true, sign_extend, Sail.BitVec.signExtend]
   bv_decide
 
 theorem tlb_set_pte_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44)

@@ -24,7 +24,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -80,7 +80,7 @@ theorem execSpecF_sw_au_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf

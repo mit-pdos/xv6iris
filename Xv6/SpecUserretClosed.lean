@@ -114,7 +114,7 @@ def wp_userret_closed_body (PT : SchedNames → IProp GF) (Γ : SchedNames) (j :
     (hgn : gn = V.gen) : Prop :=
   wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   kctx cpu k ∗ stackOwn ksp m ∗ pcIs cpu userretVa ∗
-  Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+  Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗ hTrapCsrs cpu ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗
   uslot (uvisOf V M sts gn cs pid) ∗

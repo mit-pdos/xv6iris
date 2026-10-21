@@ -52,7 +52,7 @@ theorem shPl_ref (len : Nat) (f : Nat → BitVec 8) (fuel off : Nat) (t : UshpCm
       | zero => simp [refParsepipe] at hpp
       | succ k => omega
     rw [refBacks_scope len f fuel s t1 hsc hf] at href
-    simp only [refPeek_scope_miss len f _ [rbSemi] hsc refOutScope_semi, Bool.false_eq_true, if_false,
+    simp only [refPeek_scope_miss len f _ [rbSemi] hsc refOutScope_semi, Bool.false_eq_true, ite_false,
       Option.some.injEq, Prod.mk.injEq] at href
     obtain ⟨rfl, rfl⟩ := href
     exact ⟨s, rfl, rfl⟩

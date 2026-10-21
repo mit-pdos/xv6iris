@@ -299,18 +299,18 @@ theorem queueOk_room (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i
     intro p q hp1 hp2 hq1 hq2 he
     by_cases hpn : p = np <;> by_cases hqn : q = np
     · omega
-    · simp only [if_pos hpn, if_neg hqn] at he
+    · simp only [ite_eq_left hpn, ite_eq_right hqn] at he
       exact absurd he.symm (hne q hq1 (by omega))
-    · simp only [if_neg hpn, if_pos hqn] at he
+    · simp only [ite_eq_right hpn, ite_eq_left hqn] at he
       exact absurd he (hne p hp1 (by omega))
-    · simp only [if_neg hpn, if_neg hqn] at he
+    · simp only [ite_eq_right hpn, ite_eq_right hqn] at he
       exact h.2 p q hp1 (by omega) hq1 (by omega) he
   have hltf : ∀ p, lo ≤ p → p < np + 1 →
       (fun p => if p = np then i else ring (p % NUM)) p < NUM := by
     intro p hp1 hp2
     by_cases hpn : p = np
-    · simpa only [if_pos hpn] using hi
-    · simpa only [if_neg hpn] using (h.1 p hp1 (by omega)).1
+    · simpa only [ite_eq_left hpn] using hi
+    · simpa only [ite_eq_right hpn] using (h.1 p hp1 (by omega)).1
   have := window_le_of_inj lo (np + 1) _ hltf hinj
   omega
 
@@ -358,7 +358,7 @@ theorem queueOk_arm' (st : Nat → HState) (ring : Nat → Nat) (lo np : Nat) (i
     have hact := (h.1 p h1 h2).2
     rw [he, hfree] at hact
     exact absurd hact (by simp [HState.isActive])
-  simp only [if_neg hne]
+  simp only [ite_eq_right hne]
   exact (h.1 p h1 h2).2
 
 /-! ### The staged head
@@ -576,8 +576,8 @@ theorem diskWrite_eq (dk : Nat -> BitVec 8) (off : Nat) (bs : List (BitVec 8)) (
     Virtio.diskWrite dk off bs a = if off <= a then (bs[a - off]?).getD (dk a) else dk a := by
   unfold Virtio.diskWrite
   by_cases h : off <= a
-  · rw [if_pos h, if_pos h]; cases bs[a - off]? <;> rfl
-  · rw [if_neg h, if_neg h]
+  · rw [ite_eq_left h, ite_eq_left h]; cases bs[a - off]? <;> rfl
+  · rw [ite_eq_right h, ite_eq_right h]
 
 /-- A DRAIN does not move the image a read sees: the cached sector simply
 becomes durable. -/
@@ -602,7 +602,7 @@ theorem cacheView_drain (v : VirtioState) (s : Nat) (hc : cacheOk v) :
         rw [cacheView_none w a h1, cacheView_some v a bs h2, hwd, diskWrite_eq]
         simp only [sectorSize_eq] at hsec hlen ⊢
         fix_dec
-        rw [if_pos (by omega)]
+        rw [ite_eq_left (by omega)]
         have heq : a - 512 * s = a % 512 := by omega
         rw [heq]
       · have hdisk : w.disk a = v.disk a := by
@@ -610,9 +610,9 @@ theorem cacheView_drain (v : VirtioState) (s : Nat) (hc : cacheOk v) :
           simp only [sectorSize_eq] at hsec ⊢
           fix_dec
           by_cases hle : 512 * s <= a
-          · rw [if_pos hle, List.getElem?_eq_none (by omega)]
+          · rw [ite_eq_left hle, List.getElem?_eq_none (by omega)]
             rfl
-          · rw [if_neg hle]
+          · rw [ite_eq_right hle]
         have hg : Virtio.alistGet w.cache (a / Virtio.sectorSize)
             = Virtio.alistGet v.cache (a / Virtio.sectorSize) := by
           rw [hwc]; exact Alist.get_del_ne _ _ _ hsec
@@ -690,6 +690,6 @@ theorem inFlightBlk_free (st : Nat → HState) (i : Nat) (c : Chain) (bno : Nat)
     rw [hst] at hstj
     cases hstj
     exact hne hblk.symm
-  exact ⟨j, c', hj, by simp only [hji, if_false]; exact hstj, hdw, hblk⟩
+  exact ⟨j, c', hj, by simp only [hji, ite_false]; exact hstj, hdw, hblk⟩
 
 end Xv6

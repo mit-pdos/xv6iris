@@ -65,7 +65,7 @@ theorem wp_uk_ecall_sbrk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
   iintro %r %M' %pm' %sz' %fdv' %cw' %g' %cs' %lz' %secc' %hok %hfd %_ %hcw %hgn %_ %_ %hsc %hch -
   have hok2 : usysMemOk USYS_sbrk (tfOf m pc) r M pm szk false M' pm' sz' lz' := hok
   unfold usysMemOk at hok2
-  rw [if_neg (by decide), if_pos rfl] at hok2
+  rw [ite_eq_right (by decide), ite_eq_left rfl] at hok2
   obtain ⟨himg, hperm, hret, hlzr⟩ := hok2
   have hl : lz' = false := hlzr (.inl (by unfold usysSbrkEager; rw [tfOf_a1]; exact heag)) rfl
   have hc : cw' = cw := usysCwdOk_quiet (by decide) hcw
@@ -100,9 +100,9 @@ theorem wp_uk_ecall_sbrk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
   · -- FAILED: the break did not move; the row's image is the grow at the same break
     subst sz'
     unfold usysSbrkImg at himg
-    rw [if_pos (Nat.le_refl _)] at himg
+    rw [ite_eq_left (Nat.le_refl _)] at himg
     unfold usysSbrkPerm at hperm
-    rw [if_pos (Nat.le_refl _)] at hperm
+    rw [ite_eq_left (Nat.le_refl _)] at hperm
     have hperm2 : pm' = pm := hperm.trans (funext fun k => by cases pm k <;> simp)
     clear hperm
     subst M' pm'
@@ -125,9 +125,9 @@ theorem wp_uk_ecall_sbrk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     have hsz' : sz' = szk + n := by have := hup (by omega); omega
     subst hsz'
     unfold usysSbrkImg at himg
-    rw [if_pos (by omega)] at himg
+    rw [ite_eq_left (by omega)] at himg
     unfold usysSbrkPerm at hperm
-    rw [if_pos (by omega)] at hperm
+    rw [ite_eq_left (by omega)] at hperm
     subst himg
     imod uheap_grow_run N.t N.d N.s M pm pm' szk n
       (fun a h1 h2 => by
@@ -140,7 +140,7 @@ theorem wp_uk_ecall_sbrk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
         simp only [hnone]
         have h1' : a / 4096 * 4096 < pgRoundUpN (szk + n) := by unfold pgRoundUpN; omega
         have h2' : ¬ a / 4096 * 4096 < pgRoundUpN szk := by rw [hal]; omega
-        rw [if_pos ⟨h1', h2'⟩]; rfl)
+        rw [ite_eq_left ⟨h1', h2'⟩]; rfl)
       (fun p hp => by
         rw [hperm]
         cases hq : pm p with

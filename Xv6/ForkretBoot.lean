@@ -66,7 +66,7 @@ theorem FkrAfter.callee {k : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitV
 theorem FkrAfter.avail_ge {k : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitVec 64}
     (h : FkrAfter k eb root pa ksp) (n : Nat) (hn : n ≤ 416) : n ≤ k.avail := by
   have := h.avail
-  cases eb <;> simp only [trapRes, kvFrameSlots, Bool.false_eq_true, if_false, if_true] at this <;> omega
+  cases eb <;> simp only [trapRes, kvFrameSlots, Bool.false_eq_true, ite_false, ite_true] at this <;> omega
 
 section Boot
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

@@ -31,7 +31,7 @@ import MachCSL.WpSmodeSret
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -39,24 +39,32 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 set_option maxHeartbeats 4000000 in
 /-- **The execute stage of `sret` into user mode** (`SPP = U`, `SPIE`
 arbitrary, `TSR = 0`, `senvcfg.LPE = 0`): the hart drops to `User`, at
-`sepc` with bit 0 cleared; `mstatus` is `sretMs` of the old one. -/
+`sepc` with bit 0 cleared; `mstatus` is `sretMs` of the old one.  (Since
+sail-riscv 0.16 `sret` also reads `hstatus` and clears its `SPV`, H enabled
+or not, as `execSpecF_sret`: the cell comes back at `hstatusSret hs`.) -/
 theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1)
-    (pc npc₀ epc : BitVec 64) (R : RegMap) (Out : IProp GF) :
+    (pc npc₀ epc hs : BitVec 64) (R : RegMap) (Out : IProp GF) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.User
       { c with mstatus := sretMs c.mstatus } (instruction.SRET ()) pc npc₀ (epc &&& 0xFFFFFFFFFFFFFFFE#64)
       iprop(hartObsStep (.uEnter cpu c.satp epc (gprList R)) Out ∗ gprFile cpu R ∗
-        Register.sepc ↦ᵣ[cpu] epc)
-      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ Out) := by
+        Register.sepc ↦ᵣ[cpu] epc ∗ Register.hstatus ↦ᵣ[cpu] hs)
+      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ Out ∗ Register.hstatus ↦ᵣ[cpu] hstatusSret hs) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hpriv, HF, Hsepc⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hpriv, HF, Hsepc, Hhstatus⟩, HΦ⟩
   ihave Hgprs := (gprFile_gprCells cpu R).1 $$ HF
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hspp' : BitVec.extractLsb' 8 1 (~~~(1#64 <<< 5) &&& (~~~(1#64 <<< 1) &&& c.mstatus |||
-      BitVec.zeroExtend 64 (BitVec.extractLsb' 5 1 c.mstatus) <<< 1) ||| 1#64 <<< 5) = 0#1 := by
-    revert hspp; bv_decide
+  -- 0.16 clears `SPP` first, then copies `SPIE` into `SIE`: the same value
+  have hms : BitVec.updateSubrange (BitVec.updateSubrange (BitVec.updateSubrange
+      (BitVec.updateSubrange (BitVec.updateSubrange c.mstatus 8 8 0#1) 1 1
+        (_get_Mstatus_SPIE (BitVec.updateSubrange c.mstatus 8 8 0#1))) 5 5 1#1) 17 17 0#1) 23 23 0#1 =
+      sretMs c.mstatus := by
+    unfold sretMs _get_Mstatus_SPIE
+    simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
+      BitVec.extractLsb]
+    bv_decide
   unfold execute
   swp_run 300
   simp only [update_bit0_eq]
@@ -64,11 +72,12 @@ theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (G
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
-    simp only [sretMs]
     iframe
     iexact Hhw
   ihave HF := (gprFile_gprCells cpu R).2 $$ Hgprs
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc Hout]
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc Hout Hhstatus]
   iframe HF Hsepc Hout
+  unfold hstatusSret
+  iexact Hhstatus
 
 end MachCSL

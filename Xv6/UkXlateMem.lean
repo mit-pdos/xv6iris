@@ -49,14 +49,14 @@ theorem ukm_entry_win {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) (x : PAddr
 theorem ukm_data_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
     (ht : ukTextLeaf w = false) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukDataAddrs um := by
   refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
-  simp only [ht, Bool.false_eq_true, if_false]
+  simp only [ht, Bool.false_eq_true, ite_false]
   exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
 
 /-- A byte of a TEXT page is a text address. -/
 theorem ukm_text_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
     (ht : ukTextLeaf w = true) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukTextAddrs um := by
   refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
-  simp only [ht, if_true]
+  simp only [ht, ite_true]
   exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
 
 /-- The tree's bytes are off the data pages. -/
@@ -78,9 +78,9 @@ theorem ukm_view_write (um : RegMapF (BitVec 64)) (mm T : BMap) (pa : PAddr) (n 
     apply List.map_congr_left
     intro j hj
     cases ht : ukTextLeaf w
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [bmWrite_other _ _ _ _ _ (hout k w hk ht j (List.mem_range.1 hj))]
-    · simp only [if_true]
+    · simp only [ite_true]
 
 set_option maxHeartbeats 1000000 in
 /-- **The A/D write-back keeps the engine's maps** (the twin of
@@ -151,7 +151,7 @@ theorem ukm_pins {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand C P T s
   ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.priv,
    ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide),
     ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.cfg.hw _ _ rfl, h.cfg.menvcfg,
-    h.cfg.lok.2, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl⟩⟩
+    h.cfg.lok.2, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl, ufFoot_rd _ (by decide)⟩⟩
 
 /-- **The outcome of a translation stretch at an engine machine**: an
 engine machine, the file moved only at `tlb`, the page view unchanged. -/

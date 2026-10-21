@@ -95,10 +95,10 @@ theorem bi_bne_last {α : Type} (i : Nat) (hi : i < 30) (p q : α) :
     (if bcond bop.BNE (bufAddr (i + 1)) (KA.«bcache» + 0x8268#64) then p else q)
       = if i + 1 = 30 then q else p := by
   by_cases he : i + 1 = 30
-  · rw [if_pos he,
-      if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((bi_s1_eq i hi).mpr he))]
-  · rw [if_neg he,
-      if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((bi_s1_eq i hi).mp hc))]
+  · rw [ite_eq_left he,
+      ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((bi_s1_eq i hi).mpr he))]
+  · rw [ite_eq_right he,
+      ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((bi_s1_eq i hi).mp hc))]
 
 /-- The registers `binit`'s body must not disturb across a call (all the
 callee-saved ones but the cursor `s1`). -/
@@ -175,7 +175,7 @@ theorem bi_reindex [CurCtx] (n : Nat) (hn : n ≤ 29) :
   have hlt : x < n := List.mem_range.mp (List.mem_of_getElem? hx)
   unfold biPrevNode biPrevBuf
   rw [bi_node_succ x, show bufPrevVal x = bufAddr (x + 1) from by
-    simp only [bufPrevVal, if_neg (show ¬ x = 29 from by omega)]]
+    simp only [bufPrevVal, ite_eq_right (show ¬ x = 29 from by omega)]]
 
 /-- The two halves of a buffer join into `bufOut`. -/
 theorem bi_merge [CurCtx] (n : Nat) :
@@ -408,7 +408,7 @@ theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iframe #
     iapply wpNext_intro_pin_lc
     iintro %c1 %hp1 Hlc %R2 Hk Hpc Hhn Hpend Hnode Hrest %hpost
-    rw [if_pos (show 29 + 1 = 30 from rfl)]
+    rw [ite_eq_left (show 29 + 1 = 30 from rfl)]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hnodes := bi_snoc biPrevNode 29 $$ [Hnodes Hnode]
     case' _ => iframe
@@ -428,7 +428,7 @@ theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %R2 Hk Hpc Hhn Hpend Hnode Hrest %hpost
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hnodes := bi_snoc biPrevNode i $$ [Hnodes Hnode]
     case' _ => iframe

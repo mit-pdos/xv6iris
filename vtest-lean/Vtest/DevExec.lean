@@ -24,7 +24,7 @@ import Vtest.HartExec
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 
 /-- `MachCSL.devObsOk`, decided. -/
 def devObsOkB : (d : DevId) → DevSt d → DevSt d → List DevObs → Bool

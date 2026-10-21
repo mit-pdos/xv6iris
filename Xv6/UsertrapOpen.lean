@@ -43,7 +43,7 @@ theorem usertrap_open (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNa
     wp_usertrap_body (GF := GF) (fun h => usertrapResAt PT Γ j h)
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn := by
   unfold wp_usertrap_body
-  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hpt, Htf, Hres, Hsi, Hfi, Hpi, Hki, Hnext⟩
+  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hh, Hstv, Hpt, Htf, Hres, Hsi, Hfi, Hpi, Hki, Hnext⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
@@ -70,7 +70,7 @@ theorem usertrap_open (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNa
   rw [hpj]
   have hpn : k.proc ≠ 0#64 := hok.proc_ne
   iapply (usertrap_entry PT Γ MP HD A cpu tv hok)
-  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hcaps Hown Hsi Hfi Hpi Hki
+  iframe Hk Hpc Hsepc Hsc Htv Hh Hstv Hcl Hcaps Hown Hsi Hfi Hpi Hki
   unfold utKont
   iintro %c
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))

@@ -38,7 +38,7 @@ theorem ush_bigSepL_exist_fun {PROP : Type _} [BI PROP] {A B : Type _} [Decidabl
     iexists (fun z => if z = x then y else f z)
     have heq : ([∗list] z ∈ l, Φ z (if z = x then y else f z)) = [∗list] z ∈ l, Φ z (f z) :=
       BigSepL.bigSepL_eq (fun {_ z} hk => by
-        rw [if_neg]
+        rw [ite_eq_right]
         intro e
         subst e
         exact hx (List.mem_of_getElem? hk))

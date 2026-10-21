@@ -92,9 +92,9 @@ theorem bytesString_nonul (bs : List (BitVec 8)) : nonul (bytesString bs) := by
   | cons b bs ih =>
     rw [bytesString_cons]
     by_cases hb : b = 0#8
-    · simp only [hb, if_pos]
+    · simp only [hb, ite_eq_left]
       intro c hc; simp at hc
-    · simp only [hb, if_false]
+    · simp only [hb, ite_false]
       intro c hc
       rcases List.mem_cons.mp hc with rfl | hc
       · exact hb
@@ -124,7 +124,7 @@ theorem bytesString_split : ∀ bs : List (BitVec 8),
       | succ k' =>
         obtain ⟨pad, hpad⟩ := ih ⟨k', by simpa using hk, by simpa using hbk⟩
         refine ⟨pad, ?_⟩
-        rw [bytesString_cons, if_neg hb, cstringBytes_cons, List.cons_append]
+        rw [bytesString_cons, ite_eq_right hb, cstringBytes_cons, List.cons_append]
         exact congrArg (b :: ·) hpad
 
 end Xv6

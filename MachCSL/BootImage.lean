@@ -32,7 +32,7 @@ def bootByte (n : Nat) : BitVec 8 :=
 /-- Past the file image (`.bss` and the free pages) the loaded byte is zero. -/
 theorem bootByte_zero (n : Nat) (h : KernelElf.elfEnd ≤ n) : bootByte n = 0#8 := by
   unfold bootByte
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
 
 /-- The RAM cells, one per address, at their loaded bytes. -/
 def bootImageList : List (PAddr × BitVec 8) :=
@@ -61,14 +61,14 @@ theorem bootImageList_distinct :
 theorem bootImageList_spec : BootImageSpec (Std.ExtTreeMap.ofList bootImageList compare) := by
   intro a
   by_cases h : inRam a 1
-  · rw [if_pos h]
+  · rw [ite_eq_left h]
     refine Std.ExtTreeMap.getElem?_ofList_of_mem (k := a) (Std.ReflCmp.compare_self) bootImageList_distinct ?_
     unfold bootImageList
     rw [List.mem_map]
     refine ⟨a.toNat, ?_, ?_⟩
     · rw [List.mem_range'_1]; unfold inRam at h; omega
     · simp
-  · rw [if_neg h]
+  · rw [ite_eq_right h]
     refine Std.ExtTreeMap.getElem?_ofList_of_contains_eq_false ?_
     refine Bool.eq_false_iff.2 fun hc => h ?_
     rw [List.contains_iff_mem] at hc

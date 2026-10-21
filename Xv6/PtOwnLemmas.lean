@@ -28,8 +28,8 @@ theorem PTree.setKid_same {t : PTree} {i : BitVec 9} {c : PTree} (h : t.kids i =
   have he : (fun j => if j = i then some c else t.kids j) = t.kids := by
     funext j
     by_cases hj : j = i
-    · rw [if_pos hj, hj, h]
-    · rw [if_neg hj]
+    · rw [ite_eq_left hj, hj, h]
+    · rw [ite_eq_right hj]
   rw [he, PTree.eta]
 
 theorem PTree.setEnt_self (t : PTree) (i : BitVec 9) : t.setEnt i (t.ents i) = t := by
@@ -37,8 +37,8 @@ theorem PTree.setEnt_self (t : PTree) (i : BitVec 9) : t.setEnt i (t.ents i) = t
   have he : (fun j => if j = i then t.ents i else t.ents j) = t.ents := by
     funext j
     by_cases hj : j = i
-    · rw [if_pos hj, hj]
-    · rw [if_neg hj]
+    · rw [ite_eq_left hj, hj]
+    · rw [ite_eq_right hj]
   rw [he, PTree.eta]
 
 theorem PTree.setKid_setKid (t : PTree) (i : BitVec 9) (c c' : PTree) :
@@ -136,9 +136,9 @@ theorem PTree.wf_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitV
       intro j
       simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
       by_cases hj : j = vpnIdx vpn (l+1)
-      · rw [if_pos hj]
+      · rw [ite_eq_left hj]
         exact ⟨by rw [hj, hc1, PTree.base_fill], ih c fr hc2⟩
-      · rw [if_neg hj]; exact hwf j
+      · rw [ite_eq_right hj]; exact hwf j
     | none =>
       cases fr with
       | nil => exact hwf
@@ -146,10 +146,10 @@ theorem PTree.wf_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitV
         intro j
         simp only [PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node]
         by_cases hj : j = vpnIdx vpn (l+1)
-        · rw [if_pos hj, if_pos hj]
+        · rw [ite_eq_left hj, ite_eq_left hj]
           exact ⟨by rw [PTree.base_fill, PTree.zeroNode_base],
             ih _ fr' (PTree.zeroNode_wf b l)⟩
-        · rw [if_neg hj, if_neg hj]; exact hwf j
+        · rw [ite_eq_right hj, ite_eq_right hj]; exact hwf j
 
 theorem PTree.wfU_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
     (hwf : t.wfU lvl) : (t.fill lvl vpn fr).1.wfU lvl := by
@@ -165,9 +165,9 @@ theorem PTree.wfU_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bit
       intro j
       simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
       by_cases hj : j = vpnIdx vpn (l+1)
-      · rw [if_pos hj]
+      · rw [ite_eq_left hj]
         exact ⟨by rw [hj, hc1, PTree.base_fill], ih c fr hc2⟩
-      · rw [if_neg hj]; exact hwf j
+      · rw [ite_eq_right hj]; exact hwf j
     | none =>
       cases fr with
       | nil => exact hwf
@@ -175,10 +175,10 @@ theorem PTree.wfU_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bit
         intro j
         simp only [PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node]
         by_cases hj : j = vpnIdx vpn (l+1)
-        · rw [if_pos hj, if_pos hj]
+        · rw [ite_eq_left hj, ite_eq_left hj]
           exact ⟨by rw [PTree.base_fill, PTree.zeroNode_base],
             ih _ fr' (PTree.zeroNode_wfU b l)⟩
-        · rw [if_neg hj, if_neg hj]; exact hwf j
+        · rw [ite_eq_right hj, ite_eq_right hj]; exact hwf j
 
 /-! ## Every walk is unchanged -/
 
@@ -195,9 +195,9 @@ theorem PTree.walk_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
       obtain ⟨hc1, hc2⟩ := hc
       simp only [PTree.walk, PTree.setKid, PTree.kids_node, PTree.ents_node, PTree.base_node]
       by_cases hj : vpnIdx v (l+1) = vpnIdx vpn (l+1)
-      · rw [if_pos hj, hj, hk]
+      · rw [ite_eq_left hj, hj, hk]
         exact ih c fr hc2
-      · rw [if_neg hj]; rfl
+      · rw [ite_eq_right hj]; rfl
     | none =>
       cases fr with
       | nil => rfl
@@ -208,9 +208,9 @@ theorem PTree.walk_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
           PTree.base_node]
         fix_dec
         by_cases hj : vpnIdx v (l+1) = vpnIdx vpn (l+1)
-        · rw [if_pos hj, if_pos hj, hj, hk, hz, if_pos rfl]
+        · rw [ite_eq_left hj, ite_eq_left hj, hj, hk, hz, ite_eq_left rfl]
           exact (ih _ fr' (PTree.zeroNode_wfU b l)).trans (PTree.zeroNode_walk b l v)
-        · rw [if_neg hj, if_neg hj]
+        · rw [ite_eq_right hj, ite_eq_right hj]
 
 /-! ## The path is complete once the supply covers the gap -/
 
@@ -390,8 +390,8 @@ theorem bigSepL_upd_acc {α β : Type _} (l : List α) (n : Nat) (i : α)
     refine BigSepL.bigSepL_mono ?_
     intro k x hkx
     by_cases hk : k = n
-    · rw [if_pos hk, if_pos hk]
-    · rw [if_neg hk, if_neg hk, heq b k x hkx hk]
+    · rw [ite_eq_left hk, ite_eq_left hk]
+    · rw [ite_eq_right hk, ite_eq_right hk, heq b k x hkx hk]
   iintro H
   icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (x : α) => Φ x) hidx).1 $$ H
     with ⟨Hi, Hrest⟩
@@ -434,7 +434,7 @@ theorem nodeOwn_acc [CurCtx] (dq : DFrac) (t : PTree) (i : BitVec 9) :
         = iprop(wordPointsTo (pteAddr t.base j) 8 dq (t.ents j)) := by
     intro v k j hkj hk
     have hne : j ≠ i := fun hc => hk (by rw [allIdx_index_eq hkj, hc])
-    simp only [PTree.setEnt, PTree.base_node, PTree.ents_node, if_neg hne]
+    simp only [PTree.setEnt, PTree.base_node, PTree.ents_node, ite_eq_right hne]
   unfold nodeOwn
   iintro H
   icases (bigSepL_upd_acc (GF := GF) allIdx i.toNat i (allIdx_getElem? i)
@@ -456,7 +456,7 @@ theorem kidsOwn_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : BitVec 9)
     intro c' k j hkj hk
     have hne : j ≠ i := fun hc => hk (by rw [allIdx_index_eq hkj, hc])
     unfold kidOwn
-    simp only [PTree.setKid, PTree.kids_node, if_neg hne]
+    simp only [PTree.setKid, PTree.kids_node, ite_eq_right hne]
   unfold kidsOwn
   iintro H
   icases (bigSepL_upd_acc (GF := GF) allIdx i.toNat i (allIdx_getElem? i)
@@ -510,7 +510,7 @@ theorem kidsOwn_accO [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : BitVec 9
     | none => rfl
     | some c =>
       unfold setKidO kidOwn
-      simp only [PTree.setKid, PTree.kids_node, if_neg hne]
+      simp only [PTree.setKid, PTree.kids_node, ite_eq_right hne]
   unfold kidsOwn
   iintro H
   icases (bigSepL_upd_acc (GF := GF) allIdx i.toNat i (allIdx_getElem? i)
@@ -610,7 +610,7 @@ theorem ptreeOwn_read_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : Bit
 
 theorem pageAddr_align (b : BitVec 44) : (Xv6.pageAddr b).toNat % 8 = 0 := by
   have h8 : BitVec.extractLsb' 0 3 (Xv6.pageAddr b) = 0#3 := by
-    simp only [Xv6.pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    simp only [Xv6.pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
     bv_decide
   have h8' := congrArg BitVec.toNat h8
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat,
@@ -752,7 +752,7 @@ theorem bigSepL_nodup_of_excl {α : Type _} (l : List α) (Φ : α → IProp GF)
     have hlem : ([∗list] k ↦ x ∈ l, iprop(if k = i then emp else Φ x)) ⊢ Φ l[j] := by
       have hl := BigSepL.bigSepL_lookup
         (Φ := fun (k : Nat) (x : α) => iprop(if k = i then emp else Φ x)) h2
-      rw [if_neg (by omega : ¬ j = i)] at hl
+      rw [ite_eq_right (by omega : ¬ j = i)] at hl
       exact hl
     have hfin : iprop(Φ l[i] ∗ Φ l[j]) ⊢ (False : IProp GF) := by
       rw [heq]; exact hex l[j]

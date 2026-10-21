@@ -193,13 +193,13 @@ theorem refParsepipe_bars (len : Nat) (f : Nat → BitVec 8) (hnn : refNonnul le
   induction h with
   | last c toks hc hns htoks hlen =>
     intro n hn
-    simp only [if_true] at hn
+    simp only [ite_true] at hn
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     exact refParsepipe_end len f m c _
       (refParseexec_exec len f m c toks hnn hns hc (ushsToks_tokens htoks) hlen (by omega))
   | cons c gp toks b rest hc hbw htoks hpos hlen hb ih =>
     intro n hn
-    simp only [List.cons_ne_nil, if_false, List.length_cons] at hn
+    simp only [List.cons_ne_nil, ite_false, List.length_cons] at hn
     obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
     obtain ⟨hgp, hbar, hws1, hws2, -⟩ := hbw
     have hbar' : f gp = rbBar := hbar

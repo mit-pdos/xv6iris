@@ -63,7 +63,7 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
   · intro i c hc
     rw [List.getElem?_take] at hc
     by_cases hiq : i < nlines Iw
-    · rw [if_pos hiq] at hc
+    · rw [ite_eq_left hiq] at hc
       obtain ⟨_, hok⟩ := hcsb' i c hc
       refine ⟨hiq, ?_⟩
       obtain ⟨z, hz⟩ := bodiesOf_prefix Iw E hpre
@@ -75,7 +75,7 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
       rw [lmUpto_ext M (cs.take (nlines Iw)) cs s (bodiesOf Iw) (bodiesOf E) i
         (fun j hj => hagree j (by omega)) (fun j hj => (hbod j (by omega)).symm)]
       exact hok
-    · rw [if_neg hiq] at hc; simp at hc
+    · rw [ite_eq_right hiq] at hc; simp at hc
   · intro q' hq'
     have hq'q : q' ≤ nlines Iw := by have := nstarted_le_S Iw; omega
     rw [lmProIdx_ext M (cs.take (nlines Iw)) cs (nlines Iw) hagree q' hq'q]

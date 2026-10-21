@@ -7,7 +7,7 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
@@ -40,14 +40,21 @@ inductive regidx where
   deriving Inhabited, BEq, Repr
   open regidx
 
-abbrev base_E_enabled : Bool := false
+abbrev base_E_enabled  : Bool := false
 
-abbrev regidx_bit_width : Int := (if ( base_E_enabled  : Bool) then 4 else 5)
+abbrev regidx_bit_width  : Int := (if ( base_E_enabled  : Bool) then 4 else 5)
 
 inductive vregidx where
   | Vregidx (_ : (BitVec 5))
   deriving Inhabited, BEq, Repr
   open vregidx
+
+abbrev physaddrbits := (BitVec 64)
+
+inductive physaddr where
+  | Physaddr (_ : physaddrbits)
+  deriving Inhabited, BEq, Repr
+  open physaddr
 
 abbrev xlenbits := (BitVec 64)
 
@@ -60,7 +67,7 @@ abbrev fp_exception_flags := (BitVec 5)
 
 abbrev fp_rounding_modes := (BitVec 5)
 
-
+abbrev is_fp_bits (k_n : Int) : Bool := List.elem k_n [16, 32, 64, 128]
 
 -- Abbreviation fp_bits skipped
 
@@ -87,7 +94,7 @@ inductive VectorHalf where | High | Low
   deriving BEq, Inhabited, Repr
   open VectorHalf
 
-abbrev max_mem_access : Int := 4096
+abbrev max_mem_access  : Int := 4096
 
 abbrev mem_access_width := Nat
 
@@ -120,60 +127,53 @@ inductive PointerMaskingMode where | PMM_Disabled | PMM_Reserved | PMM_PMLEN_7 |
   deriving BEq, Inhabited, Repr
   open PointerMaskingMode
 
-abbrev xlen : Int := 64
+abbrev xlen  : Int := 64
 
-abbrev physaddr_bits : Int := 56
+abbrev sdtrig_mcontrol6_maskmax  : Int := 63
 
-abbrev log2_xlen : Int := (if ( xlen = 32  : Bool) then 5 else 6)
+abbrev physaddr_bits  : Int := 56
 
-abbrev xlen_bytes : Int := (if ( xlen = 32  : Bool) then 4 else 8)
+abbrev geilen  : Int := 63
 
-abbrev physaddrbits_len : Int := (if ( xlen = 32  : Bool) then 34 else 64)
+abbrev log2_xlen  : Int := (if ( xlen = 32  : Bool) then 5 else 6)
 
-abbrev asidlen : Int := (if ( xlen = 32  : Bool) then 9 else 16)
+abbrev xlen_bytes  : Int := (if ( xlen = 32  : Bool) then 4 else 8)
+
+abbrev physaddrbits_len  : Int := (if ( xlen = 32  : Bool) then 34 else 64)
+
+abbrev gpalen  : Int := (if ( xlen = 32  : Bool) then 34 else 64)
+
+abbrev asidmax  : Int := (if ( xlen = 32  : Bool) then 9 else 16)
+
+abbrev asidlen  : Int := 16
+
+abbrev vmidmax  : Int := (if ( xlen = 32  : Bool) then 7 else 14)
+
+abbrev vmidlen  : Int := 14
+
+abbrev gpabits := (BitVec 64)
 
 abbrev asidbits := (BitVec 16)
 
-abbrev ext_d_supported : Bool := true
+abbrev vmidbits := (BitVec 14)
 
-abbrev flen_bytes : Int := (if ( ext_d_supported  : Bool) then 8 else 4)
+abbrev ext_d_supported  : Bool := true
 
-abbrev flen : Int := (if ( true  : Bool) then 8 else 4 * 8)
+abbrev flen_bytes  : Int := (if ( ext_d_supported  : Bool) then 8 else 4)
 
-abbrev flenbits := (BitVec (if ( true  : Bool) then 8 else 4 * 8))
+abbrev flen  : Int := ((if ( true  : Bool) then 8 else 4) * 8)
 
-abbrev vlen_exp : Int := 8
+abbrev flenbits := (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
 
-abbrev elen_exp : Int := 6
+abbrev vlen_exp  : Int := 8
 
-abbrev vlen : Int := (2 ^ 8)
+abbrev elen_exp  : Int := 6
 
-abbrev elen : Int := (2 ^ 6)
+abbrev vlen  : Int := (2 ^ 8)
 
-abbrev physaddrbits := (BitVec 64)
-
-inductive physaddr where
-  | Physaddr (_ : physaddrbits)
-  deriving Inhabited, BEq, Repr
-  open physaddr
+abbrev elen  : Int := (2 ^ 6)
 
 abbrev mem_meta := Unit
-
-inductive write_kind where | Write_plain | Write_RISCV_release | Write_RISCV_strong_release | Write_RISCV_conditional | Write_RISCV_conditional_release | Write_RISCV_conditional_strong_release
-  deriving BEq, Inhabited, Repr
-  open write_kind
-
-inductive read_kind where | Read_plain | Read_ifetch | Read_ttw | Read_RISCV_acquire | Read_RISCV_strong_acquire | Read_RISCV_reserved | Read_RISCV_reserved_acquire | Read_RISCV_reserved_strong_acquire
-  deriving BEq, Inhabited, Repr
-  open read_kind
-
-inductive barrier_kind where | Barrier_RISCV_rw_rw | Barrier_RISCV_r_rw | Barrier_RISCV_r_r | Barrier_RISCV_rw_w | Barrier_RISCV_w_w | Barrier_RISCV_w_rw | Barrier_RISCV_rw_r | Barrier_RISCV_r_w | Barrier_RISCV_w_r | Barrier_RISCV_tso | Barrier_RISCV_i
-  deriving BEq, Inhabited, Repr
-  open barrier_kind
-
-structure RISCV_strong_access where
-  variety : Access_variety
-  deriving BEq, Inhabited, Repr
 
 abbrev RVFI_DII_Instruction_Packet := (BitVec 64)
 
@@ -211,6 +211,7 @@ inductive MemoryAccessType (k_a : Type) where
   | Load (_ : k_a)
   | Store (_ : k_a)
   | LoadReserved (_ : (Bool × Bool × k_a))
+  | LoadExecute (_ : k_a)
   | StoreConditional (_ : (Bool × Bool × k_a))
   | Atomic (_ : (amoop × Bool × Bool × k_a × k_a))
   | InstructionFetch (_ : Unit)
@@ -243,10 +244,10 @@ inductive ExceptionType where
   | E_Load_Page_Fault (_ : Unit)
   | E_Reserved_14 (_ : Unit)
   | E_SAMO_Page_Fault (_ : Unit)
-  | E_Reserved_16 (_ : Unit)
+  | E_Double_Trap (_ : Unit)
   | E_Reserved_17 (_ : Unit)
   | E_Software_Check (_ : Unit)
-  | E_Reserved_19 (_ : Unit)
+  | E_Hardware_Error (_ : Unit)
   | E_Fetch_GPage_Fault (_ : Unit)
   | E_Load_GPage_Fault (_ : Unit)
   | E_Virtual_Instr (_ : Unit)
@@ -271,6 +272,10 @@ inductive csrop where | CSRRW | CSRRS | CSRRC
 inductive iop where | ADDI | SLTI | SLTIU | XORI | ORI | ANDI
   deriving BEq, Inhabited, Repr
   open iop
+
+inductive hlvop where | HLV | HLVX
+  deriving BEq, Inhabited, Repr
+  open hlvop
 
 structure mul_op where
   result_part : VectorHalf
@@ -446,11 +451,17 @@ inductive instruction where
   | C_ZEXT_W (_ : cregidx)
   | C_NOT (_ : cregidx)
   | C_MUL (_ : (cregidx × cregidx))
+  | HLVTYPE (_ : (word_width × hlvop × Bool × regidx × regidx))
+  | HSV (_ : (word_width × regidx × regidx))
+  | HFENCE_VVMA (_ : (regidx × regidx))
+  | HFENCE_GVMA (_ : (regidx × regidx))
   | CSRReg (_ : (csreg × regidx × regidx × csrop))
   | CSRImm (_ : (csreg × (BitVec 5) × regidx × csrop))
   | SINVAL_VMA (_ : (regidx × regidx))
   | SFENCE_W_INVAL (_ : Unit)
   | SFENCE_INVAL_IR (_ : Unit)
+  | HINVAL_VVMA (_ : (regidx × regidx))
+  | HINVAL_GVMA (_ : (regidx × regidx))
   | WRS (_ : wrsop)
   | SSPUSH (_ : regidx)
   | C_SSPUSH (_ : Unit)
@@ -472,25 +483,27 @@ inductive Privilege where | User | VirtualUser | Supervisor | VirtualSupervisor 
   deriving BEq, Inhabited, Repr
   open Privilege
 
+inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_H | Ext_Sha | Ext_Shcounterenw | Ext_Shgatpa | Ext_Shtvala | Ext_Shvsatpa | Ext_Shvstvala | Ext_Shvstvecd | Ext_Zibi | Ext_Zic64b | Ext_Zicbom | Ext_Zicbop | Ext_Zicboz | Ext_Zicfilp | Ext_Zicfiss | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihintntl | Ext_Zihintpause | Ext_Zihpm | Ext_Zilx | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zacas | Ext_Zalrsc | Ext_Zama16b | Ext_Zawrs | Ext_Za64rs | Ext_Za128rs | Ext_Zfa | Ext_Zfbfmin | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Ziccamoa | Ext_Ziccamoc | Ext_Ziccif | Ext_Zicclsm | Ext_Ziccrse | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zkt | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvl32b | Ext_Zvl64b | Ext_Zvl128b | Ext_Zvl256b | Ext_Zvl512b | Ext_Zvl1024b | Ext_Zve32f | Ext_Zve32x | Ext_Zve64d | Ext_Zve64f | Ext_Zve64x | Ext_Zvabd | Ext_Zvfbfmin | Ext_Zvfbfwma | Ext_Zvfh | Ext_Zvfhmin | Ext_Zvbb | Ext_Zvbc | Ext_Zvkb | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksed | Ext_Zvksh | Ext_Zvkt | Ext_Zvkn | Ext_Zvknc | Ext_Zvkng | Ext_Zvks | Ext_Zvksc | Ext_Zvksg | Ext_Ssccptr | Ext_Sscofpmf | Ext_Sscounterenw | Ext_Ssdbltrp | Ext_Ssnpm | Ext_Ssstateen | Ext_Ssstrict | Ext_Sdtrig | Ext_Sstc | Ext_Sstvala | Ext_Sstvecd | Ext_Ssu64xl | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Svade | Ext_Svadu | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svrsw60t59b | Ext_Svukte | Ext_Svvptc | Ext_Smcntrpmf | Ext_Smdbltrp | Ext_Smmpm | Ext_Smnpm | Ext_Smstateen | Ext_Ssqosid | Ext_Sspm | Ext_Supm
+  deriving BEq, Inhabited, Repr
+  open extension
+
+inductive XenvcfgCbieReservedBehavior where | Xenvcfg_Fatal | Xenvcfg_ClearPermissions | Xenvcfg_Ignore
+  deriving BEq, Inhabited, Repr
+  open XenvcfgCbieReservedBehavior
+
+abbrev MEnvcfg := (BitVec 64)
+
 inductive Architecture where | RV32 | RV64 | RV128
   deriving BEq, Inhabited, Repr
   open Architecture
 
 abbrev Misa := (BitVec 64)
 
-inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_H | Ext_Zibi | Ext_Zic64b | Ext_Zicbom | Ext_Zicbop | Ext_Zicboz | Ext_Zicfilp | Ext_Zicfiss | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihintntl | Ext_Zihintpause | Ext_Zihpm | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zacas | Ext_Zalrsc | Ext_Zama16b | Ext_Zawrs | Ext_Za64rs | Ext_Za128rs | Ext_Zfa | Ext_Zfbfmin | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Ziccamoa | Ext_Ziccamoc | Ext_Ziccif | Ext_Zicclsm | Ext_Ziccrse | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zkt | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvl32b | Ext_Zvl64b | Ext_Zvl128b | Ext_Zvl256b | Ext_Zvl512b | Ext_Zvl1024b | Ext_Zve32f | Ext_Zve32x | Ext_Zve64d | Ext_Zve64f | Ext_Zve64x | Ext_Zvabd | Ext_Zvfbfmin | Ext_Zvfbfwma | Ext_Zvfh | Ext_Zvfhmin | Ext_Zvbb | Ext_Zvbc | Ext_Zvkb | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksed | Ext_Zvksh | Ext_Zvkt | Ext_Zvkn | Ext_Zvknc | Ext_Zvkng | Ext_Zvks | Ext_Zvksc | Ext_Zvksg | Ext_Ssccptr | Ext_Sscofpmf | Ext_Sscounterenw | Ext_Ssnpm | Ext_Ssstateen | Ext_Sstc | Ext_Sstvala | Ext_Sstvecd | Ext_Ssu64xl | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Svade | Ext_Svadu | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svrsw60t59b | Ext_Svvptc | Ext_Smcntrpmf | Ext_Smmpm | Ext_Smnpm | Ext_Smstateen | Ext_Ssqosid | Ext_Sspm | Ext_Supm
-  deriving BEq, Inhabited, Repr
-  open extension
-
 abbrev Mstatus := (BitVec 64)
 
-inductive XenvcfgCbieReservedBehavior where | Xenvcfg_Fatal | Xenvcfg_ClearPermissions
-  deriving BEq, Inhabited, Repr
-  open XenvcfgCbieReservedBehavior
-
-abbrev MEnvcfg := (BitVec 64)
-
 abbrev Seccfg := (BitVec 64)
+
+abbrev HEnvcfg := (BitVec 64)
 
 abbrev SEnvcfg := (BitVec 64)
 
@@ -502,13 +515,17 @@ abbrev Hstateen2 := (BitVec 64)
 
 abbrev Hstateen3 := (BitVec 64)
 
-abbrev Mstateen0 := (BitVec 64)
-
 abbrev Mstateen1 := (BitVec 64)
 
 abbrev Mstateen2 := (BitVec 64)
 
 abbrev Mstateen3 := (BitVec 64)
+
+abbrev Mstateen0 := (BitVec 64)
+
+inductive CSRBitConfig where | CSRBit_Writable | CSRBit_ReadOnlyZero | CSRBit_ReadOnlyOne
+  deriving BEq, Inhabited, Repr
+  open CSRBitConfig
 
 abbrev Sstateen0 := (BitVec 32)
 
@@ -518,7 +535,7 @@ abbrev Sstateen2 := (BitVec 32)
 
 abbrev Sstateen3 := (BitVec 32)
 
-inductive stateen_bit where | STATEEN_FCSR | STATEEN_SRMCFG | STATEEN_ENVCFG | STATEEN_SE
+inductive stateen_bit where | STATEEN_FCSR | STATEEN_SRMCFG | STATEEN_P1P13 | STATEEN_CONTEXT | STATEEN_ENVCFG | STATEEN_SE
   deriving BEq, Inhabited, Repr
   open stateen_bit
 
@@ -526,9 +543,13 @@ inductive AmocasOddRegisterReservedBehavior where | AMOCAS_Fatal | AMOCAS_Illega
   deriving BEq, Inhabited, Repr
   open AmocasOddRegisterReservedBehavior
 
-inductive InterruptType where | I_Reserved_0 | I_S_Software | I_VS_Software | I_M_Software | I_Reserved_4 | I_S_Timer | I_VS_Timer | I_M_Timer | I_Reserved_8 | I_S_External | I_VS_External | I_M_External | I_SG_External | I_COF
+inductive InterruptType where | I_Reserved_0 | I_S_Software | I_VS_Software | I_M_Software | I_Reserved_4 | I_S_Timer | I_VS_Timer | I_M_Timer | I_Reserved_8 | I_S_External | I_VS_External | I_M_External | I_SG_External | I_COF | I_Reserved_14 | I_Reserved_15
   deriving BEq, Inhabited, Repr
   open InterruptType
+
+inductive loop_chain_state where | NotInChain | InChainWithMatch | InChainWithoutMatch
+  deriving BEq, Inhabited, Repr
+  open loop_chain_state
 
 inductive MemoryRegionType where | MainMemory | IOMemory
   deriving BEq, Inhabited, Repr
@@ -538,6 +559,7 @@ structure PMAMisalignedExceptions where
   load_store : (Option misaligned_exception)
   vector : (Option misaligned_exception)
   amo : misaligned_exception
+  lrsc : misaligned_exception
   deriving BEq, Inhabited, Repr
 
 inductive Reservability where | RsrvNone | RsrvNonEventual | RsrvEventual
@@ -581,13 +603,30 @@ inductive PTW_Error where
   | PTW_No_Permission (_ : Unit)
   | PTW_Misaligned (_ : Unit)
   | PTW_PTE_Needs_Update (_ : Unit)
+  | PTW_Implicit_Error (_ : (ExceptionType × gpabits × (MemoryAccessType mem_payload)))
   | PTW_Ext_Error (_ : ext_ptw_error)
   deriving Inhabited, BEq, Repr
   open PTW_Error
 
+inductive TranslationStage where | S_Stage | VS_Stage | G_Stage
+  deriving BEq, Inhabited, Repr
+  open TranslationStage
+
+abbrev ext_exception := Unit
+
+structure ExceptionContext where
+  trap : ExceptionType
+  excinfo_is_gva : Bool
+  excinfo : xlenbits
+  excinfo2 : (Option xlenbits)
+  excinst : (Option xlenbits)
+  excinst_offset : (BitVec 5)
+  ext : (Option ext_exception)
+  deriving BEq, Inhabited, Repr
+
 inductive TrapCause where
   | Interrupt (_ : InterruptType)
-  | Exception (_ : ExceptionType)
+  | Exception (_ : ExceptionContext)
   deriving Inhabited, BEq, Repr
   open TrapCause
 
@@ -599,18 +638,28 @@ structure GlobalMisalignedExceptions where
   load_store : (Option misaligned_exception)
   vector : (Option misaligned_exception)
   amo : (Option misaligned_exception)
-  lrsc : misaligned_exception
+  lrsc : (Option misaligned_exception)
   deriving BEq, Inhabited, Repr
 
 inductive ExtContextPolicy where | ExtContext_Off | ExtContext_TwoState | ExtContext_FourState
   deriving BEq, Inhabited, Repr
   open ExtContextPolicy
 
+abbrev plat_hpmcounter_width_bits  : Int := 64
+
+abbrev plat_hpmevent_width_bits  : Int := 56
+
+abbrev num_triggers  : Int := 16
+
+inductive Sdtrig_breakpoint_reentrancy where | Use_tcontrol | Use_interrupt_enables | No_reentrancy_support
+  deriving BEq, Inhabited, Repr
+  open Sdtrig_breakpoint_reentrancy
+
 inductive FcsrRmReservedBehavior where | Fcsr_RM_Fatal | Fcsr_RM_Illegal
   deriving BEq, Inhabited, Repr
   open FcsrRmReservedBehavior
 
-inductive PmpWriteOnlyReservedBehavior where | PMP_Fatal | PMP_ClearPermissions
+inductive PmpWriteOnlyReservedBehavior where | PMP_Fatal | PMP_ClearPermissions | PMP_Ignore
   deriving BEq, Inhabited, Repr
   open PmpWriteOnlyReservedBehavior
 
@@ -642,7 +691,7 @@ abbrev ext_ptw_fail := Unit
 
 abbrev instbits := (BitVec 32)
 
-abbrev pagesize_bits : Int := 12
+abbrev pagesize_bits  : Int := 12
 
 inductive regno where
   | Regno (_ : Nat)
@@ -659,11 +708,20 @@ inductive CSRAccessType where | CSRRead | CSRWrite | CSRReadWrite
   deriving BEq, Inhabited, Repr
   open CSRAccessType
 
+inductive CSRCheckResult where
+  | CSR_Check_OK (_ : Unit)
+  | CSR_Illegal (_ : Unit)
+  | CSR_Virtual (_ : Unit)
+  deriving Inhabited, BEq, Repr
+  open CSRCheckResult
 
+abbrev is_mem_width (k_w : Int) : Bool := List.elem k_w [1, 2, 4, 8]
 
-abbrev max_mem_width_bytes_exp : Int := 3
+abbrev max_mem_width_bytes_exp  : Int := 3
 
-abbrev max_mem_width_bytes : Int := (2 ^ 3)
+abbrev max_mem_width_bytes  : Int := (2 ^ 3)
+
+abbrev is_mem_width_wide (k_w : Int) : Bool := List.elem k_w [1, 2, 4, 8, 16]
 
 inductive SWCheckCodes where | LANDING_PAD_FAULT
   deriving BEq, Inhabited, Repr
@@ -685,6 +743,12 @@ inductive ExtStatus where | Off | Initial | Clean | Dirty
   deriving BEq, Inhabited, Repr
   open ExtStatus
 
+abbrev hgatp_mode := (BitVec 4)
+
+inductive HGATPMode where | HBare | Sv32x4 | Sv39x4 | Sv48x4 | Sv57x4
+  deriving BEq, Inhabited, Repr
+  open HGATPMode
+
 abbrev satp_mode := (BitVec 4)
 
 inductive SATPMode where | Bare | Sv32 | Sv39 | Sv48 | Sv57
@@ -693,13 +757,25 @@ inductive SATPMode where | Bare | Sv32 | Sv39 | Sv48 | Sv57
 
 abbrev csrRW := (BitVec 2)
 
+abbrev is_sv_mode (k_v : Int) : Bool := List.elem k_v [32, 39, 48, 57]
 
+abbrev is_svx4_mode (k_v : Int) : Bool := List.elem k_v [34, 41, 50, 59]
+
+abbrev is_sv_or_svx4_mode (k_v : Int) : Bool := (is_sv_mode k_v) ∨ (is_svx4_mode k_v)
+
+abbrev is_sv32_mode (k_v : Int) : Bool := k_v = 32 ∨ k_v = 34
+
+abbrev root_level (k_v : Nat) : Int :=
+  (if ( k_v = 32 ∨ k_v = 34  : Bool) then 1 else (if ( k_v = 39 ∨ k_v = 41  : Bool) then 2 else (if ( k_v
+  = 48 ∨ k_v = 50  : Bool) then 3 else 4)))
 
 abbrev level_range (k_v : Nat) := Nat
 
-abbrev pte_bits k_v := (BitVec (if ( k_v = 32  : Bool) then 32 else 64))
+abbrev vpn_level_size (k_v : Nat) : Int := (12 - (if ( (is_sv32_mode k_v)  : Bool) then 2 else 3))
 
-abbrev ppn_bits k_v := (BitVec (if ( k_v = 32  : Bool) then 22 else 44))
+abbrev pte_bits k_v := (BitVec (if ( (is_sv32_mode k_v)  : Bool) then 32 else 64))
+
+abbrev ppn_bits k_v := (BitVec (if ( (is_sv32_mode k_v)  : Bool) then 22 else 44))
 
 abbrev vpn_bits k_v := (BitVec (k_v - 12))
 
@@ -707,7 +783,27 @@ inductive page_based_mem_type where | PBMT_PMA | PBMT_NC | PBMT_IO
   deriving BEq, Inhabited, Repr
   open page_based_mem_type
 
+inductive write_kind where | Write_plain | Write_RISCV_release | Write_RISCV_strong_release | Write_RISCV_conditional | Write_RISCV_conditional_release | Write_RISCV_conditional_strong_release
+  deriving BEq, Inhabited, Repr
+  open write_kind
+
+inductive read_kind where | Read_plain | Read_ifetch | Read_RISCV_acquire | Read_RISCV_strong_acquire | Read_RISCV_reserved | Read_RISCV_reserved_acquire | Read_RISCV_reserved_strong_acquire
+  deriving BEq, Inhabited, Repr
+  open read_kind
+
+inductive access_kind where
+  | AK_Write (_ : (write_kind × (MemoryAccessType mem_payload)))
+  | AK_Read (_ : (read_kind × (MemoryAccessType mem_payload)))
+  deriving Inhabited, BEq, Repr
+  open access_kind
+
+inductive barrier_kind where | Barrier_RISCV_rw_rw | Barrier_RISCV_r_rw | Barrier_RISCV_r_r | Barrier_RISCV_rw_w | Barrier_RISCV_w_w | Barrier_RISCV_w_rw | Barrier_RISCV_rw_r | Barrier_RISCV_r_w | Barrier_RISCV_w_r | Barrier_RISCV_tso | Barrier_RISCV_i
+  deriving BEq, Inhabited, Repr
+  open barrier_kind
+
 abbrev regtype := xlenbits
+
+abbrev Hstatus := (BitVec 64)
 
 abbrev Mtvec := (BitVec 64)
 
@@ -719,6 +815,10 @@ abbrev Counterin := (BitVec 32)
 
 abbrev Sstatus := (BitVec 64)
 
+abbrev Hgatp64 := (BitVec 64)
+
+abbrev Hgatp32 := (BitVec 32)
+
 abbrev Satp64 := (BitVec 64)
 
 abbrev Satp32 := (BitVec 32)
@@ -726,6 +826,15 @@ abbrev Satp32 := (BitVec 32)
 inductive FeatureEnabledResult where | FEATURE_ENABLED | FEATURE_ILLEGAL | FEATURE_VIRTUAL
   deriving BEq, Inhabited, Repr
   open FeatureEnabledResult
+
+inductive Event where | EV_FENCE | EV_TLB_MISS | EV_MISALIGNED_LOAD_EXCEPTION | EV_MISALIGNED_STORE_EXCEPTION
+  deriving BEq, Inhabited, Repr
+  open Event
+
+structure event_selector where
+  event : Event
+  selector : (BitVec 64)
+  deriving BEq, Inhabited, Repr
 
 abbrev Minterrupts := (BitVec 64)
 
@@ -736,6 +845,14 @@ inductive XipReadType where | IncludePlatformInterrupts | ExcludePlatformInterru
   open XipReadType
 
 abbrev Sinterrupts := (BitVec 64)
+
+abbrev HpmEvent := (BitVec 64)
+
+abbrev hpmidx := Nat
+
+inductive event_csr where | EV_EVENT | EV_COUNTER
+  deriving BEq, Inhabited, Repr
+  open event_csr
 
 /-- Type quantifiers: k_a : Type -/
 inductive Ext_DataAddr_Check (k_a : Type) where
@@ -769,14 +886,6 @@ abbrev bits_WU := (BitVec 32)
 abbrev bits_L := (BitVec 64)
 
 abbrev bits_LU := (BitVec 64)
-
-abbrev ext_exception := Unit
-
-structure sync_exception where
-  trap : ExceptionType
-  excinfo : (Option xlenbits)
-  ext : (Option ext_exception)
-  deriving BEq, Inhabited, Repr
 
 inductive PmpAddrMatchType where | OFF | TOR | NA4 | NAPOT
   deriving BEq, Inhabited, Repr
@@ -923,9 +1032,9 @@ inductive cfregidx where
 
 abbrev Fcsr := (BitVec 32)
 
+abbrev nfields_range (k_q : Int) : Bool := k_q > 0 ∧ k_q ≤ 8
 
-
-
+abbrev nfields_range_pow2 (k_q : Int) : Bool := List.elem k_q [1, 2, 4, 8]
 
 abbrev nfields := Int
 
@@ -1186,7 +1295,7 @@ abbrev LMUL_pow := Int
 
 abbrev sew_bitsize := Int
 
-
+abbrev is_sew_bitsize (k_n : Int) : Bool := List.elem k_n [8, 16, 32, 64]
 
 inductive agtype where | UNDISTURBED | AGNOSTIC
   deriving BEq, Inhabited, Repr
@@ -1196,6 +1305,175 @@ abbrev Vcsr := (BitVec 3)
 
 abbrev CountSmcntrpmf := (BitVec 64)
 
+abbrev trigger_index := Nat
+
+inductive Trig_Type where | TT_none | TT_legacy | TT_mcontrol | TT_icount | TT_itrigger | TT_etrigger | TT_mcontrol6 | TT_tmexttrigger | TT_custom | TT_disabled | TT_reserved
+  deriving BEq, Inhabited, Repr
+  open Trig_Type
+
+inductive Trig_Action where | TA_Breakpoint | TA_Enter_Debug | TA_Trace_On | TA_Trace_Off | TA_Trace_Notify | TA_Ext_Trigger_0 | TA_Ext_Trigger_1
+  deriving BEq, Inhabited, Repr
+  open Trig_Action
+
+inductive Hit where | Hit_false | Hit_before | Hit_after | Hit_imm_after
+  deriving BEq, Inhabited, Repr
+  open Hit
+
+inductive Compare_Selection where | Compare_Address | Compare_Data
+  deriving BEq, Inhabited, Repr
+  open Compare_Selection
+
+abbrev Trig_Match_Size := Int
+
+inductive Trig_Match where | TM_EQ | TM_NAPOT | TM_GE | TM_LT | TM_MASK_LO | TM_MASK_HI | TM_NEQ | TM_NOT_NAPOT | TM_NOT_MASK_LO | TM_NOT_MASK_HI
+  deriving BEq, Inhabited, Repr
+  open Trig_Match
+
+abbrev Trigger_Extra_RV32 := (BitVec 32)
+
+abbrev Trigger_Extra_RV64 := (BitVec 64)
+
+structure TExtra where
+  mhvalue : (BitVec 13)
+  mhselect : (BitVec 3)
+  sbytemask : (BitVec 4)
+  svalue : (BitVec 32)
+  sselect : (BitVec 2)
+  deriving BEq, Inhabited, Repr
+
+inductive trigger_addr_type where | TriggerAddress_Load | TriggerAddress_Store | TriggerAddress_AMO
+  deriving BEq, Inhabited, Repr
+  open trigger_addr_type
+
+abbrev trigger_data_bits  : Int := (8 * 16)
+
+abbrev trigger_data := (BitVec (8 * 16))
+
+inductive MemoryTriggerPayload where
+  | TriggerFetchAddr (_ : xlenbits)
+  | TriggerFetchInstr (_ : (xlenbits × trigger_data × Nat))
+  | TriggerAddress (_ : (trigger_addr_type × xlenbits × Int))
+  | TriggerStore (_ : (xlenbits × trigger_data × Nat))
+  | TriggerLoadData (_ : (xlenbits × trigger_data × Nat))
+  | TriggerAMOData (_ : (xlenbits × trigger_data × trigger_data × Nat))
+  deriving Inhabited, BEq, Repr
+  open MemoryTriggerPayload
+
+abbrev pending_trigger_info := (Trig_Action × trigger_index × xlenbits)
+
+structure TDisabled where
+  dmode : Bool
+  data : (BitVec (64 - 5))
+  tdata2 : xlenbits
+  textra : TExtra
+  deriving BEq, Inhabited, Repr
+
+abbrev TDisabled_bits := (BitVec 64)
+
+structure MControl6 where
+  dmode : Bool
+  uncertain : Bool
+  hit : Hit
+  vs : Bool
+  vu : Bool
+  select : Compare_Selection
+  size : Trig_Match_Size
+  action : Trig_Action
+  chain : Bool
+  t_match : Trig_Match
+  m : Bool
+  uncertainen : Bool
+  s : Bool
+  u : Bool
+  execute : Bool
+  store : Bool
+  load : Bool
+  tdata2 : xlenbits
+  textra : TExtra
+  match_info : (Option (xlenbits × Hit))
+  deriving BEq, Inhabited, Repr
+
+abbrev MControl6_bits := (BitVec 64)
+
+structure ICount where
+  dmode : Bool
+  vs : Bool
+  vu : Bool
+  hit : Bool
+  count : (BitVec 14)
+  m : Bool
+  pending : Bool
+  s : Bool
+  u : Bool
+  new_count : (Option (BitVec 14))
+  action : Trig_Action
+  active : Bool
+  tdata2 : xlenbits
+  textra : TExtra
+  deriving BEq, Inhabited, Repr
+
+abbrev ICount_bits := (BitVec 64)
+
+structure ITrigger where
+  dmode : Bool
+  hit : Bool
+  vs : Bool
+  vu : Bool
+  nmi : Bool
+  m : Bool
+  s : Bool
+  u : Bool
+  action : Trig_Action
+  tdata2 : xlenbits
+  textra : TExtra
+  pending : Bool
+  deriving BEq, Inhabited, Repr
+
+structure ETrigger where
+  dmode : Bool
+  hit : Bool
+  vs : Bool
+  vu : Bool
+  m : Bool
+  s : Bool
+  u : Bool
+  action : Trig_Action
+  tdata2 : xlenbits
+  textra : TExtra
+  pending : Bool
+  deriving BEq, Inhabited, Repr
+
+abbrev IETrigger_bits := (BitVec 64)
+
+inductive Trigger where
+  | T_disabled (_ : TDisabled)
+  | T_icount (_ : ICount)
+  | T_itrigger (_ : ITrigger)
+  | T_etrigger (_ : ETrigger)
+  | T_mcontrol6 (_ : MControl6)
+  deriving Inhabited, BEq, Repr
+  open Trigger
+
+abbrev TInfo := (BitVec 64)
+
+abbrev TData1 := (BitVec 64)
+
+abbrev TControl := (BitVec 64)
+
+abbrev SContext := (BitVec 64)
+
+abbrev MContext := (BitVec 64)
+
+abbrev External_Trigger := (BitVec 64)
+
+inductive tdata where | TDATA1 | TDATA2 | TDATA3
+  deriving BEq, Inhabited, Repr
+  open tdata
+
+inductive mask_type where | MASK_LO | MASK_HI
+  deriving BEq, Inhabited, Repr
+  open mask_type
+
 inductive Software_Check_Code where | SWC_NO_INFO | SWC_LANDING_PAD_FAULT | SWC_SHADOW_STACK_FAULT
   deriving BEq, Inhabited, Repr
   open Software_Check_Code
@@ -1203,13 +1481,6 @@ inductive Software_Check_Code where | SWC_NO_INFO | SWC_LANDING_PAD_FAULT | SWC_
 inductive landing_pad_expectation where | NO_LP_EXPECTED | LP_EXPECTED
   deriving BEq, Inhabited, Repr
   open landing_pad_expectation
-
-inductive CSRCheckResult where
-  | CSR_Check_OK (_ : Unit)
-  | CSR_Illegal (_ : Unit)
-  | CSR_Virtual (_ : Unit)
-  deriving Inhabited, BEq, Repr
-  open CSRCheckResult
 
 abbrev MemoryOpResult k_a := (Result k_a (physaddr × ExceptionType))
 
@@ -1219,7 +1490,9 @@ inductive Splittability where | CanSplit | CannotSplit
   deriving BEq, Inhabited, Repr
   open Splittability
 
-
+abbrev valid_misaligned_order (k_n : Int) (k_first : Int) (k_last : Int) (k_step : Int) : Bool :=
+  k_first = 0 ∧ k_last = (k_n - 1) ∧ k_step = 1 ∨
+  k_first = (k_n - 1) ∧ k_last = 0 ∧ k_step = ((- 1))
 
 structure Phys_Mem_Access_Info where
   splittable : Splittability
@@ -1247,27 +1520,29 @@ inductive PTE_Check where
   deriving Inhabited, BEq, Repr
   open PTE_Check
 
-abbrev tlb_vpn_bits : Int := (57 - 12)
+abbrev tlb_vpn_bits  : Int := (59 - 12)
 
-abbrev tlb_ppn_bits : Int := 44
+abbrev tlb_ppn_bits  : Int := 44
 
 structure TLB_Entry where
   asid : asidbits
+  vmid : vmidbits
+  stage : TranslationStage
   global : Bool
-  vpn : (BitVec (57 - 12))
-  levelMask : (BitVec (57 - 12))
+  vpn : (BitVec (59 - 12))
+  levelMask : (BitVec (59 - 12))
   ppn : (BitVec 44)
   pte : (BitVec 64)
   pteAddr : physaddr
   deriving BEq, Inhabited, Repr
 
-abbrev num_tlb_entries_exp : Int := 6
+abbrev num_tlb_entries_exp  : Int := 6
 
-abbrev num_tlb_entries : Int := (2 ^ 6)
+abbrev num_tlb_entries  : Int := (2 ^ 6)
 
 abbrev tlb_index_range := Nat
 
-/-- Type quantifiers: k_v : Int, is_sv_mode(k_v) -/
+/-- Type quantifiers: k_v : Int, (is_sv_or_svx4_mode k_v) -/
 structure PTW_Output (k_v : Nat) where
   ppn : (ppn_bits k_v)
   pte : (pte_bits k_v)
@@ -1288,7 +1563,8 @@ inductive ExecutionResult where
   | Enter_Wait (_ : WaitReason)
   | Illegal_Instruction (_ : Unit)
   | Virtual_Instruction (_ : Unit)
-  | Trap (_ : (Privilege × sync_exception × xlenbits))
+  | Trap (_ : (Privilege × ExceptionContext × xlenbits))
+  | PendingTrigger (_ : pending_trigger_info)
   | Ext_CSR_Check_Failure (_ : Unit)
   | Ext_ControlAddr_Check_Failure (_ : ext_control_addr_error)
   | Ext_DataAddr_Check_Failure (_ : ext_data_addr_error)
@@ -1296,11 +1572,13 @@ inductive ExecutionResult where
   deriving Inhabited, Repr
   open ExecutionResult
 
+structure AccessInfo where
+  eff_privilege : Privilege
+  pmlen : pm_len
+  as_guest : Bool
+  deriving BEq, Inhabited, Repr
+
 abbrev Srmcfg := (BitVec 64)
-
-abbrev HpmEvent := (BitVec 64)
-
-abbrev hpmidx := Nat
 
 inductive cbie where | CBIE_ILLEGAL | CBIE_EXEC_FLUSH | CBIE_EXEC_INVAL
   deriving BEq, Inhabited, Repr
@@ -1310,33 +1588,44 @@ inductive checked_cbop where | CBOP_ILLEGAL | CBOP_ILLEGAL_VIRTUAL | CBOP_INVAL_
   deriving BEq, Inhabited, Repr
   open checked_cbop
 
+structure instr_info where
+  fetch_privilege : Privilege
+  fetch_trigger_reentrance : Bool
+  fetched_instruction : instruction
+  executed_instruction : (Option instruction)
+  instbits : instbits
+  compressed : Bool
+  deriving Inhabited, Repr
+
 inductive HartState where
   | HART_ACTIVE (_ : Unit)
-  | HART_WAITING (_ : (WaitReason × instbits))
-  deriving Inhabited, BEq, Repr
+  | HART_WAITING (_ : (WaitReason × instr_info))
+  deriving Inhabited, Repr
   open HartState
 
 inductive FetchResult where
   | F_Ext_Error (_ : ext_fetch_addr_error)
   | F_Base (_ : word)
   | F_RVC (_ : half)
-  | F_Error (_ : (ExceptionType × xlenbits))
+  | F_Error (_ : ExceptionContext)
   deriving Inhabited, BEq, Repr
   open FetchResult
 
 /-- Type quantifiers: k_width : Int, k_width ≥ 0 -/
 inductive FetchBytes_Result (k_width : Nat) where
   | FetchBytes_Ext_Error (_ : ext_fetch_addr_error)
-  | FetchBytes_Exception (_ : ExceptionType)
+  | FetchBytes_Exception (_ : ExceptionContext)
   | FetchBytes_Success (_ : (BitVec (k_width * 8)))
   deriving Inhabited, BEq, Repr
   open FetchBytes_Result
 
 inductive Step where
   | Step_Pending_Interrupt (_ : (InterruptType × Privilege))
+  | Step_Pending_Trigger (_ : pending_trigger_info)
+  | Step_Fetch_Trigger (_ : pending_trigger_info)
   | Step_Ext_Fetch_Failure (_ : ext_fetch_addr_error)
-  | Step_Fetch_Failure (_ : (virtaddr × ExceptionType))
-  | Step_Execute (_ : (ExecutionResult × instbits))
+  | Step_Fetch_Failure (_ : ExceptionContext)
+  | Step_Execute (_ : (ExecutionResult × instr_info))
   | Step_Waiting (_ : WaitReason)
   deriving Inhabited, Repr
   open Step
@@ -1358,11 +1647,8 @@ inductive ISA_Format where | Canonical_Lowercase | DeviceTree_ISA_Extensions
 
 inductive Register : Type where
   | hart_state
-  | mhpmcounter
-  | mhpmevent
   | ssp
   | srmcfg
-  | satp
   | tlb
   | pma_regions
   | htif_payload_writes
@@ -1370,11 +1656,15 @@ inductive Register : Type where
   | htif_exit_code
   | htif_done
   | htif_tohost
-  | stimecmp
-  | mtimecmp
   | htif_tohost_base
   | pc_reset_address
   | elp
+  | mcontext
+  | scontext
+  | tcontrol
+  | written_trigger_index
+  | tselect
+  | triggers
   | minstretcfg
   | mcyclecfg
   | vcsr
@@ -1448,18 +1738,47 @@ inductive Register : Type where
   | f0
   | pmpaddr_n
   | pmpcfg_n
+  | written_event_index
+  | mhpmcounter
+  | mhpmevent
+  | vsip
+  | vsie
+  | hideleg
+  | hedeleg
+  | sig_msip
+  | msip
+  | mtime
+  | mtimecmp
+  | sig_ssip
   | sig_seip
   | sig_meip
   | mideleg
   | medeleg
   | mip
   | mie
-  | tselect
+  | hvip
+  | sig_hgeip
+  | hgeie
+  | vstimecmp
+  | stimecmp
+  | vsatp
+  | satp
+  | hgatp
   | stval
   | scause
   | sepc
   | sscratch
   | stvec
+  | vstval
+  | vscause
+  | vsepc
+  | vsscratch
+  | vstvec
+  | htinst
+  | htval
+  | htimedelta
+  | mtval2
+  | mtinst
   | mconfigptr
   | mhartid
   | marchid
@@ -1467,16 +1786,17 @@ inductive Register : Type where
   | mvendorid
   | minstret_increment
   | minstret
-  | mtime
   | mcycle
   | mcountinhibit
   | mcounteren
+  | hcounteren
   | scounteren
   | mscratch
   | mtval
   | mepc
   | mcause
   | mtvec
+  | hstatus
   | cur_inst
   | x31
   | x30
@@ -1511,6 +1831,7 @@ inductive Register : Type where
   | x1
   | nextPC
   | PC
+  | henvcfg
   | menvcfg
   | mseccfg
   | senvcfg
@@ -1518,14 +1839,15 @@ inductive Register : Type where
   | sstateen2
   | sstateen1
   | sstateen0
+  | mstateen0
   | mstateen3
   | mstateen2
   | mstateen1
-  | mstateen0
   | hstateen3
   | hstateen2
   | hstateen1
   | hstateen0
+  | vsstatus
   | mstatus
   | misa
   | cur_privilege
@@ -1542,11 +1864,8 @@ open Register
 
 abbrev RegisterType : Register → Type
   | .hart_state => HartState
-  | .mhpmcounter => (Vector (BitVec 64) 32)
-  | .mhpmevent => (Vector (BitVec 64) 32)
   | .ssp => (BitVec 64)
   | .srmcfg => (BitVec 64)
-  | .satp => (BitVec 64)
   | .tlb => (Vector (Option TLB_Entry) (2 ^ 6))
   | .pma_regions => (List PMA_Region)
   | .htif_payload_writes => (BitVec 4)
@@ -1554,11 +1873,15 @@ abbrev RegisterType : Register → Type
   | .htif_exit_code => (BitVec 64)
   | .htif_done => Bool
   | .htif_tohost => (BitVec 64)
-  | .stimecmp => (BitVec 64)
-  | .mtimecmp => (BitVec 64)
   | .htif_tohost_base => (Option (BitVec 64))
   | .pc_reset_address => (BitVec 64)
   | .elp => (BitVec 1)
+  | .mcontext => (BitVec 64)
+  | .scontext => (BitVec 64)
+  | .tcontrol => (BitVec 64)
+  | .written_trigger_index => (Option (Nat × tdata))
+  | .tselect => (BitVec 64)
+  | .triggers => (Vector Trigger 16)
   | .minstretcfg => (BitVec 64)
   | .mcyclecfg => (BitVec 64)
   | .vcsr => (BitVec 3)
@@ -1598,52 +1921,81 @@ abbrev RegisterType : Register → Type
   | .vr1 => (BitVec (2 ^ 8))
   | .vr0 => (BitVec (2 ^ 8))
   | .fcsr => (BitVec 32)
-  | .f31 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f30 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f29 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f28 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f27 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f26 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f25 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f24 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f23 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f22 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f21 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f20 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f19 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f18 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f17 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f16 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f15 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f14 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f13 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f12 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f11 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f10 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f9 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f8 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f7 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f6 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f5 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f4 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f3 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f2 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f1 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
-  | .f0 => (BitVec (if ( true  : Bool) then 8 else 4 * 8))
+  | .f31 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f30 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f29 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f28 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f27 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f26 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f25 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f24 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f23 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f22 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f21 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f20 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f19 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f18 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f17 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f16 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f15 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f14 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f13 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f12 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f11 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f10 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f9 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f8 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f7 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f6 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f5 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f4 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f3 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f2 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f1 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
+  | .f0 => (BitVec ((if ( true  : Bool) then 8 else 4) * 8))
   | .pmpaddr_n => (Vector (BitVec 64) 64)
   | .pmpcfg_n => (Vector (BitVec 8) 64)
+  | .written_event_index => (Option (Nat × event_csr))
+  | .mhpmcounter => (Vector (BitVec 64) 32)
+  | .mhpmevent => (Vector (BitVec 64) 32)
+  | .vsip => (BitVec 64)
+  | .vsie => (BitVec 64)
+  | .hideleg => (BitVec 64)
+  | .hedeleg => (BitVec 64)
+  | .sig_msip => (BitVec 1)
+  | .msip => (BitVec 32)
+  | .mtime => (BitVec 64)
+  | .mtimecmp => (BitVec 64)
+  | .sig_ssip => (BitVec 1)
   | .sig_seip => (BitVec 1)
   | .sig_meip => (BitVec 1)
   | .mideleg => (BitVec 64)
   | .medeleg => (BitVec 64)
   | .mip => (BitVec 64)
   | .mie => (BitVec 64)
-  | .tselect => (BitVec 64)
+  | .hvip => (BitVec 64)
+  | .sig_hgeip => (BitVec 64)
+  | .hgeie => (BitVec 64)
+  | .vstimecmp => (BitVec 64)
+  | .stimecmp => (BitVec 64)
+  | .vsatp => (BitVec 64)
+  | .satp => (BitVec 64)
+  | .hgatp => (BitVec 64)
   | .stval => (BitVec 64)
   | .scause => (BitVec 64)
   | .sepc => (BitVec 64)
   | .sscratch => (BitVec 64)
   | .stvec => (BitVec 64)
+  | .vstval => (BitVec 64)
+  | .vscause => (BitVec 64)
+  | .vsepc => (BitVec 64)
+  | .vsscratch => (BitVec 64)
+  | .vstvec => (BitVec 64)
+  | .htinst => (BitVec 64)
+  | .htval => (BitVec 64)
+  | .htimedelta => (BitVec 64)
+  | .mtval2 => (BitVec 64)
+  | .mtinst => (BitVec 64)
   | .mconfigptr => (BitVec 64)
   | .mhartid => (BitVec 64)
   | .marchid => (BitVec 64)
@@ -1651,16 +2003,17 @@ abbrev RegisterType : Register → Type
   | .mvendorid => (BitVec 32)
   | .minstret_increment => Bool
   | .minstret => (BitVec 64)
-  | .mtime => (BitVec 64)
   | .mcycle => (BitVec 64)
   | .mcountinhibit => (BitVec 32)
   | .mcounteren => (BitVec 32)
+  | .hcounteren => (BitVec 32)
   | .scounteren => (BitVec 32)
   | .mscratch => (BitVec 64)
   | .mtval => (BitVec 64)
   | .mepc => (BitVec 64)
   | .mcause => (BitVec 64)
   | .mtvec => (BitVec 64)
+  | .hstatus => (BitVec 64)
   | .cur_inst => (BitVec 64)
   | .x31 => (BitVec 64)
   | .x30 => (BitVec 64)
@@ -1695,6 +2048,7 @@ abbrev RegisterType : Register → Type
   | .x1 => (BitVec 64)
   | .nextPC => (BitVec 64)
   | .PC => (BitVec 64)
+  | .henvcfg => (BitVec 64)
   | .menvcfg => (BitVec 64)
   | .mseccfg => (BitVec 64)
   | .senvcfg => (BitVec 64)
@@ -1702,14 +2056,15 @@ abbrev RegisterType : Register → Type
   | .sstateen2 => (BitVec 32)
   | .sstateen1 => (BitVec 32)
   | .sstateen0 => (BitVec 32)
+  | .mstateen0 => (BitVec 64)
   | .mstateen3 => (BitVec 64)
   | .mstateen2 => (BitVec 64)
   | .mstateen1 => (BitVec 64)
-  | .mstateen0 => (BitVec 64)
   | .hstateen3 => (BitVec 64)
   | .hstateen2 => (BitVec 64)
   | .hstateen1 => (BitVec 64)
   | .hstateen0 => (BitVec 64)
+  | .vsstatus => (BitVec 64)
   | .mstatus => (BitVec 64)
   | .misa => (BitVec 64)
   | .cur_privilege => Privilege
@@ -1722,71 +2077,151 @@ abbrev RegisterType : Register → Type
   | .rvfi_instruction => (BitVec 64)
   | .fp_rounding_global => (BitVec 5)
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0, m : Nat, m ≥ 0, m ≥ k_n -/
-def zero_extend {m : _} (v : (BitVec k_n)) : (BitVec m) :=
-  (Sail.BitVec.zeroExtend v m)
+/-- Type quantifiers: k_p : Bool -/
+def not (b : Bool) : Bool :=
+  (! b)
 
-def physaddrbits_zero_extend (xs : (BitVec 64)) : (BitVec 64) :=
-  (zero_extend (m := 64) xs)
+def is_implicit_access (access : (MemoryAccessType mem_payload)) : Bool :=
+  match access with
+  | .InstructionFetch () => true
+  | .Load .PageTableEntry => true
+  | .Store .PageTableEntry => true
+  | _ => false
 
+def ak_memory_access (acc : access_kind) : (MemoryAccessType mem_payload) :=
+  match acc with
+  | .AK_Write (_, access) => access
+  | .AK_Read (_, access) => access
+
+def ak_is_explicit (acc : access_kind) : Bool :=
+  (not (is_implicit_access (ak_memory_access acc)))
+
+def ak_is_ifetch (acc : access_kind) : Bool :=
+  ((ak_memory_access acc) == (InstructionFetch ()))
+
+def ak_is_ttw (acc : access_kind) : Bool :=
+  match (ak_memory_access acc) with
+  | .Load .PageTableEntry => true
+  | .Store .PageTableEntry => true
+  | _ => false
+
+def ak_is_relaxed (acc : access_kind) : Bool :=
+  ((ak_is_explicit acc) && (match acc with
+    | .AK_Write (.Write_plain, _) => true
+    | .AK_Write (.Write_RISCV_conditional, _) => true
+    | .AK_Read (.Read_plain, _) => true
+    | .AK_Read (.Read_RISCV_reserved, _) => true
+    | _ => false : Bool))
+
+def ak_is_rel_acq_rcsc (acc : access_kind) : Bool :=
+  ((ak_is_explicit acc) && (match acc with
+    | .AK_Write (.Write_RISCV_strong_release, _) => true
+    | .AK_Write (.Write_RISCV_conditional_strong_release, _) => true
+    | .AK_Read (.Read_RISCV_strong_acquire, _) => true
+    | .AK_Read (.Read_RISCV_reserved_strong_acquire, _) => true
+    | _ => false : Bool))
+
+def ak_is_rel_acq_rcpc (acc : access_kind) : Bool :=
+  ((ak_is_explicit acc) && (match acc with
+    | .AK_Write (.Write_RISCV_release, _) => true
+    | .AK_Write (.Write_RISCV_conditional_release, _) => true
+    | .AK_Read (.Read_RISCV_acquire, _) => true
+    | .AK_Read (.Read_RISCV_reserved_acquire, _) => true
+    | _ => false : Bool))
+
+def ak_is_standalone (acc : access_kind) : Bool :=
+  ((ak_is_explicit acc) && (match (ak_memory_access acc) with
+    | .LoadReserved _ => false
+    | .StoreConditional _ => false
+    | .Atomic _ => false
+    | _ => true : Bool))
+
+def ak_is_exclusive (acc : access_kind) : Bool :=
+  match (ak_memory_access acc) with
+  | .LoadReserved _ => true
+  | .StoreConditional _ => true
+  | _ => false
+
+def ak_is_atomic_rmw (acc : access_kind) : Bool :=
+  match (ak_memory_access acc) with
+  | .Atomic _ => true
+  | _ => false
+
+@[reducible]
 instance : Arch where
-  va_size := 64
-  pa := (BitVec 64)
-  abort := Unit
-  translation := Unit
+  addr_size := physaddrbits_len
+  addr_space := Unit
+  CHERI := false
+  cap_size_log := 0
+  register := Register
+  register_type := RegisterType
+  mem_acc := access_kind
+  mem_acc_is_explicit := ak_is_explicit
+  mem_acc_is_ifetch := ak_is_ifetch
+  mem_acc_is_ttw := ak_is_ttw
+  mem_acc_is_relaxed := ak_is_relaxed
+  mem_acc_is_rel_acq_rcpc := ak_is_rel_acq_rcpc
+  mem_acc_is_rel_acq_rcsc := ak_is_rel_acq_rcsc
+  mem_acc_is_standalone := ak_is_standalone
+  mem_acc_is_exclusive := ak_is_exclusive
+  mem_acc_is_atomic_rmw := ak_is_atomic_rmw
   trans_start := Unit
   trans_end := Unit
-  fault := Unit
-  tlb_op := Unit
-  cache_op := Unit
+  abort := Unit
   barrier := barrier_kind
-  arch_ak := RISCV_strong_access
+  cache_op := Unit
+  tlbi := Unit
+  exn := Unit
   sys_reg_id := Unit
 
-
-
-abbrev SailM := PreSailM RegisterType trivialChoiceSource exception
-abbrev SailME := PreSailME RegisterType trivialChoiceSource exception
+abbrev SailM := PreSailM exception
+abbrev SailME := PreSailME exception
 
 
 
-instance : Inhabited (RegisterRef RegisterType HartState) where
+instance : Inhabited (RegisterRef HartState) where
   default := .Reg hart_state
-instance : Inhabited (RegisterRef RegisterType Privilege) where
+instance : Inhabited (RegisterRef Privilege) where
   default := .Reg cur_privilege
-instance : Inhabited (RegisterRef RegisterType (BitVec 1)) where
+instance : Inhabited (RegisterRef (BitVec 1)) where
   default := .Reg sig_meip
-instance : Inhabited (RegisterRef RegisterType (BitVec 128)) where
+instance : Inhabited (RegisterRef (BitVec 128)) where
   default := .Reg rvfi_pc_data
-instance : Inhabited (RegisterRef RegisterType (BitVec 192)) where
+instance : Inhabited (RegisterRef (BitVec 192)) where
   default := .Reg rvfi_inst_data
-instance : Inhabited (RegisterRef RegisterType (BitVec 3)) where
+instance : Inhabited (RegisterRef (BitVec 3)) where
   default := .Reg vcsr
-instance : Inhabited (RegisterRef RegisterType (BitVec 32)) where
+instance : Inhabited (RegisterRef (BitVec 32)) where
   default := .Reg sstateen0
-instance : Inhabited (RegisterRef RegisterType (BitVec 320)) where
+instance : Inhabited (RegisterRef (BitVec 320)) where
   default := .Reg rvfi_int_data
-instance : Inhabited (RegisterRef RegisterType (BitVec 4)) where
+instance : Inhabited (RegisterRef (BitVec 4)) where
   default := .Reg htif_payload_writes
-instance : Inhabited (RegisterRef RegisterType (BitVec 5)) where
+instance : Inhabited (RegisterRef (BitVec 5)) where
   default := .Reg fp_rounding_global
-instance : Inhabited (RegisterRef RegisterType (BitVec 64)) where
+instance : Inhabited (RegisterRef (BitVec 64)) where
   default := .Reg rvfi_instruction
-instance : Inhabited (RegisterRef RegisterType (BitVec 704)) where
+instance : Inhabited (RegisterRef (BitVec 704)) where
   default := .Reg rvfi_mem_data
-instance : Inhabited (RegisterRef RegisterType (BitVec (2 ^ 8))) where
+instance : Inhabited (RegisterRef (BitVec (2 ^ 8))) where
   default := .Reg vr0
-instance : Inhabited (RegisterRef RegisterType Bool) where
+instance : Inhabited (RegisterRef Bool) where
   default := .Reg rvfi_int_data_present
-instance : Inhabited (RegisterRef RegisterType (List PMA_Region)) where
+instance : Inhabited (RegisterRef (List PMA_Region)) where
   default := .Reg pma_regions
-instance : Inhabited (RegisterRef RegisterType (Option (BitVec 64))) where
+instance : Inhabited (RegisterRef (Option (BitVec 64))) where
   default := .Reg htif_tohost_base
-instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 64) 32)) where
+instance : Inhabited (RegisterRef (Option (Nat × tdata))) where
+  default := .Reg written_trigger_index
+instance : Inhabited (RegisterRef (Option (Nat × event_csr))) where
+  default := .Reg written_event_index
+instance : Inhabited (RegisterRef (Vector Trigger 16)) where
+  default := .Reg triggers
+instance : Inhabited (RegisterRef (Vector (BitVec 64) 32)) where
   default := .Reg mhpmevent
-instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 64) 64)) where
+instance : Inhabited (RegisterRef (Vector (BitVec 64) 64)) where
   default := .Reg pmpaddr_n
-instance : Inhabited (RegisterRef RegisterType (Vector (BitVec 8) 64)) where
+instance : Inhabited (RegisterRef (Vector (BitVec 8) 64)) where
   default := .Reg pmpcfg_n
-instance : Inhabited (RegisterRef RegisterType (Vector (Option TLB_Entry) (2 ^ 6))) where
+instance : Inhabited (RegisterRef (Vector (Option TLB_Entry) (2 ^ 6))) where
   default := .Reg tlb

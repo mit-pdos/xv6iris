@@ -88,12 +88,12 @@ theorem ust_tickOpt (cpu : CPU) (C : UCfg) {ξ : CtxId} (BF : UByteFrame GF ξ) 
     ⊢ swp cpu (if tick then tick_clock () else pure ()) (fun _ => Φ) := by
   cases tick with
   | false =>
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro ⟨Hfr, HK⟩
     iapply swp_ret
     iapply HK $$ %s %(ucClockAgree_refl s) Hfr
   | true =>
-    simp only [if_true]
+    simp only [ite_true]
     iintro ⟨Hfr, HK⟩
     iapply swp_ucTick (ufRegF cpu C) BF ufFoot_ucTick s hm
     iframe Hfr

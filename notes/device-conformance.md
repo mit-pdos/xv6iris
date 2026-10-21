@@ -23,8 +23,12 @@ RTL: 30) either
 - no proof, which is a FINDING (the row says `no proof`).
 
 It is a regression test: the executions already recorded from real machines
-are still executions the model ADMITS.  Green set: QEMU 69 (68 agree, 1
-stuck), JH7110 23, CVA6 19 -- Rocq's green set plus five hart-1 variants.
+are still executions the model ADMITS.  Green set on the sail-riscv 0.16 model
+(since 2026-10-20): QEMU 68 (67 agree, 1 stuck), JH7110 23, CVA6 19 --
+Rocq's green set plus five hart-1 variants, minus the one run the 0.16
+configuration turned red, QEMU/CoreCsrprobe (below, "The 0.16 bump"); before
+the bump QEMU 69 (68 agree, 1 stuck), JH7110 23, CVA6 19, and for one day
+(2026-10-19) three fewer.
 
 ## How it is checked
 
@@ -37,6 +41,18 @@ the noncomputable part of the Sail model comes from compiled copies tied to
 the originals by `rfl`-proved `csimp` rules (`Vtest/Compile.lean`).  Trusted
 beyond the kernel: the Lean compiler/interpreter (one `native_decide` axiom
 per capture).
+
+The harness speaks lean-sail's concurrency interface v2 (sail-riscv 0.16):
+a hart's events are `Sail.ArchSem.InstructionEffect`s over a `MemRequest`
+(a read answers its bits and an empty tag vector, a write carries its bits
+and answers `.ok ()`, a store's footprint is announced first, silently), and
+the model's failures and finite choices are separate nodes of its monad
+(`.inl (.error _)`, `.inr n`).  Two things the relation leaves open are
+fixed by the interpreter's policy (`HPol`), which can make a run miss a
+capture but never take a step the model does not have: the `exit_wait`
+input of `try_step` at each cycle boundary (`HPol.ew`, default `false`, the
+schedule the pre-0.16 harness ran) and a finite choice (its first
+alternative).  `XState` keeps one slot per model register (213 in 0.16).
 
 ## Commands (on a build machine or in CI)
 
@@ -61,6 +77,50 @@ Rocq README's open model-vs-hardware findings (misa.H / mideleg, the DTB
 pointer, raw counters, virtio feature words and `seg_max`, the
 four-descriptor chain, no F/D instructions, the direct-mapped TLB, power-on
 ADUE, board and RTL CSR differences); `explain --all` prints each.
+
+### The 0.16 bump (2026-10-19/20): one run red, by this tree's configuration
+
+Re-running every checked-in capture on the sail-riscv 0.16 model (no
+capture regenerated, no proof changed) turned four green runs red and no red
+run green.  All four were FINDINGS about this tree's CONFIGURATION, T0 choices
+under `notes/model-policy.md` (section 4); under upstream's defaults the runs
+would agree.  0.16's device behaviour (UARTs, PLIC, CLINT, virtio) is not
+involved: every device run that was green is still green.  Three of the four
+-- the `CoreRegsFcsr` runs -- were the symptom of a configuration item (F and
+D off) that lasted one day: every validated platform has F and D, and `misa`
+had come to read a value no platform reports, so the item was withdrawn on
+2026-10-20 and the three runs are green again (the policy's T0(a) now says the
+configuration follows the validated platforms wherever they agree).  The
+fourth, QEMU/CoreCsrprobe, stays red: Sdtrig is off here (configuration item
+3).  The platforms disagree on it -- this very test's scoreboard, slot 35
+(`csrr tselect`, 1 = trapped), reads 0 on QEMU and the JH7110 and 1 on CVA6 --
+so the configuration follows CVA6 (owner ruling (6), 2026-10-20, under T0(a)'s
+disagreement rule); the cost of Sdtrig on (trigger checks in every memory
+access and fetch, trigger registers in the power-on obligations) is estimated,
+not measured.  With Sdtrig on the run would read `tselect = 0` from `zeroRegs`
+without a pin; its pre-bump green was a `tselect` stub that always answered.
+(Corrected 2026-10-20: this note had said every validated platform has
+Sdtrig.)
+
+| Run | Claim | Verdict (`explain`) and first failing obligation | Cause |
+|---|---|---|---|
+| QEMU/CoreRegsFcsr, QEMU/CoreRegsFcsr (hart 1), CVA6/CoreRegsFcsr -- red 2026-10-19 only | agrees | BUDGET at pc 0, mcause 1: the run never reached DONE | the withdrawn item 8 (F and D off): `mstatus.FS` read-only zero and the floating-point CSRs illegal, so the test's `csrr fcsr` trapped to the mtvec it never installed; green again with F and D advertised (their instructions still uncompiled: `fcsr` is a CSR, not an instruction) |
+| QEMU/CoreCsrprobe | agrees | DONE, result differs at slot 35 (`tselect`: model 1 = trapped, QEMU 0), at the trap count (2 vs 1) and in the trap records (an extra mcause 2 at mepc 0x800003c0, mtval 0x7a0023f3 = `csrr t2, tselect`) | configuration item 3, Sdtrig off (upstream default on; QEMU and the JH7110 have trigger CSRs, CVA6 does not): reading `tselect` is an illegal instruction; the pre-bump model had a `tselect` stub that always answered |
+
+(JH7110/CoreRegsFcsr and the CVA6 and JH7110 CoreCsrprobe runs were red
+before the bump and stay red; CVA6/CoreCsrprobe's slot 35 agrees with the
+model, both trap.)  The one "stuck" run in the QEMU and CVA6 green sets is
+`core_csrwide`, stuck at `csrr mseccfg` as before the bump (the Rocq tree's
+finding 32): `notes/model-diffs.md` section 4 has the mechanism, an uncompiled
+Zkr clause behind `is_CSR_accessible`, which no configuration flag removes.
+
+What the captures witness about `misa` (`core_csrvals` slot 1, a `sw` of the
+low 32 bits; `core_regs_mcsr` does not publish it, and MXL is the board
+line's): QEMU 0x001411AD (A C D F H I M S U), JH7110 0x0094112F (A B C D F I M
+S U X), CVA6 0x0014112F (A B C D F I M S U).  All three have F and D and lack
+V; QEMU alone has H; the two boards have B and QEMU does not; the tree's
+0x...14112D is QEMU's word without H (configuration items 2-3,
+`notes/model-diffs.md` section 4; Rocq finding 29).
 
 Noted, not a difference: `Virtio.capacity0` is 2000 sectors (xv6's FSSIZE)
 where Rocq's `virtio_capacity0` is 128; a test starts its disk at 128

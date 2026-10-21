@@ -295,7 +295,7 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitl []
   · rw [iregRegime_true]; iexact Hopen
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin
   iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Ht1 Hslot -
   ihave Htx := logTx_join icfgLog t $$ Ht1 Ht2
@@ -345,14 +345,14 @@ theorem namex_dl_found_held (data : Nat → List (BitVec 8)) (dn : Dinode) (dinu
     inodeRef (GF := GF) kslot qq icfgDev inum2 ∗ runitAny inum2.toNat ⊢ inodeHeld (ientry kslot) := by
   have hb : inum2.toNat < 16 * icfgNib ∧ 0 < inum2.toNat := by
     cases self
-    · simp only [Bool.false_eq_true, if_false] at harm
+    · simp only [Bool.false_eq_true, ite_false] at harm
       obtain ⟨-, hf, rfl⟩ := harm
       have hinums := dirOk_dir icfgNib dn data hty hdok
       have hlt := dirFirst_lt _ _ _ _ hf
       have hlive := dirFirst_live _ _ _ _ hf
       refine ⟨?_, Xv6.dirlookup_live_pos data kk hlive⟩
       rw [MachCSL.zext32_toNat]; exact hinums kk hlt hlive
-    · simp only [if_true] at harm
+    · simp only [ite_true] at harm
       obtain ⟨-, rfl, -⟩ := harm
       exact ⟨hib, hip⟩
   iintro ⟨Href, Hru⟩
@@ -395,9 +395,9 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     A.γk (ientry ik) inum bm data dn dn nf false 0#32 A.pidv A.dqp (DFrac.own (1 : Qp).half)
     (DFrac.own 1) ik sd A.rootv A.rti A.dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes
     hinums (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
-    (by simp only [Bool.false_eq_true, if_false]; exact ha2)
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha2)
   unfold wp_dirlookup_eb_body at h
-  simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
+  simp only [dirlookupAddr, Bool.false_eq_true, ite_false] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrc, Hrr, Hbs,
     Hslot, Hlk, Hdi, HK⟩
   icases namexEnv_open Γ A $$ Henv with
@@ -412,11 +412,11 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply HK $$ %c %spie %spp %R' %found %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
     Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi
   cases found
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%hf, Hslot, -⟩
     iframe Hslot
     ipureintro; exact hf
-  · simp only [if_true]
+  · simp only [ite_true]
     icases Harm with ⟨%inum2, %hks, %harm, Href, Hru2, -⟩
     iexists inum2, self, kd
     iframe Href Hru2

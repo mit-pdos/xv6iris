@@ -31,7 +31,7 @@ import Vtest.Pool
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 open Iris.ProgramLogic
 
 /-! ## The ABI (tools/vtest/abi.h) -/
@@ -213,20 +213,22 @@ def RunNoStepAt (t : Test) : Prop :=
 /-- `MachCSL.bootRun` over the executable register file. -/
 def xbootRun {X : Type} : SailM X → XRegs → Option (X × XRegs)
   | .pure x, f => some (x, f)
-  | .impure (.error _) _, _ => none
-  | .impure (.ok o) k, f =>
+  | .impure (.inl (.error _)) _, _ => none
+  | .impure (.inr _) _, _ => none
+  | .impure (.inl (.ok o)) k, f =>
     match o, k with
-    | .regRead r, k => xbootRun (k (f.get r)) f
-    | .regWrite r v, k => xbootRun (k PUnit.unit) (f.insert r v)
+    | .regRead r _, k => xbootRun (k (f.get r)) f
+    | .regWrite r _ v, k => xbootRun (k ()) (f.insert r v)
+    | .memWriteAnnounce _, k => xbootRun (k ()) f
     | .cacheOp _, k => xbootRun (k ()) f
-    | .tlbi _, k => xbootRun (k ()) f
+    | .tlbOp _, k => xbootRun (k ()) f
     | .translationStart _, k => xbootRun (k ()) f
     | .translationEnd _, k => xbootRun (k ()) f
-    | .takeException _, k => xbootRun (k ()) f
-    | .returnException _, k => xbootRun (k ()) f
-    | .cycleCount, k => xbootRun (k ()) f
+    | .archException _, k => xbootRun (k ()) f
+    | .returnException, k => xbootRun (k ()) f
+    | .clockCycle, k => xbootRun (k ()) f
     | .getCycleCount, k => xbootRun (k (0 : Nat)) f
-    | .message _, k => xbootRun (k ()) f
+    | .printMessage _, k => xbootRun (k ()) f
     | _, _ => none
 
 theorem xbootRun_sound {X : Type} (m : SailM X) (f f' : XRegs) (v : X)
@@ -237,13 +239,16 @@ theorem xbootRun_sound {X : Type} (m : SailM X) (f f' : XRegs) (v : X)
     obtain ⟨rfl, rfl⟩ := h; rfl
   | impure call k ih =>
     cases call with
-    | error e => simp [xbootRun] at h
-    | ok o =>
-      cases o <;> simp only [xbootRun, reduceCtorEq] at h
-      all_goals
-        first
-        | exact ih _ _ h
-        | (have h' := ih _ _ h; rw [XRegs.file_insert] at h'; exact h')
+    | inr n => simp [xbootRun] at h
+    | inl e =>
+      cases e with
+      | error e => simp [xbootRun] at h
+      | ok o =>
+        cases o <;> simp only [xbootRun, reduceCtorEq] at h
+        all_goals
+          first
+          | exact ih _ _ h
+          | (have h' := ih _ _ h; rw [XRegs.file_insert] at h'; exact h')
 
 /-- The boot program's landing file for hart id `hid`, executably. -/
 def bootX (hid : Nat) : Option XRegs :=

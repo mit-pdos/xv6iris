@@ -430,11 +430,11 @@ theorem writei_src_split (A : WiArgs) (src : BitVec 64) (PI : UPtd) (tot mm : Na
       wiSrcRest A src tot mm := by
   unfold wiSrc wiSrcRest
   cases hu : A.user
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iintro ⟨Hb, Hp⟩
     icases UMemL.byteBuf_split_td src A.dqs A.sbs tot mm (hle hu) $$ Hb with ⟨H1, H2, H3⟩
     iframe
-  · simp only [if_true]
+  · simp only [ite_true]
     iintro H
     iframe
 
@@ -465,7 +465,7 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
         byteBuf (GF := GF) dst (DFrac.own 1) ch ∗ wiSrc A src P2 := by
   unfold wiSrcRest wiSrc
   cases hu : A.user
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iintro ⟨⟨%hr, Hs, Hd⟩, H1, H3, Hp⟩
     have hl := hle hu
     have hcl : ((A.sbs.drop tot).take mm).length = mm := by
@@ -484,7 +484,7 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
           byteBuf src A.dqs A.sbs from by rw [← hl'])
       iapply UMemL.byteBuf_join_td src A.dqs A.sbs _ tot mm hl hcl
       iframe
-  · simp only [if_true]
+  · simp only [ite_true]
     iintro ⟨⟨%P', %bs', %kv, ⟨%hx, %hpost⟩, %hkv, Hpriv, Hd⟩, -⟩
     have e := UMemL.viewFaulted_trans A.M hext.1 hx.1
     rw [e] at hpost

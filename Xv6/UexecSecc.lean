@@ -92,8 +92,8 @@ theorem seccMaskedSeccOk (n : Int) (tf : List (BitVec 64)) (m m' r : BitVec 64)
 theorem usysFdOkPipeFail (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List FdState)
     (hr : r.toNat ≠ 0) (h : usysFdOk USYS_pipe tf r sts sts') : sts' = sts := by
   unfold usysFdOk at h
-  simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, if_false, if_true] at h
-  rw [if_neg hr] at h
+  simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, ite_false, ite_true] at h
+  rw [ite_eq_right hr] at h
   exact h.2
 
 /-! ## 2.  THE KEY -/
@@ -222,22 +222,22 @@ theorem seccRowsFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts'
   unfold usysFdOk at h
   iintro #Hr
   by_cases hc : n = USYS_close
-  · rw [if_pos hc] at h
+  · rw [ite_eq_left hc] at h
     obtain ⟨h1, _⟩ := h
     split at h1
     · subst h1
       iapply seccRowsInsert sts _ .closed $$ Hr
       unfold seccRow; ipureintro; trivial
     · subst h1; iexact Hr
-  rw [if_neg hc] at h
+  rw [ite_eq_right hc] at h
   by_cases hd : n = USYS_dup
-  · rw [if_pos hd] at h
+  · rw [ite_eq_left hd] at h
     rcases h with ⟨fd1, _, _, _, h1⟩ | ⟨_, h1, _⟩
     · subst h1
       iapply seccRowsInsert sts fd1 _ $$ Hr
       iapply seccRowsLookup sts _ $$ Hr
     · subst h1; iexact Hr
-  rw [if_neg hd, if_neg ho, if_neg hp] at h
+  rw [ite_eq_right hd, ite_eq_right ho, ite_eq_right hp] at h
   subst h
   iexact Hr
 

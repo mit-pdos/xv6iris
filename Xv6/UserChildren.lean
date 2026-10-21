@@ -387,8 +387,8 @@ theorem zsAuth_update (f : Nat → Option (BitVec 32 × Int)) (k : Nat) (hk : k 
   ipureintro
   intro i hi
   by_cases e : i = k
-  · subst e; simp only [if_true]; exact get?_insert_eq rfl
-  · simp only [e, if_false]
+  · subst e; simp only [ite_true]; exact get?_insert_eq rfl
+  · simp only [e, ite_false]
     rw [get?_insert_ne (fun h => e (zs_key_inj hi hk h.symm))]
     exact hM i hi
 

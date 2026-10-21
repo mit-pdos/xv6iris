@@ -93,7 +93,7 @@ theorem ukCode_seg (γt : GName) (s : User.USeg) :
       apply User.utextImg_run
       intro j hj
       unfold User.USeg.byte
-      rw [if_pos ⟨by omega, by omega⟩, Nat.add_sub_cancel_left]
+      rw [ite_eq_left ⟨by omega, by omega⟩, Nat.add_sub_cancel_left]
     exact h1.trans E.2
   · unfold ukCode User.utextImg
     iintro #H

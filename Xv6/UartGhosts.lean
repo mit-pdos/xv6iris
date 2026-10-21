@@ -648,7 +648,7 @@ theorem uartColOk_txPop (i : UartId) (u u' : UartState) (b : BitVec 8) (ins : Li
   split at hpop
   · exact absurd hpop (by simp)
   · rename_i c tx' htx
-    simp only [hloop, Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at hpop
+    simp only [hloop, Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at hpop
     obtain ⟨rfl, rfl⟩ := hpop
     refine ⟨?_, rfl⟩
     obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14, h15⟩ := hok

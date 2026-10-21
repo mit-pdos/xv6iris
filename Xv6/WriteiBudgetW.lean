@@ -86,16 +86,16 @@ theorem bmPot_le1 (bms : Nat) (S : List Nat) : bmPot bms S ≤ 1 := by
   unfold bmPot; split <;> omega
 
 theorem bmPot_in (bms : Nat) (S : List Nat) (h : bms ∈ S) : bmPot bms S = 0 := by
-  unfold bmPot; rw [if_pos h]
+  unfold bmPot; rw [ite_eq_left h]
 
 /-- The set only grows, so the potential only falls. -/
 theorem bmPot_mono (bms : Nat) (S S' : List Nat) (hsub : ∀ x ∈ S, x ∈ S') :
     bmPot bms S' ≤ bmPot bms S := by
   unfold bmPot
   by_cases h' : bms ∈ S'
-  · rw [if_pos h']; omega
+  · rw [ite_eq_left h']; omega
   · have : bms ∉ S := fun h => h' (hsub _ h)
-    rw [if_neg h', if_neg this]; exact Nat.le_refl 1
+    rw [ite_eq_right h', ite_eq_right this]; exact Nat.le_refl 1
 
 /-- What the rest of the loop can afford (Rocq's `wi_inv_bud`). -/
 def wiInvBud (bms : Nat) (W nI : Nat) (SI : List Nat) : Prop :=
@@ -121,8 +121,8 @@ theorem wiBmapNeedOk (bms : Nat) (W nI : Nat) (SI : List Nat) (ind : Bool) (hW :
   unfold wiInvBud bmPot at h
   unfold bmapNeed
   by_cases hi : bms ∈ SI
-  · rw [if_pos hi] at h; simp only [hi, decide_true]; cases ind <;> simp <;> omega
-  · rw [if_neg hi] at h; simp only [hi, decide_false]; cases ind <;> simp <;> omega
+  · rw [ite_eq_left hi] at h; simp only [hi, decide_true]; cases ind <;> simp <;> omega
+  · rw [ite_eq_right hi] at h; simp only [hi, decide_false]; cases ind <;> simp <;> omega
 
 /-- No arm of bmap costs more than two plus the potential (Rocq's
 `wi_bmap_cost_le`). -/
@@ -130,8 +130,8 @@ theorem wiBmapCostLe (bms : Nat) (SI : List Nat) (al ind : Bool) :
     bmapCost (decide (bms ∈ SI)) al ind ≤ 2 + bmPot bms SI := by
   unfold bmapCost bmPot
   by_cases hi : bms ∈ SI
-  · simp only [hi, decide_true, if_true]; cases al <;> cases ind <;> simp
-  · simp only [hi, decide_false, if_false]; cases al <;> cases ind <;> simp
+  · simp only [hi, decide_true, ite_true]; cases al <;> cases ind <;> simp
+  · simp only [hi, decide_false, ite_false]; cases al <;> cases ind <;> simp
 
 /-- THE STEP where bmap allocated NOTHING (Rocq's `wi_step_noalloc`). -/
 theorem wiStepNoalloc (bms : Nat) (ncount nI nI' B W : Nat) (SI SI' : List Nat)
@@ -200,9 +200,9 @@ theorem wiIterAllocBound (bms : Nat) (nI nB nL : Nat) (SI : List Nat) (crlw al i
     nI ≤ nL + 2 + bmPot bms SI := by
   unfold bmapCost at h1; unfold bmPot
   by_cases hi : bms ∈ SI
-  · simp only [hi, decide_true, if_true] at h1 ⊢
+  · simp only [hi, decide_true, ite_true] at h1 ⊢
     cases al <;> cases ind <;> cases crlw <;> simp at h1 h2 h3 ⊢ <;> omega
-  · simp only [hi, decide_false, if_false] at h1 ⊢
+  · simp only [hi, decide_false, ite_false] at h1 ⊢
     cases al <;> cases ind <;> cases crlw <;> simp at h1 h2 h3 ⊢ <;> omega
 
 /-- ...and the NON-allocating one (Rocq's `wi_iter_noalloc_bound`). -/

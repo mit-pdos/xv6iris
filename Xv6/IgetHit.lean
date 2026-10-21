@@ -66,7 +66,7 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   rw [mem_mdom, mem_mdom, LawfulPartialMap.get?_insert]
   by_cases h : j = y
   · subst h; simp [hMj]
-  · simp only [h, if_false]
+  · simp only [h, ite_false]
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]

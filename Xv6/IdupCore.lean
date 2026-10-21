@@ -111,7 +111,7 @@ theorem id_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   rw [hdom, mem_mdom, mem_mdom, LawfulPartialMap.get?_insert]
   by_cases h : k = y
   · subst h; simp [hMk]
-  · simp only [h, if_false]
+  · simp only [h, ite_false]
 
 /-- **THE OPEN** (Rocq ProofIdup 384--487): everything between the acquire
 and the `lw`, in Rocq's order.  See the file header. -/

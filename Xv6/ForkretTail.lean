@@ -56,7 +56,7 @@ theorem fkr_userret_va' :
 /-- **MAKE_SATP** (`(pa >> 12) | (8L << 60)`), at a page address. -/
 theorem fkr_make_satp (r : BitVec 44) :
     (pageAddr r >>> 12) ||| 0x8000000000000000#64 = satpOf KTier.kpt r := by
-  unfold pageAddr pteAddr zero_extend Sail.BitVec.zeroExtend satpOf
+  unfold pageAddr pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend satpOf
   bv_decide
 
 theorem fkr_ctx_setReg (k : KCtx) (r : BitVec 5) (v : BitVec 64) (a b : Bool) (R : RegMap) :
@@ -111,6 +111,7 @@ theorem fkr_prep_call [CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ :
       Register.sepc ↦ᵣ[cpu'] (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗
       (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
       (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
+      hTrapCsrs cpu' -∗
       Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
       procPrivFd γ pa pid
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
@@ -157,6 +158,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
       kctx c' ((k.intrOff true false).withRegs R') -∗ pcIs c' userretVa -∗
       Register.sepc ↦ᵣ[c'] tfResumePc V.tf -∗
       (∃ v : BitVec 64, Register.scause ↦ᵣ[c'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c'] v) -∗
+      hTrapCsrs c' -∗
       Register.stvec ↦ᵣ[c'] uservecTvec -∗ cpuClaim c' pa -∗
       procPrivFd γ pa pid (fkrPrep V k.root c') M -∗ wpLoop c'))
     ⊢ wpLoop (GF := GF) c := by
@@ -183,7 +185,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   iintro %c2 %hpin
   have hpin' : k.sie = false → c2 = c1 := fun h => hpin (Or.inl h)
   ihave Hce := cpuClaimExt_move c1 c2 _ _ hpin' $$ Hce
-  iintro %R1 Hk Hpc %hcs Hpay Hsepc Hsc Htv Hstv Hpv
+  iintro %R1 Hk Hpc %hcs Hpay Hsepc Hsc Htv Hh Hstv Hpv
   ihave Hcl := fkr_claim c2 k.sie pa $$ [Hce Hpay]
   · iframe
   have hsie : ((k.intrOff true false).withRegs R1).sie = false := rfl
@@ -191,7 +193,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   k_norm_g at hcs
   obtain ⟨c_2, c_8, c_9, -⟩ := hcs
   have hR9 : R1 9#5 = pa := by rw [c_9]; k_norm_g; exact hs1
-  simp only [KCtx.setReg_regs, RegMap.set_apply, if_true]
+  simp only [KCtx.setReg_regs, RegMap.set_apply, ite_true]
   rw [fkr_ret58']
   icases fkr_priv_pt hct γ pa pid _ M $$ Hpv with ⟨Hpg, Hpvb⟩
   -- +0x58  ld a0,80(s1)
@@ -255,7 +257,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   ihave Hsepc := (show Register.sepc ↦ᵣ[c2] (tfW V.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) ⊢
       Register.sepc ↦ᵣ[c2] tfResumePc V.tf from by rw [fkr_sepc]) $$ Hsepc
   ihave Hk := kctx_eq_mono c2 _ _ (fkr_ctx_setReg k 1#5 (KA.«forkret» + 88#64) true false _) $$ Hk
-  iapply Hn $$ %_ %⟨?_, ?_⟩ Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
+  iapply Hn $$ %_ %⟨?_, ?_⟩ Hk Hpc Hsepc Hsc Htv Hh Hstv Hcl Hpv
   · simp only [RegMap.set_apply]
     k_norm_g
     exact fkr_make_satp _

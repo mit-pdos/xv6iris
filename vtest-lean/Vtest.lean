@@ -112,7 +112,6 @@ import Vtest.QEMU.ConcLostPass
 import Vtest.QEMU.ConcMpPass
 import Vtest.QEMU.ConcSbPass
 import Vtest.QEMU.ConcSmokePass
-import Vtest.QEMU.CoreCsrprobePass
 import Vtest.QEMU.CoreCsrwidePass
 import Vtest.QEMU.CoreHartPass
 import Vtest.QEMU.CoreIcachePass

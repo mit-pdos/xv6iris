@@ -293,7 +293,7 @@ theorem fdUnpair_pair (a b fuel : Nat) (hf : a ≤ fuel) : fdUnpair fuel (fdPair
     | zero => simp [fdUnpair, fdPair]; omega
     | succ f =>
       simp only [fdUnpair, fdPair, Nat.pow_zero, Nat.one_mul]
-      rw [if_neg (by omega)]; simp; omega
+      rw [ite_eq_right (by omega)]; simp; omega
   | succ a ih =>
     cases fuel with
     | zero => omega
@@ -301,7 +301,7 @@ theorem fdUnpair_pair (a b fuel : Nat) (hf : a ≤ fuel) : fdUnpair fuel (fdPair
       have e : fdPair (a + 1) b = 2 * fdPair a b := by
         simp only [fdPair]; rw [Nat.pow_succ, Nat.mul_comm (2 ^ a) 2, Nat.mul_assoc]
       simp only [fdUnpair]
-      rw [e, if_pos (by omega), show 2 * fdPair a b / 2 = fdPair a b by omega, ih f (by omega)]
+      rw [e, ite_eq_left (by omega), show 2 * fdPair a b / 2 = fdPair a b by omega, ih f (by omega)]
 
 theorem fdPair_gt (a b : Nat) : b < fdPair a b := by
   have : 1 ≤ 2 ^ a := Nat.one_le_two_pow
@@ -338,7 +338,7 @@ theorem fdDecList_enc (l : List Nat) (fuel : Nat) (hf : fdEncList l ≤ fuel) :
     | succ f =>
       have hpos : fdEncList (x :: l) ≠ 0 := by simp [fdEncList]; omega
       simp only [fdEncList] at hf hpos ⊢
-      rw [fdDecList, if_neg hpos, fdUnpair_pair x _ _ (by omega)]
+      rw [fdDecList, ite_eq_right hpos, fdUnpair_pair x _ _ (by omega)]
       simp only
       rw [ih f (by omega)]
 
@@ -385,19 +385,19 @@ theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
     · rename_i hk
       have hm : (4 + 12 * (k - 4)) % 12 = 4 := by omega
       simp only [raltDec]
-      rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-        if_neg (by omega), if_neg (by omega)]
+      rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+        ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+        ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+        ite_eq_right (by omega), ite_eq_right (by omega)]
       congr 1; omega
   | RFRan sel =>
     -- `raltEnc` first: unfolding it under `raltDec`'s `if`s leaves their decidability instances
-    -- at the folded form, which `rw [if_neg …]` then rejects (Lean ≥ 4.34)
+    -- at the folded form, which `rw [ite_eq_right …]` then rejects (Lean ≥ 4.34)
     simp only [raltEnc]
     simp only [raltDec]
-    rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-      if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-      if_neg (by omega), if_pos (by omega)]
+    rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+      ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+      ite_eq_right (by omega), ite_eq_left (by omega)]
     have e : (15 + 12 * fdEncList sel - 15) / 12 = fdEncList sel := by omega
     rw [e, fdDecList_enc sel _ (Nat.le_refl _)]
   | _ => rfl

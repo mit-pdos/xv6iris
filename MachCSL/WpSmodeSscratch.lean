@@ -20,7 +20,7 @@ import MachCSL.WpMmodeAlu
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -28,10 +28,16 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 @[sail_facts] theorem csr_name_map_forwards_sscratch : csr_name_map_forwards 0x140#12 = pure "sscratch" := rfl
 
 -- the `read_CSR` / `write_CSR` arms, so the executor never unfolds the
--- model's whole match
-@[sail_facts] theorem read_CSR_sscratch : read_CSR 0x140#12 = readReg Register.sscratch := rfl
+-- model's whole match.  sail-riscv 0.16: both arms first ask
+-- `inVirtualPrivilege` (the H extension's `vsscratch` redirect; never taken
+-- here, the hart is at `Supervisor`, which is not virtual).
+@[sail_facts] theorem read_CSR_sscratch : read_CSR 0x140#12 =
+    (do if (← inVirtualPrivilege ()) then readReg Register.vsscratch
+        else readReg Register.sscratch) := rfl
 @[sail_facts] theorem write_CSR_sscratch (v : BitVec 64) : write_CSR 0x140#12 v =
-    (do writeReg Register.sscratch v; pure (.Ok (← readReg Register.sscratch))) := rfl
+    (do if (← inVirtualPrivilege ()) then
+          (do writeReg Register.vsscratch v; pure (.Ok (← readReg Register.vsscratch)))
+        else (do writeReg Register.sscratch v; pure (.Ok (← readReg Register.sscratch)))) := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- **`csrw sscratch, rs1`** (`csrrw x0, sscratch, rs1`): the cell takes the

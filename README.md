@@ -4,10 +4,11 @@ This project proves, in [Lean 4](https://lean-lang.org/) with the separation log
 [Transfinite Iris-Lean](https://github.com/dongjaelee1/iris-lean/tree/transfinite) (a fork of
 [iris-lean](https://github.com/leanprover-community/iris-lean) step-indexed by ordinals), that the
 [xv6-riscv](https://github.com/mit-pdos/xv6-riscv) kernel and its user programs are correct —
-reasoning about the *actual binaries*, instruction by instruction, against the official
-[Sail RISC-V](https://github.com/riscv/sail-riscv) ISA semantics compiled to Lean by Sail's own Lean
-backend (from the [zeldovich/sail-riscv](https://github.com/zeldovich/sail-riscv) fork; see
-"Regenerating the Sail model").  The kernel and user ELFs are dumped into Lean data, an Iris language
+reasoning about the *actual binaries*, instruction by instruction, against the
+[Sail RISC-V](https://github.com/riscv/sail-riscv) ISA semantics -- RISC-V International's formal
+model, release 0.16, with the deviations recorded in [`notes/model-diffs.md`](notes/model-diffs.md)
+(what may deviate, and how, is [`notes/model-policy.md`](notes/model-policy.md)) -- compiled to Lean
+by Sail's own Lean backend (see "Regenerating the Sail model").  The kernel and user ELFs are dumped into Lean data, an Iris language
 is built over the Sail model's event monad (together with device models for the UARTs, the PLIC and the
 virtio disk, and a power thread that cuts power and reboots), and machine code is specified with
 separation-logic points-to assertions for registers, memory and devices.
@@ -43,9 +44,18 @@ hypotheses are the initial state (generation 0, power off, the disk holding the 
 
 Their axioms are Lean's `propext`, `Classical.choice`, `Quot.sound` and `bv_decide` certificates, and
 nothing else; the Sail platform hooks are realised as definitions, and the two reservation predicates
-the model leaves unspecified are `opaque` (arbitrary but fixed).  CI checks this on every push, and
+the model leaves unspecified are `opaque` (arbitrary but fixed), as is the sealed boot image
+`MachCSL.bootImageSealed`, whose value `bootImage_eq` proves (`notes/adequacy_axioms_baseline.md`).
+CI checks this on every push, and
 also reports the *trusted base* of each statement: the definitions a reader must check to trust it
 (the machine model, the generated Sail model, the trace and application specifications).
+
+Two restrictions of the modelled machine bound these statements and are recorded rather than hidden
+(`notes/model-diffs.md`): the memory never fails a conditional write, so the page walker's atomic A/D
+update (a fork commit) never takes its failure arm (an `internal_error`, not a retry) -- its atomicity rests on the TSO memory's reservation
+blocking, and the spec's step-7 re-walk is a recorded gap -- and the model's module subset and
+configuration are this tree's (F/D and scalar-crypto instructions advertised but not compiled; Sdtrig,
+H, B and V off).
 
 ## Layout
 
@@ -56,8 +66,8 @@ MachCSL/        the framework, nothing xv6-specific: the Iris language over the 
 Xv6/            the xv6 verification: kernel images as data, one Spec/Proof/Link triple per kernel
                 function, the file system and crash layer, the process layer, syscalls, the user programs,
                 the application (union) layer and the top theorems
-model/          the Sail RISC-V model compiled to Lean (GENERATED, checked in) and its configuration
-vendor/lean-sail/   lean-sail with a free-monad concurrency interface (see its README)
+model/          the Sail RISC-V model compiled to Lean (GENERATED, checked in) and its configuration;
+                lean-sail (the Sail Lean runtime) is a git dependency, fetched to .lake/packages/Sail
 vtest-lean/     device conformance: the machine model re-checked against captured QEMU/board/RTL behaviours
 tools/          image dumpers and generators, the CI scripts (tools/ci/), coverage/profile/dead-code reports,
                 the assumption audit and trusted-base report
@@ -72,7 +82,7 @@ The proofs are a [lake](https://github.com/leanprover/lean4/tree/master/src/lake
 installs the Lean of `lean-toolchain`.
 
 ```sh
-lake build Xv6 MachCSL     # the whole development (~2,300 modules)
+lake build Xv6 MachCSL     # the whole development (~2,400 modules)
 lake build Vtest           # the device-conformance suite (not a default target)
 make help                  # the check/report entry points (lint, check-gen, test-tools, ci, ...)
 tools/ci/run_all.sh        # everything CI does, in order (= make ci)
@@ -86,41 +96,62 @@ so build on a machine sized for it.
 **Toolchain.** Lean `v4.34.1` (`lean-toolchain`).  Iris is the `Iris/` package of the fork
 `dongjaelee1/iris-lean`, branch `transfinite`, whose committed step-index choice is the ordinal one
 (`Iris.SI := Ordinals.Ordinal.{3}`); it and its dependencies (batteries, Qq, the fork's `ordinals`)
-are pinned in `lake-manifest.json`, lean-sail vendored.  `tools/ci/toolchain_check.sh` checks
-that the three toolchain files, the manifest and the fetched packages agree; CI runs it first.
+are pinned in `lake-manifest.json`, as is lean-sail (upstream
+[`rems-project/lean-sail`](https://github.com/rems-project/lean-sail) at tag `v7`, the Sail Lean
+runtime whose `PreSailM` is the free monad MachCSL steps; the generated model's own `lakefile.toml`
+requires the same revision).  `tools/ci/toolchain_check.sh` checks that the two toolchain files, the
+two lean-sail pins, the manifest and the fetched packages agree; CI runs it first.
 
 **Images.** The kernel image, the user programs and `fs.img` are xv6-riscv `b72cbac1` (branch
 `verified`).  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,
 `tools/dump_user_elf.py`, `tools/gen_*`) are checked in with their source revision and md5 in their
 headers; `make check-gen` regenerates everything derivable without an ELF or `sail` and fails on any
-difference, and `make check-gen-kernel KERNEL=…` re-dumps the kernel from the pinned ELF.  Proofs name
+difference (this includes the tables derived from the generated model: `MachCSL/ModelFacts.lean`,
+`MachCSL/Platform.lean` and the literal-CSR block of `MachCSL/UExecCsrDflt.lean`, from
+`tools/gen_model_facts.py`, `tools/gen_platform.py` and `tools/gen_uxr_csr_lits.py`), and
+`make check-gen-kernel KERNEL=…` re-dumps the kernel from the pinned ELF.  Proofs name
 kernel addresses symbolically (`KA.«sym» + off`), so a relayout moves the dump, not the proofs; the
 shell's per-instruction facts are regenerated by `tools/sh_rebase/`.
 
 ### Regenerating the Sail model
 
 `model/Lean_RV64D/` is generated and checked in; a normal build never regenerates it.  It comes from
-the fork [`zeldovich/sail-riscv`](https://github.com/zeldovich/sail-riscv), branch `xv6`, pinned by
-`SAIL_RISCV_REV` in `tools/regen_sail_model.sh` — the same source and configuration as the Rocq
-development (its deltas against upstream: the atomic PTE A/D-bit update and the tagging of fetches and
-page-table walks at the concurrency interface).
+the fork [`dongjaelee1/sail-riscv`](https://github.com/dongjaelee1/sail-riscv), branch `xv6`, pinned
+by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`: upstream
+[`riscv/sail-riscv`](https://github.com/riscv/sail-riscv) release 0.16 (concurrency interface v2)
+plus six commits, each listed with its kind and reason in `notes/model-diffs.md` §1: the atomic PTE
+A/D-bit update (upstream PR #1860); the external-interrupt pin registers consulted without the
+Simple Interrupt Generator (whose MMIO window collides with the PLIC's; MachCSL's PLIC device drives
+the pins); two Lean-target repairs of upstream code that does not elaborate; the F/D instructions
+kept out of `postlude`'s dependencies (they were not in the model before the bump either); and
+`hideleg` ignored without H (a bug fix).
 
 ```sh
 tools/regen_sail_model.sh [SAIL_RISCV_DIR]    # then: git diff --exit-code model/
 ```
 
-It needs a `sail` with the Lean backend **and** the fix that makes `&&`/`||` short-circuit when an
-operand has effects: the unpatched backend always evaluates both operands, which changes the model's
-semantics (Sail's own semantics short-circuits).  Until upstream Sail accepts the fix and releases it,
-build `sail` from rems-project/sail `5745ea9e` (the version the vendored lean-sail matches) with the
-fix from [`zeldovich/sail`, branch `lean-short-circuit`](https://github.com/zeldovich/sail/tree/lean-short-circuit)
-cherry-picked onto it; the script's header has the commands.  With a Sail release that contains the
-fix, this step goes away.  Three files decide what comes out: `model/sail-config-rv64d.json` (the xv6
-platform configuration), `model/sail-modules.txt` (the module subset) and `model/Xv6Extras.lean`, the one
-hand-written file: the realisation of the Sail platform hooks (the reservation hooks, terminal writes,
-the experimental-extensions flag), passed to sail as a second import file and never overwritten.
+It needs a `sail` with the Lean backend built from the fork
+[`dongjaelee1/sail`](https://github.com/dongjaelee1/sail), branch `xv6`: rems-project/sail `sail2`
+(its development branch, `e4982101`) **plus four Lean-backend fixes** (`notes/model-diffs.md` §2) — two still-unmerged ones
+from [`zeldovich/sail`](https://github.com/zeldovich/sail), `lean-short-circuit` (`&&`/`||` must
+short-circuit when an operand has effects; the unpatched backend always evaluates both operands,
+which changes the model's semantics — upstream PR #1750) and `lean-backend-nexp-parens` (type-level
+arithmetic parenthesised; without it `flen` prints as 8 bits — PR #1774), and two of ours (Lean
+command keywords escaped in identifiers; `termination_by` only on a recursive definition) — and
+`z3`.  Build it from a clone of that branch with opam and dune (`opam install --deps-only .`, then
+`dune build --release` and `dune install --release --prefix <dir>`); the script's header says what
+`sail --version` must print.  In the agent container the toolchain is installed under
+`/work/toolchain` (user space, no root).  With a Sail release that contains the fixes, build that
+release instead.  Three files decide what comes out: `model/sail-config-rv64d.json`
+(the xv6 platform configuration; its header lists every deviation from upstream's defaults),
+`model/sail-modules.txt` (the module subset) and `model/Xv6Extras.lean`, the one hand-written file: the
+realisation of the Sail platform hooks (the reservation hooks, terminal writes, the
+experimental-extensions flag), passed to sail as a second import file and never overwritten.
 Before changing the configuration, regenerate with it unchanged and check that `git diff model/` is
-empty — that separates an intended change from drift in the checkout.
+empty — that separates an intended change from drift in the checkout.  Every way the model the
+proofs are about differs from upstream (the fork's commits, compiler patches, the module subset,
+the configuration, how MachCSL runs the model) is listed in
+[`notes/model-diffs.md`](notes/model-diffs.md).
 
 ## Design
 
@@ -129,10 +160,11 @@ The development follows the MachCSL paper and the design documented in
 port keeps); decisions the port made differently are in [`notes/design-rulings.md`](notes/design-rulings.md)
 and in each file's "Deviations from Rocq" header.
 
-* **The model as a free monad.**  Sail's Lean backend targets lean-sail, whose monad is a
-  deterministic state monad.  The vendored lean-sail redefines it as a free monad over an event type,
-  so a machine step interprets one event (register or memory access, barrier, choice) at a time and
-  harts and devices interleave between events; the generated model compiles against it unchanged.
+* **The model as a free monad.**  Sail's Lean backend targets lean-sail, whose monad (since v7,
+  the "concurrency interface") is a free monad over an event type, so a machine step interprets one
+  event (register or memory access, barrier, finite choice) at a time and harts and devices
+  interleave between events; the generated model compiles against it unchanged.  (Before the 0.16
+  bump the tree vendored a lean-sail patched to the same effect.)
 * **The language and eras.**  A hart expression carries its remaining Sail computation; the state
   holds the per-hart register files, the shared memory (under a TSO memory model), the devices,
   the current generation and the power bit.  The power thread cuts power (the generation advances, so

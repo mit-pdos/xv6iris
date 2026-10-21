@@ -69,7 +69,7 @@ theorem ub_foldl_set_other (l : List Nat) (f : Nat → PAddr) (g : Nat → BitVe
     simp only [List.foldl_cons]
     rw [ih _ (fun j hj => h j (List.mem_cons_of_mem _ hj))]
     unfold bmSet
-    rw [if_neg (Ne.symm (h x List.mem_cons_self))]
+    rw [ite_eq_right (Ne.symm (h x List.mem_cons_self))]
 
 theorem ub_foldl_set_at (l : List Nat) (f : Nat → PAddr) (g : Nat → BitVec 8) (a : PAddr) (j : Nat)
     (hnd : l.Nodup) (hj : j ∈ l) (hfa : f j = a) (huniq : ∀ j' ∈ l, f j' = a → j' = j) :
@@ -84,7 +84,7 @@ theorem ub_foldl_set_at (l : List Nat) (f : Nat → PAddr) (g : Nat → BitVec 8
     · subst hx
       rw [ub_foldl_set_other l f g a _ (fun j' hj' e => hnd'.1 (huniq j' (List.mem_cons_of_mem _ hj') e ▸ hj'))]
       unfold bmSet
-      rw [if_pos hfa.symm]
+      rw [ite_eq_left hfa.symm]
     · have hj' : j ∈ l := by
         rcases List.mem_cons.1 hj with h | h
         · exact absurd h.symm hx
@@ -160,7 +160,7 @@ theorem ubLookup_isSome (A : List (PAddr × BitVec 8)) (a : PAddr) :
     simp only [ubLookup, List.map_cons, List.mem_cons]
     by_cases h : a = p.1
     · simp [h]
-    · simp only [h, if_false, false_or]; exact ih
+    · simp only [h, ite_false, false_or]; exact ih
 
 theorem ubLookup_mem (A : List (PAddr × BitVec 8)) (hnd : (A.map Prod.fst).Nodup) (p : PAddr × BitVec 8)
     (hp : p ∈ A) : ubLookup A p.1 = some p.2 := by
@@ -172,7 +172,7 @@ theorem ubLookup_mem (A : List (PAddr × BitVec 8)) (hnd : (A.map Prod.fst).Nodu
     rcases List.mem_cons.1 hp with rfl | hp
     · simp
     · have hne : p.1 ≠ q.1 := fun e => hnd.1 (e ▸ List.mem_map_of_mem hp)
-      rw [if_neg hne]
+      rw [ite_eq_right hne]
       exact ih hnd.2 hp
 
 /-! ## Ownership of a byte list -/

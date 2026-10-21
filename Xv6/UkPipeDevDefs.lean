@@ -110,7 +110,7 @@ delivered. -/
 theorem pdev_rd_ans (d : Nat) (g : Nat → BitVec 8) (hd : (d : Int) < 2 ^ 31) :
     rdAnsOf (BitVec.ofNat 64 d) g = .RdBytes ((List.range d).map g) := by
   unfold rdAnsOf
-  rw [pdev_signed_nat d hd, if_neg (by omega)]
+  rw [pdev_signed_nat d hd, ite_eq_right (by omega)]
   simp
 
 /-- **Rocq `pdev_map_seq`**. -/

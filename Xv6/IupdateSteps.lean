@@ -138,7 +138,7 @@ theorem iu_step_out [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 : Na
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes dn) (iregOut fscIreg inum dn) e0
   unfold iregOut
-  rw [if_neg hnz]
+  rw [ite_eq_right hnz]
   iapply (iregWrite_au ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn (diblkBytes ds)
     CoPset.subseteq_top (by omega) hdn hnz hstab hnl) $$ Hinv Hdn
 

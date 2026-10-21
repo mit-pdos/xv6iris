@@ -88,7 +88,8 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
       (_ : R 20#5 = k.regs 20#5 ∧ R 21#5 = k.regs 21#5 ∧ R 22#5 = k.regs 22#5 ∧ R 23#5 = k.regs 23#5 ∧
         R 24#5 = k.regs 24#5 ∧ R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5),
       kernelText ∗ kctx c (((k.pushed 6).withSpie a b).withRegs R) ∗ pcIs c (KA.«kerneltrap» + 0x36#64) ∗
-      Register.sepc ↦ᵣ[c] e' ∗ Register.scause ↦ᵣ[c] sc' ∗ Register.stval ↦ᵣ[c] tv' ∗ cpuClaim c k.proc ∗ intrRes c ∗
+      Register.sepc ↦ᵣ[c] e' ∗ Register.scause ↦ᵣ[c] sc' ∗ (Register.stval ↦ᵣ[c] tv' ∗ hTrapCsrs c) ∗
+      cpuClaim c k.proc ∗ intrRes c ∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (k.regs 8#5) ∗
       wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) (k.regs 9#5) ∗

@@ -96,7 +96,7 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
         intro hq; rw [hq] at hlt; simp [proRounds] at hlt
       have hpp := proOf_pos so.gsPs hpsb hps0
       have hle := (lmProcBefore_head M so.gsPs so.gsCs (gsState M sd so) _ hin).length_le
-      simp only [lmPendingAt, if_true] at hle
+      simp only [lmPendingAt, ite_true] at hle
       omega
   have hf0nil : so.gsSt = none := hf0n.2 ⟨hEnil, hwnil⟩
   have hpsnil := gopEmpty_stage_ps M sd so hpsl hpsb hEnil hwnil

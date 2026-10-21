@@ -1,9 +1,12 @@
 import LeanRV64D.LeanRV64D
 import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
+import LeanRV64D.Xlen
 import LeanRV64D.PlatformConfig
 import LeanRV64D.MemTypeUtils
 import LeanRV64D.Callbacks
+import LeanRV64D.InterruptInterface
 import LeanRV64D.InterruptRegs
 
 set_option maxHeartbeats 1_000_000_000
@@ -12,12 +15,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -61,6 +64,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -94,10 +99,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -143,6 +151,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -161,17 +170,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -186,12 +202,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -202,7 +221,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -212,10 +234,12 @@ def SIG_VERSION_OFFSET := 0
 
 def SIG_PLATFORM_OFFSET := 4
 
+def SIG_GUEST_OFFSET := 8
+
 /-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
 def sig_load (access : (MemoryAccessType mem_payload)) (addr : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) (physaddr × ExceptionType)) := do
   let .Physaddr paddr := addr
-  let VERSION := 0x00010000#32
+  let VERSION := 0x00010001#32
   if (((width != 4) || ((Sail.BitVec.extractLsb paddr 1 0) != (zeros (n := ((1 -i 0) +i 1))))) : Bool)
   then (pure (Err (addr, (← (accessFaultFromAccessType access)))))
   else
@@ -226,7 +250,14 @@ def sig_load (access : (MemoryAccessType mem_payload)) (addr : physaddr) (width 
         (do
           if ((paddr == (BitVec.addInt plat_sig_base SIG_PLATFORM_OFFSET)) : Bool)
           then (pure (Ok (zeros (n := (8 *i width)))))
-          else (pure (Err (addr, (← (accessFaultFromAccessType access)))))))
+          else
+            (do
+              if ((← do
+                   if ((paddr == (BitVec.addInt plat_sig_base SIG_GUEST_OFFSET)) : Bool)
+                   then (currentlyEnabled Ext_H)
+                   else (pure false)) : Bool)
+              then (pure (Ok (zeros (n := (8 *i width)))))
+              else (pure (Err (addr, (← (accessFaultFromAccessType access))))))))
 
 /-- Type quantifiers: width : Nat, width ≥ 0, 0 < width ∧ width ≤ max_mem_access -/
 def sig_store (addr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : SailM (Result Bool (physaddr × ExceptionType)) := do
@@ -259,15 +290,34 @@ def sig_store (addr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : Sa
                   then writeReg sig_seip value
                   else (pure ())
                   if (((_get_Minterrupts_MSI data) == 1#1) : Bool)
-                  then writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 3 3 value)
+                  then writeReg sig_msip value
                   else (pure ())
-                  if ((← do
-                       if (((_get_Minterrupts_SSI data) == 1#1) : Bool)
-                       then (currentlyEnabled Ext_S)
-                       else (pure false)) : Bool)
-                  then writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 1 1 value)
+                  if (((_get_Minterrupts_SSI data) == 1#1) : Bool)
+                  then writeReg sig_ssip value
                   else (pure ())
                   (csr_name_write_callback "mip" (← (read_mip IncludePlatformInterrupts)))
                   (pure (Ok true))))
-          else (pure (Err (addr, (E_SAMO_Access_Fault ()))))))
+          else
+            (do
+              if ((← do
+                   if ((paddr == (BitVec.addInt plat_sig_base SIG_GUEST_OFFSET)) : Bool)
+                   then (currentlyEnabled Ext_H)
+                   else (pure false)) : Bool)
+              then
+                (do
+                  let value := (BitVec.access data 31)
+                  let guest := (BitVec.toNatInt (Sail.BitVec.extractLsb data 5 0))
+                  if (((Sail.BitVec.extractLsb data 30 6) != (zeros (n := ((30 -i 6) +i 1)))) : Bool)
+                  then (pure (Err (addr, (E_SAMO_Access_Fault ()))))
+                  else
+                    (do
+                      if (((guest == 0) || (guest >b geilen)) : Bool)
+                      then (pure (Err (addr, (E_SAMO_Access_Fault ()))))
+                      else
+                        (do
+                          writeReg sig_hgeip (BitVec.update (← readReg sig_hgeip) guest value)
+                          (csr_name_write_callback "hgeip" (← (read_hgeip ())))
+                          (csr_name_write_callback "mip" (← (read_mip IncludePlatformInterrupts)))
+                          (pure (Ok true)))))
+              else (pure (Err (addr, (E_SAMO_Access_Fault ())))))))
 

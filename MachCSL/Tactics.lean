@@ -2,9 +2,9 @@
 MachCSL: proof automation for symbolic execution of the Sail model.
 
 `sail_norm` normalises the head of the hart's remaining computation: it
-associates binds to the right, eliminates `pure`s, pushes `ExceptT.run`
-(the model's early-return blocks) through binds, reduces `match`/`if` on
-constructors and closed conditions.
+associates binds to the right, eliminates `pure`s, pushes `SailME.run`
+(the model's early-return blocks) through the actions they lift and stops it
+at an early return, reduces `match`/`if` on constructors and closed conditions.
 
 `swp_step` then looks at the head event of `swp cpu m Φ` and applies the
 matching rule (`swp_readReg_bind`, `swp_writeReg_bind`, ...), framing the
@@ -14,30 +14,49 @@ this up to `n` times.
 -/
 import MachCSL.DecInst
 import MachCSL.HwConfig
+import MachCSL.SailBytes
 
 noncomputable section
 
 namespace MachCSL
 
 open Lean Elab Tactic Meta
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## Normalisation lemmas -/
 
-theorem run_liftM {ε : Type} {m : Type → Type} [Monad m] [LawfulMonad m] {α : Type} (x : m α) :
-    ExceptT.run (liftM x : ExceptT ε m α) = x >>= fun a => pure (.ok a) := by
-  show ExceptT.run (ExceptT.lift x) = _
-  rw [ExceptT.run_lift, map_eq_pure_bind]
+/-! The model's early-return blocks, `SailME.run do ...` (lean-sail v7's `PreSailME`: a free
+monad over the model's effects, each wrapped in `Except.ok`, whose `Except.error` node is the early
+return).  The normaliser pushes `SailME.run` through the block's lifted actions, so the hart's
+next event surfaces at the head, and stops it at an early return. -/
 
-theorem run_SailME_throw {α β : Type} (e : α) :
-    ExceptT.run (SailME.throw e : SailME α β) = pure (.error (.inr e)) := rfl
+theorem run_lift_bind {α β : Type} (m : SailM β) (f : β → SailME α α) :
+    SailME.run (monadLift m >>= f) = m >>= fun b => SailME.run (f b) := by
+  induction m with
+  | pure b => rfl
+  | impure op k ih =>
+    unfold SailME.run at ih ⊢
+    exact congrArg (FreeM.impure op) (funext ih)
 
-theorem bindCont_ok {ε : Type} {m : Type → Type} [Monad m] {α β : Type}
-    (f : α → ExceptT ε m β) (a : α) : ExceptT.bindCont f (.ok a) = ExceptT.run (f a) := rfl
+theorem run_lift {α : Type} (m : SailM α) : SailME.run (monadLift m : SailME α α) = m := by
+  induction m with
+  | pure b => rfl
+  | impure op k ih =>
+    unfold SailME.run at ih ⊢
+    exact congrArg (FreeM.impure op) (funext ih)
 
-theorem bindCont_error {ε : Type} {m : Type → Type} [Monad m] {α β : Type}
-    (f : α → ExceptT ε m β) (e : ε) : ExceptT.bindCont f (.error e) = pure (.error e) := rfl
+theorem run_pure {α : Type} (x : α) : SailME.run (pure x : SailME α α) = pure x := rfl
+
+theorem run_throw {α : Type} (e : α) : SailME.run (SailME.throw e : SailME α α) = pure e := rfl
+
+theorem run_throw_bind {α β : Type} (e : α) (f : β → SailME α α) :
+    SailME.run (SailME.throw e >>= f) = pure e := rfl
+
+/-- lean-sail v7's `sail_assert` answers a passing assertion with a raw `FreeM.pure`: it is the
+monad's `pure ()`, which the normaliser's `pure` rules consume. -/
+@[sail_facts] theorem sail_assert_true (s : String) :
+    (LeanRV64D.sail_assert true s : SailM Unit) = pure () := rfl
 
 /-- Lean ≥ 4.34 compiles a `match` on literals into `dite`s whose branches are cast with
 `Eq.ndrec_symm`; with a constant motive (every Sail match result type is) the cast is the
@@ -166,7 +185,7 @@ bit-vector width, a dependent position `simp` cannot rewrite into once the
 value is there, so it is inlined only after the outer binders are gone and
 the value has been simplified.  Registered as pre- and post-step in place
 of `pure_bind` (a `pure` exposed by a post-rewrite of the action, e.g.
-`ExceptT.run_pure`, would otherwise be inlined by the lemma first).  A
+`run_pure`, would otherwise be inlined by the lemma first).  A
 catch-all pattern: the bind may be the raw projection form. -/
 def pureBindValueCore (e : Lean.Expr) : SimpM Simp.Step := do
   let some (ix, ik) :=
@@ -250,28 +269,57 @@ BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.re
       LeanRV64D.Functions.zeros, LeanRV64D.Functions.default_meta, BitVec.setWidth_eq,
       Int.ofNat_eq_natCast, Int.toNat_natCast, Int.natCast_zero, Int.zero_mul, Int.mul_zero,
       BitVec.add_zero, MachCSL.addInt_zero,
-      LeanRV64D.SailME.run, Sail.ConcurrencyInterfaceV1.PreSail.PreSailME.run,
-      ExceptT.run_bind, ExceptT.run_pure, ExceptT.run_mk,
-      MachCSL.run_liftM, MachCSL.run_SailME_throw, MachCSL.bindCont_ok, MachCSL.bindCont_error,
+      MachCSL.run_lift_bind, MachCSL.run_lift, MachCSL.run_pure, MachCSL.run_throw,
+      MachCSL.run_throw_bind, MachCSL.FreeMLemmas.freeM_pure_bind,
+      MachCSL.from_bytes_le_vecbytes_1, MachCSL.from_bytes_le_vecbytes_2,
+      MachCSL.from_bytes_le_vecbytes_4, MachCSL.from_bytes_le_vecbytes_8,
       ite_true, ite_false, dite_true, dite_false, Bool.true_and, Bool.and_true,
       Bool.false_and, Bool.and_false, Bool.true_or, Bool.or_true, Bool.false_or, Bool.or_false,
-      Bool.not_true, Bool.not_false, LeanRV64D.Functions.not,
+      Bool.not_true, Bool.not_false, LeanRV64D.not,
       LeanRV64D.Functions.get_config_rvfi, LeanRV64D.Functions.get_config_print_instr,
       LeanRV64D.Functions.get_config_print_pmp, LeanRV64D.Functions.get_config_print_exception, LeanRV64D.Functions.get_config_print_interrupt,
       LeanRV64D.Functions.get_config_print_clint])
 
 /-! ## The step tactic -/
 
-/-- Find the `swp cpu m Φ` in the goal and return `m`. -/
-def findSwp (e : Lean.Expr) : Option Lean.Expr :=
-  -- `@swp GF inst cpu X m Φ`: six arguments, the program at index 4
-  (e.find? fun t => t.isAppOfArity ``MachCSL.swp 6).map fun t => t.getAppArgs[4]!
+/-- Find the `swp cpu m Φ` of the goal and return `m`: the one in the CONCLUSION (reached by
+descending through the last argument, the proof-mode entailment's conclusion), and anywhere in the
+goal only if the conclusion has none -- a hypothesis can itself mention `swp` (e.g. a loop body's
+spec over the rest of an early-return block, `MachCSL.swp_run_intrange_loop`). -/
+partial def findSwp (e : Lean.Expr) : Option Lean.Expr :=
+  let rec concl (t : Lean.Expr) : Option Lean.Expr :=
+    if let .mdata _ e := t then concl e
+    else if t.isAppOfArity ``MachCSL.swp 6 then some t.getAppArgs[4]!
+    else if t.isApp then concl t.appArg! else none
+  match concl e with
+  | some m => some m
+  | none => (e.find? fun t => t.isAppOfArity ``MachCSL.swp 6).map fun t => t.getAppArgs[4]!
 
 /-- The head action of `m`: for `x >>= k` it is `x`, otherwise `m` itself. -/
 def headAction (m : Lean.Expr) : Lean.Expr :=
   if m.isAppOfArity ``Bind.bind 6 then m.getAppArgs[4]!
   else if isBind m then m.getAppArgs[2]!
   else m
+
+/-- Whether `m` is an early-return block `@SailME.run α body`. -/
+def isRun (m : Lean.Expr) : Bool := m.isAppOfArity ``LeanRV64D.SailME.run 2
+
+/-- For an early-return block, the head action of its body; otherwise `x` itself. -/
+def peelRun (x : Lean.Expr) : Lean.Expr :=
+  if isRun x then headAction x.getAppArgs[1]! else x
+
+/-- The action behind the plumbing the model's early-return blocks put around it: the block,
+the lift of a `SailM` action into it. -/
+def stripWrappers (x : Lean.Expr) : Lean.Expr := Id.run do
+  let mut x := x
+  for _ in [0:6] do
+    x := headAction x
+    if isRun x then x := x.getAppArgs[1]!
+    else if let .const n _ := x.getAppFn then
+      if (n == ``liftM || n == ``MonadLiftT.monadLift || n == ``MonadLift.monadLift) &&
+          x.getAppNumArgs > 0 then
+        x := x.getAppArgs.back!
+  return x
 
 /-- The frozen configuration registers (`MachCSL.hwVal`), read and
 (same-value) written off the persistent `hwConfig` bundle, not a cell. -/
@@ -280,12 +328,14 @@ def isHwReg (r : Lean.Expr) : Bool :=
    ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
    ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
 
-/-- The frozen counter registers the cycle reads (`MachCSL.hwAny`): cells of
-the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
+/-- The existential cells of the persistent `hwConfig` bundle (`MachCSL.hwAny`: the frozen
+counter registers the cycle reads, and H's `hgeie`, `hcounteren` and `henvcfg`), so a read is
 answered at an arbitrary value. -/
 def isHwAnyReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.mcountinhibit, ``LeanRV64D.Register.minstretcfg,
-   ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren].any r.isConstOf
+   ``LeanRV64D.Register.mcyclecfg, ``LeanRV64D.Register.scounteren,
+   ``LeanRV64D.Register.hgeie, ``LeanRV64D.Register.hcounteren,
+   ``LeanRV64D.Register.henvcfg].any r.isConstOf
 
 /-- Name for the cell hypothesis of register `r`. -/
 def regHypName (r : Lean.Expr) : Name :=
@@ -297,13 +347,17 @@ def regHypName (r : Lean.Expr) : Name :=
 argument at each level (the proof-mode entailment's conclusion is its last
 argument), so that neither finding nor rewriting it traverses the context. -/
 partial def getSwp (tgt : Lean.Expr) : Option Lean.Expr :=
-  if tgt.isAppOfArity ``MachCSL.swp 6 then some tgt.getAppArgs[4]!
-  else if tgt.isApp then getSwp tgt.appArg!
-  else none
+  match tgt with
+  | .mdata _ e => getSwp e
+  | _ =>
+    if tgt.isAppOfArity ``MachCSL.swp 6 then some tgt.getAppArgs[4]!
+    else if tgt.isApp then getSwp tgt.appArg!
+    else none
 
 /-- Rewrite the `swp` computation of a goal (see `getSwp`); a full traversal
 if it is not on the last-argument path. -/
 partial def mapSwp (tgt : Lean.Expr) (f : Lean.Expr → Lean.Expr) : Lean.Expr :=
+  if let .mdata d e := tgt then .mdata d (mapSwp e f) else
   if tgt.isAppOfArity ``MachCSL.swp 6 then
     let args := tgt.getAppArgs
     mkAppN tgt.getAppFn (args.set! 4 (f args[4]!))
@@ -388,7 +442,7 @@ def sailNormFocused : TacticM Unit := withMainContext do
 the model's type-level names. -/
 def unfoldDenylist : List Name :=
   [``LeanRV64D.readReg, ``LeanRV64D.writeReg, ``LeanRV64D.readRegRef, ``LeanRV64D.writeRegRef,
-   ``LeanRV64D.reg_deref, ``LeanRV64D.assert, ``LeanRV64D.cycle_count, ``LeanRV64D.get_cycle_count,
+   ``LeanRV64D.reg_deref, ``LeanRV64D.sail_assert, ``LeanRV64D.cycle_count, ``LeanRV64D.get_cycle_count,
    ``LeanRV64D.print_effect, ``LeanRV64D.print_int_effect, ``LeanRV64D.print_bits_effect,
    ``LeanRV64D.print_endline_effect, ``LeanRV64D.internal_pick, ``LeanRV64D.sailTryCatch,
    ``LeanRV64D.sailThrow, ``LeanRV64D.sailTryCatchE, ``LeanRV64D.SailM, ``LeanRV64D.SailME,
@@ -400,6 +454,10 @@ by hand when `swp_run` stops in front of them. -/
 def neverUnfold : List Name :=
   [``LeanRV64D.Functions.matching_pma_region, ``LeanRV64D.Functions.within_clint,
    ``LeanRV64D.Functions.is_aligned_paddr, ``LeanRV64D.Functions.is_aligned_vaddr,
+   -- the byte-vector conversions of the memory interface: the `SailBytes` round trips
+   -- (`from_bytes_le_vecbytes_*` in the normaliser, `vecbytes_to_bitvec_to_bytes_le_*` in the
+   -- store step) consume them; unfolded they are byte loops
+   ``LeanRV64D.Functions.to_bytes_le, ``LeanRV64D.Functions.from_bytes_le,
    -- string-keyed maps: unfolding them makes `simp` decide hundreds of string
    -- equalities (minutes); each name needs a `sail_facts` equation instead
    ``LeanRV64D.Functions.csr_name_map_backwards, ``LeanRV64D.Functions.csr_name_map_forwards,
@@ -411,9 +469,8 @@ def neverUnfold : List Name :=
 constants, or the Sail support library that may be unfolded in a condition. -/
 def isUnfoldable (env : Environment) (n : Name) : Bool :=
   let inNs := (`LeanRV64D).isPrefixOf n || (`MachCSL).isPrefixOf n ||
-    ((`Sail).isPrefixOf n && !(`Sail.ConcurrencyInterfaceV1).isPrefixOf n &&
-      !(`Sail.ArchSem).isPrefixOf n)
-  inNs && !(`LeanRV64D.ConcurrencyInterfaceV1).isPrefixOf n && !unfoldDenylist.contains n &&
+    ((`Sail).isPrefixOf n && !(`Sail.ArchSem).isPrefixOf n)
+  inNs && !(`LeanRV64D.ArchSem).isPrefixOf n && !unfoldDenylist.contains n &&
     !neverUnfold.contains n &&
     n != `MachCSL.bootPmpcfg && n != `MachCSL.bootPmpaddr && n != `MachCSL.bootPMA &&
     !(`MachCSL.swp).isPrefixOf n &&
@@ -452,7 +509,7 @@ def reduceClosedCond (x : Lean.Expr) : MetaM (Option Lean.Expr) := do
 each closed decided `if` by its branch, definitionally.  The model's
 `BitVec (if sv_width = 32 then 22 else 44)` types at `sv_width = 39` are
 otherwise reduced by `simp` in the explicit arguments only, never inside the
-`Monad` instances, after which `ExceptT.run_bind` and the event rules no
+`Monad` instances, after which `run_lift_bind` and the event rules no
 longer match syntactically. -/
 def closedNatHeads : List Name := [``Int.toNat, ``HMul.hMul, ``HAdd.hAdd, ``HSub.hSub]
 
@@ -603,7 +660,7 @@ def rewriteWithHyps : TacticM Bool := withMainContext do
 
 /-- The condition/scrutinee that decides the head of `e`, if any. -/
 def headCondition (e : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let e := if e.isAppOfArity ``ExceptT.run 4 then e.getAppArgs[3]! else e
+  let e := peelRun e
   if e.isAppOfArity ``ite 5 then return some e.getAppArgs[1]!
   if e.isAppOfArity ``dite 5 then return some e.getAppArgs[1]!
   -- a raw recursor / casesOn application: the discriminant is the major premise
@@ -627,25 +684,33 @@ def headCondition (e : Lean.Expr) : MetaM (Option Lean.Expr) := do
 /-- Names that are never unfolded as a head: the monad plumbing the
 normaliser handles. -/
 def plumbing : List Name :=
-  [``ExceptT.run, ``Bind.bind, ``Pure.pure, ``liftM, ``MonadLiftT.monadLift, ``MonadLift.monadLift,
-   ``ExceptT.lift, ``ExceptT.mk, ``ExceptT.bindCont]
+  [``Bind.bind, ``Pure.pure, ``liftM, ``MonadLiftT.monadLift, ``MonadLift.monadLift,
+   ``LeanRV64D.SailME.run, ``LeanRV64D.SailME.throw, ``Sail.ArchSem.PreSail.PreSailME.run,
+   ``Sail.ArchSem.PreSail.PreSailME.throw]
+
+/-- Whether `fn` is the head of an action the normaliser's `SailME.run` lemmas consume (a lift,
+a `pure`, an early return). -/
+def isRunPlumbing (fn : Lean.Expr) : Bool :=
+  [``liftM, ``MonadLiftT.monadLift, ``MonadLift.monadLift, ``Pure.pure,
+   ``LeanRV64D.SailME.throw].any fn.isConstOf
 
 /-- Expose the next event of the action `x` by unfolding whatever is at its
 head: a model function, an instance projection (e.g. `ForIn.forIn`), a loop
 combinator, or the functions inside the condition/scrutinee that decides it.
-Descends into `ExceptT.run` (never unfolding the wrapper itself). -/
+Descends into `SailME.run` (never unfolding the wrapper itself): if the block's head is a lift,
+a `pure` or an early return, the normaliser's `run_*` lemmas consume it; otherwise the block's
+head action is unfolded. -/
 partial def unfoldHead (x : Lean.Expr) : TacticM Unit := do
   let fn := x.getAppFn
   match fn with
   | .const n _ =>
-    if n == ``ExceptT.run then
-      unfoldHead x.getAppArgs[3]!
+    if n == ``LeanRV64D.SailME.run && x.getAppNumArgs == 2 then
+      let inner := headAction x.getAppArgs[1]!
+      if isRunPlumbing inner.getAppFn then sailNormFocused
+      else unfoldHead inner
     else if n == ``Bind.bind then
-      -- an early-return block whose `ExceptT.run` wrapper got unfolded away:
-      -- put it back (definitionally) so the `ExceptT.run_*` lemmas apply
-      let stx ← Lean.Elab.Term.exprToSyntax x
-      evalTactic (← `(tactic| rw [show ($stx) = ExceptT.run ($stx) from rfl]))
-      evalTactic (← `(tactic| sail_norm))
+      -- a bind at the head of a head: re-associate
+      sailNormFocused
     else if plumbing.contains n then
       sailNormFocused
     else if neverUnfold.contains n then
@@ -674,8 +739,7 @@ partial def unfoldHead (x : Lean.Expr) : TacticM Unit := do
       evalTactic (← `(tactic| first | unfold $f:ident | simp only [$f:ident]))
   | .proj S _ e =>
     if S == ``Bind then
-      let stx ← Lean.Elab.Term.exprToSyntax x
-      evalTactic (← `(tactic| rw [show ($stx) = ExceptT.run ($stx) from rfl]))
+      -- a raw bind projection at the head: the normaliser re-associates it
       evalTactic (← `(tactic| sail_norm))
     else
       -- a projection of an instance constant (e.g. `ForIn.forIn`): unfold the instance
@@ -708,6 +772,12 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       -- quantifies over the answer instead of pinning it
       if rE.isAppOf ``LeanRV64D.Register.sig_seip || rE.isAppOf ``LeanRV64D.Register.sig_meip then
         evalTactic (← `(tactic| (iapply swp_readReg_any_bind; try (inext; iintro %$h:ident))))
+      -- the hart's id: off the bundle (`Hhw`, at `bootHid cpu`), or an owned cell (M-mode boot)
+      else if rE.isConstOf ``LeanRV64D.Register.mhartid then
+        let hw := mkIdent `Hhw
+        evalTactic (← `(tactic| first
+          | (iapply swp_readReg_mhartid_bind; iframe $hw:ident; try inext)
+          | (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
       -- the frozen configuration registers are read off the persistent
       -- `hwConfig` bundle (`Hhw`), at their pinned value
       else if isHwReg rE then
@@ -767,21 +837,20 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
              try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))))
       else
         evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
-    else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then
+    else if n == ``LeanRV64D.ArchSem.sail_mem_read then
       -- normalise the request's address arithmetic so the bytes frame, then
       -- read the access kind off the request: a fetch reads image bytes
       -- (`swp_sail_mem_read_ifetch`), a plain load the running context's
       -- bytes (`swp_sail_mem_read_plain`, which threads the context token)
-      try unfoldModelIn x catch _ => pure ()
+      try unfoldModelIn x.getAppArgs.back! catch _ => pure ()
       let tgt ← instantiateMVars (← getMainTarget)
       let some m := findSwp tgt | throwError "swp_step: no swp goal"
       let bind := isBind m
-      let x := headAction m
-      let x := if x.isAppOfArity ``ExceptT.run 4 then x.getAppArgs[3]! else x
+      let x := stripWrappers m
       let req := x.getAppArgs.back!
-      let akE ← withDefault <| whnf (← mkProjection req `access_kind)
+      let akE ← withDefault <| whnf (← mkAppM ``MachCSL.akIfetch #[← mkProjection req `access_kind])
       let reqStx ← Lean.Elab.Term.exprToSyntax req
-      if akE.isAppOf ``Sail.ConcurrencyInterfaceV1.Access_kind.AK_ifetch then
+      if akE.isConstOf ``Bool.true then
         if bind then
           evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_read_ifetch _ $reqStx _ rfl); iframe; try (inext; iintro $(mkIdent `Hbytes):ident))))
         else
@@ -791,34 +860,62 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
           evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_read_plain _ $reqStx _ _ _ rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
         else
           evalTactic (← `(tactic| (iapply (swp_sail_mem_read_plain _ $reqStx _ _ _ rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
-    else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_write then
-      -- normalise the request, then read the written value off its `value`
-      -- field: the rule takes the value and the equation explicitly
-      try unfoldModelIn x catch _ => pure ()
+    else if n == ``LeanRV64D.ArchSem.sail_mem_write then
+      -- `sail_mem_write req bytes tags`: normalise the request, then take the
+      -- written value from the bytes (`write_ram` passes `to_bytes_le data`:
+      -- the value is `data`, by the `SailBytes` round trip at the width)
+      let args := x.getAppArgs
+      if args.size < 3 then throwError "swp_step: memory write with too few arguments:{indentExpr x}"
+      try unfoldModelIn args[args.size - 3]! catch _ => pure ()
       let tgt ← instantiateMVars (← getMainTarget)
       let some m := findSwp tgt | throwError "swp_step: no swp goal"
       let bind := isBind m
-      let x := headAction m
-      let x := if x.isAppOfArity ``ExceptT.run 4 then x.getAppArgs[3]! else x
-      let req := x.getAppArgs.back!
-      let valE ← withDefault <| whnf (← mkProjection req `value)
-      unless valE.isAppOfArity ``Option.some 2 do
-        throwError "swp_step: memory write with no value:{indentExpr valE}"
+      let x := stripWrappers m
+      let args := x.getAppArgs
+      let req := args[args.size - 3]!
+      let bytes := args[args.size - 2]!
+      let tags := args[args.size - 1]!
       let reqStx ← Lean.Elab.Term.exprToSyntax req
-      let wStx ← Lean.Elab.Term.exprToSyntax valE.getAppArgs[1]!
+      let bytesStx ← Lean.Elab.Term.exprToSyntax bytes
+      let tagsStx ← Lean.Elab.Term.exprToSyntax tags
+      let (wStx, hvStx) ← if bytes.isAppOf ``LeanRV64D.Functions.to_bytes_le then do
+          let w ← Lean.Elab.Term.exprToSyntax bytes.getAppArgs.back!
+          let hv ← `(by first
+            | exact MachCSL.vecbytes_to_bitvec_to_bytes_le_1 _
+            | exact MachCSL.vecbytes_to_bitvec_to_bytes_le_2 _
+            | exact MachCSL.vecbytes_to_bitvec_to_bytes_le_4 _
+            | exact MachCSL.vecbytes_to_bitvec_to_bytes_le_8 _)
+          pure (w, hv)
+        else do
+          pure (← `(Sail.vecbytes_to_bitvec $bytesStx), ← `(rfl))
       if bind then
-        evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_write_plain _ $reqStx _ _ $wStx rfl rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
+        evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_write_plain _ $reqStx $bytesStx $tagsStx _ _ $wStx $hvStx rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
       else
-        evalTactic (← `(tactic| (iapply (swp_sail_mem_write_plain _ $reqStx _ _ $wStx rfl rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
-    else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_barrier then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_sail_barrier; inext; iapply swp_ret)))
+        evalTactic (← `(tactic| (iapply (swp_sail_mem_write_plain _ $reqStx $bytesStx $tagsStx _ _ $wStx $hvStx rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))
+    else if n == ``LeanRV64D.ArchSem.sail_mem_address_announce then
+      -- the store's address announcement (v2): silent
+      -- (the request explicitly: its type is the model's `Mem_request n nt physaddrbits_len ..`,
+      -- the rule's the interface's `Mem_request n nt Arch.addr_size ..`, equal by unfolding only)
+      let reqStx ← Lean.Elab.Term.exprToSyntax x.getAppArgs.back!
+      if bind then
+        evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_address_announce _ $reqStx); inext)))
+      else
+        evalTactic (← `(tactic| (iapply (swp_sail_mem_address_announce _ $reqStx); inext)))
+    else if n == ``LeanRV64D.ArchSem.sail_barrier then
+      -- (the silent leaves `▷ Φ v ⊢ swp cpu x Φ`: under a bind the continuation runs on; a
+      -- bare one leaves the postcondition)
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_sail_barrier; inext)))
+      else evalTactic (← `(tactic| (iapply swp_sail_barrier; inext)))
     else if n == ``LeanRV64D.cycle_count then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_cycle_count; inext; iapply swp_ret)))
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_cycle_count; inext)))
+      else evalTactic (← `(tactic| (iapply swp_cycle_count; inext)))
     else if n == ``LeanRV64D.get_cycle_count then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_get_cycle_count; inext; iapply swp_ret)))
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_get_cycle_count; inext)))
+      else evalTactic (← `(tactic| (iapply swp_get_cycle_count; inext)))
     else if n == ``LeanRV64D.print_effect then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_print_effect; inext; iapply swp_ret)))
-    else if n == ``Pure.pure && !bind then
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_print_effect; inext)))
+      else evalTactic (← `(tactic| (iapply swp_print_effect; inext)))
+    else if (n == ``Pure.pure || n == ``Sail.ArchSem.FreeM.pure) && !bind then
       evalTactic (← `(tactic| iapply swp_ret))
     else
       unfoldHead x
@@ -843,7 +940,7 @@ def specced : List Name :=
    ``LeanRV64D.Functions.translate_TLB_hit, ``LeanRV64D.Functions.translate_TLB_miss,
    ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB,
    ``LeanRV64D.Functions.translateAddr, ``LeanRV64D.Functions.transform_effective_address,
-   ``LeanRV64D.Functions.translationMode, ``LeanRV64D.Functions.handle_interrupt]
+   ``LeanRV64D.Functions.satp_mode, ``LeanRV64D.Functions.handle_interrupt]
 
 /-- Succeeds (doing nothing) iff the head of the `swp` goal is a call of a
 function with its own stage spec, so that `swp_run` stops there. -/
@@ -853,28 +950,21 @@ register_option swp_run.memStop : Bool :=
 elab "swp_at_spec" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
   let some m := findSwp tgt | throwError "swp_at_spec: no swp goal"
-  let mut x := headAction m
   -- look through the wrappers the monad plumbing puts around a call: the
-  -- `ExceptT.run` of an early-return block, the binds inside it, the lift
-  for _ in [0:6] do
-    x := headAction x
-    if x.isAppOfArity ``ExceptT.run 4 then x := x.getAppArgs[3]!
-    else if let .const n _ := x.getAppFn then
-      if (n == ``liftM || n == ``MonadLiftT.monadLift || n == ``MonadLift.monadLift || n == ``ExceptT.lift) &&
-          x.getAppNumArgs > 0 then
-        x := x.getAppArgs.back!
+  -- `SailME.run` of an early-return block, the binds inside it, the lift
+  let x := stripWrappers m
   if let .const n _ := x.getAppFn then
     if specced.contains n then return
     if (← getOptions).getBool `swp_run.memStop then
-      if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read ||
-          n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_write then return
+      if n == ``LeanRV64D.ArchSem.sail_mem_read ||
+          n == ``LeanRV64D.ArchSem.sail_mem_write then return
   throwError "swp_at_spec: not at a spec'd call"
 
 /-- Is there an `swp` goal at all? (`swp_run` stops quietly when the
 computation has been consumed and only the continuation is left.) -/
 elab "swp_done" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
-  if (findSwp tgt).isSome then throwError "swp_done: still an `swp` goal"
+  if (getSwp tgt).isSome then throwError "swp_done: still an `swp` goal"
 
 elab "swp_step" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
@@ -894,7 +984,7 @@ def headIsRegEvent : TacticM Bool := withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
   let some m := findSwp tgt | return false
   -- only a top-level `readReg r >>= k` / `writeReg r v >>= k` (not wrapped in
-  -- `ExceptT.run`/`liftM`, which the normaliser must strip first)
+  -- `SailME.run`/`liftM`, which the normaliser must strip first)
   unless isBind m do return false
   let hd := (headAction m).getAppFn
   return hd.isConstOf ``LeanRV64D.readReg || hd.isConstOf ``LeanRV64D.writeReg
@@ -923,7 +1013,7 @@ def branchesOf (x : Lean.Expr) : Array Lean.Expr :=
 (the continuation of the head bind, and the branches of a conditional at the
 head). -/
 def contsOf (m : Lean.Expr) : Array Lean.Expr :=
-  let m := if m.isAppOfArity ``ExceptT.run 4 then m.getAppArgs[3]! else m
+  let m := if isRun m then m.getAppArgs[1]! else m
   if m.isAppOfArity ``Bind.bind 6 then branchesOf m.getAppArgs[4]! |>.push m.getAppArgs[5]!
   else if isBind m then branchesOf m.getAppArgs[2]! |>.push m.getAppArgs[3]!
   else branchesOf m
@@ -950,18 +1040,18 @@ partial def normHeadAction (x : Lean.Expr) : MetaM Lean.Expr := do
   | .mdata _ e => normHeadAction e
   | _ =>
     if x.isHeadBetaTarget then return ← normHeadAction x.headBeta
-    if x.isAppOfArity ``ExceptT.run 4 then
-      let inner ← normHeadAction x.getAppArgs[3]!
-      return mkAppN x.getAppFn (x.getAppArgs.set! 3 inner)
+    if isRun x then
+      let inner ← normHeadAction x.getAppArgs[1]!
+      return mkAppN x.getAppFn (x.getAppArgs.set! 1 inner)
     if let some x' ← reduceClosedCond x then return ← normHeadAction x'
     return x
 
 /-- Normalise the head of the computation `m` (its head action, through the
 bind spine), without a `simp` pass. -/
 partial def normHead (m : Lean.Expr) : MetaM Lean.Expr := do
-  if m.isAppOfArity ``ExceptT.run 4 then
-    let inner ← normHead m.getAppArgs[3]!
-    return mkAppN m.getAppFn (m.getAppArgs.set! 3 inner)
+  if isRun m then
+    let inner ← normHead m.getAppArgs[1]!
+    return mkAppN m.getAppFn (m.getAppArgs.set! 1 inner)
   if m.isAppOfArity ``Bind.bind 6 then
     let x ← normHead m.getAppArgs[4]!
     return mkAppN m.getAppFn (m.getAppArgs.set! 4 x)
@@ -970,7 +1060,7 @@ partial def normHead (m : Lean.Expr) : MetaM Lean.Expr := do
     return mkAppN m.getAppFn (m.getAppArgs.set! 2 x)
   let x ← normHeadAction m
   -- the head action may have become a bind (a `let`/`if` around a `do`)
-  if x != m && (x.isAppOfArity ``Bind.bind 6 || isBind x || x.isAppOfArity ``ExceptT.run 4) then
+  if x != m && (x.isAppOfArity ``Bind.bind 6 || isBind x || isRun x) then
     normHead x
   else
     return x
@@ -995,7 +1085,7 @@ partial def headLetValue (m : Lean.Expr) : Option Lean.Expr :=
   | .letE _ _ v _ _ => some v
   | .mdata _ e => headLetValue e
   | _ =>
-    if m.isAppOfArity ``ExceptT.run 4 then headLetValue m.getAppArgs[3]!
+    if isRun m then headLetValue m.getAppArgs[1]!
     else if m.isAppOfArity ``Bind.bind 6 then
       let x := m.getAppArgs[4]!
       if x.isAppOfArity ``Pure.pure 4 then some x.getAppArgs[3]! else headLetValue x
@@ -1121,8 +1211,9 @@ register_option swp_run.trace : Bool := { defValue := false, descr := "trace swp
 
 /-- Heads `swp_step` consumes directly (no normalisation pass needed first). -/
 def stepableHeads : List Name :=
-  [``LeanRV64D.readReg, ``LeanRV64D.writeReg, ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read,
-   ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_write, ``LeanRV64D.ConcurrencyInterfaceV1.sail_barrier,
+  [``LeanRV64D.readReg, ``LeanRV64D.writeReg, ``LeanRV64D.ArchSem.sail_mem_read,
+   ``LeanRV64D.ArchSem.sail_mem_write, ``LeanRV64D.ArchSem.sail_mem_address_announce,
+   ``LeanRV64D.ArchSem.sail_barrier,
    ``LeanRV64D.cycle_count, ``LeanRV64D.get_cycle_count, ``LeanRV64D.print_effect]
 
 /-- Normalise, then step; repeat up to `n` times, each time with the head's
@@ -1176,7 +1267,7 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
         let some m ← exposeHead | break
         let x := headAction m
         if trace then logInfo m!"swp_run: after pass head action = {x}\n  fn={x.getAppFn}"
-        let x := if x.isAppOfArity ``ExceptT.run 4 then x.getAppArgs[3]! else x
+        let x := peelRun x
         if let .const n _ := x.getAppFn then
           if stepableHeads.contains n then break
     -- the checks below look at the head: expose it first

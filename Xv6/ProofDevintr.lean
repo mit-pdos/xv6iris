@@ -88,7 +88,7 @@ theorem dv_beq_0_1 : bcond bop.BEQ 0#64 1#64 = false := by decide
 theorem dv_beq_1_1 : bcond bop.BEQ 1#64 1#64 = true := by decide
 
 theorem dv_ret_of_ext (sc : BitVec 64) (h : sc = sCause InterruptType.I_S_External) :
-    devintrRet sc = 1#64 := by simp only [devintrRet, h, if_pos]
+    devintrRet sc = 1#64 := by simp only [devintrRet, h, ite_eq_left]
 theorem dv_ret_of_tim : devintrRet (sCause InterruptType.I_S_Timer) = 2#64 := by decide
 
 /-- At a non-device cause neither `beq` is taken. -/

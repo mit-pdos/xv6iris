@@ -329,7 +329,7 @@ theorem fileCoreNoff_pipe (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = F
     fileCoreNoff (GF := GF) q pn C ⊣⊢
       iprop(isPipe pn.lock pn.pipe C.pipe ∗ pipeRef pn.pipe (fcWbool C) q ∗ irefFrac q) := by
   unfold fileCoreNoff
-  rw [if_pos h]
+  rw [ite_eq_left h]
   exact .rfl
 
 /-- The inode arm: an `FD_INODE`/`FD_DEVICE` payload IS its `inodePay`
@@ -341,7 +341,7 @@ theorem fileCoreNoff_inode (q : Qp) (pn : FPNames) (C : FContent)
   unfold fileCoreNoff
   have hp : C.type ≠ FD_PIPE := by
     rcases h with h | h <;> rw [h] <;> decide
-  rw [if_neg hp, if_pos h]
+  rw [ite_eq_right hp, ite_eq_left h]
   exact .rfl
 
 /-- AN UNTYPED SLOT'S PAYLOAD IS EXACTLY ITS IREF UNIT (Rocq
@@ -349,15 +349,15 @@ theorem fileCoreNoff_inode (q : Qp) (pn : FPNames) (C : FContent)
 theorem fileCoreNoff_none (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_NONE) :
     fileCoreNoff (GF := GF) q pn C ⊣⊢ irefFrac q := by
   unfold fileCoreNoff
-  rw [if_neg (by rw [h]; exact fdNone_ne_pipe),
-    if_neg (by rw [h]; exact fun h' => h'.elim fdNone_ne_inode fdNone_ne_device)]
+  rw [ite_eq_right (by rw [h]; exact fdNone_ne_pipe),
+    ite_eq_right (by rw [h]; exact fun h' => h'.elim fdNone_ne_inode fdNone_ne_device)]
   exact .rfl
 
 /-- The off conjunct of an `FD_INODE` file is its off-box share. -/
 theorem fileCoreOff_inode (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) (h : C.type = FD_INODE) :
     fileCoreOff (GF := GF) k q pn C ⊣⊢ offFd k q pn.obox pn.ooff C := by
   unfold fileCoreOff
-  rw [if_pos h]
+  rw [ite_eq_left h]
   exact .rfl
 
 /-- Any other file holds the free word (Rocq `file_core_off_none`,
@@ -365,7 +365,7 @@ generalised to every non-`FD_INODE` type). -/
 theorem fileCoreOff_free (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) (h : C.type ≠ FD_INODE) :
     fileCoreOff (GF := GF) k q pn C ⊣⊢ offFree k q := by
   unfold fileCoreOff
-  rw [if_neg h]
+  rw [ite_eq_right h]
   exact .rfl
 
 /-- Rocq `file_core_none`. -/

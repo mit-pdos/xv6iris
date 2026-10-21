@@ -164,7 +164,7 @@ theorem mdom_singleton {V : Type _} (z : Nat) (v : V) :
   rw [mem_mdom, LawfulSet.mem_singleton, LawfulPartialMap.get?_singleton]
   by_cases h : z = y
   · subst h; simp
-  · simp only [h, if_false, Option.isSome_none, Bool.false_eq_true, false_iff]
+  · simp only [h, ite_false, Option.isSome_none, Bool.false_eq_true, false_iff]
     exact fun h' => h h'.symm
 
 theorem mdom_insert {V : Type _} (m : RegMapF V) (z : Nat) (v : V) :
@@ -174,7 +174,7 @@ theorem mdom_insert {V : Type _} (m : RegMapF V) (z : Nat) (v : V) :
     LawfulPartialMap.get?_insert]
   by_cases h : z = y
   · subst h; simp
-  · simp only [h, if_false]
+  · simp only [h, ite_false]
     exact ⟨Or.inr, fun h' => h'.elim (fun e => absurd e.symm h) id⟩
 
 theorem mdom_delete {V : Type _} (m : RegMapF V) (z : Nat) :
@@ -298,9 +298,9 @@ theorem icIdInum_spec (p : Bool × BitVec 32 × BitVec 32) (z : Nat) :
     z ∈ icIdInum p ↔ (p.1 = true ∧ z = p.2.2.toNat) := by
   unfold icIdInum
   cases p.1
-  · simp only [if_false, Bool.false_eq_true, false_and, iff_false]
+  · simp only [ite_false, Bool.false_eq_true, false_and, iff_false]
     exact LawfulSet.mem_empty
-  · simp only [if_true, true_and]
+  · simp only [ite_true, true_and]
     exact LawfulSet.mem_singleton
 
 /-- The LIVE slots' inums (Rocq's `ic_live_inums`). -/
@@ -322,7 +322,7 @@ theorem icLiveInums_lookup (ids : List (Bool × BitVec 32 × BitVec 32)) (z : Na
     refine ⟨k, p, hk, ?_⟩
     cases hv : p.1
     · simp [hv] at hf
-    · simp only [hv, if_true, Option.some.injEq] at hf
+    · simp only [hv, ite_true, Option.some.injEq] at hf
       exact ⟨rfl, hf.symm⟩
   · rintro ⟨k, p, hk, hv, rfl⟩
     exact ⟨p, List.mem_of_getElem? hk, by simp [hv]⟩

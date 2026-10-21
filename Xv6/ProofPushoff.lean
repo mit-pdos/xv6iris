@@ -85,7 +85,7 @@ theorem csRegs_set {R R' : RegMap} (h : csRegs R R') (i : BitVec 5) (v : BitVec 
     intro j h1 h2 e; subst e; omega
   unfold csRegs at *
   simp only [RegMap.set_apply]
-  rw [if_neg (hne 18#5 (by decide) (by decide)), if_neg (hne 19#5 (by decide) (by decide)), if_neg (hne 20#5 (by decide) (by decide)), if_neg (hne 21#5 (by decide) (by decide)), if_neg (hne 22#5 (by decide) (by decide)), if_neg (hne 23#5 (by decide) (by decide)), if_neg (hne 24#5 (by decide) (by decide)), if_neg (hne 25#5 (by decide) (by decide)), if_neg (hne 26#5 (by decide) (by decide)), if_neg (hne 27#5 (by decide) (by decide))]
+  rw [ite_eq_right (hne 18#5 (by decide) (by decide)), ite_eq_right (hne 19#5 (by decide) (by decide)), ite_eq_right (hne 20#5 (by decide) (by decide)), ite_eq_right (hne 21#5 (by decide) (by decide)), ite_eq_right (hne 22#5 (by decide) (by decide)), ite_eq_right (hne 23#5 (by decide) (by decide)), ite_eq_right (hne 24#5 (by decide) (by decide)), ite_eq_right (hne 25#5 (by decide) (by decide)), ite_eq_right (hne 26#5 (by decide) (by decide)), ite_eq_right (hne 27#5 (by decide) (by decide))]
   exact h
 
 /-- The exit context of the `c->noff` store inside a four-slot body, when
@@ -251,7 +251,7 @@ theorem push_off_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (M : MYCP
     -- j b98
     k_step (wp_s_j cpu _ (KA.«push_off» + 0x38#64) true 2097120#21) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    try rw [if_pos hn0]
+    try rw [ite_eq_left hn0]
     iapply (push_off_tail M true cpu k hsie hnoff hK hwf (fun h => nomatch h) old (fun h => nomatch h) _ ?hsp ?hcs)
       $$ [- $Hk $Hpc $Hpin]
     rotate_right 1
@@ -274,7 +274,7 @@ theorem push_off_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (M : MYCP
     k_step (wp_s_branch cpu _ (KA.«push_off» + 0x16#64) true 22#13 15#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [bcond_beq_ofNat' k.noff (by omega), decide_eq_false hd]
     iintro Hk Hpc
-    try rw [if_neg hn0]
+    try rw [ite_eq_right hn0]
     iapply (push_off_tail M false cpu k hsie hnoff hK hwf (fun _ => by omega) k.intena (fun _ => rfl) _ ?hsp ?hcs)
       $$ [- $Hk $Hpc]
     rotate_right 1

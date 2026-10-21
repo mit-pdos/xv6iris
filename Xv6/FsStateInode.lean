@@ -233,7 +233,7 @@ def fnBare (n : FsNode) : Prop :=
 
 theorem replicate_getElem! {α : Type _} [Inhabited α] (n : Nat) (a : α) (k : Nat)
     (hk : k < n) : (List.replicate n a)[k]! = a :=
-  getElem!_of_getElem? (by rw [List.getElem?_replicate, if_pos hk])
+  getElem!_of_getElem? (by rw [List.getElem?_replicate, ite_eq_left hk])
 
 theorem fnBare_wf (n : FsNode) (h : fnBare n) : dinodeWf n.fnRec := by
   obtain ⟨ha, _, _, _, _⟩ := h
@@ -832,7 +832,7 @@ theorem nodeExact_bump (n n' : FsNode) (D : Std.ExtTreeSet Fname compare) (s : F
     rw [Bool.eq_false_iff]; intro h; exact hsD (Std.ExtTreeSet.mem_iff_contains.2 h)
   rw [ho] at hx'
   rw [ho', hnl, Std.ExtTreeSet.size_insert, hc]
-  simp only [Bool.false_eq_true, if_false] at hx' ⊢
+  simp only [Bool.false_eq_true, ite_false] at hx' ⊢
   omega
 
 theorem entDsetOk_empty (n : FsNode) : entDsetOk n ∅ :=

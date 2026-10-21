@@ -884,7 +884,7 @@ theorem iregLnk_root_alive (γfs : FsNames) (d : Dinode) :
     iregLnk (GF := GF) γfs iregRoot.toNat d ⊢ ⌜1 ≤ d.diNlink.toNat⌝ := by
   unfold iregLnk iregLnkAt iregKeep
   have hr : ((iregRoot.toNat : Nat) : Int) = iregRoot := by decide
-  simp only [if_pos hr]
+  simp only [ite_eq_left hr]
   iintro ⟨%v, -, Ha, Htk⟩
   ihave %h := FsStateLink.linkAuth_tok_agree _ _ _ _ _ $$ [Ha Htk]
   · iframe Ha Htk

@@ -65,12 +65,12 @@ theorem fdFreesFrom_insert : ∀ (fs : List (BitVec 64)) (i j : Nat) (l : List N
     split at h
     · rename_i ha
       obtain ⟨rfl, rfl⟩ := List.cons.inj h
-      simp only [Nat.sub_self, List.set_cons_zero, fdFreesFrom, if_neg hv]
+      simp only [Nat.sub_self, List.set_cons_zero, fdFreesFrom, ite_eq_right hv]
     · rename_i ha
       obtain ⟨hle, -⟩ := fdFreesFrom_head t (i + 1) j l h
       have : j - i = (j - (i + 1)) + 1 := by omega
       rw [this, List.set_cons_succ]
-      simp only [fdFreesFrom, if_neg ha]
+      simp only [fdFreesFrom, ite_eq_right ha]
       exact ih (i + 1) j l v hv h
 
 theorem fdFrees_insert (fs : List (BitVec 64)) (j : Nat) (l : List Nat) (v : BitVec 64)

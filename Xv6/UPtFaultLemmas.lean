@@ -107,11 +107,11 @@ theorem ptRep_mapped (t : PTree) (L : RegMapF (BitVec 64)) (hrep : ptRep t L)
   have hea := PTree.walk_addr 2 t vpn addr v hwalk
   have hz : t.entAt 2 vpn ≠ 0#64 := by
     intro hz0
-    rw [PTree.walk_eq, if_pos hz0] at hwalk
+    rw [PTree.walk_eq, ite_eq_left hz0] at hwalk
     exact absurd hwalk (by simp)
   refine ⟨hc, ?_, ?_⟩
   · rw [hea.2]; exact had
-  · rw [PTree.walk_eq, PtRun.slot_snd_of_complete 2 t vpn hc, if_neg hz]
+  · rw [PTree.walk_eq, PtRun.slot_snd_of_complete 2 t vpn hc, ite_eq_right hz]
 
 /-- Filling a path keeps the representation: the new nodes are zero, so no
 walk moves, and the pages stay valid and distinct. -/
@@ -153,7 +153,7 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
       rw [Iris.Std.get?_insert_eq rfl] at hw
       obtain rfl : c = w := Option.some.inj hw
       refine ⟨pteAddr (t.slot 2 v').1 (vpnIdx v' 0), v, ?_, had⟩
-      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, if_neg hvz,
+      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, ite_eq_right hvz,
         PtRun.slot_snd_of_complete 2 t v' hc]
     · rw [Iris.Std.get?_insert_ne (m := L) (k := vpn.toNat) (k' := v'.toNat) (v := c)
         (fun hh => he (hkey v' hh.symm))] at hw
@@ -368,10 +368,10 @@ theorem umPages_fresh' (P : UPtd) (M : Nat → List (BitVec 8)) (r : BitVec 64)
     · iexact H
 
 theorem viewZero_self (M : Nat → List (BitVec 8)) (k : Nat) :
-    viewZero M k k = List.replicate 4096 0#8 := if_pos rfl
+    viewZero M k k = List.replicate 4096 0#8 := ite_eq_left rfl
 
 theorem viewZero_ne (M : Nat → List (BitVec 8)) (k k' : Nat) (h : k' ≠ k) :
-    viewZero M k k' = M k' := if_neg h
+    viewZero M k k' = M k' := ite_eq_right h
 
 /-- The page `vmfault` maps joins the user pages, at the zeroed view. -/
 theorem umPages_insert (P : UPtd) (M : Nat → List (BitVec 8)) (vpn : Nat) (r : BitVec 64)

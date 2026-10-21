@@ -268,21 +268,21 @@ theorem kcatRound_tree (N : UkNames GF) (fdv : BitVec 64) (fd : Int) (rest : Pro
   isplit
   · -- the read failed: the read-error tail
     iintro %hneg
-    have hr : rdAnsOf ret g = .RdErr := by unfold rdAnsOf; rw [if_pos hneg]
+    have hr : rdAnsOf ret g = .RdErr := by unfold rdAnsOf; rw [ite_eq_left hneg]
     rw [hr, catTurn_err]
     iapply kcatDgCr_tree $$ HK
   isplit
   · -- end of file: the rest
     iintro %hz
     have hr : rdAnsOf ret g = .RdBytes [] := by
-      unfold rdAnsOf; rw [if_neg (by omega), hz]; rfl
+      unfold rdAnsOf; rw [ite_eq_right (by omega), hz]; rfl
     rw [hr, catTurn_nil]
     iexact HK
   · -- nb bytes: the write of the prefix the read filled
     iintro %nb %hnb %hpos
     have hle : nb ≤ 512 := by unfold readAnsOk at hok; omega
     have hr : rdAnsOf ret g = .RdBytes ((List.range nb).map g) := by
-      unfold rdAnsOf; rw [if_neg (by omega), hnb]; rfl
+      unfold rdAnsOf; rw [ite_eq_right (by omega), hnb]; rfl
     have hne : (List.range nb).map g ≠ [] := by
       intro he; have := congrArg List.length he; simp at this; omega
     rw [hr, catTurn_cons _ _ _ hne]
@@ -305,13 +305,13 @@ theorem kcatRound_tree (N : UkNames GF) (fdv : BitVec 64) (fd : Int) (rest : Pro
     · unfold kcatWpost
       try dsimp only
       by_cases hw : wret.toInt = (nb : Int)
-      · rw [if_pos hw, treePay_tau]
+      · rw [ite_eq_left hw, treePay_tau]
         isplit
         · iintro _; iexact HKw
         · iintro %hne'
           iexfalso; ipureintro
           exact hne' (kcat_ofNat_of_toInt wret nb hw).symm
-      · rw [if_neg hw]
+      · rw [ite_eq_right hw]
         isplit
         · iintro %heq
           iexfalso; ipureintro
@@ -372,13 +372,13 @@ theorem kcatFile_tree (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (
   iapply Hcont $$ %h' %ret [HK] Hrun
   try dsimp only
   by_cases hneg : ret.toInt < 0
-  · rw [if_pos hneg]
+  · rw [ite_eq_left hneg]
     isplit
     · iintro _
       iapply kcatDgOpen_tree $$ HK
     · iintro %hnn
       iexfalso; ipureintro; omega
-  · rw [if_neg hneg]
+  · rw [ite_eq_right hneg]
     isplit
     · iintro %hn
       iexfalso; ipureintro; omega

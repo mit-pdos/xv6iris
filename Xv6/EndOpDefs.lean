@@ -327,19 +327,19 @@ theorem eoPins_set (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 : BitVec 64)
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
-  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
-  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
-  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
-  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
-  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
-  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
-  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
-  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
-  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
-  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
-  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
-  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n2)]; exact a2
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n8)]; exact a8
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n9)]; exact a9
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n18)]; exact a18
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n19)]; exact a19
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n20)]; exact a20
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n21)]; exact a21
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n22)]; exact a22
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n23)]; exact a23
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n24)]; exact a24
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n25)]; exact a25
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n26)]; exact a26
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n27)]; exact a27
 
 theorem eoPins_set9 (k : KCtx) (R : RegMap) (r9 r18 r19 r20 r21 v : BitVec 64)
     (h : eoPins k R r9 r18 r19 r20 r21) : eoPins k (R.set 9#5 v) v r18 r19 r20 r21 := by
@@ -491,10 +491,10 @@ def eoExt (Lw : Nat → List (BitVec 8)) (t : Nat) (bs : List (BitVec 8)) :
 
 theorem eoExt_lt (Lw : Nat → List (BitVec 8)) (t : Nat) (bs : List (BitVec 8))
     (i : Nat) (h : i < t) : eoExt Lw t bs i = Lw i := by
-  unfold eoExt; rw [if_neg (by omega)]
+  unfold eoExt; rw [ite_eq_right (by omega)]
 
 theorem eoExt_eq (Lw : Nat → List (BitVec 8)) (t : Nat) (bs : List (BitVec 8)) :
-    eoExt Lw t bs t = bs := by unfold eoExt; rw [if_pos rfl]
+    eoExt Lw t bs t = bs := by unfold eoExt; rw [ite_eq_left rfl]
 
 theorem eoExt_len (Lw : Nat → List (BitVec 8)) (t : Nat) (bs : List (BitVec 8))
     (hLw : ∀ i, (Lw i).length = BSIZE) (hbs : bs.length = BSIZE) :
@@ -502,8 +502,8 @@ theorem eoExt_len (Lw : Nat → List (BitVec 8)) (t : Nat) (bs : List (BitVec 8)
   intro i
   unfold eoExt
   by_cases h : i = t
-  · rw [if_pos h]; exact hbs
-  · rw [if_neg h]; exact hLw i
+  · rw [ite_eq_left h]; exact hbs
+  · rw [ite_eq_right h]; exact hLw i
 
 /-! ## Pure facts the commit's book-keeping needs -/
 
@@ -937,11 +937,11 @@ theorem eo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; exact hTlen
   cases cmt
   · ileft
-    isimp only [Bool.false_eq_true, if_false] at Hcmt
-    isimp only [Bool.false_eq_true, if_false] at Harm
+    isimp only [Bool.false_eq_true, ite_false] at Hcmt
+    isimp only [Bool.false_eq_true, ite_false] at Harm
     iframe Hcmt Harm Hhelp
   · iright
-    isimp only [if_true] at Hcmt
+    isimp only [ite_true] at Hcmt
     iframe Hcmt Hhelp
     ipureintro
     exact hcmt0 rfl
@@ -1043,7 +1043,7 @@ theorem eo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
   iapply (eo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
-  isimp only [if_true]
+  isimp only [ite_true]
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
 
 end

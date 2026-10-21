@@ -127,7 +127,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
   case neg =>
     -- THE NUL: strchr found no newline, and the scan is over
     have hz : F (i + k) = cNul := hst.resolve_left hnl
-    rw [if_neg hnl, show ukBtaken .BEQ (BitVec.ofNat 64 0) 0#64 = true from rfl, if_pos rfl,
+    rw [ite_eq_right hnl, show ukBtaken .BEQ (BitVec.ofNat 64 0) 0#64 = true from rfl, ite_eq_left rfl,
       show BitVec.ofNat 64 0x140 + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0x16a from by decide]
     ihave Hbuf := grepBuf_close_same N.d i (k + 1) F (by omega) $$ HA HM HR
     icases Hk with ⟨Hend, -⟩
@@ -143,9 +143,9 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     rcases Nat.lt_or_ge (i + k) mv with h | h
     · exact h
     · exfalso; rw [show i + k = mv by omega, hFm] at hnl; exact absurd hnl (by decide)
-  rw [if_pos hnl, Xv6.beq_nat _ 0 (by omega) (by decide), decide_eq_false (by omega), if_neg (by decide),
+  rw [ite_eq_left hnl, Xv6.beq_nat _ 0 (by omega) (by decide), decide_eq_false (by omega), ite_eq_right (by decide),
     ukPc 0x140 0x142 true rfl]
-  have hs1_5' : m5.get 9#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i + k) := by rw [hs1_5, ha04, if_pos hnl]
+  have hs1_5' : m5.get 9#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i + k) := by rw [hs1_5, ha04, ite_eq_left hnl]
   icases grepUbytes_snoc_open N.d (User.Grep.Sym.«buf» + i) k (fun j => F (i + j)) $$ HM with ⟨HM, Hb⟩
   -- 0x142  sb zero,0(s1) : *q = 0
   gfetch 0x142 false (.STORE (0#12, .Regidx 0#5, .Regidx 9#5, 1))
@@ -209,7 +209,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
   cases sk
   case true =>
     -- skipping the tail of an over-long line: no match, no write
-    rw [if_pos rfl, show BitVec.ofNat 64 0x146 + BitVec.signExtend 64 8170#13 = BitVec.ofNat 64 0x130 from by decide]
+    rw [ite_eq_left rfl, show BitVec.ofNat 64 0x146 + BitVec.signExtend 64 8170#13 = BitVec.ofNat 64 0x130 from by decide]
     ihave Hbuf := grepBuf_close_set N.d i k F ubyte0 (by omega) $$ HA HM Hb HR
     rw [grepK_skip_S _ fd rest F i k mv hpl hlt hnl]
     iapply Htail $$ %h8 %m5 %(grepFset F (i + k) ubyte0) [] [] [] [] Hre Hbuf Ht Hrun
@@ -217,7 +217,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     · ipureintro; exact hs1_5'
     · ipureintro; exact hFset1
     · ipureintro; exact hFset2
-  rw [if_neg (by decide), ukPc 0x146 0x14a false rfl]
+  rw [ite_eq_right (by decide), ukPc 0x146 0x14a false rfl]
   -- 0x14a  c.mv a1,s2 ; 0x14c  c.mv a0,s8 ; 0x14e  jal match
   gfetch 0x14a true (.RTYPE (.Regidx 18#5, .Regidx 0#5, .Regidx 11#5, .ADD))
   iapply wp_uk_rtype UL N h8 m5 (BitVec.ofNat 64 0x14a) true 18#5 0#5 11#5 .ADD _
@@ -274,7 +274,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
   rw [ha09, kgrep_beqz_b01]
   cases hm : matchRe ((List.range lr).map fr) ((List.range k).map (fun j => F (i + j)))
   · -- no match
-    rw [show (!false) = true from rfl, if_pos rfl,
+    rw [show (!false) = true from rfl, ite_eq_left rfl,
       show BitVec.ofNat 64 0x152 + BitVec.signExtend 64 8158#13 = BitVec.ofNat 64 0x130 from by decide]
     ihave Hbuf := grepBuf_close_set N.d i k F ubyte0 (by omega) $$ HA HM Hb HR
     rw [grepK_nomatch_S _ fd rest F i k mv hpl hlt hnl hm]
@@ -283,7 +283,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     · ipureintro; exact hs1_9
     · ipureintro; exact hFset1
     · ipureintro; exact hFset2
-  rw [show (!true) = false from rfl, if_neg (by decide), ukPc 0x152 0x154 true rfl]
+  rw [show (!true) = false from rfl, ite_eq_right (by decide), ukPc 0x152 0x154 true rfl]
   obtain ⟨-, -, -, hs5_9, -, -, -, -, hs11_9⟩ := hgl9
   -- 0x154  sb s5,0(s1) : *q = '\n'
   gfetch 0x154 false (.STORE (0#12, .Regidx 21#5, .Regidx 9#5, 1))
@@ -348,10 +348,10 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
   · ipureintro; rw [w10, kgrep_cint 1 (by decide)]; rfl
   · ipureintro; exact w11
   · ipureintro; rw [w12, grepLength_line]
-  · simp only [usrcAt, grepLength_line, Bool.false_eq_true, if_false]
+  · simp only [usrcAt, grepLength_line, Bool.false_eq_true, ite_false]
     iexact HM
   iintro %h20 %wret HK Hs Hrun
-  simp only [usrcAt, grepLength_line, Bool.false_eq_true, if_false]
+  simp only [usrcAt, grepLength_line, Bool.false_eq_true, ite_false]
   rw [show retPc (m14.get 1#5) = BitVec.ofNat 64 0x168 by rw [ukWr_get_same _ _ _ (by decide)]; decide]
   ihave Hbuf := grepBuf_close_same N.d i (k + 1) F (by omega) $$ HA Hs HR
   -- 0x168  c.j 0x130
@@ -362,7 +362,7 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
   iintro %h21 Hrun
   rw [show BitVec.ofNat 64 0x168 + BitVec.signExtend 64 2097096#21 = BitVec.ofNat 64 0x130 from by decide,
     show ukWr (stubRet m14 16 wret) 0#5 (BitVec.ofNat 64 0x168 + instrLen true) = stubRet m14 16 wret by
-      unfold ukWr; rw [if_pos rfl]]
+      unfold ukWr; rw [ite_eq_left rfl]]
   iapply Htail $$ %h21 %(stubRet m14 16 wret) %F [] [] [] [] Hre Hbuf HK Hrun
   · ipureintro
     unfold stubRet

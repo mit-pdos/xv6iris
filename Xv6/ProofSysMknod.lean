@@ -167,7 +167,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   · -- ===== ARM B: create returned 0 =====
     ihave Harm := sys_mknod_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Htx, Hcf⟩
-    simp only [Bool.false_eq_true, if_false] at hns
+    simp only [Bool.false_eq_true, ite_false] at hns
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
     iintro Hk Hpc
@@ -190,7 +190,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   · -- ===== create SUCCEEDED: the LOCKED inode =====
     ihave Harm := sys_mknod_ite_t _ _ $$ Harm
     icases Harm with ⟨%⟨h10, hkk, hpos, hnib, hpure⟩, Hlk, Hcok⟩
-    simp only [if_true] at hns
+    simp only [ite_true] at hns
     obtain ⟨hmade, -⟩ := creOkPure_dev _ _ made dn hpure
     subst hmade
     have hnz : ientry kk ≠ 0#64 := ientry_ne_zero kk (Nat.le_of_lt hkk)

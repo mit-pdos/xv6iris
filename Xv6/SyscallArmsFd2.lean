@@ -46,10 +46,10 @@ theorem umemByte_writerImg_lazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 
     umemByte (writerImg P M) va = (umemLazy P sz M va).getD 0#8 := by
   unfold umemByte writerImg umemLazy
   by_cases h : (Iris.Std.PartialMap.get? P.um (va / 4096)).isSome
-  · simp only [h, if_true]
-  · simp only [h, if_false, Bool.false_eq_true]
+  · simp only [h, ite_true]
+  · simp only [h, ite_false, Bool.false_eq_true]
     have hlt : va % 4096 < 4096 := Nat.mod_lt _ (by decide)
-    rw [List.getElem?_replicate, if_pos hlt]
+    rw [List.getElem?_replicate, ite_eq_left hlt]
     split <;> rfl
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
@@ -98,8 +98,8 @@ theorem syscArmWrite_ans (P P' : UPtd) (sz : BitVec 64) (sts : List FdState) (a0
   unfold usysWriteAns usysWriteAnsAt
   rw [← hn]
   by_cases hlt : argZ a2 < 0
-  · rw [if_pos hlt]; exact hneg hlt
-  · rw [if_neg hlt]
+  · rw [ite_eq_left hlt]; exact hneg hlt
+  · rw [ite_eq_right hlt]
     obtain ⟨i, hr, hle, hpre, hcut⟩ := hpos (by omega)
     rw [hr]
     congr 1
@@ -127,7 +127,7 @@ theorem uwriteRun_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) 
 theorem usysOutAt_nil (ι : UIota) (hp : ι.cpos = []) (img : ElfMem) (a : BitVec 64) :
     usysOutAt ι (uwriteRun img a (uwriteCntOf (-1#64))) := by
   unfold usysOutAt uwriteCntOf uwriteRun
-  rw [hp, if_pos rfl]
+  rw [hp, ite_eq_left rfl]
   exact ⟨rfl, List.Pairwise.nil⟩
 
 omit [MachGS GF] in
@@ -178,7 +178,7 @@ theorem syscArmWrite_ev [MonoNatG GF] [WchGpre GF] (P : UPtd) (sz : Nat) (M : Na
       iframe Hl
       ipureintro
       intro _
-      have hc : uwriteCntOf r = r.toNat := by unfold uwriteCntOf; rw [if_neg hr]
+      have hc : uwriteCntOf r = r.toNat := by unfold uwriteCntOf; rw [ite_eq_right hr]
       rw [hc, ← uwriteRun_writerImg P sz M a1 r.toNat]
       exact ⟨hL.2.1, hL.2.2.1⟩
 
@@ -260,8 +260,8 @@ theorem syscall_arm_read (SR : SYSREAD)
   have hmem : syscMemOk V (syscStore { V with upt := P' } (R2 10#5)) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } (R2 10#5)) M1) := by
     unfold syscMemOk
-    rw [hn5, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-      if_pos (by decide)]
+    rw [hn5, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+      ite_eq_left (by decide)]
     refine ⟨bs, ?_, himg⟩
     rw [hbl]; exact hd
   have hrr : syscReadRet V.tf (R2 10#5) := syscReadRet_of V.tf (R2 10#5) d hd hr
@@ -370,8 +370,8 @@ theorem syscall_arm_write (SW : SYSWRITE)
   have hmem : syscMemOk V (syscStore { V with upt := P' } (R2 10#5)) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } (R2 10#5)) (viewFaulted V.upt P' M)) := by
     unfold syscMemOk
-    rw [hn16, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-      if_neg (by decide), if_neg (by decide)]
+    rw [hn16, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+      ite_eq_right (by decide), ite_eq_right (by decide)]
     exact himg
   have hrows := syscRows_upt V M (viewFaulted V.upt P' M) sts cs pid P' (R2 10#5) 16 hn16 (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hl0 hext hmem
@@ -504,7 +504,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) M) := by
       unfold syscMemOk
-      rw [hn4, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide)]
+      rw [hn4, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide)]
       exact ⟨[], by simp, rfl⟩
     have hfd := syscPipe_fd_fail V sts hn4
     have hpp := syscPipe_pipe_fail V (syscImg V M)
@@ -534,7 +534,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := P' } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := P' } (R2 10#5)) M1) := by
       unfold syscMemOk
-      rw [hn4, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide)]
+      rw [hn4, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide)]
       refine ⟨_, ?_, himg⟩
       simp only [List.length_append, List.length_take, sysPipeFdBytes_length]
       omega
@@ -568,7 +568,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     have hmem : syscMemOk V (syscStore { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } (R2 10#5)) M1) := by
       unfold syscMemOk
-      rw [hn4, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide)]
+      rw [hn4, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide)]
       refine ⟨_, ?_, himg⟩
       simp only [List.length_append, sysPipeFdBytes_length]
       omega

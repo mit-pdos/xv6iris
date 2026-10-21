@@ -133,7 +133,7 @@ theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
   iintro Hk Hpc
   by_cases hend : bi + 1 = 8192
   · -- bi == BPB: out of the loop (+0xe6  j +0x8a), to the exhaust arm
-    simp only [hend, ne_eq, not_true_eq_false, decide_false, Bool.false_eq_true, if_false]
+    simp only [hend, ne_eq, not_true_eq_false, decide_false, Bool.false_eq_true, ite_false]
     k_step_e (wp_s_j cpu _ (KA.«balloc» + 0xe6#64) true 2097060#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
@@ -143,7 +143,7 @@ theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
       $$ [$Hk $Hpc $Hframe $Hpe $Hpi $Hbc $Hte $Hce $Hpid $Hsz $Hbms $Hsl $Hlk $Hop $Hnext]
     case hb' => ba_body_tac
   · -- the next iteration
-    simp only [hend, ne_eq, not_false_eq_true, _root_.decide_true, if_true]
+    simp only [hend, ne_eq, not_false_eq_true, _root_.decide_true, ite_true]
     have IH' := IH (by unfold BPB BSIZE at hbi ⊢; omega)
     unfold baScanPre baScanPreAt at IH'
     iapply (IH' cpu _ ?hr')
@@ -199,12 +199,12 @@ theorem ba_scan_step (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (
   rw [ba_bgeu_scan bi size (by unfold BPB BSIZE at hbi; omega) (by unfold BPB BSIZE at hsz; omega)]
   by_cases hs : size ≤ bi
   · -- b + bi ≥ sb.size: out of the loop, to the exhaust arm
-    simp only [hs, _root_.decide_true, if_true]
+    simp only [hs, _root_.decide_true, ite_true]
     iapply (ba_exhaust BE PK Γ cpu c0 k spie spp R γl γb V γ γfs logstart bmapstart size dev
         u cr Sb kk (BitVec.ofNat 32 bmapstart) (bitmapBytes used) bsd d pidv dqp dqb dqs
         hK hnoff hlocks htier hsz hkk hb hp0)
       $$ [$Hk $Hpc $Hframe $Hpe $Hpi $Hbc $Hte $Hce $Hpid $Hsz $Hbms $Hsl $Hlk $Hop $Hnext]
-  simp only [hs, decide_false, Bool.false_eq_true, if_false]
+  simp only [hs, decide_false, Bool.false_eq_true, ite_false]
   have hbi31 : bi < 2 ^ 31 := by unfold BPB BSIZE at hbi; omega
   have hq : bi / 8 < BSIZE := bit_byte_lt BSIZE bi (by unfold BPB at hbi; exact hbi)
   -- +0xba  andi a3,a4,7 ; +0xbe  sllw a3,s3,a3 : the mask
@@ -267,7 +267,7 @@ theorem ba_scan_step (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (
     case n10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h10
   · -- the bit is CLEAR: the alloc arm
     k_step_e (wp_s_branch cpu _ (KA.«balloc» + 0xdc#64) true 8028#13 11#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hu, if_false, MachCSL.beqz_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hu, ite_false, MachCSL.beqz_zero]
     iintro Hk Hpc
     iapply (ba_alloc BR LW BE MS Γ cpu c0 k spie spp _ γl γb V γdl pd pav pu j γ γfs logstart
         bmapstart size dev u cr Sb used bi kk bsd d pidv dqp dqb dqs hj hproc hK hnoff

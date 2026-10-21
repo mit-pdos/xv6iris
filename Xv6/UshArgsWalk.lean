@@ -80,7 +80,7 @@ theorem refParseexec_inv (len : Nat) (f : Nat → BitVec 8) (n i : Nat) (t : Ush
   cases hit with
   | true => simp at h
   | false =>
-    simp only [Bool.false_eq_true, if_false] at h
+    simp only [Bool.false_eq_true, ite_false] at h
     rcases er : refRedirs len f n s [] with _ | ⟨rs, s1⟩
     · rw [er] at h; cases h
     · rw [er] at h

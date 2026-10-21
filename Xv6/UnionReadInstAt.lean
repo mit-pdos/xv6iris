@@ -64,8 +64,8 @@ theorem union_disc_no_ctrl_d (h : List Obs) (b : BitVec 8) (hend : obsEndsIn .ua
   have hb : b.toNat = 4 := by
     unfold consXlate at hx
     by_cases h13 : b = 13#8
-    · rw [if_pos h13] at hx; exact absurd hx (by decide)
-    · rw [if_neg h13] at hx; exact hx
+    · rw [ite_eq_left h13] at hx; exact absurd hx (by decide)
+    · rw [ite_eq_right h13] at hx; exact hx
   obtain ⟨s0, hin⟩ := ushCycles_snoc_in h0 b
   obtain ⟨s, -, hseg, -⟩ := hd _ hin
   rw [consIns_app, consIns_in] at hseg

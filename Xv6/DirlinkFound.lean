@@ -96,7 +96,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     hK hnoff htier hkk (fun h => absurd h (by decide)) (fun h => absurd h (by decide)) hgeom hbg
     hcov hlog hnib hbel hn hpd ha0
   unfold wp_iput_gen_eb_body at h'
-  simp only [iputAddr, Bool.false_eq_true, if_false] at h'
+  simp only [iputAddr, Bool.false_eq_true, ite_false] at h'
   iapply h'
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hit Hiti Hesc Hinv Hslk Href Hsb Hsi Hbmi Hpid Hbs
     Hop Htx
@@ -206,7 +206,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
       cap := id
       sized := id
       arms := by
-        rw [if_pos rfl]
+        rw [ite_eq_left rfl]
         exact ⟨harm, rfl, rfl, rfl, rfl, rfl, rfl⟩ }
   iapply (dirlink_tail cpu k spie1 spp1 _ v1 v3 v4 bs
       (by have := hs.hK; unfold dirlinkSlots at this; omega) hs.hal ?t2 ?t9 ?t19 ?t20 ?t23 ?t24

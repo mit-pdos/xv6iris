@@ -93,13 +93,13 @@ instance fileCoreNoff_morph (t : KTier) (q : Qp) (pn : FPNames) (C : FContent) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCoreNoff (GF := GF) q pn C) := by
   unfold fileCoreNoff
   by_cases h1 : C.type = FD_PIPE
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     exact @instCtxMorphSep GF _ _ _ (hpipe t pn.lock pn.pipe C.pipe) (instCtxMorphConst _)
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     by_cases h2 : C.type = FD_INODE ∨ C.type = FD_DEVICE
-    · simp only [if_pos h2]
+    · simp only [ite_eq_left h2]
       exact inodePay_morph t _ _ _ _ _ _ _ _
-    · simp only [if_neg h2]
+    · simp only [ite_eq_right h2]
       exact instCtxMorphConst _
 
 /-- Rocq `file_core_morph`. -/
@@ -151,9 +151,9 @@ instance ofileLentOrSlot_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : 
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; ofileLentOrSlot (GF := GF) γ γd pa D fd v) := by
   unfold ofileLentOrSlot
   by_cases h : fd ∈ D
-  · simp only [if_pos h]
+  · simp only [ite_eq_left h]
     exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphWordAt t _ _ _ _)
-  · simp only [if_neg h]
+  · simp only [ite_eq_right h]
     exact ofileSlot_morph t γ γd pa fd v
 
 instance procOfilesOwe_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : BitVec 64)

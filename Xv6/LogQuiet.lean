@@ -155,7 +155,7 @@ theorem logResAt_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     subst hcmtf
     have hT : T = ∅ := eo_tx_empty T om hTlen (by rw [hlen]; exact hout0)
     subst hT
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%n, %LB, %hsum, %hsub, %hreg, %hquiet, Htok, Hbatch⟩
     have hn0 : n = 0 := hquiet hout0
     unfold logStateAt
@@ -175,7 +175,7 @@ theorem logResAt_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     unfold logQuiet
     iintro ⟨Htx, HLauth, Hmirh, -, -⟩ Htok Hout Hcmt Hnc Hhelp
     iexists out, false, nc, om, E, X, ∅, nxo, nxt, nxl
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
     isplitr
     · ipureintro; exact hlen

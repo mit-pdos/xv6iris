@@ -2,7 +2,7 @@ name: CI (Lean)
 
 # The Lean tree's counterpart of the Rocq job (.github/workflows/ci.yml on
 # `main`), step for step.  It builds the Sail-generated Lean model
-# (model/Lean_RV64D/), lean-sail (vendor/lean-sail/), iris-lean, and the
+# (model/Lean_RV64D/), lean-sail (a git dependency, .lake/packages/Sail), iris-lean, and the
 # proofs (MachCSL/, Xv6/ -- the checked-in kernel and user-program dumps are
 # Lean files of Xv6/ and are compiled with them), and then audits what was
 # built: the axioms under the top theorems, the trusted base of their
@@ -128,13 +128,11 @@ jobs:
 
       # ---- 2. Cache: the fetched packages and everything built from inputs
       #         that no proof edit touches ----
-      #   .lake/packages               iris-lean, batteries, Qq: the clones
-      #                                 AND their build (it lives inside them)
+      #   .lake/packages               iris-lean, lean-sail (Sail), batteries, Qq:
+      #                                 the clones AND their build (it lives inside them)
       #   model/Lean_RV64D/.lake       the build of the Sail model
-      #   vendor/lean-sail/.lake       the build of lean-sail
       # Keyed on exactly what those are built from: the toolchain, the pinned
-      # package revisions, and the model's and lean-sail's sources (hashed --
-      # "the model hash").  No restore-keys on purpose, as in the Rocq job: a
+      # package revisions, and the model's sources (hashed -- "the model hash").  No restore-keys on purpose, as in the Rocq job: a
       # miss rebuilds from nothing, and a stale restore would only make lake
       # work out what to throw away.  Lake validates what is restored by
       # content hash (its .trace files), not by mtime, so a fresh checkout
@@ -152,8 +150,7 @@ jobs:
           path: |
             .lake/packages
             model/Lean_RV64D/.lake
-            vendor/lean-sail/.lake
-          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**', 'vendor/lean-sail/**') }}
+          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**') }}
 
       # Installs elan and the toolchain if (still) absent, puts elan's proxies
       # on PATH for the later steps, and fetches -- without building or

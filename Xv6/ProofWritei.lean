@@ -164,10 +164,10 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       %hout Hk Hpc Hte Hce Hidev Hinum Hmeta Hmap Hblk Hsi Hsz Hbms Hdn [Hsrc] Hsl Hop
     unfold wiSrc
     cases hu : A.user
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [hA.hproc]
       iexact Hsrc
-    · simp only [if_true]
+    · simp only [ite_true]
       icases Hsrc with ⟨%kv, %hkv, Hsrc⟩
       iexists kv
       isplitl []
@@ -183,10 +183,10 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
   · unfold wiSrc
     rw [UMemL.viewFaulted_self]
     cases hu : A.user
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [← hA.hproc]
       iexact Hsrc
-    · simp only [if_true]
+    · simp only [ite_true]
       iexists A.V.ev
       isplitl []
       · ipureintro; exact Nat.le_refl _

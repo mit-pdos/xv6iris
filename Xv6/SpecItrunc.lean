@@ -181,7 +181,7 @@ theorem bmPaidS_intro (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)
     logOpSe (GF := GF) icfgLog (itEntry crb u) Sb e0 ⊢ bmPaidS crb u Sb e0 := by
   unfold bmPaidS itEntry
   cases crb
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iintro H
     iright
     isplitl []
@@ -190,7 +190,7 @@ theorem bmPaidS_intro (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)
     isplitl []
     · ipureintro; exact fun _ h => h
     · iexact H
-  · simp only [if_true]
+  · simp only [ite_true]
     iintro H
     ileft
     iexists Sb

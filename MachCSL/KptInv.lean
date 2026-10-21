@@ -360,7 +360,7 @@ theorem histBytes_keys_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat
       · rw [BigSepL.bigSepL_eq (l := List.range n)
           (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} (if j = n then e :: He else Hs j)))
           (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (rangeIdx_lt hx))])]
+          (fun {_ x} hx => by rw [ite_eq_right (Nat.ne_of_lt (rangeIdx_lt hx))])]
         iexact Hb
       · simp only [↓reduceIte]
         iexact Hpt
@@ -370,15 +370,15 @@ theorem histBytes_keys_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat
       rcases Nat.lt_succ_iff_lt_or_eq.1 hj with hj | rfl
       · obtain ⟨e', H', h1, h2, h3⟩ := hvals j hj
         refine ⟨e', H', ?_, h2, ?_⟩
-        · simp only [if_neg (Nat.ne_of_lt hj)]; exact h1
-        · simp only [if_neg (Nat.ne_of_lt hj)]; exact h3
+        · simp only [ite_eq_right (Nat.ne_of_lt hj)]; exact h1
+        · simp only [ite_eq_right (Nat.ne_of_lt hj)]; exact h3
       · exact ⟨e, He, by simp, hev, by simp⟩
     · iapply BigSepL.bigSepL_snoc.2
       isplitl []
       · rw [BigSepL.bigSepL_eq (l := List.range n)
           (Φ := fun _ (j : Nat) => iprop(keyAt era ξ (if j = n then e.t else f j)))
           (Ψ := fun _ (j : Nat) => iprop(keyAt era ξ (f j)))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (rangeIdx_lt hx))])]
+          (fun {_ x} hx => by rw [ite_eq_right (Nat.ne_of_lt (rangeIdx_lt hx))])]
         iexact Hkeys
       · simp only [↓reduceIte]
         iexact Hkey

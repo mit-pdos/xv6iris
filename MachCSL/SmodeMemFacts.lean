@@ -8,7 +8,7 @@ import MachCSL.PlatformFacts
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- A one-byte access never crosses a page boundary. -/
@@ -16,7 +16,7 @@ theorem split_on_page_boundary_1 (va : BitVec 64) :
     split_on_page_boundary va 1 = pure (1, 0) := by
   unfold split_on_page_boundary
   dsimp only
-  rw [if_pos]
+  rw [ite_eq_left]
   · rfl
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
@@ -38,7 +38,7 @@ theorem split_on_page_boundary_4 (va : BitVec 64) (h : va.toNat % 4 = 0) :
     omega
   unfold split_on_page_boundary
   dsimp only
-  rw [if_pos]
+  rw [ite_eq_left]
   · rfl
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,
@@ -61,7 +61,7 @@ theorem split_on_page_boundary_2 (va : BitVec 64) (h : va.toNat % 2 = 0) :
     omega
   unfold split_on_page_boundary
   dsimp only
-  rw [if_pos]
+  rw [ite_eq_left]
   · rfl
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,

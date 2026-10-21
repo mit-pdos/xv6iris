@@ -86,11 +86,11 @@ theorem snapRecDecode (S : FsStateRec) (P : Nat → List (BitVec 8)) (home : Lis
   obtain ⟨bs, hbs, hin⟩ := hb.skRec i n hi
   rw [fsRestrict_lookup] at hbs
   by_cases hh : S.fssSb.sbInodestart + i / 16 ∈ home
-  · rw [if_pos hh] at hbs
+  · rw [ite_eq_left hh] at hbs
     cases hbs
     exact recInBlk_inj _ _ _ _ (fsDinode_wf P S.fssSb i) (hb.skRepr i n hi).inrRecWf
       (imgRec_inBlk P S.fssSb i hfull (hb.skInum i n hi)) hin
-  · rw [if_neg hh] at hbs; cases hbs
+  · rw [ite_eq_right hh] at hbs; cases hbs
 
 /-- **Rocq `snap_node_at`**: `skRegdom` names every region inum. -/
 theorem snapNode_at (S : FsStateRec) (D : BlockMap) (nib z : Nat) (hb : SnapBytes S D)
@@ -169,12 +169,12 @@ theorem mem_snapBlkSet (n : FsNode) (b : Nat) : b ∈ snapBlkSet n ↔ fnOwns n 
     · exact Or.inl ⟨p.1, ⟨p.2, toList_get.1 hp⟩, rfl⟩
     · right
       by_cases hz : fnIndb n = 0
-      · rw [if_pos hz] at hi; cases hi
-      · rw [if_neg hz, List.mem_singleton] at hi
+      · rw [ite_eq_left hz] at hi; cases hi
+      · rw [ite_eq_right hz, List.mem_singleton] at hi
         exact ⟨hz, hi.symm⟩
   · rintro (⟨k, ⟨bs, hk⟩, rfl⟩ | ⟨hnz, rfl⟩)
     · exact Or.inl ⟨(k, bs), toList_get.2 hk, rfl⟩
-    · right; rw [if_neg hnz]; exact List.mem_singleton.2 rfl
+    · right; rw [ite_eq_right hnz]; exact List.mem_singleton.2 rfl
 
 /-- **Rocq `snap_blk_set_disj`**. -/
 theorem snapBlkSet_disj (S : FsStateRec) (D : BlockMap) (i j : Nat) (n m : FsNode)
@@ -248,8 +248,8 @@ theorem snapRestrict_val (P : Nat → List (BitVec 8)) (home : List Nat) (b : Na
     (bs : List (BitVec 8)) (h : PartialMap.get? (fsRestrict P home) b = some bs) : P b = bs := by
   rw [fsRestrict_lookup] at h
   by_cases hb : b ∈ home
-  · rw [if_pos hb] at h; exact Option.some.inj h
-  · rw [if_neg hb] at h; cases h
+  · rw [ite_eq_left hb] at h; exact Option.some.inj h
+  · rw [ite_eq_right hb] at h; cases h
 
 theorem freeSet_nodup (nb : Nat) (u : BitSet) : (freeSet nb u).Nodup := by
   unfold freeSet List.Nodup
@@ -257,10 +257,10 @@ theorem freeSet_nodup (nb : Nat) (u : BitSet) : (freeSet nb u).Nodup := by
   refine List.pairwise_lt_range.imp ?_
   intro a a' hlt b ha b' ha'
   by_cases hu : a ∈ u
-  · rw [if_pos hu] at ha; cases ha
+  · rw [ite_eq_left hu] at ha; cases ha
   · by_cases hu' : a' ∈ u
-    · rw [if_pos hu'] at ha'; cases ha'
-    · rw [if_neg hu] at ha; rw [if_neg hu'] at ha'
+    · rw [ite_eq_left hu'] at ha'; cases ha'
+    · rw [ite_eq_right hu] at ha; rw [ite_eq_right hu'] at ha'
       rw [← Option.some.inj ha, ← Option.some.inj ha']
       omega
 
@@ -404,7 +404,7 @@ theorem snapLinkRoute (γfs : FsNames) (S : FsStateRec) (D : BlockMap) (nib : Na
     isplitr [Htk]
     · unfold iregLnkAt iregKeep
       iexists v0
-      rw [if_pos (show ((1 : Nat) : Int) = iregRoot from rfl), ← fnMult_ireg]
+      rw [ite_eq_left (show ((1 : Nat) : Int) = iregRoot from rfl), ← fnMult_ireg]
       isplitr
       · ipureintro; exact fnItyOk_ireg _ _ Hv
       iframe Ha Ht
@@ -421,7 +421,7 @@ theorem snapLinkRoute (γfs : FsNames) (S : FsStateRec) (D : BlockMap) (nib : Na
     isplitr [Htk]
     · unfold iregLnkAt iregKeep
       iexists v
-      rw [if_neg hne, ← fnMult_ireg]
+      rw [ite_eq_right hne, ← fnMult_ireg]
       isplitr
       · ipureintro; exact fnItyOk_ireg _ _ Hv
       iframe Ha

@@ -24,7 +24,7 @@ import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -35,7 +35,7 @@ set_option maxRecDepth 100000 in
 /-- **An empty slot**: a miss. -/
 theorem utlb_lookup_empty (D : UFoot) (orc : UOrc) (s : UWSt) (hd : D.Dr .tlb = true) (tlb : Tlb)
     (ht : s.file .tlb = tlb) (vpn : BitVec 27) (hslot : tlb[tlbHash vpn]! = none) :
-    runRW D orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc) := by
+    runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (none, s, orc) := by
   uwk_run -bv [tlbHash_eq]
 
 set_option maxHeartbeats 4000000 in
@@ -43,8 +43,9 @@ set_option maxRecDepth 100000 in
 /-- **A resident entry for another page**: a miss. -/
 theorem utlb_lookup_other (D : UFoot) (orc : UOrc) (s : UWSt) (hd : D.Dr .tlb = true) (tlb : Tlb)
     (ht : s.file .tlb = tlb) (vpn : BitVec 27) (ent : TLB_Entry) (hslot : tlb[tlbHash vpn]! = some ent)
-    (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = false) :
-    runRW D orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc) := by
+    (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = false) :
+    runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (none, s, orc) := by
+  have hm' : ¬ (match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) := by simp [hm]
   uwk_run -bv [tlbHash_eq]
 
 set_option maxHeartbeats 4000000 in
@@ -52,9 +53,10 @@ set_option maxRecDepth 100000 in
 /-- **A resident entry for this page**: a hit on the page's slot. -/
 theorem utlb_lookup_hit (D : UFoot) (orc : UOrc) (s : UWSt) (hd : D.Dr .tlb = true) (tlb : Tlb)
     (ht : s.file .tlb = tlb) (vpn : BitVec 27) (ent : TLB_Entry) (hslot : tlb[tlbHash vpn]! = some ent)
-    (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
-    runRW D orc s (lookup_TLB 39 0#16 vpn) = some (some (tlbHash vpn, ent), s, orc) := by
+    (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
+    runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (some (tlbHash vpn, ent), s, orc) := by
   uwk_run -bv [tlbHash_eq]
+  rw [tlbHash_eq]
 
 /-! ## §2 The hit (Rocq `PtTreeAdue`'s hit refresh, `CommonWalk`'s leaf check
 on the cached word) -/
@@ -74,8 +76,8 @@ set_option maxRecDepth 100000 in
 theorem utlb_hit_denied (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = false) :
-    runRW D orc s (translate_TLB_hit 39 0#16 vpn acc .User mxr sum () (tlbHash vpn)
-      (tlbEntryOf 0#16 vpn ppn w addr)) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf]
 
@@ -86,10 +88,10 @@ the TLB is not written. -/
 theorem utlb_hit_keep (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = true)
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (none, ()), s', orc')) :
-    runRW D orc s (translate_TLB_hit 39 0#16 vpn acc .User mxr sum () (tlbHash vpn)
-      (tlbEntryOf 0#16 vpn ppn w addr)) = some (.Ok (ppn, .PBMT_PMA, ()), s', orc') := by
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Ok (ppn, .PBMT_PMA, ()), s', orc') := by
   have hrw := uwk_rw_of_valid w hinv
   have hpb := utlb_pbmt_of_valid w hinv
   uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, tlb_get_level_tlbEntryOf,
@@ -104,10 +106,10 @@ theorem utlb_hit_refresh (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPi
     (hdr : D.Dr .tlb = true) (hdw : D.Dw .tlb = true) (tlb : Tlb) (ht : s'.file .tlb = tlb) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr p : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = true)
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (some p, ()), s', orc')) :
-    runRW D orc s (translate_TLB_hit 39 0#16 vpn acc .User mxr sum () (tlbHash vpn)
-      (tlbEntryOf 0#16 vpn ppn w addr)) =
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) =
       some (.Ok (ppn, .PBMT_PMA, ()),
         { s' with pin := s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn ppn p addr))) },
         orc') := by
@@ -126,8 +128,8 @@ set_option maxRecDepth 100000 in
 "no fault arm writes"). -/
 theorem utlb_miss_err (D : UFoot) (orc : UOrc) (s : UWSt) (vpn : BitVec 27) (root : BitVec 44)
     (acc : MemoryAccessType mem_payload) (mxr sum : Bool) (e : PTW_Error)
-    (hwalk : runRW D orc s (pt_walk 39 vpn acc .User mxr sum root 2 false ()) = some (.Err (e, ()), s, orc)) :
-    runRW D orc s (translate_TLB_miss 39 0#16 root vpn acc .User mxr sum ()) = some (.Err (e, ()), s, orc) := by
+    (hwalk : runRW D orc s (pt_walk 39 vpn acc .User mxr sum root 2 false .S_Stage ()) = some (.Err (e, ()), s, orc)) :
+    runRW D orc s (translate_TLB_miss 39 0#16 0#14 root vpn acc .User mxr sum .S_Stage ()) = some (.Err (e, ()), s, orc) := by
   uwk_run -bv
 
 set_option maxHeartbeats 4000000 in
@@ -138,11 +140,11 @@ is (`po`: the written-back word, or none), the leaf's page reported. -/
 theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tlb = true) (hdw : D.Dw .tlb = true)
     (tlb : Tlb) (ht : s'.file .tlb = tlb) (vpn : BitVec 27) (root : BitVec 44)
     (acc : MemoryAccessType mem_payload) (mxr sum : Bool) (w addr : BitVec 64) (po : Option (BitVec 64))
-    (hwalk : runRW D orc s (pt_walk 39 vpn acc .User mxr sum root 2 false ()) =
+    (hwalk : runRW D orc s (pt_walk 39 vpn acc .User mxr sum root 2 false .S_Stage ()) =
       some (.Ok (uwkOut w addr false, ()), s, orc))
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (po, ()), s', orc')) :
-    runRW D orc s (translate_TLB_miss 39 0#16 root vpn acc .User mxr sum ()) =
+    runRW D orc s (translate_TLB_miss 39 0#16 0#14 root vpn acc .User mxr sum .S_Stage ()) =
       some (.Ok (ptePpn w, .PBMT_PMA, ()),
         UWSt.mk (s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn)
           (some (tlbEntryOf 0#16 vpn (ptePpn w) (po.getD w) addr)))) s'.rs s'.mm s'.rv,
@@ -164,12 +166,11 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
 the tree's walk of the page reaches (up to `A`/`D`), at the walk's entry. -/
 theorem utlbOk_hit (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27) (ent : TLB_Entry)
     (hslot : tlb[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
-    (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
+    (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
     ∃ (addr w w' : BitVec 64), t.walk 2 vpn = some (addr, w) ∧ pteAD w w' ∧
       ent = tlbEntryOf 0#16 vpn (ptePpn w) w' addr := by
   obtain ⟨vpn₁, addr, w, w', -, hw, had, rfl⟩ := h (tlbHash vpn) (tlbHash_lt vpn) ent hslot
   have hm' := match_tlbEntryOf vpn₁ vpn (ptePpn w) w' addr
-  simp only [sign_extend, Sail.BitVec.signExtend] at hm'
   rw [hm', decide_eq_true_eq] at hm
   subst hm
   exact ⟨addr, w, w', hw, had, rfl⟩
@@ -257,18 +258,27 @@ theorem utlb_permOk_setAD (acc : MemoryAccessType mem_payload) (mxr : Bool) (w :
 theorem utlb_translate_of_hit (D : UFoot) (orc : UOrc) (s : UWSt) (root : BitVec 44) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool) (i : Nat) (ent : TLB_Entry)
     (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hl : runRW D orc s (lookup_TLB 39 0#16 vpn) = some (some (i, ent), s, orc))
-    (hh : runRW D orc s (translate_TLB_hit 39 0#16 vpn acc p mxr sum () i ent) = r) :
-    runRW D orc s (translate 39 0#16 root vpn acc p mxr sum ()) = r := by
+    (hl : runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (some (i, ent), s, orc))
+    (hh : runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc p mxr sum i ent .S_Stage ()) = r) :
+    runRW D orc s (translate 39 0#16 0#14 root vpn acc p mxr sum .S_Stage ()) = r := by
   rw [utr_translate_split, hl]; exact hh
 
-/-- A miss: `translate` is the walk from the root. -/
+/-- `generate_event` (sail-riscv 0.16) reads the privilege for its callback, a no-op. -/
+theorem utlb_generate_event {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) (e : Event)
+    (hp : D.Dr .cur_privilege = true) (k : Unit → SailM X) :
+    runRW D orc s (generate_event e >>= k) = runRW D orc s (k ()) := by
+  unfold generate_event event_callback
+  exact runRW_regRead_dr D orc s .cur_privilege (a := none) _ hp
+
+/-- A miss: `translate` is the walk from the root (after the `EV_TLB_MISS` event, which reads
+the privilege). -/
 theorem utlb_translate_of_miss (D : UFoot) (orc : UOrc) (s : UWSt) (root : BitVec 44) (vpn : BitVec 27)
-    (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool)
+    (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool) (hp : D.Dr .cur_privilege = true)
     (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hl : runRW D orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc))
-    (hm : runRW D orc s (translate_TLB_miss 39 0#16 root vpn acc p mxr sum ()) = r) :
-    runRW D orc s (translate 39 0#16 root vpn acc p mxr sum ()) = r := by
-  rw [utr_translate_split, hl]; exact hm
+    (hl : runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (none, s, orc))
+    (hm : runRW D orc s (translate_TLB_miss 39 0#16 0#14 root vpn acc p mxr sum .S_Stage ()) = r) :
+    runRW D orc s (translate 39 0#16 0#14 root vpn acc p mxr sum .S_Stage ()) = r := by
+  rw [utr_translate_split, hl]
+  exact (utlb_generate_event D orc s _ hp _).trans hm
 
 end MachCSL

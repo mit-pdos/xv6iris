@@ -95,8 +95,8 @@ theorem ue_fd1 {E : Penv} (hE : E.fd = fun x => if x = 1 then some 0 else none) 
   rw [hE] at h
   simp only at h
   by_cases h1 : fd = 1
-  · rw [if_pos h1] at h; cases h; exact ⟨h1, rfl⟩
-  · rw [if_neg h1] at h; cases h
+  · rw [ite_eq_left h1] at h; cases h; exact ⟨h1, rfl⟩
+  · rw [ite_eq_right h1] at h; cases h
 
 section Params
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]

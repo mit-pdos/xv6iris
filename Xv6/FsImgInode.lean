@@ -146,25 +146,25 @@ theorem fsInodeWf_ok (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinode)
     · exact Or.inr (Or.inr h)
   · intro k hk hlt
     have := forallb_range _ _ k hdir hk
-    simp only [if_pos hlt] at this
+    simp only [ite_eq_left hlt] at this
     exact (fsAddrOk_spec sb _).1 this
   · intro k hk hge
     have := forallb_range _ _ k hdir hk
-    simp only [if_neg (Nat.not_lt.2 hge), decide_eq_true_eq] at this
+    simp only [ite_eq_right (Nat.not_lt.2 hge), decide_eq_true_eq] at this
     exact this
   · intro hle
-    simp only [if_pos hle, decide_eq_true_eq] at hind
+    simp only [ite_eq_left hle, decide_eq_true_eq] at hind
     exact hind
   · intro hgt
-    simp only [if_neg (Nat.not_le.2 hgt)] at hind
+    simp only [ite_eq_right (Nat.not_le.2 hgt)] at hind
     exact (fsAddrOk_spec sb _).1 hind
   · intro j hj hlt
     have := forallb_range _ _ j hent hj
-    simp only [if_pos hlt] at this
+    simp only [ite_eq_left hlt] at this
     exact (fsAddrOk_spec sb _).1 this
   · intro j hj hge
     have := forallb_range _ _ j hent hj
-    simp only [if_neg (Nat.not_lt.2 hge), decide_eq_true_eq] at this
+    simp only [ite_eq_right (Nat.not_lt.2 hge), decide_eq_true_eq] at this
     exact this
 
 /-- **`bmCovers`' SHAPE, over the image's bytes** (Rocq's
@@ -191,7 +191,7 @@ theorem fsInodesWf_spec (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     (hnz : (fsDinode P sb i).diType.toNat ≠ 0) : FsInodeOk P sb (fsDinode P sb i) := by
   apply fsInodeWf_ok
   have := forallb_range _ _ i h hi
-  simp only [if_neg hnz] at this
+  simp only [ite_eq_right hnz] at this
   exact this
 
 /-! ### which inums are live, and what is past the end -/
@@ -206,7 +206,7 @@ theorem fsRegionFree_spec (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Nat
     (h : fsRegionFree P sb nib = true) (hlo : sb.sbNinodes ≤ z) (hhi : z < 16 * nib) :
     (fsDinode P sb z).diType.toNat = 0 := by
   have := forallb_range _ _ z h hhi
-  simp only [if_neg (Nat.not_lt.2 hlo), decide_eq_true_eq] at this
+  simp only [ite_eq_right (Nat.not_lt.2 hlo), decide_eq_true_eq] at this
   exact this
 
 /-- **THE TWO CLAUSES W3 CANNOT CARRY** (Rocq's `fs_region_nlink`): L3, a
@@ -232,7 +232,7 @@ theorem fsRegionNlink_free (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Na
     (h : fsRegionNlink P sb nib = true) (hz : z < 16 * nib)
     (hty : (fsDinode P sb z).diType.toNat = 0) : (fsDinode P sb z).diNlink.toNat = 0 := by
   have h1 := (fsRegionNlink_at P sb nib z h hz).1
-  simp only [if_pos hty, decide_eq_true_eq] at h1
+  simp only [ite_eq_left hty, decide_eq_true_eq] at h1
   exact h1
 
 /-- L4, at the region's width (Rocq's `fs_region_nlink_short`). -/
@@ -258,7 +258,7 @@ theorem fsRegionBare_size (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Nat
     (h : fsRegionBare P sb nib = true) (hz : z < 16 * nib)
     (hty : (fsDinode P sb z).diType.toNat = 0) : (fsDinode P sb z).diSize.toNat = 0 := by
   have := forallb_range _ _ z h hz
-  simp only [if_pos hty, fsRecBare, Bool.and_eq_true, decide_eq_true_eq] at this
+  simp only [ite_eq_left hty, fsRecBare, Bool.and_eq_true, decide_eq_true_eq] at this
   exact this.1
 
 /-- Rocq's `fs_region_bare_addr`. -/
@@ -267,7 +267,7 @@ theorem fsRegionBare_addr (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z k : N
     (hty : (fsDinode P sb z).diType.toNat = 0) (hk : k < 13) :
     ((fsDinode P sb z).diAddrs[k]!).toNat = 0 := by
   have := forallb_range _ _ z h hz
-  simp only [if_pos hty, fsRecBare, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at this
+  simp only [ite_eq_left hty, fsRecBare, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at this
   have hlen : (fsDinode P sb z).diAddrs.length = 13 := fsDinode_wf P sb z
   rw [getElem!_pos _ k (by omega)]
   exact this.2 _ (List.getElem_mem _)

@@ -62,9 +62,9 @@ theorem umemRead_viewLazy {P P' : UPtd} {sz : BitVec 64} (M : Nat → List (BitV
   refine List.ext_getElem? fun j => ?_
   rw [umemRead_getElem?, umemRead_getElem?]
   by_cases hj : j < n
-  · rw [if_pos hj, if_pos hj]
+  · rw [ite_eq_left hj, ite_eq_left hj]
     simp only [umemByte, viewLazy_page M hext (hm j hj)]
-  · rw [if_neg hj, if_neg hj]
+  · rw [ite_eq_right hj, ite_eq_right hj]
 
 /-- Two views that agree on the string's bytes read the same string. -/
 theorem umemStr_congr (V1 V2 : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
@@ -87,7 +87,7 @@ theorem umemStr_congr (V1 V2 : Nat → List (BitVec 8)) (va max : Nat) (s : List
       intro j hj
       have e1 := umemRead_getElem? V1 va (i + 1) j
       have e2 := umemRead_getElem? V2 va (i + 1) j
-      rw [hagree, e2, if_pos (by omega), if_pos (by omega)] at e1
+      rw [hagree, e2, ite_eq_left (by omega), ite_eq_left (by omega)] at e1
       exact (Option.some.inj e1)
     have hbyte : ∀ j (hj : j < (umemRead V1 va max).length),
         (umemRead V1 va max)[j] = umemByte V1 (va + j) := by

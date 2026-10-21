@@ -142,7 +142,7 @@ theorem kvmARun_eq_bRun (f : Nat) : ∀ (P1 P0 : Nat → Bool) (x n : Nat),
     intro P1 P0 x n hn
     by_cases h0 : n = 0
     · subst h0; simp [kvmBRun, kvmARun]
-    · simp only [kvmBRun, if_neg h0]
+    · simp only [kvmBRun, ite_eq_right h0]
       generalize hm : min n (512 - x % 512) = m
       have hmn : m ≤ n := by rw [← hm]; exact Nat.min_le_left _ _
       have hm' : m = n ∨ m = 512 - x % 512 := by rw [← hm]; omega
@@ -263,7 +263,7 @@ theorem kvm_fill2_pres0 (t : PTree) (v : BitVec 27) (fr : List (BitVec 44))
     simp only [PTree.setKid, PTree.kids_node]
     by_cases hj : j = vpnIdx v 2
     · subst hj
-      simp only [if_true, Option.any_some, hk, decide_true, Bool.true_and]
+      simp only [ite_true, Option.any_some, hk, decide_true, Bool.true_and]
       exact kvm_fill1_kids c v fr h j'
     · simp [hj]
   | none =>
@@ -274,7 +274,7 @@ theorem kvm_fill2_pres0 (t : PTree) (v : BitVec 27) (fr : List (BitVec 44))
       simp only [PTree.setKid, PTree.setEnt, PTree.kids_node]
       by_cases hj : j = vpnIdx v 2
       · subst hj
-        simp only [if_true, Option.any_some, hk, Option.any_none, decide_true, Bool.true_and,
+        simp only [ite_true, Option.any_some, hk, Option.any_none, decide_true, Bool.true_and,
           Bool.false_or]
         rw [kvm_fill1_kids (PTree.zeroNode b) v fr' (by
           rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at h; omega) j']
@@ -312,7 +312,7 @@ theorem kvm_setLeaf_pres0 (t : PTree) (v : BitVec 27) (w : BitVec 64) (j j' : Bi
     simp only [PTree.setKid, PTree.kids_node]
     by_cases hj : j = vpnIdx v 2
     · subst hj
-      simp only [if_true, Option.any_some, hk, kvm_setLeaf1_eq]
+      simp only [ite_true, Option.any_some, hk, kvm_setLeaf1_eq]
       cases hk' : c.kids (vpnIdx v 1) with
       | some d =>
         simp only [PTree.setKid, PTree.kids_node]
@@ -389,7 +389,7 @@ theorem kvm_mapRun_shape (n : Nat) : ∀ (t : PTree) (v : BitVec 27) (p : BitVec
     simp only [kvmARun] at hs ⊢
     have hc := kvmShapeIs_cost t v P1 P0 h
     have hft : t.missingOn 2 v ≤ fr.length := by omega
-    rw [mapRun_succ_eq, if_pos ((complete_fill 2 t v fr).mpr hft)]
+    rw [mapRun_succ_eq, ite_eq_left ((complete_fill 2 t v fr).mpr hft)]
     simp only
     have hst := kvmShapeIs_step t v fr (kLeaf p perm 0#1 0#1) P1 P0 h hft
     cases n with

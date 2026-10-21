@@ -147,7 +147,7 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
     fun r hr h9' h19 h21 => by rw [hk4 r hr h9' h21, e2 r h19 h21]
   unfold ushTokExit
   by_cases hx : k + ushpToklen (len - k) k f < len
-  · rw [if_pos hx]
+  · rw [ite_eq_left hx]
     iapply shGtk_from388 UL SC N dq dw s0 len _ eqp f weq n h4 m4 hle hs64 heqb h4_9
       (by rw [e4 18#5 (by decide) (by decide) (by decide) (by decide), h18])
       (by rw [e4 22#5 (by decide) (by decide) (by decide) (by decide), h22]) $$ Hc Hcell Hs Hws Hrun
@@ -155,7 +155,7 @@ theorem shGtk_word (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw dv 
     iapply Hk $$ Hcell Hs Hws Hsy %h5 %m5 [] %h5_9 [] Hrun
     · ipureintro; intro r hr h9' h19 h21; rw [hk5 r hr h9' h19, e4 r hr h9' h19 h21]
     · ipureintro; rw [hk5 21#5 (by decide) (by decide) (by decide), h4_21]
-  · rw [if_neg hx]
+  · rw [ite_eq_right hx]
     have hend : k + ushpToklen (len - k) k f = len := by omega
     iapply shGtk_at424 UL SC N dq dw s0 len eqp f weq n h4 m4 hs64 heqb (by rw [h4_9, hend])
       (by rw [e4 18#5 (by decide) (by decide) (by decide) (by decide), h18])

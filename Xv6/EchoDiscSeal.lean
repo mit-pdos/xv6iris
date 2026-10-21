@@ -204,7 +204,7 @@ theorem proRounds_replicate_0 (d : Nat) : proRounds (List.replicate d 0) = d := 
   | succ d ih =>
     have h0 : ¬ proCont 0 := by decide
     rw [List.replicate_succ, proRounds, ih]
-    simp only [h0, if_false]
+    simp only [h0, ite_false]
     omega
 
 end Xv6

@@ -305,7 +305,7 @@ theorem snapReadInd (g gl gt : GName) (D : BlockMap) (n : FsNode) (hf : dblkFull
   apply wand_intro
   refine fsSnapPureImp fun hnz => ?_
   unfold indOwned
-  rw [if_neg hnz]
+  rw [ite_eq_right hnz]
   iintro ⟨Ha, Hi⟩
   iapply snapBlkRead_full g gl gt D _ _ hf $$ Ha Hi
 
@@ -343,7 +343,7 @@ theorem inodeDat_owns (Γ : FsViewNames GF) (n : FsNode) (b : Nat) (hon : fnOwns
     ihave Hb := BigSepM.bigSepM_lookup hk $$ Hd
     iexists bs; iexact Hb
   · unfold indOwned
-    rw [if_neg hnz]
+    rw [ite_eq_right hnz]
     iintro ⟨-, Hi⟩
     iexists (indBytes n.fnEnt); iexact Hi
 
@@ -372,7 +372,7 @@ theorem inodeDat_slotInj (Γ : FsViewNames GF) (hex : phiExcl Γ) (i : Nat) (n :
     rw [fnSlot_data n j (by omega)] at hnzj heq
     obtain ⟨bsj, hbj⟩ := (hloc.inlBlkDom j (by omega)).2 hnzj
     unfold indOwned
-    rw [if_neg hnz]
+    rw [ite_eq_right hnz]
     iintro ⟨Hdat, Hind⟩
     ihave Hbj := BigSepM.bigSepM_lookup hbj $$ Hdat
     ihave %hne := FsView.blkOwned_ne Γ hex _ _ _ _ $$ Hind Hbj
@@ -383,7 +383,7 @@ theorem inodeDat_slotInj (Γ : FsViewNames GF) (hex : phiExcl Γ) (i : Nat) (n :
     rw [fnSlot_data n k (by omega)] at hnz heq
     obtain ⟨bsk, hbk⟩ := (hloc.inlBlkDom k (by omega)).2 hnz
     unfold indOwned
-    rw [if_neg hnzj]
+    rw [ite_eq_right hnzj]
     iintro ⟨Hdat, Hind⟩
     ihave Hbk := BigSepM.bigSepM_lookup hbk $$ Hdat
     ihave %hne := FsView.blkOwned_ne Γ hex _ _ _ _ $$ Hbk Hind

@@ -360,7 +360,7 @@ def dummyReg (nib : Nat) : RegMapF (GName × GName) :=
 theorem dummyReg_cov (nib z : Nat) (hz : z < 16 * nib) :
     (PartialMap.get? (dummyReg nib) z).isSome := by
   unfold dummyReg
-  rw [gsetToGmap_get, if_pos ((regionInums_spec nib z).mpr hz)]
+  rw [gsetToGmap_get, ite_eq_left ((regionInums_spec nib z).mpr hz)]
   rfl
 
 /-- The registry's boot map as a `[∗set]` (Rocq's inline
@@ -453,7 +453,7 @@ def iregTopBoot (γfs : FsNames) (D : Nat → Dinode) (z : Nat) : IProp GF :=
 theorem iregTopBoot_live (γfs : FsNames) (D : Nat → Dinode) (z : Nat)
     (hnz : (D z).diType.toNat ≠ 0) : ⊢ iregTopBoot (GF := GF) γfs D z := by
   unfold iregTopBoot
-  rw [if_neg hnz]
+  rw [ite_eq_right hnz]
   exact .rfl
 
 /-- ONE INUM OF `iregAlloc`'s MINT (Rocq's inline `big_sepS_mono` step):
@@ -491,7 +491,7 @@ theorem iregAlloc_slot [Icfg] (γfs : FsNames) (γi : GName) (z : Nat) (n : Nat)
   unfold iregOut dinodeAt iregTopBoot
   rw [hz]
   by_cases hty : (D z).diType.toNat = 0
-  · rw [if_pos hty, if_pos hty]
+  · rw [ite_eq_left hty, ite_eq_left hty]
     isplitr [Hmk]
     · iapply (iregSlot_intro γfs γi z (D z) none 0 (some (.excl .frzOff)) 0 hok trivial
         trivial) $$ Hla Hep Hlnk Hdisj Hcnt Hsh Hfz
@@ -506,7 +506,7 @@ theorem iregAlloc_slot [Icfg] (γfs : FsNames) (γi : GName) (z : Nat) (n : Nat)
       · iexists 1, 1
         iexact Hrf
     · iexact Hmk
-  · rw [if_neg hty, if_neg hty]
+  · rw [ite_eq_right hty, ite_eq_right hty]
     isplitr [Hfrag]
     · iapply (iregSlot_intro γfs γi z (D z) none 0 (some (.excl .frzOff)) 0 hok trivial
         trivial) $$ Hla Hep Hlnk Hdisj Hcnt Hsh Hfz

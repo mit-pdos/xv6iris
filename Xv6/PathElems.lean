@@ -64,7 +64,7 @@ header, kept because the reasons are the content:
 1. **`skipelem` IS AN `if`, NOT A `match`.**  Rocq matches `pe_skip p` against
    `[]` / `_ :: _`; here the same function is `if peSkip p = [] then none
    else ...`, which is the same total function and lets `skipelem_none` /
-   `skipelem_some` be `if_pos` / `if_neg` instead of a dependent-match
+   `skipelem_some` be `ite_eq_left` / `ite_eq_right` instead of a dependent-match
    rewrite.  Every downstream statement is unchanged.
 
 2. **`path_elems_unfold` IS STATED WITH `Option.elim`.**  Rocq states it as a
@@ -130,7 +130,7 @@ theorem peSkip_length : ∀ p : List (BitVec 8), (peSkip p).length ≤ p.length
   | b :: p => by
     rw [peSkip]
     by_cases hb : b = SLASH
-    · simp only [hb, if_pos]
+    · simp only [hb, ite_eq_left]
       have := peSkip_length p
       simp only [List.length_cons]
       omega
@@ -145,8 +145,8 @@ theorem peSkip_head : ∀ (p : List (BitVec 8)) (b : BitVec 8) (q : List (BitVec
     intro b q h
     rw [peSkip] at h
     by_cases hc : c = SLASH
-    · rw [if_pos hc] at h; exact ih b q h
-    · rw [if_neg hc] at h
+    · rw [ite_eq_left hc] at h; exact ih b q h
+    · rw [ite_eq_right hc] at h
       rw [← (List.cons.inj h).1]; exact hc
 
 theorem peSkip_idem (p : List (BitVec 8)) : peSkip (peSkip p) = peSkip p := by
@@ -161,7 +161,7 @@ theorem peElem_rest : ∀ p : List (BitVec 8), peElem p ++ peRest p = p
     rw [peElem, peRest]
     by_cases hb : b = SLASH
     · simp [hb]
-    · simp only [hb, if_false, List.cons_append, peElem_rest p]
+    · simp only [hb, ite_false, List.cons_append, peElem_rest p]
 
 theorem peElem_rest_length (p : List (BitVec 8)) :
     (peElem p).length + (peRest p).length = p.length := by
@@ -214,11 +214,11 @@ theorem peRest_at_sep (v : List (BitVec 8)) (hv : peAtSep v) : peRest v = v := b
 /-! ## skipelem: the two unfoldings, and the master split law -/
 
 theorem skipelem_none (p : List (BitVec 8)) (h : peSkip p = []) : skipelem p = none :=
-  if_pos h
+  ite_eq_left h
 
 theorem skipelem_some (p : List (BitVec 8)) (hne : peSkip p ≠ []) :
     skipelem p = some ((peElem (peSkip p)).take 14, peSkip (peRest (peSkip p))) :=
-  if_neg hne
+  ite_eq_right hne
 
 theorem skipelem_nil : skipelem [] = none := skipelem_none [] rfl
 

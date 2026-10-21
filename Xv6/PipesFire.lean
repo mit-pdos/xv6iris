@@ -327,19 +327,19 @@ def soLastd (G : Filt) (s : List (BitVec 8)) : StOut :=
 theorem soProd_ok (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Producer) (fs : List Filt)
     (s : List (BitVec 8)) (hs : aP fc p fs s) : StageOut fc (prodContent fc p) (SProd p) (soProd s) := by
   rcases hs with rfl | (rfl | ⟨_, ho⟩) | ⟨hh, rfl⟩
-  · rw [soProd, if_neg (by decide)]
+  · rw [soProd, ite_eq_right (by decide)]
     have := StageOut.silent (fc := fc) (L := prodContent fc p) (SProd p)
     simpa [stRdDead, stWrDead] using this
-  · rw [soProd, if_neg (dgSt_ne_write p fs 0)]
+  · rw [soProd, ite_eq_right (dgSt_ne_write p fs 0)]
     have := StageOut.exec (fc := fc) (L := prodContent fc p) (SProd p)
     simpa [stRdDead, stWrDead, dgSt] using this
   · cases p with
     | PrEcho _ => cases ho
     | PrCatF f =>
       cases ho
-      rw [soProd, if_neg (catDgOpen_ne_write f)]
+      rw [soProd, ite_eq_right (catDgOpen_ne_write f)]
       exact .catfOpen f
-  · rw [soProd, if_pos rfl]
+  · rw [soProd, ite_eq_left rfl]
     cases p with
     | PrEcho _ => exact hh.elim
     | PrCatF f =>
@@ -899,13 +899,13 @@ theorem real_run (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produc
       rw [hsub]
       refine sfx_build fc p (sfilt fs) v so m 1 _ _ ?_ ?_ ?_ ?_ ?_
       · intro i h1 h2
-        simp only [so, if_neg (show i ≠ m + 1 by omega)]
+        simp only [so, ite_eq_right (show i ≠ m + 1 by omega)]
         refine ⟨hsh i (by omega), soMid_ok fc _ _ _ ?_, soMid_cons _⟩
         exact aS_mid fc p fs i _ h1 (hab i (by omega))
-      · simp only [so, if_pos (show 1 + m = m + 1 by omega)]
+      · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega)]
         rw [show 1 + m = m + 1 by omega]
         exact soLastd_ok fc p _ _ hL1 hT
-      · simp only [so, if_pos (show 1 + m = m + 1 by omega)]; exact soLastd_cons _ _
+      · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega)]; exact soLastd_cons _ _
       · rw [hrd 1 (Nat.le_refl _)]; exact pipePairB_gone _ _ _
       · intro i _ _; rw [hrd (i + 1) (by omega)]; exact pipePairB_gone _ _ _
     · -- the content: it came down the chain
@@ -913,7 +913,7 @@ theorem real_run (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produc
       have hnx : v WLast ≠ filtDgExec (sfilt fs (m + 1)) := fun h => hnd (Or.inr h)
       obtain ⟨hDL, hfD⟩ := aT_content fc p _ _ hL1 hT hne hnx
       have hlastd : soLastd (sfilt fs (m + 1)) (v WLast) = ⟨v WLast, some (.RdEof (v WLast)), none⟩ := by
-        simp only [soLastd, if_neg hnx, if_neg hne]
+        simp only [soLastd, ite_eq_right hnx, ite_eq_right hne]
       have hlast_ok : StageOut fc (prodContent fc p) (SLast (sfilt fs (m + 1)))
           ⟨v WLast, some (.RdEof (v WLast)), none⟩ := by
         have := StageOut.lastF (fc := fc) (sfilt fs (m + 1)) (v WLast) hDL
@@ -928,27 +928,27 @@ theorem real_run (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produc
           intro i h1 h2
           simp only [so]
           by_cases him : i = m + 1
-          · rw [if_pos him, hlastd]; rfl
-          · rw [if_neg him, if_pos h1]; rfl
+          · rw [ite_eq_left him, hlastd]; rfl
+          · rw [ite_eq_right him, ite_eq_left h1]; rfl
         have habove : ∀ i, i ≤ i0 → i < m + 1 → rdOf (so i) = .RdGone := by
           intro i h1 h2
-          simp only [so, if_neg (show i ≠ m + 1 by omega), if_neg (show ¬ i0 < i by omega)]
+          simp only [so, ite_eq_right (show i ≠ m + 1 by omega), ite_eq_right (show ¬ i0 < i by omega)]
           exact soMid_rd _
         rw [← soProd_cons (v (WLeft 0))]
         refine .node p fs (soProd (v (WLeft 0))) _ hso0 ?_
         rw [hsub]
         refine sfx_build fc p (sfilt fs) v so m 1 _ _ ?_ ?_ ?_ ?_ ?_
         · intro i h1 h2
-          simp only [so, if_neg (show i ≠ m + 1 by omega)]
+          simp only [so, ite_eq_right (show i ≠ m + 1 by omega)]
           refine ⟨hsh i (by omega), ?_⟩
           by_cases hlt : i0 < i
-          · rw [if_pos hlt]
+          · rw [ite_eq_left hlt]
             exact ⟨soCopy_ok fc _ _ _ hDL, (hib i hlt (by omega)).symm⟩
-          · rw [if_neg hlt]
+          · rw [ite_eq_right hlt]
             exact ⟨soMid_ok fc _ _ _ (aS_mid fc p fs i _ h1 (hab i (by omega))), soMid_cons _⟩
-        · simp only [so, if_pos (show 1 + m = m + 1 by omega), hlastd]
+        · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega), hlastd]
           rw [show 1 + m = m + 1 by omega]; exact hlast_ok
-        · simp only [so, if_pos (show 1 + m = m + 1 by omega), hlastd]
+        · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega), hlastd]
         · -- the first reader
           by_cases hz : i0 = 0
           · rw [hbelow 1 (by omega) (by omega)]
@@ -972,11 +972,11 @@ theorem real_run (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produc
                 apply aM_write
                 have := aS_mid fc p fs i0 _ (by omega) (hab i0 (by omega))
                 rw [hic] at this; rw [hei]; exact this
-              simp only [so, if_neg (show i ≠ m + 1 by omega), if_neg (show ¬ i0 < i by omega), hcat]
+              simp only [so, ite_eq_right (show i ≠ m + 1 by omega), ite_eq_right (show ¬ i0 < i by omega), hcat]
               rw [hei, hic]
               simp only [soMid, wrOf, pipePairB, filtIsCat]
               exact ⟨trivial, hDL⟩
-            · simp only [so, if_neg (show i ≠ m + 1 by omega), if_pos (show i0 < i by omega), soCopy,
+            · simp only [so, ite_eq_right (show i ≠ m + 1 by omega), ite_eq_left (show i0 < i by omega), soCopy,
                 wrOf, Option.getD_some, hif i (by omega) (by omega)]
               rfl
       · -- the producer wrote the line whole, every stage passed it
@@ -997,16 +997,16 @@ theorem real_run (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produc
         rw [hsub]
         refine sfx_build fc p (sfilt fs) v so m 1 _ _ ?_ ?_ ?_ ?_ ?_
         · intro i h1 h2
-          simp only [so, if_neg (show i ≠ m + 1 by omega)]
+          simp only [so, ite_eq_right (show i ≠ m + 1 by omega)]
           exact ⟨hsh i (by omega), soCopy_ok fc _ _ _ hDL, (hall i (by omega)).symm⟩
-        · simp only [so, if_pos (show 1 + m = m + 1 by omega), hlastd]
+        · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega), hlastd]
           rw [show 1 + m = m + 1 by omega]; exact hlast_ok
-        · simp only [so, if_pos (show 1 + m = m + 1 by omega), hlastd]
+        · simp only [so, ite_eq_left (show 1 + m = m + 1 by omega), hlastd]
         · rw [hrdall 1 (Nat.le_refl _) (by omega)]
           exact hDe
         · intro i h1 h2
           rw [hrdall (i + 1) (by omega) (by omega)]
-          simp only [so, if_neg (show i ≠ m + 1 by omega), soCopy, wrOf, Option.getD_some,
+          simp only [so, ite_eq_right (show i ≠ m + 1 by omega), soCopy, wrOf, Option.getD_some,
             hpf i h1 (by omega)]
           rfl
 
@@ -1263,7 +1263,7 @@ theorem fire_nt (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produce
       rintro rfl; rw [hpf0] at hw0; exact dgPipeB_ne_nil hw0
     · rcases range_dec (fun j => v (WLeft j) ≠ []) k fs.length with ⟨j, hj1, hj2, hnz⟩ | hnone
       · right
-        exact ⟨WLeft j, hnz, Or.inr (Or.inr (Or.inl ⟨j, rfl, hj2, by rw [if_pos rfl]; exact hj1, hnz⟩))⟩
+        exact ⟨WLeft j, hnz, Or.inr (Or.inr (Or.inl ⟨j, rfl, hj2, by rw [ite_eq_left rfl]; exact hj1, hnz⟩))⟩
       · by_cases hl0 : v WLast = []
         · left; left
           refine ⟨k, hw, vupd_self _ _ _, ?_, ?_, ?_, ?_⟩
@@ -1388,7 +1388,7 @@ theorem fire_t1 (fc : List (BitVec 8) → Option (List (BitVec 8))) (p : Produce
   · rcases range_dec (fun j => v (WLeft j) ≠ []) (k + 1) fs.length with ⟨j, hj1, hj2, hnz⟩ | hnone
     · right
       refine ⟨WLeft j, hnz, Or.inr (Or.inr (Or.inl ⟨j, rfl, hj2, ?_, hnz⟩))⟩
-      rw [if_neg altForkc_ne_pipe]; omega
+      rw [ite_eq_right altForkc_ne_pipe]; omega
     · by_cases hl0 : v WLast = []
       · left
         refine ⟨hk, vupd_self _ _ _, ?_, ?_, ?_, ?_⟩

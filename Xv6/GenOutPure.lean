@@ -96,16 +96,16 @@ theorem lmPendingAt_ps_mono (ps ps' cs : List Nat) (s : M.lmSt) (I : List (BitVe
     lmPendingAt M ps cs s I <+: lmPendingAt M ps' cs s I := by
   unfold lmPendingAt
   by_cases h0 : I = []
-  · rw [if_pos h0, if_pos h0]; exact proOf_mono _ _ hp
-  · rw [if_neg h0, if_neg h0]
+  · rw [ite_eq_left h0, ite_eq_left h0]; exact proOf_mono _ _ hp
+  · rw [ite_eq_right h0, ite_eq_right h0]
     by_cases hm : restOf I = []
-    · rw [if_pos hm, if_pos hm]
+    · rw [ite_eq_left hm, ite_eq_left hm]
       unfold lmContAt
       refine (List.prefix_append_right_inj _).mpr ?_
       cases M.lmPanic (lmAt M cs (nlines I - 1))
       · exact List.prefix_refl _
       · exact proOf_from_mono _ _ _ hp
-    · rw [if_neg hm, if_neg hm]; exact List.prefix_refl _
+    · rw [ite_eq_right hm, ite_eq_right hm]; exact List.prefix_refl _
 
 include L in
 theorem lmPendingAt_round_det (ps ps' cs : List Nat) (s : M.lmSt) (I : List (BitVec 8))
@@ -347,7 +347,7 @@ theorem lmPsLenOk_blk (so : GStage M) (a : Nat) (b : BitVec 8) (hr : restOf (so.
       unfold lmAt; rw [← hq, ll_snoc_lookup_total]
     have heq : lmProIdx M (so.gsCs ++ [a]) (nlines (so.gsE.map Prod.snd))
         = lmProIdx M so.gsCs (nlines (so.gsE.map Prod.snd)) + 1 := by
-      rw [hsnoc, hold, if_pos h3]
+      rw [hsnoc, hold, ite_eq_left h3]
     simp only [lmPsRound] at hne2
     rw [heq] at hne2
     apply hne2

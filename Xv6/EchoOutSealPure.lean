@@ -58,8 +58,8 @@ theorem segEchoed_snoc (L : List LogEntry) (e : LogEntry) :
     segOf (echoed (L ++ [e]))
       = segOf (echoed L) ++ (if logEchoed e then [(openSeg (leHist e), leByte e)] else []) := by
   by_cases he : logEchoed e
-  · rw [echoed_snoc_yes L e he, segOf_app, if_pos he]; rfl
-  · rw [echoed_snoc_no L e he, if_neg he, List.append_nil]
+  · rw [echoed_snoc_yes L e he, segOf_app, ite_eq_left he]; rfl
+  · rw [echoed_snoc_no L e he, ite_eq_right he, List.append_nil]
 
 /-- Rocq `ch_E_byte`: the byte going out is the only event that moves the
 list. -/

@@ -27,7 +27,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 open Sail.ArchSem (FreeM)
 
@@ -91,7 +91,7 @@ theorem swp_checked_mem_read_dev4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_read_dev cpu _ pa rfl d off hdec (devWordOk_devBytes hio) (by decide) rfl Ψ)
+  mem_iapply (swp_sail_mem_read_dev cpu) pa rfl d off hdec (devWordOk_devBytes hio) (by decide) rfl Ψ
   iframe HAU
   inext
   iintro %w HΨ
@@ -128,7 +128,8 @@ theorem swp_checked_mem_write_dev4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_write_dev cpu _ pa rfl d off hdec (devWordOk_devBytes hio) (by decide) data rfl Ψ)
+  mem_iapply (swp_sail_mem_write_dev cpu) pa rfl d off hdec (devWordOk_devBytes hio) (by decide) data
+    (vecbytes_to_bitvec_to_bytes_le_4 _) Ψ
   iframe HAU
   inext
   iintro HΨ
@@ -174,7 +175,7 @@ theorem execSpecF_lw_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf
@@ -263,7 +264,7 @@ theorem execSpecF_sw_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf

@@ -23,7 +23,7 @@ import Std.Data.DHashMap
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 
 /-! ## Register files -/
 
@@ -35,7 +35,7 @@ def zeroRegs : RegFile := fun r => by
   cases r <;> exact default
 
 /-- How many registers the model has: `Register.ctorIdx` is below it. -/
-def nRegs : Nat := 180
+def nRegs : Nat := 213
 
 theorem ctorIdx_lt (r : Register) : r.ctorIdx < nRegs := by
   cases r <;> decide
@@ -245,8 +245,8 @@ theorem afterLoadHR_eq (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) :
       ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
     simp [List.any_eq_true]
   by_cases h : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
-  · rw [if_pos (this.2 h), if_pos h]
-  · rw [if_neg (fun h' => h (this.1 h')), if_neg h]
+  · rw [ite_eq_left (this.2 h), ite_eq_left h]
+  · rw [ite_eq_right (fun h' => h (this.1 h')), ite_eq_right h]
 
 def afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) : XState :=
   x.setHart cpu { x.hart cpu with hr := afterLoadHR (x.hart cpu).hr pa n tvn }

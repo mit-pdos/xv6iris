@@ -1,6 +1,8 @@
 import LeanRV64D.LeanRV64D
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
+import LeanRV64D.Xlen
 import LeanRV64D.PlatformConfig
 import LeanRV64D.VmemTypes
 import LeanRV64D.MemTypeUtils
@@ -13,12 +15,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -62,6 +64,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -95,10 +99,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -144,6 +151,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -162,17 +170,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -187,12 +202,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -203,7 +221,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -221,6 +242,8 @@ def pmpCheckRWX (ent : (BitVec 8)) (access : (MemoryAccessType mem_payload)) : S
   | .StoreConditional (_, _, .Data) => (pure ((_get_Pmpcfg_ent_W ent) == 1#1))
   | .Atomic (_, _, _, .Data, .Data) =>
     (pure (((_get_Pmpcfg_ent_R ent) == 1#1) && ((_get_Pmpcfg_ent_W ent) == 1#1)))
+  | .LoadExecute .Data =>
+    (pure (((_get_Pmpcfg_ent_R ent) == 1#1) && ((_get_Pmpcfg_ent_X ent) == 1#1)))
   | .InstructionFetch () => (pure ((_get_Pmpcfg_ent_X ent) == 1#1))
   | .Load .ShadowStack =>
     (pure (((_get_Pmpcfg_ent_R ent) == 1#1) && ((_get_Pmpcfg_ent_W ent) == 1#1)))
@@ -228,16 +251,20 @@ def pmpCheckRWX (ent : (BitVec 8)) (access : (MemoryAccessType mem_payload)) : S
     (pure (((_get_Pmpcfg_ent_R ent) == 1#1) && ((_get_Pmpcfg_ent_W ent) == 1#1)))
   | .Atomic (_, _, _, .ShadowStack, .ShadowStack) =>
     (pure (((_get_Pmpcfg_ent_R ent) == 1#1) && ((_get_Pmpcfg_ent_W ent) == 1#1)))
+  | .LoadExecute p =>
+    (internal_error "pmp/pmp_control.sail" 36
+      (HAppend.hAppend "Invalid payload ("
+        (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadExecute.")))
   | .LoadReserved (_, _, p) =>
-    (internal_error "pmp/pmp_control.sail" 32
+    (internal_error "pmp/pmp_control.sail" 37
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadReserved.")))
   | .StoreConditional (_, _, p) =>
-    (internal_error "pmp/pmp_control.sail" 33
+    (internal_error "pmp/pmp_control.sail" 38
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for StoreConditional.")))
   | .Atomic (_, _, _, rp, wp) =>
-    (internal_error "pmp/pmp_control.sail" 34
+    (internal_error "pmp/pmp_control.sail" 39
       (HAppend.hAppend "Invalid payloads ("
         (HAppend.hAppend (mem_payload_name_forwards rp)
           (HAppend.hAppend ", " (HAppend.hAppend (mem_payload_str_forwards wp) ") for Atomic.")))))
@@ -276,6 +303,16 @@ def pmpRangeMatch (begin : Nat) (end_ : Nat) (addr : Nat) (width : Nat) : pmpAdd
     then PMP_Match
     else PMP_PartialMatch)
 
+/-- Type quantifiers: grain : Nat, 0 ≤ grain ∧ grain ≤ 63 -/
+def pmpTORBound (addr : (BitVec 64)) (grain : Nat) : (BitVec 64) :=
+  let mask : xlenbits := (zero_extend (m := 64) (ones (n := (Min.min grain xlen))))
+  (addr &&& (Complement.complement mask))
+
+def test_pmpTORBound (_ : Unit) : SailM Unit := do
+  sail_assert ((pmpTORBound (zero_extend (m := 64) 0x5#4) 0) == (zero_extend (m := 64) 0x5#4)) "pmp/pmp_control.sail:85.61-85.62"
+  sail_assert ((pmpTORBound (zero_extend (m := 64) 0x5#4) 1) == (zero_extend (m := 64) 0x4#4)) "pmp/pmp_control.sail:86.61-86.62"
+  sail_assert ((pmpTORBound (zero_extend (m := 64) 0x7#4) 2) == (zero_extend (m := 64) 0x4#4)) "pmp/pmp_control.sail:87.61-87.62"
+
 def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec 64)) (ent : (BitVec 8)) (pmpaddr : (BitVec 64)) (prev_pmpaddr : (BitVec 64)) : SailM pmpAddrMatch := do
   let .Physaddr addr : physaddr := typ_0
   let addr := (BitVec.toNatInt addr)
@@ -283,14 +320,16 @@ def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec 64)) (ent : (BitVec 8)) (pm
   match (pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A ent)) with
   | .OFF => (pure PMP_NoMatch)
   | .TOR =>
-    (if ((zopz0zKzJ_u prev_pmpaddr pmpaddr) : Bool)
+    (let pmpaddr := (pmpTORBound pmpaddr sys_pmp_grain)
+    let prev_pmpaddr := (pmpTORBound prev_pmpaddr sys_pmp_grain)
+    if ((zopz0zKzJ_u prev_pmpaddr pmpaddr) : Bool)
     then (pure PMP_NoMatch)
     else
       (pure (pmpRangeMatch ((BitVec.toNatInt prev_pmpaddr) *i 4) ((BitVec.toNatInt pmpaddr) *i 4)
           addr width)))
   | .NA4 =>
     (do
-      (assert (sys_pmp_grain <b 1) "NA4 cannot be selected when PMP grain G >= 1.")
+      sail_assert (sys_pmp_grain <b 1) "NA4 cannot be selected when PMP grain G >= 1."
       let begin := ((BitVec.toNatInt pmpaddr) *i 4)
       (pure (pmpRangeMatch begin (begin +i 4) addr width)))
   | .NAPOT =>

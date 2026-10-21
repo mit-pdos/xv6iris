@@ -139,7 +139,7 @@ theorem ushMain_console (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (SC :
       have hbt : ukBtaken .BGE ((stubRet mC 15 ret).get 9#5) ((stubRet mC 15 ret).get 10#5) = true := by
         rw [hs1D, ha0D, hret, ushCons_bge fd (by unfold NSTD at hkl; omega),
           decide_eq_true (show fd ≤ 2 by unfold NSTD at hkl; omega)]
-      rw [hbt, if_pos rfl,
+      rw [hbt, ite_eq_left rfl,
         show BitVec.ofNat 64 0x8e8 + BitVec.signExtend 64 8180#13 = BitVec.ofNat 64 0x8dc from by decide]
       iapply IH $$ %h6 %_ %_ %hs1D %hs2D %(ushFd0p_cons l fd hlen hk hfd0) Hin Hstd Hcwd Hch Hpid Hpos HR Hbs Hrun
     | none =>

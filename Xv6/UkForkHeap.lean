@@ -93,16 +93,16 @@ theorem useqMap_get (a : Nat) : ∀ (n : Nat) (f : Nat → BitVec 8) (x : Nat),
     get? (useqMap a n f) x = if a ≤ x ∧ x < a + n then some (f (x - a)) else none
   | 0, f, x => by
     simp only [useqMap, LawfulPartialMap.get?_empty]
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
   | n + 1, f, x => by
     simp only [useqMap]
     rw [LawfulPartialMap.get?_insert, useqMap_get a n f x]
     by_cases hx : a + n = x
     · subst hx; simp
-    · rw [if_neg hx]
+    · rw [ite_eq_right hx]
       by_cases h1 : a ≤ x ∧ x < a + n
-      · rw [if_pos h1, if_pos ⟨h1.1, by omega⟩]
-      · rw [if_neg h1, if_neg (by omega)]
+      · rw [ite_eq_left h1, ite_eq_left ⟨h1.1, by omega⟩]
+      · rw [ite_eq_right h1, ite_eq_right (by omega)]
 
 section BigSep
 variable {GF : BundledGFunctors.{0}}
@@ -117,7 +117,7 @@ theorem useqMap_bigSep (Φ : Nat → BitVec 8 → IProp GF) (a : Nat) :
     exact BigSepM.bigSepM_empty.trans BigSepL.bigSepL_nil.symm
   | n + 1, f => by
     have hfresh : get? (useqMap a n f) (a + n) = none := by
-      rw [useqMap_get]; rw [if_neg (by omega)]
+      rw [useqMap_get]; rw [ite_eq_right (by omega)]
     simp only [useqMap]
     refine (BigSepM.bigSepM_insert hfresh).trans ?_
     rw [List.range_succ]

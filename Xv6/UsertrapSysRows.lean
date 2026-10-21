@@ -53,7 +53,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
   refine ⟨?_, fun h => absurd hsc h, ?_, ?_, by rw [hsc]; exact utEvQuiet_ecall _ _, ?_, ?_, ?_, ?_, hr.ks⟩
   · -- the round
     unfold utRound uroundOk
-    rw [if_pos hsc]
+    rw [ite_eq_left hsc]
     by_cases hx : syscNum (utSysRec A.sep A.V) = USYS_exec
     · left
       refine ⟨by rw [hnp, ← hn]; exact hx, ?_, ?_⟩
@@ -130,7 +130,7 @@ theorem ut_rows_of_sysc (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitV
         rw [hnp]
         unfold usysCwdOk
         rcases hr.cwi with ⟨h9, hz⟩ | hc
-        · rw [← hn, if_pos h9]; intro hnz; rw [ha0] at hz; exact absurd hz hnz
+        · rw [← hn, ite_eq_left h9]; intro hnz; rw [ha0] at hz; exact absurd hz hnz
         · have hc' : V2.cwi = A.V.cwi := hc
           split <;> first | (intro _; exact hc') | exact hc'
       · -- the mask

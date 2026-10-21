@@ -155,7 +155,7 @@ theorem tfOf_resumeGpr (m : RegMap) (pc : BitVec 64) (h0 : m 0#5 = 0#64) :
   funext i; unfold tfResumeGpr0 tfResumeGpr zeroRf
   by_cases hi : i = 0#5
   · subst hi; simp [h0]
-  · rw [if_neg hi]; exact tfOf_reg m pc i hi
+  · rw [ite_eq_right hi]; exact tfOf_reg m pc i hi
 
 /-- Rocq `tf_ueq_resume_gpr`. -/
 theorem tfUeq_resumeGpr (b : RegMap) {tf tf' : List (BitVec 64)} (h : tfUeq tf tf') :
@@ -165,7 +165,7 @@ theorem tfUeq_resumeGpr (b : RegMap) {tf tf' : List (BitVec 64)} (h : tfUeq tf t
   · simp [hi]
   · have h0 : i.toNat ≠ 0 := fun h => hi (BitVec.eq_of_toNat_eq (by simpa using h))
     have hlt := i.isLt
-    rw [if_neg hi, if_neg hi]; exact h.2 _ (by omega) (by omega)
+    rw [ite_eq_right hi, ite_eq_right hi]; exact h.2 _ (by omega) (by omega)
 
 /-- Rocq `tf_ueq_resume_gpr0`. -/
 theorem tfUeq_resumeGpr0 {tf tf' : List (BitVec 64)} (h : tfUeq tf tf') :
@@ -182,7 +182,7 @@ theorem tfResumeGpr_bump (b : RegMap) (tf : List (BitVec 64)) (r : BitVec 64)
     · subst h10; simp; exact bumpTf_a0 tf r hl
     · have h0 : i.toNat ≠ 0 := fun h => hi (BitVec.eq_of_toNat_eq (by simpa using h))
       have h10' : i.toNat ≠ 10 := fun h => h10 (BitVec.eq_of_toNat_eq (by simpa using h))
-      simp only [if_neg hi, if_neg h10]
+      simp only [ite_eq_right hi, ite_eq_right h10]
       exact bumpTf_other tf r _ (by unfold tfArgIdx; omega) (by unfold tfEpcIdx; omega)
 
 theorem tfResumeGpr0_bump (tf : List (BitVec 64)) (r : BitVec 64) (hl : tfArgIdx 0 < tf.length) :
@@ -303,7 +303,7 @@ theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut :
         ⌜W.perm = π ∧ W.sz = sz ∧ W.fd = fdv ∧ W.cwd = cw ∧ W.gen = gn ∧ W.ch = cs ∧ W.pid = pidv ∧
           W.lazy = lz ∧ W.secc = secc⌝ ∗ trappedMachine cpu C pt Rut sz sc stv W := by
   unfold userTrapFrame
-  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hany, Hcfg, Hrut, Hrc⟩
+  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hh, Hg, Hany, Hcfg, Hrut, Hrc⟩
   ihave ⟨%M, Hpt⟩ := userPtmInv_intro cpu pt sz $$ Hany
   let g0 : RegMap := g.set 0#5 0#64
   have hg0 : g0 0#5 = 0#64 := by simp [g0]
@@ -344,8 +344,8 @@ theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Iris.SI} {c : Prop} [Decid
     {a a' b b' : IProp GF} (h1 : c → a ≡{k}≡ a') (h2 : ¬ c → b ≡{k}≡ b') :
     (if c then a else b) ≡{k}≡ (if c then a' else b') := by
   by_cases h : c
-  · rw [if_pos h, if_pos h]; exact h1 h
-  · rw [if_neg h, if_neg h]; exact h2 h
+  · rw [ite_eq_left h, ite_eq_left h]; exact h1 h
+  · rw [ite_eq_right h, ite_eq_right h]; exact h2 h
 
 section UexecRet
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
@@ -384,8 +384,8 @@ theorem uexecPayDep_free (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f :
   have hr : (if sc = uecallScause then (if usysEff W.secc W.tf = USYS_exit then Q (exitXs W.tf) else iprop(emp))
       else iprop(emp)) = iprop(emp) := by
     by_cases h1 : sc = uecallScause
-    · rw [if_pos h1, if_neg (show ¬ usysEff W.secc W.tf = USYS_exit from fun h2 => hne ⟨h1, h2⟩)]
-    · rw [if_neg h1]
+    · rw [ite_eq_left h1, ite_eq_right (show ¬ usysEff W.secc W.tf = USYS_exit from fun h2 => hne ⟨h1, h2⟩)]
+    · rw [ite_eq_right h1]
   rw [hr]
   iintro #H
   isplitl []
@@ -450,7 +450,7 @@ theorem uexecPayDep_exit (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat �
   unfold uexecPayDep upayAt; rw [hf]
   show _ ⊢ iprop(myPay gn Q ∗ (if uecallScause = uecallScause then
     (if usysEff secc (tfOf m pc) = USYS_exit then Q (exitXs (tfOf m pc)) else iprop(emp)) else iprop(emp)))
-  rw [if_pos rfl, if_pos hn]
+  rw [ite_eq_left rfl, ite_eq_left hn]
 
 /-! ### Fork's and wait's answers -/
 
@@ -615,7 +615,7 @@ def ukillCredAt (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis)
 
 theorem ukillCredAt_not (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
     (h : ¬ ukillSc sc) : ⊢ ukillCredAt (GF := GF) X gn sc W f := by
-  unfold ukillCredAt; rw [if_neg h]; iintro; iempintro
+  unfold ukillCredAt; rw [ite_eq_right h]; iintro; iempintro
 
 theorem ukillCredAt_of_cred (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     □ uKillCred ⊢ ukillCredAt (GF := GF) X gn sc W f := by

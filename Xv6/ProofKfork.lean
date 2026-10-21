@@ -189,9 +189,9 @@ theorem procSlots_used_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     slotUsed Γ pa ∗ procCtxAt (GF := GF) Γ ξl pa ∗ hartAtAny Γ pa ∗ zsElem pa none ⊢
       procSlotsAt Γ ξl pa USED := by
   unfold procSlotsAt
-  rw [if_pos (show needsCtx USED from by decide), if_neg (show ¬ isRunning USED from by decide),
-    if_neg (show ¬ invDormant USED from by decide), if_pos (show notRunning USED from by decide),
-    if_neg (show ¬ USED = ZOMBIE from by decide)]
+  rw [ite_eq_left (show needsCtx USED from by decide), ite_eq_right (show ¬ isRunning USED from by decide),
+    ite_eq_right (show ¬ invDormant USED from by decide), ite_eq_left (show notRunning USED from by decide),
+    ite_eq_right (show ¬ USED = ZOMBIE from by decide)]
   iintro ⟨Hu, Hc, Htag, Hz⟩
   iframe Hc Htag Hz
   iapply pavSlot_intro Γ pa USED (by decide) $$ Hu
@@ -619,13 +619,13 @@ theorem kf_tf_chunk [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (Bit
   -- close: kf = c10
   have hsc : ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).setReg 14#5 ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 14#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).sie = false := by simp only [KCtx.setReg_sie]; exact hsie
   have h15c : ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).setReg 14#5 ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 14#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 15#5 = pageAddr bo + BitVec.ofNat 64 (32 * (i + 1)) := by
-    simp only [KCtx.rget_setReg', BitVec.reduceEq, if_true, if_false, ite_true, ite_false]
+    simp only [KCtx.rget_setReg', BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false]
     rw [ha5]; exact kf_tf_cursor_step (pageAddr bo) i
   have h14c : ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).setReg 14#5 ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 14#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 14#5 = pageAddr bn + BitVec.ofNat 64 (32 * (i + 1)) := by
-    simp only [KCtx.rget_setReg', BitVec.reduceEq, if_true, if_false, ite_true, ite_false]
+    simp only [KCtx.rget_setReg', BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false]
     rw [ha4]; exact kf_tf_cursor_step (pageAddr bn) i
   have h13c : ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).setReg 14#5 ((((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).setReg 15#5 (((((kc.setReg 10#5 x0).setReg 11#5 x1).setReg 12#5 x2).setReg 12#5 x3).rget cpu 15#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 14#5 + BitVec.signExtend 64 (BitVec.ofNat 12 32))).rget cpu 13#5 = kc.rget cpu 13#5 := by
-    simp only [KCtx.rget_setReg', BitVec.reduceEq, if_true, if_false, ite_true, ite_false]
+    simp only [KCtx.rget_setReg', BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false]
   have hidx : 4 * i + 3 + 1 = 4 * (i + 1) := by omega
   have hcbig : ([∗list] j ↦ w ∈ tfMerge Ptf C0 (4 * i + 3 + 1),
         wordPointsTo (GF := GF) (pageAddr bn + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w)
@@ -638,10 +638,10 @@ theorem kf_tf_chunk [CurCtx] (cpu : CPU) (bo bn : BitVec 44) (Ptf C0 : List (Bit
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         first
         | (intro r hr; rcases hr with rfl|rfl|rfl|rfl|rfl|rfl <;>
-            simp only [KCtx.rget_setReg', BitVec.reduceEq, ite_false, if_false, Bool.false_eq_true])
+            simp only [KCtx.rget_setReg', BitVec.reduceEq, ite_false, ite_false, Bool.false_eq_true])
         | simp only [KCtx.rget_setReg', KCtx.setReg_noff, KCtx.setReg_locks, KCtx.setReg_tier,
             KCtx.setReg_proc, KCtx.setReg_avail, KCtx.setReg_intena, KCtx.setReg_root,
-            BitVec.reduceEq, ite_false, if_false, Bool.false_eq_true]) Hk Hpc Hpar Hchild
+            BitVec.reduceEq, ite_false, ite_false, Bool.false_eq_true]) Hk Hpc Hpar Hchild
 
 theorem kf_step_bne [CurCtx] (cpu : CPU) (k' : KCtx) (hsie : k'.sie = false)
     (pc : BitVec 64) (rvc : Bool) (imm : BitVec 13) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 0#5)
@@ -813,19 +813,19 @@ theorem kf_setReg_frame (k : KCtx) (jp jc : Nat) (noffv : Nat) (locksv : List St
   · simp only [KCtx.setReg_proc]; exact hp
   · simp only [KCtx.setReg_avail]; exact hK
   · show (k.setReg i v).regs 20#5 = _
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h20 e.symm)]; exact h20v
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h20 e.symm)]; exact h20v
   · show (k.setReg i v).regs 19#5 = _
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h19 e.symm)]; exact h19v
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h19 e.symm)]; exact h19v
   · show (k.setReg i v).regs 21#5 = _
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h21 e.symm)]; exact h21v
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h21 e.symm)]; exact h21v
   · show (k.setReg i v).regs 2#5 = _
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h2 e.symm)]; exact hsp
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h2 e.symm)]; exact hsp
   · show (k.setReg i v).avail = _; rw [KCtx.setReg_avail]; exact hav
   · simp only [KCtx.setReg_intena]; exact hin
   · simp only [KCtx.setReg_root]; exact hrt
   · intro r hr
     show (k.setReg i v).regs r = _
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by rintro rfl; exact hhi hr)]; exact hhiv r hr
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by rintro rfl; exact hhi hr)]; exact hhiv r hr
 
 /-- `kfFrame` transported across a `filedup` crossing (callee-saved). -/
 theorem kfFrame_cross {k : KCtx} {jp jc : Nat} {noffv : Nat} {locksv : List String}
@@ -960,16 +960,16 @@ theorem kfChild_congr [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (
     kfChild (GF := GF) γ γd pa fd i c ⊢ kfChild γ γd pa (fd + 1) i c := by
   unfold kfChild
   by_cases hi : i < fd
-  · rw [if_pos hi, if_pos (by omega)]
-  · rw [if_neg hi, if_neg (by omega)]
+  · rw [ite_eq_left hi, ite_eq_left (by omega)]
+  · rw [ite_eq_right hi, ite_eq_right (by omega)]
 
 omit [MachGS GF] in
 theorem kfFrag_congr [CurCtx] (γd : GName) (fd i : Nat) (st : FdState) (h : i ≠ fd) :
     kfFrag (GF := GF) γd fd i st ⊢ kfFrag γd (fd + 1) i st := by
   unfold kfFrag
   by_cases hi : i < fd
-  · rw [if_pos hi, if_pos (by omega)]
-  · rw [if_neg hi, if_neg (by omega)]
+  · rw [ite_eq_left hi, ite_eq_left (by omega)]
+  · rw [ite_eq_right hi, ite_eq_right (by omega)]
 
 /-- A NULL parent descriptor (`.closed`): the child's fresh slot becomes a
 null slot (its unit stays), its fragment stays `.closed`. -/
@@ -977,7 +977,7 @@ theorem kfChild_null [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (f
     kfChild (GF := GF) γ γd pa fd fd c ∗ kfFrag γd fd fd .closed ⊢
       ⌜c = 0#64⌝ ∗ kfChild γ γd pa (fd + 1) fd c ∗ kfFrag γd (fd + 1) fd .closed := by
   unfold kfChild kfFrag
-  simp only [Nat.lt_irrefl, Nat.lt_add_one, if_true, if_false]
+  simp only [Nat.lt_irrefl, Nat.lt_add_one, ite_true, ite_false]
   iintro ⟨⟨%hc, Hc, Hs, Ha⟩, Hf⟩
   subst hc
   isplitl []
@@ -994,7 +994,7 @@ theorem kfChild_open [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (f
       fdStAuth γd fd .closed ∗ kfFrag γd fd fd st ∗ fileRef γ kk q st ⊢
       |==> (kfChild γ γd pa (fd + 1) fd (fnode kk) ∗ kfFrag γd (fd + 1) fd st) := by
   unfold kfChild kfFrag
-  simp only [Nat.lt_irrefl, Nat.lt_add_one, if_true, if_false]
+  simp only [Nat.lt_irrefl, Nat.lt_add_one, ite_true, ite_false]
   iintro ⟨Hc, Ha, Hf, Hr⟩
   imod fdSt_update γd fd _ _ st $$ [Ha Hf] with ⟨Ha, Hf⟩
   · iframe
@@ -1133,7 +1133,7 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
         (fun i s hi => kfFrag_congr γdC fd i s hi) $$ Hcfr with ⟨HcF, HcFb⟩
     -- ld a0,0(s1)
     have hlda : k.rget cpu 9#5 + BitVec.signExtend 64 (0#12) = pOfile (procAddr jp) fd := by
-      rw [KCtx.rget_eq, if_neg (by decide), if_neg (by decide), h9]; simp
+      rw [KCtx.rget_eq, ite_eq_right (by decide), ite_eq_right (by decide), h9]; simp
     icases kf_ofile_ro_acc (procAddr jp) Pof fd pv hpv $$ Hpar with ⟨Hc, Hpb⟩
     iapply (kf_step_ld cpu k hsie (KA.«kfork» + 0x96#64) true (0#12) 10#5 9#5 (by decide) (by decide) pv _ (KA.«kfork» + 0x98#64) hlda (by decide))
     iframe Hk Hpc Hc
@@ -1146,9 +1146,9 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
       kf_setReg_frame k jp jc noffv locksv spval availv rootv kent intv 10#5 pv ⟨hsie, hn, hl, ht, hp, hK, h20v, h19v, h21v, hsp, hav, hin, hrt, hhiv⟩
         (by decide) (by decide) (by decide) (by decide) (by decide)
     have h9_10 : (k.setReg 10#5 pv).regs 9#5 = pOfile (procAddr jp) fd := by
-      rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h9]
+      rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h9]
     have h18_10 : (k.setReg 10#5 pv).regs 18#5 = pOfile (procAddr jc) fd := by
-      rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h18]
+      rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h18]
     by_cases hz : pv = 0#64
     · -- a null parent descriptor: its state is `.closed`, the child's slot stays null
       subst hz
@@ -1188,7 +1188,7 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
       icases (show kfChild (GF := GF) γ γdC (procAddr jc) fd fd (C[fd]'hfdc) ⊢
           ⌜C[fd]'hfdc = 0#64⌝ ∗ wordPointsTo (pOfile (procAddr jc) fd) 8 (DFrac.own 1) (C[fd]'hfdc) ∗
           fdSlot ∗ fdStAuth γdC fd .closed from by
-        unfold kfChild; rw [if_neg (Nat.lt_irrefl fd)]) $$ HcC with ⟨%hc0, Hcc, Hsl, HaC⟩
+        unfold kfChild; rw [ite_eq_right (Nat.lt_irrefl fd)]) $$ HcC with ⟨%hc0, Hcc, Hsl, HaC⟩
       iapply (kf_step_beq cpu (k.setReg 10#5 (fnode kk)) (by simp only [KCtx.setReg_sie]; exact hsie)
           (KA.«kfork» + 0x98#64) true (8182#13) 10#5 0#5 (by decide) false
           (by rw [hval, KCtx.rget_zero]; simp only [bcond]; exact beq_eq_false_iff_ne.mpr hz) (KA.«kfork» + 0x9a#64) (by decide))
@@ -1218,16 +1218,16 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
           (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).spp) R' hcs
         rwa [KCtx.withSpie_self' _ _ _ rfl rfl] at hx
       have hjp : jumpPc (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).regs 1#5) = (KA.«kfork» + 0x9e#64) := by
-        rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]; decide
+        rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]; decide
       ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).regs 1#5)) ⊢
           pcIs cpu (KA.«kfork» + 0x9e#64) from by rw [hjp]) $$ Hpc
       unfold calleeSaved at hcs
       have hR18 : R' 18#5 = pOfile (procAddr jc) fd := by
-        rw [hcs.2.2.2.1, KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide),
-          KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h18]
+        rw [hcs.2.2.2.1, KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide),
+          KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h18]
       have hsda : (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).withRegs R').rget cpu 18#5
           + BitVec.signExtend 64 (0#12) = pOfile (procAddr jc) fd := by
-        rw [KCtx.rget_withRegs', if_neg (by decide), if_neg (by decide), hR18]; simp
+        rw [KCtx.rget_withRegs', ite_eq_right (by decide), ite_eq_right (by decide), hR18]; simp
       -- sd a0,0(s2): np->ofile[fd] = f
       iapply (kf_step_sd cpu (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).withRegs R') (by
             simp only [KCtx.withRegs_sie, KCtx.setReg_sie]; exact hsie)
@@ -1237,7 +1237,7 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
       · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
       iintro Hk Hpc Hcc
       have hy10 : (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).withRegs R').rget cpu 10#5 = fnode kk := by
-        rw [KCtx.rget_withRegs', if_neg (by decide), if_neg (by decide), hR10]
+        rw [KCtx.rget_withRegs', ite_eq_right (by decide), ite_eq_right (by decide), hR10]
       ihave Hcc := (show wordPointsTo (GF := GF) (pOfile (procAddr jc) fd) 8 (DFrac.own 1)
           ((((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).withRegs R').rget cpu 10#5) ⊢
           wordPointsTo (GF := GF) (pOfile (procAddr jc) fd) 8 (DFrac.own 1) (fnode kk) from by
@@ -1259,8 +1259,8 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
       iintro Hk Hpc
       have h9R : (((k.setReg 10#5 (fnode kk)).setReg 1#5 (KA.«kfork» + 0x9e#64)).withRegs R').regs 9#5
           = pOfile (procAddr jp) fd := by
-        rw [KCtx.withRegs_regs, hcs.2.2.1, KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide),
-          KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h9]
+        rw [KCtx.withRegs_regs, hcs.2.2.1, KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide),
+          KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h9]
       iapply (TT _ (C.set fd (fnode kk))
         hkfR h9R (by rw [KCtx.withRegs_regs]; exact hR18) (by rw [List.length_set]; exact hlen))
       iframe Hk Hpc Hpinv Hft Hpar Hpays Hfr Hchild Hcfr HΨ
@@ -1291,7 +1291,7 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
     -- beq s1,s3 (taken: fd+1 = 16)
     iapply (kf_step_beq cpu ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).setReg 18#5 ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).rget cpu 18#5 + BitVec.signExtend 64 8#12))
         (by simp only [KCtx.setReg_sie]; exact hsie) (KA.«kfork» + 0x92#64) false (18#13) 9#5 20#5 (by decide) true
-        (by simp only [KCtx.rget_setReg', KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, h9'', h20v, kf_ofile_succ]; rw [hfd1]; unfold bcond; simp) (KA.«kfork» + 0xa4#64) (by decide))
+        (by simp only [KCtx.rget_setReg', KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false, h9'', h20v, kf_ofile_succ]; rw [hfd1]; unfold bcond; simp) (KA.«kfork» + 0xa4#64) (by decide))
     iframe Hk Hpc
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -1323,14 +1323,14 @@ theorem kf_ofile_copy [CurCtx] (FD : FILEDUP) (Γ : SchedNames) (jp jc : Nat)
     -- beq s1,s3 (not taken: fd+1 < 16)
     iapply (kf_step_beq cpu ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).setReg 18#5 ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).rget cpu 18#5 + BitVec.signExtend 64 8#12))
         (by simp only [KCtx.setReg_sie]; exact hsie) (KA.«kfork» + 0x92#64) false (18#13) 9#5 20#5 (by decide) false
-        (by simp only [KCtx.rget_setReg', KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false, h9'', h20v, kf_ofile_succ]; unfold bcond; exact beq_eq_false_iff_ne.mpr (kf_ofile_ne (procAddr jp) (fd + 1) hfd1)) (KA.«kfork» + 0x96#64) (by decide))
+        (by simp only [KCtx.rget_setReg', KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false, h9'', h20v, kf_ofile_succ]; unfold bcond; exact beq_eq_false_iff_ne.mpr (kf_ofile_ne (procAddr jp) (fd + 1) hfd1)) (KA.«kfork» + 0x96#64) (by decide))
     iframe Hk Hpc
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
     iintro Hk Hpc
     iapply (IH (fd + 1) (by omega) ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).setReg 18#5 ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).rget cpu 18#5 + BitVec.signExtend 64 8#12)) D (kf_setReg_frame (k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)) jp jc noffv locksv spval availv rootv kent intv 18#5 ((k''.setReg 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12)).rget cpu 18#5 + BitVec.signExtend 64 8#12) (kf_setReg_frame k'' jp jc noffv locksv spval availv rootv kent intv 9#5 (k''.rget cpu 9#5 + BitVec.signExtend 64 8#12) ⟨hsie, hn, hl, ht, hp, hK, h20v, h19v, h21v, hsp, hav, hin, hrt, hhiv⟩ (by decide) (by decide) (by decide) (by decide) (by decide)) (by decide) (by decide) (by decide) (by decide) (by decide))
-        (by rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), KCtx.setReg_regs, RegMap.set_apply, if_pos rfl, KCtx.rget_eq, if_neg (by decide), if_neg (by decide), h9'', kf_ofile_succ])
-        (by rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl, KCtx.rget_setReg', if_neg (by decide), KCtx.rget_eq, if_neg (by decide), if_neg (by decide), h18'', kf_ofile_succ]) hlenD)
+        (by rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl, KCtx.rget_eq, ite_eq_right (by decide), ite_eq_right (by decide), h9'', kf_ofile_succ])
+        (by rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl, KCtx.rget_setReg', ite_eq_right (by decide), KCtx.rget_eq, ite_eq_right (by decide), ite_eq_right (by decide), h18'', kf_ofile_succ]) hlenD)
     iframe Hk Hpc Hpinv Hft Hpar Hpays Hfr Hchild Hcfr HΨ
 
 /-! ## The two blocks at the copy loop's edges -/
@@ -1381,13 +1381,13 @@ theorem kf_child_init [CurCtx] (γ : FileNames) (γd : GName) (pa : BitVec 64) (
         · exact (Option.some.inj hc).symm
         · exact absurd hc (by simp)
       unfold kfChild
-      rw [if_neg (Nat.not_lt_zero i)]
+      rw [ite_eq_right (Nat.not_lt_zero i)]
       iintro ⟨Hc, Hs, Ha⟩
       iframe Hc Hs Ha
       ipureintro; exact hc0) $$ H
   · iapply BigSepL.bigSepL_mono (Φ := fun i (_ : FdState) => fdSt (GF := GF) γd i .closed)
       (Ψ := fun i st => kfFrag (GF := GF) γd 0 i st) (fun {i st} _ => by
-      unfold kfFrag; rw [if_neg (Nat.not_lt_zero i)]) $$ Hf
+      unfold kfFrag; rw [ite_eq_right (Nat.not_lt_zero i)]) $$ Hf
 
 /-- The parent's block, opened at its cells (the old `procPrivNoctxAt`
 view), its cwd reference, and its descriptors' payloads. -/
@@ -1485,7 +1485,7 @@ theorem kf_child_close [X : CurCtx] (γ : FileNames) (γd γp : GName) (pa : Bit
         have := (List.getElem?_eq_some_iff.1 hc).1; omega
       rw [ofileLentOrSlot_out γ γd pa [] i c (by simp)]
       unfold kfChild
-      rw [if_pos hi]
+      rw [ite_eq_left hi]
       ) $$ Hc
   · unfold fdFrags
     rw [hfdg]
@@ -1499,7 +1499,7 @@ theorem kf_child_close [X : CurCtx] (γ : FileNames) (γd γp : GName) (pa : Bit
           have h16 : sts.length = 16 := by rw [hsl]; rfl
           omega
         unfold kfFrag
-        rw [if_pos hi]
+        rw [ite_eq_left hi]
         ) $$ Hf
     · iexact Hrows
 
@@ -2022,9 +2022,9 @@ theorem kf_slots_unused_intro [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : Bit
       zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
-  rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
-    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  rw [ite_eq_right (by decide : ¬ needsCtx UNUSED), ite_eq_right (by decide : ¬ isRunning UNUSED),
+    ite_eq_left (by decide : invDormant UNUSED), ite_eq_left (by decide : notRunning UNUSED),
+    ite_eq_right (by decide : ¬ UNUSED = ZOMBIE)]
   iintro ⟨Hu, Hd, Hh, Hz⟩
   isplitl []
   · iempintro
@@ -2263,26 +2263,26 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   ihave HcwP := (show inodeHeldAt (GF := GF) (ientry kkc) V.cwi ⊢ cwdRefAt V.cwd V.cwi from by
     unfold cwdRefAt; rw [hcwdv]) $$ HcwP
   have hjpid : jumpPc (((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)).regs 1#5) = (KA.«kfork» + 0xac#64) := by
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]; decide
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]; decide
   ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc (((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)).regs 1#5)) ⊢
       pcIs cpu (KA.«kfork» + 0xac#64) from by rw [hjpid]) $$ Hpc
   unfold calleeSaved at hcsid
   obtain ⟨id_2, id_8, id_9, id_18, id_19, id_20, id_21, id_22, id_23, id_24, id_25, id_26, id_27⟩ := hcsid
   have hRid19 : Rid 19#5 = procAddr i := by
-    simp only [id_19, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact h19'
+    simp only [id_19, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19'
   have hRid21 : Rid 21#5 = procAddr j := by
-    simp only [id_21, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact h21'
+    simp only [id_21, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h21'
   have hRid2 : Rid 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
-    simp only [id_2, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hsp'
+    simp only [id_2, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hsp'
   have hRidhi : ∀ r : BitVec 5, kfHi r → Rid r = k.regs r := by
     intro r hr
     rcases hr with rfl|rfl|rfl|rfl|rfl|rfl
-    · simp only [id_22, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 22#5 (Or.inl rfl)
-    · simp only [id_23, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 23#5 (Or.inr (Or.inl rfl))
-    · simp only [id_24, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 24#5 (Or.inr (Or.inr (Or.inl rfl)))
-    · simp only [id_25, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 25#5 (Or.inr (Or.inr (Or.inr (Or.inl rfl))))
-    · simp only [id_26, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 26#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))
-    · simp only [id_27, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hhiv' 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))
+    · simp only [id_22, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 22#5 (Or.inl rfl)
+    · simp only [id_23, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 23#5 (Or.inr (Or.inl rfl))
+    · simp only [id_24, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 24#5 (Or.inr (Or.inr (Or.inl rfl)))
+    · simp only [id_25, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 25#5 (Or.inr (Or.inr (Or.inr (Or.inl rfl))))
+    · simp only [id_26, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 26#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))
+    · simp only [id_27, KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hhiv' 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))
   -- sd a0,336(s4): np->cwd = idup result
   ihave Hcwd_c := (show wordPointsTo (GF := GF) (pCwd (procAddr i)) 8 (DFrac.own 1) V_c.cwd ⊢
     wordPointsTo (procAddr i + 336#64) 8 (DFrac.own 1) V_c.cwd from by unfold pCwd; iintro H; iexact H) $$ Hcwd_c
@@ -2318,28 +2318,28 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   ihave HrtP := (show inodeHeldAt (GF := GF) (ientry kkr) V.rti ⊢ rootRefAt V.root V.rti from by
     unfold rootRefAt; rw [hrootv]) $$ HrtP
   have hjpid2 : jumpPc ((((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)).withRegs ((Rid.set 10#5 V.root).set 1#5 (KA.«kfork» + 0xb8#64))).regs 1#5) = (KA.«kfork» + 0xb8#64) := by
-    rw [KCtx.withRegs_regs, RegMap.set_apply, if_pos rfl]; decide
+    rw [KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left rfl]; decide
   ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc ((((k'.setReg 10#5 V.cwd).setReg 1#5 (KA.«kfork» + 0xac#64)).withRegs ((Rid.set 10#5 V.root).set 1#5 (KA.«kfork» + 0xb8#64))).regs 1#5)) ⊢
       pcIs cpu (KA.«kfork» + 0xb8#64) from by rw [hjpid2]) $$ Hpc
   unfold calleeSaved at hcsid2
   obtain ⟨jd_2, jd_8, jd_9, jd_18, jd_19, jd_20, jd_21, jd_22, jd_23, jd_24, jd_25, jd_26, jd_27⟩ := hcsid2
   -- the register facts, carried across the second idup (the names shadow the first's)
   have hRid19 : Rid2 19#5 = procAddr i := by
-    simp only [jd_19, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid19
+    simp only [jd_19, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid19
   have hRid21 : Rid2 21#5 = procAddr j := by
-    simp only [jd_21, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid21
+    simp only [jd_21, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid21
   have hRid2 : Rid2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
-    simp only [jd_2, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid2
+    simp only [jd_2, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid2
   have hRidhi : ∀ r : BitVec 5, kfHi r → Rid2 r = k.regs r := by
     intro r hr
     have hr' := hRidhi r hr
     rcases hr with rfl|rfl|rfl|rfl|rfl|rfl
-    · simp only [jd_22, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
-    · simp only [jd_23, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
-    · simp only [jd_24, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
-    · simp only [jd_25, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
-    · simp only [jd_26, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
-    · simp only [jd_27, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hr'
+    · simp only [jd_22, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
+    · simp only [jd_23, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
+    · simp only [jd_24, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
+    · simp only [jd_25, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
+    · simp only [jd_26, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
+    · simp only [jd_27, KCtx.setReg_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hr'
   -- sd a0,344(s3): np->root = idup result
   ihave Hrt_c := (show wordPointsTo (GF := GF) (pRoot (procAddr i)) 8 (DFrac.own 1) V_c.root ⊢
     wordPointsTo (procAddr i + 344#64) 8 (DFrac.own 1) V_c.root from by unfold pRoot; iintro H; iexact H) $$ Hrt_c
@@ -2403,32 +2403,32 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   case hsk => simp only [KCtx.setReg_sie, KCtx.withRegs_sie, hsie']
   case hK2 => simp only [KCtx.setReg_avail, KCtx.withRegs_avail]; have hh := hK'; unfold idupSlots at hh; omega
   case hn16 =>
-    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
+    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case ha0 =>
-    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false, pName]
+    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, pName]
   case ha1 =>
-    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false, pName]
+    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, pName]
   case hret =>
-    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false]; decide
+    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]; decide
   iintro %Rss Hk Hpc HbufC HbufP %hpost
   obtain ⟨hcsss, hRss10⟩ := hpost
   unfold calleeSaved at hcsss
   obtain ⟨ss_2, ss_8, ss_9, ss_18, ss_19, ss_20, ss_21, ss_22, ss_23, ss_24, ss_25, ss_26, ss_27⟩ := hcsss
   have hRss19 : Rss 19#5 = procAddr i := by
-    rw [ss_19]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid19
+    rw [ss_19]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid19
   have hRss21 : Rss 21#5 = procAddr j := by
-    rw [ss_21]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid21
+    rw [ss_21]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid21
   have hRss2 : Rss 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
-    rw [ss_2]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRid2
+    rw [ss_2]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRid2
   have hRsshi : ∀ r : BitVec 5, kfHi r → Rss r = k.regs r := by
     intro r hr
     rcases hr with rfl|rfl|rfl|rfl|rfl|rfl
-    · rw [ss_22]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 22#5 (Or.inl rfl)
-    · rw [ss_23]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 23#5 (Or.inr (Or.inl rfl))
-    · rw [ss_24]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 24#5 (Or.inr (Or.inr (Or.inl rfl)))
-    · rw [ss_25]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 25#5 (Or.inr (Or.inr (Or.inr (Or.inl rfl))))
-    · rw [ss_26]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 26#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))
-    · rw [ss_27]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false]; exact hRidhi 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))
+    · rw [ss_22]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 22#5 (Or.inl rfl)
+    · rw [ss_23]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 23#5 (Or.inr (Or.inl rfl))
+    · rw [ss_24]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 24#5 (Or.inr (Or.inr (Or.inl rfl)))
+    · rw [ss_25]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 25#5 (Or.inr (Or.inr (Or.inr (Or.inl rfl))))
+    · rw [ss_26]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 26#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))
+    · rw [ss_27]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRidhi 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))
   -- rebuild the parent's name cells (unchanged), retype the child name (bs')
   ihave Hname_p : pnameCells (procAddr j) (DFrac.own 1) V.name $$ [HbufP]
   case' _ => unfold pnameCells; isplitl []; · ipureintro; exact hwfp
@@ -2450,7 +2450,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
   k_step (wp_s_sd cpu _ (KA.«kfork» + 0xce#64) false 368#12 19#5 15#5 (by decide) V_c.pvSecc)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_setReg', KCtx.rget_withRegs', KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc,
-      KCtx.setReg_proc, hp', hRss19, BitVec.reduceEq, ite_false, ite_true, if_false, if_true]
+      KCtx.setReg_proc, hp', hRss19, BitVec.reduceEq, ite_false, ite_true, ite_false, ite_true]
   iintro Hk Hpc Hsc_c
   ihave Hsc_p := (show wordPointsTo (GF := GF) (procAddr j + 368#64) 8 (DFrac.own 1) V.pvSecc ⊢
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc from by unfold pSecc; iintro H; iexact H) $$ Hsc_p
@@ -2461,12 +2461,12 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     wordPointsTo (procAddr i + 48#64) 4 pidPriv pid_c from by unfold pPid; iintro H; iexact H) $$ Hpid_c
   k_step (wp_s_lw cpu _ (KA.«kfork» + 0xd2#64) false 48#12 9#5 19#5 (by decide) (by decide) pidPriv pid_c)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_setReg', BitVec.reduceEq, ite_false, if_false, KCtx.rget_withRegs', KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRss19]
+    with [KCtx.rget_setReg', BitVec.reduceEq, ite_false, ite_false, KCtx.rget_withRegs', KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRss19]
   iintro Hk Hpc Hpid_c
   -- c.mv a0,s3 : a0 = np = procAddr i
   k_step (wp_s_add cpu _ (KA.«kfork» + 0xd6#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_setReg', BitVec.reduceEq, ite_false, if_false, KCtx.rget_withRegs', KCtx.rget_zero, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRss19]
+    with [KCtx.rget_setReg', BitVec.reduceEq, ite_false, ite_false, KCtx.rget_withRegs', KCtx.rget_zero, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', KCtx.withRegs_proc, KCtx.setReg_proc, hp', hRss19]
   iintro Hk Hpc
   -- ===== ghost publish: build the child's private block and forkret record =====
   have hbelowP : umBelow V.sz Pnew' :=
@@ -2564,7 +2564,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     ⟨Hlocked, Hpg, %kl, %xs, %pidx, HstateW, Hchan, Hrest⟩
   icases (pstateWhole_split Γ (procAddr i) USED).1 $$ Hpg with ⟨Hpl, Hkept⟩
   ihave Hkept := (show (if unclaimed USED then (emp : IProp GF) else pstateAtHlf Γ (procAddr i) USED) ⊢
-    pstateAtHlf Γ (procAddr i) USED from by rw [if_neg (by decide : ¬ unclaimed USED)]) $$ Hkept
+    pstateAtHlf Γ (procAddr i) USED from by rw [ite_eq_right (by decide : ¬ unclaimed USED)]) $$ Hkept
   -- reassemble the release payload at USED
   ihave Hlockres : procLockResAt Γ curCtx (procAddr i) $$ [HstateW Hpl Hchan Hrest Hslots]
   case' _ =>
@@ -2610,7 +2610,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       · rw [r5_26]; k_norm_g [KCtx.withRegs_regs, RegMap.set_apply, hRsshi 26#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl rfl)))))]
       · rw [r5_27]; k_norm_g [KCtx.withRegs_regs, RegMap.set_apply, hRsshi 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (rfl))))))]
     have hR5_9 : R5 9#5 = BitVec.signExtend 64 pid_c := by
-      rw [r5_9]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+      rw [r5_9]; simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     -- ===== wait_lock window: np->parent = p =====
     -- auipc a0,0x10 ; addi a0,a0,1626 : a0 = &wait_lock
     kf_gstep cpu (wp_s_auipc cpu _ (KA.«kfork» + 0xdc#64) false 16#20 10#5 (by decide))
@@ -2630,7 +2630,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       ?hWnoff ?hWK ?hWs) $$ [- $Hk $Hpc $Hwl]
     rotate_right 1
     case hWaddr =>
-      simp only [k_norm_simps, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+      simp only [k_norm_simps, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       unfold waitLockAddr
       decide
     case hWnoff => simp only [k_norm_simps, KCtx.withRegs_noff, KCtx.setReg_noff, hn']; omega
@@ -2759,7 +2759,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         ?hA2noff ?hA2K ?hA2s) $$ [- $Hk $Hpc $HlkI]
       rotate_right 1
       case hA2addr =>
-        simp only [k_norm_simps, KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+        simp only [k_norm_simps, KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       case hA2noff =>
         simp only [k_norm_simps, KCtx.setReg_noff, KCtx.withLocks_noff, KCtx.withRegs_noff, KCtx.pushOffAt_noff]; omega
       case hA2K =>
@@ -2934,7 +2934,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         case hehi =>
           intro r hr; simp only [k_norm_simps, KCtx.withLocks_regs, KCtx.withRegs_regs]; exact hR9hi r hr
       case hA3addr =>
-        simp only [k_norm_simps, KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+        simp only [k_norm_simps, KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       case hA3sie => simp [hsie']
       case hA3noff =>
         simp only [k_norm_simps, KCtx.setReg_noff, KCtx.withLocks_noff, KCtx.withRegs_noff, KCtx.pushOffAt_noff]; omega
@@ -2955,7 +2955,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
           KCtx.popOff_avail, KCtx.withRegs_sie, KCtx.setReg_sie, hsie', hav', Bool.or_false, hon]
         simp only [hon, trapRes, kvFrameSlots, ite_true] at hk'av ⊢; omega
     case hW2addr =>
-      simp only [k_norm_simps, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+      simp only [k_norm_simps, KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
       unfold waitLockAddr
       decide
     case hW2sie =>
@@ -2979,7 +2979,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
         KCtx.withRegs_sie, KCtx.setReg_sie, KCtx.setReg_avail, hsie', hav', Bool.or_false, hon]
       simp only [hon, trapRes, kvFrameSlots, ite_true] at hk'av ⊢; omega
   case hRaddr =>
-    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, if_true, if_false]
+    simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   case hRsie => simp only [KCtx.withRegs_sie, KCtx.setReg_sie]; exact hsie'
   case hRnoff => simp only [KCtx.withRegs_noff, KCtx.setReg_noff, hn']; omega
   case hRK =>
@@ -3220,11 +3220,11 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       rotate_right 1
       case hK8e => unfold kforkSlots allocprocSlots at hK; omega
       case hR2e =>
-        rw [RegMap.set_apply, if_neg (by decide)]; exact b2_2.trans a1_2
-      case h9e => rw [RegMap.set_apply, if_pos rfl]; decide
+        rw [RegMap.set_apply, ite_eq_right (by decide)]; exact b2_2.trans a1_2
+      case h9e => rw [RegMap.set_apply, ite_eq_left rfl]; decide
       case hcse =>
         intro r hr
-        rw [RegMap.set_apply, if_neg (by rcases hr with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
+        rw [RegMap.set_apply, ite_eq_right (by rcases hr with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide)]
         rcases hr with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl
         · exact b2_18.trans a1_18
         · exact b2_19.trans a1_19
@@ -3283,7 +3283,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
       have hpc94 : jumpPc (KA.«kfork» + 0x16#64) = (KA.«kfork» + 0x16#64) := by decide
       k_norm [hpc94]
       have hbne : ∀ {α : Type} (a b : α), (if procAddr i = 0#64 then a else b) = b :=
-        fun a b => if_neg (procAddr_nonzero hi)
+        fun a b => ite_eq_right (procAddr_nonzero hi)
       -- beq a0,zero (not taken, a0 = procAddr i ≠ 0)
       k_step (wp_s_branch cpu _ (KA.«kfork» + 0x16#64) false 264#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -3425,7 +3425,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
           have htfne_c : V_c.trapframe ≠ 0#64 := by rw [hVcb.2.2.2]; exact kf_page_ne_zero _ hvalids_c.2
           have hptne_c : V_c.pagetable ≠ 0#64 := by rw [hVcb.2.2.1]; exact kf_page_ne_zero _ hvalids_c.1
           unfold freeprocIn
-          rw [if_neg htfne_c, if_neg hptne_c]
+          rw [ite_eq_right htfne_c, ite_eq_right hptne_c]
           isplitl []
           · ipureintro; exact ⟨hcof, hccwd, hcroot⟩
           isplitl [Hpid_c]
@@ -3761,7 +3761,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
             intro r hr
             have e := hpres.2.2.2.2.2.2.2.2.2.2.2.2.2 r hr
             rcases hr with rfl|rfl|rfl|rfl|rfl|rfl <;>
-              simp only [KCtx.rget_eq, BitVec.reduceEq, if_false] at e
+              simp only [KCtx.rget_eq, BitVec.reduceEq, ite_false] at e
             · rw [e]; k_norm_g; exact c3_22.trans (b2_22.trans a1_22)
             · rw [e]; k_norm_g; exact c3_23.trans (b2_23.trans a1_23)
             · rw [e]; k_norm_g; exact c3_24.trans (b2_24.trans a1_24)
@@ -3834,7 +3834,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
             · simp only [KCtx.setReg_proc]; exact hkfproc
             · simp only [KCtx.setReg_avail]; exact hkfavail
             · simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
-                BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf21r, hkf21]
+                BitVec.reduceEq, ite_false, ite_true, ite_false, ite_true, hkf21r, hkf21]
               unfold pOfile; bv_omega_g
             · simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hkf20r
             · simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hkf21r
@@ -3844,7 +3844,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
             · simp only [KCtx.setReg_root]; exact hkfroot
             · intro r hr
               rcases hr with rfl|rfl|rfl|rfl|rfl|rfl <;>
-                simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, if_false, ite_false]
+                simp only [KCtx.setReg_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_false]
               · exact hkfhi 22#5 (Or.inl rfl)
               · exact hkfhi 23#5 (Or.inr (Or.inl rfl))
               · exact hkfhi 24#5 (Or.inr (Or.inr (Or.inl rfl)))
@@ -3853,11 +3853,11 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
               · exact hkfhi 27#5 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr rfl)))))
           case hr9 =>
             simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
-              BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf21r, hkf21]
+              BitVec.reduceEq, ite_false, ite_true, ite_false, ite_true, hkf21r, hkf21]
             unfold pOfile; bv_omega_g
           case hr18 =>
             simp only [KCtx.setReg_regs, RegMap.set_apply, KCtx.rget_setReg', KCtx.rget_eq,
-              BitVec.reduceEq, ite_false, ite_true, if_false, if_true, hkf20r, hkf19]
+              BitVec.reduceEq, ite_false, ite_true, ite_false, ite_true, hkf20r, hkf19]
             unfold pOfile; bv_omega_g
         case hlsie => k_norm_g
         case hla5 =>

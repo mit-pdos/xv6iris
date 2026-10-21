@@ -263,7 +263,7 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   isplitl [Hout]
   · iexact Hout
   isplitl [Hcmt]
-  · isimp only [Bool.false_eq_true, if_false]
+  · isimp only [Bool.false_eq_true, ite_false]
     iexact Hcmt
   isplitl [Hnc]
   · iexact Hnc
@@ -296,7 +296,7 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; rw [hlistO, hlistT]; rfl
   isplitl [Hhelp]
   · iapply logHelp_empty $$ Hhelp
-  isimp only [Bool.false_eq_true, if_false]
+  isimp only [Bool.false_eq_true, ite_false]
   iexists 0, ([] : List Nat)
   isplitr [Hbatch Hstok]
   · ipureintro; rw [opSum_empty]; unfold LOGBLOCKS; omega

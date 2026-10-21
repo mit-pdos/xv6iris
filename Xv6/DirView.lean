@@ -797,7 +797,7 @@ theorem dirDotsIx_dirlink (self : Nat) (dn dn' : Dinode) (data data' : Nat → L
     · omega
   have hwin : ∀ k, k < 2 → dirWinAgree data data' k := by
     intro k hk j hj
-    rw [hrng, if_neg]
+    rw [hrng, ite_eq_right]
     intro ⟨hlo, hhi⟩
     exact hne k hk (by omega)
   have hw0 := hwin 0 (by omega)
@@ -877,7 +877,7 @@ theorem dirOk_dirlink (nib : Nat) (dn dn' : Dinode) (data data' : Nat → List (
   have hagree : ∀ q, q ≠ k0 → dirInum data' q = dirInum data q := by
     intro q hq
     unfold dirInum
-    rw [hrng (16 * q), hrng (16 * q + 1), if_neg (by omega), if_neg (by omega)]
+    rw [hrng (16 * q), hrng (16 * q + 1), ite_eq_right (by omega), ite_eq_right (by omega)]
   by_cases hkk : k = k0
   · -- ======== THE WRITTEN SLOT ========
     subst hkk
@@ -885,7 +885,7 @@ theorem dirOk_dirlink (nib : Nat) (dn dn' : Dinode) (data data' : Nat → List (
     · -- nothing written: `data'` IS `data`, and the size did not move
       have hag0 : dirInum data' k = dirInum data k := by
         unfold dirInum
-        rw [hrng (16 * k), hrng (16 * k + 1), if_neg (by omega), if_neg (by omega)]
+        rw [hrng (16 * k), hrng (16 * k + 1), ite_eq_right (by omega), ite_eq_right (by omega)]
       rw [hag0]
       unfold dirLive at hlive; rw [hag0] at hlive
       exact hok k (by omega) hlive
@@ -895,9 +895,9 @@ theorem dirOk_dirlink (nib : Nat) (dn dn' : Dinode) (data data' : Nat → List (
       have hfree : dirInum data k = 0#16 := by
         rw [hk0]; apply dirSlot_free; rw [← hk0]; exact hk0n
       have hhi : fileByte data' (16 * k + 1) = 0#8 := by
-        rw [hrng, if_neg (by omega), ← dirInum_byte1, hfree]; exact nthByte_zero 1
+        rw [hrng, ite_eq_right (by omega), ← dirInum_byte1, hfree]; exact nthByte_zero 1
       have hlo : fileByte data' (16 * k) = nthByte (n := 2) inum 0 := by
-        rw [hrng, if_pos (by omega), Nat.sub_self]
+        rw [hrng, ite_eq_left (by omega), Nat.sub_self]
         exact direntBytes_inum_t (deOfName inum s) 0 (by omega)
       rw [dirInum_unsigned, hhi, hlo]
       simp only [nthByte, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
@@ -908,7 +908,7 @@ theorem dirOk_dirlink (nib : Nat) (dn dn' : Dinode) (data data' : Nat → List (
       have hrec : dirInum data' k = inum := by
         apply dirInum_of_two data' k (deOfName inum s)
         intro jj hjj
-        rw [hrng, if_pos (by omega), show 16 * k + jj - 16 * k = jj by omega]
+        rw [hrng, ite_eq_left (by omega), show 16 * k + jj - 16 * k = jj by omega]
       rw [hrec]; exact hinum
   · -- ======== ANY OTHER RECORD: untouched, and below `nrec` ========
     rw [hagree k hkk]

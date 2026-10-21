@@ -16,7 +16,7 @@ import MachCSL.UCycle
 namespace Xv6
 
 open MachCSL
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- JALR's bit-0 clear is `retPc`. -/

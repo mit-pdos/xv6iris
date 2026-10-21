@@ -198,8 +198,8 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   have hmem : syscMemOk V (syscStore { V with upt := P' } (R2 10#5)) (syscImg V M)
       (syscImg (syscStore { V with upt := P' } (R2 10#5)) M1) := by
     unfold syscMemOk
-    rw [hn8, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-      if_neg (by decide), if_pos (by decide)]
+    rw [hn8, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+      ite_eq_right (by decide), ite_eq_left (by decide)]
     exact ⟨bs, by omega, himg⟩
   have hrows := syscRows_upt V M M1 sts cs pid P' (R2 10#5) 8 hn8 (by decide) (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) hl0 hext hmem

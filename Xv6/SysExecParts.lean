@@ -653,7 +653,7 @@ theorem sysExecArgvL_zero (pg : Nat → BitVec 64) : sysExecArgvL pg 0 = List.re
   · intro i h1 h2
     rw [List.getElem_replicate]
     simp only [sysExecArgvL, List.getElem_map, List.getElem_range, sysExecAvf, Nat.not_lt_zero,
-      if_false]
+      ite_false]
 
 /-- **Rocq `sx_upd`**: extend a function at one index. -/
 def sysExecUpd {α : Type} (f : Nat → α) (i : Nat) (v : α) : Nat → α :=
@@ -677,7 +677,7 @@ theorem sysExecArgvL_set (pg : Nat → BitVec 64) (t : Nat) (p : BitVec 64) :
       List.getElem?_range hi, Option.map_some, sysExecAvf, sysExecUpd]
     by_cases h : t = i
     · subst h; simp [hi]
-    · simp only [h, if_false]
+    · simp only [h, ite_false]
       by_cases hl : i < t
       · simp [hl, show i < t + 1 by omega, Nat.ne_of_lt hl]
       · simp [hl, show ¬ i < t + 1 by omega]
@@ -798,7 +798,7 @@ theorem sysExec_viewLazy_faulted (V : ProcPriv) (P : UPtd) (M : Nat → List (Bi
       simp [h0, h1, hlt]
     | none =>
       simp only [h0, h1, Option.isNone_none, Option.isSome_none, Bool.false_eq_true, and_false,
-        if_false, true_and]
+        ite_false, true_and]
 
 /-! ## §4.  THE STAGE RECORD, THE STATES AND THE SEAMS -/
 

@@ -177,7 +177,7 @@ theorem uscan_ucstr (M : ElfMem) : ∀ (f l a : Nat), l < f → Ucstr M a l → 
   | f + 1, l + 1, a, hlf, hs => by
     obtain ⟨b, hb, hb0⟩ := hs.body 0 (by omega)
     simp only [Nat.add_zero] at hb
-    simp only [uscan, hb, if_neg hb0]
+    simp only [uscan, hb, ite_eq_right hb0]
     rw [uscan_ucstr M f l (a + 1) (by omega) (ucstr_shift hs)]
 
 /-- **Rocq `uk_slen_ucstr`**: the canonical length agrees with any witness

@@ -77,19 +77,19 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
   unfold ukViewStore
   by_cases hk' : k' = va.toNat / 4096
   · subst hk'
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     apply List.ext_getElem?
     intro i
     by_cases hi : i < 4096
     · rw [List.getElem?_mapIdx, ukm_view_get _ _ _ _ _ h i hi, ukm_view_get _ _ _ _ _ h i hi, hd]
-      simp only [Bool.false_eq_true, if_false, Option.map_some, Option.some.injEq]
+      simp only [Bool.false_eq_true, ite_false, Option.map_some, Option.some.injEq]
       by_cases hin : va.toNat % 4096 ≤ i ∧ i < va.toNat % 4096 + n
-      · rw [if_pos hin]
+      · rw [ite_eq_left hin]
         have e : pte2pa lw + BitVec.ofNat 64 i =
             pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) + BitVec.ofNat 64 (i - va.toNat % 4096) := by
           rw [BitVec.add_assoc, ← BitVec.ofNat_add, Nat.add_sub_cancel' hin.1]
         rw [e, bmWrite_at _ _ _ _ (by omega) _ (by omega), Option.getD_some, hv _ (by omega)]
-      · rw [if_neg hin, bmWrite_other]
+      · rw [ite_eq_right hin, bmWrite_other]
         intro hw
         obtain ⟨j, hj, hpj⟩ := (ubWin_mem _ _ _).1 hw
         have h1 := congrArg BitVec.toNat hpj
@@ -104,7 +104,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
           else b))[i]? = none :=
         List.getElem?_eq_none (by rw [List.length_mapIdx, ukm_view_length _ _ _ _ _ h]; omega)
       rw [h1, h2]
-  · rw [if_neg hk']
+  · rw [ite_eq_right hk']
     unfold ukView
     cases hk2 : get? P.um k' with
     | none => rfl
@@ -114,7 +114,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
       intro j hj
       have hj' := List.mem_range.1 hj
       cases ht : ukTextLeaf lw'
-      · simp only [Bool.false_eq_true, if_false]
+      · simp only [Bool.false_eq_true, ite_false]
         rw [bmWrite_other]
         intro hw
         obtain ⟨j2, hj2, hpj⟩ := (ubWin_mem _ _ _).1 hw
@@ -125,7 +125,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
         obtain ⟨ha2, -, -⟩ := ukm_page_geom P hwf _ lw h
         have hpa : pte2pa lw' = pte2pa lw := BitVec.eq_of_toNat_eq (by omega)
         exact hk' (hwf.2.1 _ _ _ _ hk2 h (ukm_ppn_of_pa _ _ hpa))
-      · simp only [if_true]
+      · simp only [ite_true]
 
 /-- A landing that changed only the walker's map (and the reservation bit),
 over engine maps at the same tree, is an engine machine. -/
@@ -169,11 +169,12 @@ theorem ukRetire_store (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 r
     rw [hr0 rs1]; rfl
   have hx2 : uxaXget (ucNpcS s len).file rs2 = m.get rs2 := hr0 rs2
   have hvw : runRW ufFoot orc (ucNpcS s len) (vmem_write_addr (.Virtaddr (uxaXget (ucNpcS s len).file rs1 +
-      sign_extend (m := 64) imm)) k (umeStData (uxaXget (ucNpcS s len).file rs2) k) (.Store .Data) false false false) =
+      sign_extend (m := 64) imm)) k (umeStData (uxaXget (ucNpcS s len).file rs2) k) (.Store .Data) umoAI false false
+      false) =
       some (.Ok true, { s1 with mm := bmWrite s1.mm (pte2pa lw + BitVec.ofNat 64
         ((m.get rs1 + BitVec.signExtend 64 imm).toNat % 4096)) k (umeStData (m.get rs2) k), rv := false }, orc) := by
     rw [hva, hx2]
-    exact uma_vmem_write_addr_al ufFoot orc orc _ s1 hp0 _ k hW hal _ (.Store .Data) false false false rfl
+    exact uma_vmem_write_addr_al ufFoot orc orc _ s1 hp0 _ k hW hal _ (.Store .Data) umoAI rfl false false false rfl
       _ rfl true (fun d => { s1 with mm := bmWrite s1.mm _ k d, rv := false }) (htr orc)
       (uma_mem_write_ea_store ufFoot orc s1 hp1 _ k hW hram)
       (fun d => uma_mem_write_value_store ufFoot orc s1 hp1 _ k hW hram d ho)
@@ -205,19 +206,25 @@ theorem ukTrap_storeDenied (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (r
   have hva : uxaXget (ucNpcS s len).file rs1 + sign_extend (m := 64) imm = m.get rs1 + BitVec.signExtend 64 imm := by
     rw [hr0 rs1]; rfl
   have hvw : runRW ufFoot orc (ucNpcS s len) (vmem_write_addr (.Virtaddr (uxaXget (ucNpcS s len).file rs1 +
-      sign_extend (m := 64) imm)) k (umeStData (uxaXget (ucNpcS s len).file rs2) k) (.Store .Data) false false false) =
-      some (.Err (umaTrap s1 (.E_SAMO_Page_Fault ()) (m.get rs1 + BitVec.signExtend 64 imm)), s1, orc) := by
+      sign_extend (m := 64) imm)) k (umeStData (uxaXget (ucNpcS s len).file rs2) k) (.Store .Data) umoAI false false
+      false) =
+      some (.Err (umaTrapC s1 (utrCtx (.Store .Data) (m.get rs1 + BitVec.signExtend 64 imm) (.PTW_No_Permission ()))),
+        s1, orc) := by
     rw [hva]
-    exact uma_vmem_write_addr_terr ufFoot ume_trapFoot orc orc _ s1 hp0 _ k hW hal _ (.Store .Data) false false
-      false _ (htr orc)
+    exact uma_vmem_write_addr_terr ufFoot ume_trapFoot orc orc _ s1 hp0 _ k hW hal _ (.Store .Data) umoAI rfl false
+      false false rfl _ (htr orc)
   have hex := ume_exec_store_err ume_umoFoot orc (ucNpcS s len) (uf_drefU C P _ hl0.cfg hl0.priv) hp0 imm rs2 rs1 k
     hW _ s1 orc hvw
   have hpc1 : s1.file .PC = pc := (hf1 .PC (by decide)).trans hpc0
-  refine ⟨make_sync_exception (.E_SAMO_Page_Fault ()) (m.get rs1 + BitVec.signExtend 64 imm), s1, orc, ?_, ?_, ?_,
-    hl1, ukm_regs_tlb hr0 hf1, hpc1, hv1.trans hv0⟩
+  -- the fault's context, with the instruction offset `with_excinst_offset` writes (sail-riscv 0.16)
+  refine ⟨{ utrCtx (.Store .Data) (m.get rs1 + BitVec.signExtend 64 imm) (.PTW_No_Permission ()) with
+      excinst_offset := Sail.BitVec.truncate ((m.get rs1 + BitVec.signExtend 64 imm) -
+        bits_of_virtaddr (.Virtaddr (m.get rs1 + BitVec.signExtend 64 imm))) 5 },
+    s1, orc, ?_, ?_, ?_, hl1, ukm_regs_tlb hr0 hf1, hpc1, hv1.trans hv0⟩
   · rw [uke_uxRun_of_runRW hl0 _ orc _ hex]
-    unfold umaTrap
-    rw [hl1.priv, hpc1]
+    unfold with_excinst_offset umaTrapC
+    rw [hl1.priv, hpc1, hva]
+    rfl
   · rfl
   · rfl
 

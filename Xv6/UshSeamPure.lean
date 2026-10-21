@@ -94,14 +94,14 @@ theorem refGettoken_word_ok (len : Nat) (f : Nat → BitVec 8) (i q e fin : Nat)
   have hlt : s < len := (Nat.lt_or_ge s len).resolve_right (fun hge => h0 (refAt_ge len f s hge))
   by_cases hg : refAt len f s = rbGt
   · by_cases hg2 : refAt len f (s + 1) = rbGt <;>
-      (simp only [hg, hg2, rb_gt_ne_nul, if_true, if_false, Prod.mk.injEq] at h; exact absurd h.1 (by decide))
+      (simp only [hg, hg2, rb_gt_ne_nul, ite_true, ite_false, Prod.mk.injEq] at h; exact absurd h.1 (by decide))
   by_cases hsy : ushpIsSym (refAt len f s) = true
-  · simp only [h0, hg, hsy, if_false, if_true, Prod.mk.injEq, rtWord] at h
+  · simp only [h0, hg, hsy, ite_false, ite_true, Prod.mk.injEq, rtWord] at h
     exfalso
     have hb : refAt len f s = BitVec.ofNat 8 97 := by
       apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
     rw [hb] at hsy; exact absurd hsy (by rw [ush_sym97]; decide)
-  · simp only [h0, hg, hsy, if_false, Bool.false_eq_true, Prod.mk.injEq] at h
+  · simp only [h0, hg, hsy, ite_false, Bool.false_eq_true, Prod.mk.injEq] at h
     obtain ⟨-, rfl, rfl, -⟩ := h
     rw [refAt_lt len f s hlt] at hsy
     have hws : ushpIsWs (f s) = false := by
@@ -139,10 +139,10 @@ theorem refRedirs_ok (len : Nat) (f : Nat → BitVec 8) (n : Nat) (hnn : refNonn
     dsimp only at h
     cases hit with
     | false =>
-      simp only [Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+      simp only [Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, -⟩ := h; exact hacc
     | true =>
-      simp only [if_true] at h
+      simp only [ite_true] at h
       obtain ⟨hs, -, -⟩ := refPeek_hit_inv len f i s _ epk
       have hsle : s ≤ len := hs ▸ refSkip_le len f i hi
       rcases e1 : refGettoken len f s with ⟨tok, q0, e0, s1⟩
@@ -213,7 +213,7 @@ theorem refParseexec_ok (len : Nat) (f : Nat → BitVec 8) (n i : Nat) (t : Ushp
   cases blk with
   | true => simp at h
   | false =>
-    simp only [Bool.false_eq_true, if_false] at h
+    simp only [Bool.false_eq_true, ite_false] at h
     have hs : s ≤ len := by rw [refPeek_miss_inv len f i s _ epk]; exact refSkip_le len f i hi
     rcases er : refRedirs len f n s [] with _ | ⟨rs1, s1⟩
     · rw [er] at h; cases h
@@ -248,10 +248,10 @@ theorem refParsepipe_ok (len : Nat) (f : Nat → BitVec 8) (n : Nat) (hnn : refN
       dsimp only at h
       cases bar with
       | false =>
-        simp only [Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+        simp only [Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
         obtain ⟨rfl, -⟩ := h; exact ht1
       | true =>
-        simp only [if_true] at h
+        simp only [ite_true] at h
         obtain ⟨hs1e, -, -⟩ := refPeek_hit_inv len f s s1 _ epk
         have hs1 : s1 ≤ len := hs1e ▸ refSkip_le len f s hs
         rcases eg : refGettoken len f s1 with ⟨tok, q, e, s2⟩
@@ -279,10 +279,10 @@ theorem refBacks_ok (len : Nat) (f : Nat → BitVec 8) (n : Nat) :
     dsimp only at h
     cases amp with
     | false =>
-      simp only [Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+      simp only [Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, -⟩ := h; exact ht
     | true =>
-      simp only [if_true] at h
+      simp only [ite_true] at h
       obtain ⟨hse, -, -⟩ := refPeek_hit_inv len f i s _ epk
       have hs : s ≤ len := hse ▸ refSkip_le len f i hi
       rcases eg : refGettoken len f s with ⟨tok, q, e, s1⟩
@@ -314,10 +314,10 @@ theorem refParseline_ok (len : Nat) (f : Nat → BitVec 8) (n : Nat) (hnn : refN
         dsimp only at h
         cases semi with
         | false =>
-          simp only [Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+          simp only [Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
           obtain ⟨rfl, -⟩ := h; exact ht2
         | true =>
-          simp only [if_true] at h
+          simp only [ite_true] at h
           obtain ⟨hs2e, -, -⟩ := refPeek_hit_inv len f s1 s2 _ epk
           have hs2 : s2 ≤ len := hs2e ▸ refSkip_le len f s1 hs1
           rcases eg : refGettoken len f s2 with ⟨tok, q, e, s3⟩
@@ -381,7 +381,7 @@ theorem refCutTok_ok (len : Nat) (f : Nat → BitVec 8) (js : List Nat) (q e : N
   refine ⟨⟨hlt, hle⟩, ushZeroAt_hit js _ e hin, ?_⟩
   intro j hj
   rw [ushZeroAt_miss]
-  · unfold ushpExt; rw [if_pos (by omega)]; exact hnn _ (by omega)
+  · unfold ushpExt; rw [ite_eq_left (by omega)]; exact hnn _ (by omega)
   · intro hx
     rcases (hjs _ hx).2 with heq | hstop
     · omega

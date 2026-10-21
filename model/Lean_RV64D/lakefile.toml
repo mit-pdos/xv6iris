@@ -9,4 +9,5 @@ moreLeancArgs= ["-fbracket-depth=500"]
 
 [[require]]
 name = "Sail"
-path = "../../vendor/lean-sail"
+git = "https://github.com/rems-project/lean-sail"
+rev = "01bb54c7c8a69e52ba11863c67e7c403a6cd198a"

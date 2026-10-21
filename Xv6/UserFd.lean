@@ -124,7 +124,7 @@ theorem ufdMap_lookup (fdv : List FdState) (fd : Nat) (st : FdState) :
   | some st' =>
     simp only [Option.bind_some]
     by_cases hk : ufdKeep fd st' = true
-    · rw [if_pos hk]
+    · rw [ite_eq_left hk]
       simp only [Option.some.injEq]
       constructor
       · rintro rfl
@@ -135,7 +135,7 @@ theorem ufdMap_lookup (fdv : List FdState) (fd : Nat) (st : FdState) :
         · exact .inl hk
         · exact .inr (FdState.isClosed_eq_false.1 hk)
       · rintro ⟨rfl, _⟩; rfl
-    · rw [if_neg hk]
+    · rw [ite_eq_right hk]
       simp only [reduceCtorEq, false_iff, not_and, Option.some.injEq]
       rintro rfl hor
       apply hk
@@ -185,17 +185,17 @@ theorem ufdMapHi_get? (fdv : List FdState) (k : Nat) :
   unfold ufdMapHi
   rw [LawfulPartialMap.get?_filter, LawfulFiniteMap.get?_map_seq]
   by_cases hk : NSTD ≤ k
-  · rw [if_pos hk, if_pos hk, List.getElem?_drop]
+  · rw [ite_eq_left hk, ite_eq_left hk, List.getElem?_drop]
     rw [show NSTD + (k - NSTD) = k by omega]
     cases fdv[k]? with
     | none => rfl
     | some st => cases st <;> simp [FdState.isClosed]
-  · rw [if_neg hk, if_neg hk]; rfl
+  · rw [ite_eq_right hk, ite_eq_right hk]; rfl
 
 theorem mapSeq0_take_get? (fdv : List FdState) (k : Nat) :
     get? (FiniteMap.map_seq 0 (fdv.take NSTD) : RegMapF FdState) k =
       if k < NSTD then fdv[k]? else none := by
-  rw [LawfulFiniteMap.get?_map_seq, if_pos (Nat.zero_le _), Nat.sub_zero, List.getElem?_take]
+  rw [LawfulFiniteMap.get?_map_seq, ite_eq_left (Nat.zero_le _), Nat.sub_zero, List.getElem?_take]
 
 /-- Rocq `ufd_map_split_disj`. -/
 theorem ufdMap_split_disj (fdv : List FdState) :
@@ -204,8 +204,8 @@ theorem ufdMap_split_disj (fdv : List FdState) :
   rw [mapSeq0_take_get?] at h1
   rw [ufdMapHi_get?] at h2
   by_cases hk : k < NSTD
-  · rw [if_neg (by omega)] at h2; simp at h2
-  · rw [if_neg hk] at h1; simp at h1
+  · rw [ite_eq_right (by omega)] at h2; simp at h2
+  · rw [ite_eq_right hk] at h1; simp at h1
 
 /-- Rocq `ufd_map_split`: the prefix, whole, and the open slots above it. -/
 theorem ufdMap_split (fdv : List FdState) :
@@ -214,11 +214,11 @@ theorem ufdMap_split (fdv : List FdState) :
   apply rmap_ext; intro k
   rw [LawfulPartialMap.get?_union, mapSeq0_take_get?, ufdMapHi_get?, ufdMap_get?]
   by_cases hk : k < NSTD
-  · rw [if_pos hk, if_neg (by omega)]
+  · rw [ite_eq_left hk, ite_eq_right (by omega)]
     cases fdv[k]? with
     | none => rfl
     | some st => simp [ufdKeep, hk]
-  · rw [if_neg hk, if_pos (by omega)]
+  · rw [ite_eq_right hk, ite_eq_left (by omega)]
     cases fdv[k]? with
     | none => rfl
     | some st => cases st <;> simp [ufdKeep, hk, FdState.isClosed]
@@ -228,7 +228,7 @@ theorem ufdMapHi_open {fdv : List FdState} {fd : Nat} {st : FdState}
     (h : get? (ufdMapHi fdv) fd = some st) : st ≠ .closed ∧ NSTD ≤ fd := by
   rw [ufdMapHi_get?] at h
   by_cases hk : NSTD ≤ fd
-  · rw [if_pos hk] at h
+  · rw [ite_eq_left hk] at h
     refine ⟨?_, hk⟩
     cases h' : fdv[fd]? with
     | none => rw [h'] at h; simp at h
@@ -236,7 +236,7 @@ theorem ufdMapHi_open {fdv : List FdState} {fd : Nat} {st : FdState}
       rw [h'] at h
       cases st' <;> simp [FdState.isClosed] at h
       subst h; simp
-  · rw [if_neg hk] at h; simp at h
+  · rw [ite_eq_right hk] at h; simp at h
 
 /-- Rocq `ufd_map_hi_sub`: the premise the fork mint takes. -/
 theorem ufdMapHi_sub {fdv : List FdState} {D : RegMapF FdState} (hsub : D ⊆ ufdMap fdv)
@@ -244,7 +244,7 @@ theorem ufdMapHi_sub {fdv : List FdState} {D : RegMapF FdState} (hsub : D ⊆ uf
   intro i x hi
   have hge := hlo i (by rw [hi]; rfl)
   have hm := (ufdMap_lookup fdv i x).1 (hsub i x hi)
-  rw [ufdMapHi_get?, if_pos hge, hm.1]
+  rw [ufdMapHi_get?, ite_eq_left hge, hm.1]
   rcases hm.2 with h | h
   · omega
   · simp [FdState.isClosed_eq_false.2 h]
@@ -663,17 +663,17 @@ theorem ustdRaw_acc (γf : GName) (l : List FdState) (k : Nat) (st : FdState) (h
     ustdRaw (GF := GF) γf l ⊢
       ufdSlot γf k st ∗ ∀ st' : FdState, ufdSlot γf k st' -∗ ustdRaw γf (l.set k st') := by
   have hm : get? (FiniteMap.map_seq 0 l : RegMapF FdState) k = some st := by
-    rw [LawfulFiniteMap.get?_map_seq, if_pos (Nat.zero_le _), Nat.sub_zero]; exact hk
+    rw [LawfulFiniteMap.get?_map_seq, ite_eq_left (Nat.zero_le _), Nat.sub_zero]; exact hk
   have hlt : k < l.length := (List.getElem?_eq_some_iff.1 hk).1
   have hins : ∀ st' : FdState, (FiniteMap.map_seq 0 (l.set k st') : RegMapF FdState) =
       PartialMap.insert (FiniteMap.map_seq 0 l : RegMapF FdState) k st' := by
     intro st'
     apply rmap_ext; intro j
-    rw [LawfulFiniteMap.get?_map_seq, if_pos (Nat.zero_le _), Nat.sub_zero]
+    rw [LawfulFiniteMap.get?_map_seq, ite_eq_left (Nat.zero_le _), Nat.sub_zero]
     by_cases hj : k = j
     · subst hj; rw [LawfulPartialMap.get?_insert_eq rfl, List.getElem?_set_self hlt]
     · rw [LawfulPartialMap.get?_insert_ne hj, List.getElem?_set_ne hj, LawfulFiniteMap.get?_map_seq,
-        if_pos (Nat.zero_le _), Nat.sub_zero]
+        ite_eq_left (Nat.zero_le _), Nat.sub_zero]
   unfold ustdRaw
   iintro ⟨%hlen, Hm⟩
   icases BigSepM.bigSepM_insert_acc (Φ := fun k st => ufdSlot (GF := GF) γf k st) hm $$ Hm with ⟨Hk, Hback⟩
@@ -695,14 +695,14 @@ theorem ustdRaw_agree (γf : GName) (fdv l : List FdState) :
   apply List.ext_getElem?
   intro i
   by_cases hi : i < NSTD
-  · rw [List.getElem?_take, if_pos hi]
+  · rw [List.getElem?_take, ite_eq_left hi]
     cases hli : l[i]? with
     | none => exact absurd (List.getElem?_eq_none_iff.1 hli) (by omega)
     | some st =>
       have hm : get? (FiniteMap.map_seq 0 l : RegMapF FdState) i = some st := by
-        rw [LawfulFiniteMap.get?_map_seq, if_pos (Nat.zero_le _), Nat.sub_zero]; exact hli
+        rw [LawfulFiniteMap.get?_map_seq, ite_eq_left (Nat.zero_le _), Nat.sub_zero]; exact hli
       exact ufdMap_lookup_1 (hsub' i st hm)
-  · rw [List.getElem?_take, if_neg hi, List.getElem?_eq_none (by omega)]
+  · rw [List.getElem?_take, ite_eq_right hi, List.getElem?_eq_none (by omega)]
 
 /-- Rocq `ustd_agree`: THE LEDGER READS THE VIEW, whole. -/
 theorem ustd_agree (γf : GName) (fdv l : List FdState) :
@@ -757,7 +757,7 @@ theorem ufdOwn_agree (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdSta
   icases Ho with (⟨%hlt, %hl⟩ | Hh)
   · ipureintro
     have hi : (fdv.take NSTD)[fd]? = some st := by rw [hst]; exact hl
-    rw [List.getElem?_take, if_pos hlt] at hi
+    rw [List.getElem?_take, ite_eq_left hlt] at hi
     exact ⟨hi, by rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hi).1⟩
   · ihave %hi := ufd_agree γf fdv fd st $$ Ha Hh
     ipureintro
@@ -920,11 +920,11 @@ theorem fdLeastClosed_prefix {fdv : List FdState} {fd k : Nat} (hle : fdLeastClo
   have hkl : k < NSTD := by
     have := (List.getElem?_eq_some_iff.1 hkf).1
     rw [List.length_take] at this; omega
-  rw [List.getElem?_take, if_pos hkl] at hkf
+  rw [List.getElem?_take, ite_eq_left hkl] at hkf
   have hfb := fdLeastClosed_below hle
   have hff := fdLeastClosed_free hle
   rcases Nat.lt_trichotomy fd k with h | h | h
-  · exact absurd (by rw [List.getElem?_take, if_pos (by omega)]; exact hff) (hkb fd h)
+  · exact absurd (by rw [List.getElem?_take, ite_eq_left (by omega)]; exact hff) (hkb fd h)
   · exact h
   · exact absurd hkf (hfb k h)
 
@@ -935,9 +935,9 @@ theorem fdLeastClosed_prefix_none {fdv : List FdState} {fd : Nat} (hle : fdLeast
   refine Nat.le_of_not_lt (fun hlt => ?_)
   have hff := fdLeastClosed_free hle
   have hc : fdLeastClosed (fdv.take NSTD) fd :=
-    fdLeastClosed_intro (by rw [List.getElem?_take, if_pos (by omega)]; exact hff)
+    fdLeastClosed_intro (by rw [List.getElem?_take, ite_eq_left (by omega)]; exact hff)
       (fun j hj => by
-        rw [List.getElem?_take, if_pos (by omega)]
+        rw [List.getElem?_take, ite_eq_left (by omega)]
         exact fdLeastClosed_below hle j hj)
   unfold fdLeastClosed at hc
   rw [hk] at hc; cases hc
@@ -1048,7 +1048,7 @@ theorem ufd_close_std (γf : GName) (fdv l : List FdState) (fd : Nat) (st : FdSt
   ihave %hst := ustd_agree γf fdv l $$ Ha Hl
   have hi : fdv[fd]? = some st := by
     have : (fdv.take NSTD)[fd]? = some st := by rw [hst]; exact hkl
-    rw [List.getElem?_take, if_pos hs] at this; exact this
+    rw [List.getElem?_take, ite_eq_left hs] at this; exact this
   have hlt : fd < fdv.length := (List.getElem?_eq_some_iff.1 hi).1
   unfold ufdAuth ustd
   icases Ha with ⟨%v, Ha, _, _, Hta⟩

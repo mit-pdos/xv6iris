@@ -159,7 +159,7 @@ theorem uFinN_get (M : ElfMem) : ∀ (n k : Nat), get? (uFinN M n) k = if k < n 
       rw [LawfulPartialMap.get?_insert]
       by_cases hk : n = k
       · subst hk; simp [hM]
-      · rw [if_neg hk, ih]
+      · rw [ite_eq_right hk, ih]
         by_cases h1 : k < n
         · simp [h1, show k < n + 1 by omega]
         · simp [h1, show ¬ k < n + 1 by omega]
@@ -245,7 +245,7 @@ theorem udataLo_slack_union (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) 
   apply rmap_ext; intro a
   rw [LawfulPartialMap.get?_union, udataLo_get, udataSlack_get]
   by_cases h : a < sz
-  · simp only [h, if_true, show ¬ sz ≤ a by omega, if_false]
+  · simp only [h, ite_true, show ¬ sz ≤ a by omega, ite_false]
     cases get? (udataPart M pm) a <;> rfl
   · simp [h, show sz ≤ a by omega]
 
@@ -625,29 +625,29 @@ theorem uheap_store (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPer
     fun x => ?_, hok.stop⟩
   · unfold uMIns
     have hne : x ≠ a := by rintro rfl; rw [hnt] at hx; cases hx
-    rw [if_neg hne]; exact hok.tsub x c hx
+    rw [ite_eq_right hne]; exact hok.tsub x c hx
   · unfold uMIns
     rw [LawfulPartialMap.get?_insert] at hx
     by_cases hxa : x = a
     · subst hxa; simp at hx ⊢; exact hx
-    · rw [if_neg (Ne.symm hxa)] at hx; rw [if_neg hxa]; exact hok.dsub x c hx
+    · rw [ite_eq_right (Ne.symm hxa)] at hx; rw [ite_eq_right hxa]; exact hok.dsub x c hx
   · rw [PartialMap.disjoint_iff]; intro x
     rw [LawfulPartialMap.get?_insert]
     by_cases hxa : a = x
     · subst hxa; left; exact hnt
-    · rw [if_neg hxa]; exact (PartialMap.disjoint_iff _ _).1 hok.disj x
+    · rw [ite_eq_right hxa]; exact (PartialMap.disjoint_iff _ _).1 hok.disj x
   · unfold uMIns at hx
     by_cases hxa : x = a
     · subst hxa; exact hok.canon x (by rw [hMa]; rfl)
-    · rw [if_neg hxa] at hx; exact hok.canon x hx
+    · rw [ite_eq_right hxa] at hx; exact hok.canon x hx
   · rw [LawfulPartialMap.get?_insert] at hx
     by_cases hxa : a = x
     · subst hxa; exact hok.dw a (by rw [hMd]; rfl)
-    · rw [if_neg hxa] at hx; exact hok.dw x hx
+    · rw [ite_eq_right hxa] at hx; exact hok.dw x hx
   · rw [hok.slack x, LawfulPartialMap.get?_insert]
     by_cases hxa : a = x
     · subst hxa; simp [hMd]
-    · rw [if_neg hxa]
+    · rw [ite_eq_right hxa]
 
 /-- The image after a window write (Rocq `umem_write M a n g`). -/
 def uMWrite (M : ElfMem) (a n : Nat) (g : Nat → BitVec 8) : ElfMem :=
@@ -659,10 +659,10 @@ theorem uMWrite_succ (M : ElfMem) (a n : Nat) (g : Nat → BitVec 8) :
   simp only [uMWrite, uMIns]
   by_cases h1 : x = a + n
   · subst h1; simp
-  · rw [if_neg h1]
+  · rw [ite_eq_right h1]
     by_cases h2 : a ≤ x ∧ x < a + n
-    · rw [if_pos h2, if_pos ⟨h2.1, by omega⟩]
-    · rw [if_neg h2, if_neg (by omega)]
+    · rw [ite_eq_left h2, ite_eq_left ⟨h2.1, by omega⟩]
+    · rw [ite_eq_right h2, ite_eq_right (by omega)]
 
 /-- **The store leaf's image IS a window write** (Rocq `uM_store_umem_write`;
 definitional here, both being pointwise). -/
@@ -748,7 +748,7 @@ theorem ubytes_of_map (γd : GName) (a : Nat) :
       with ⟨Hb, H⟩
     have hD' : ∀ j, j < n → get? (PartialMap.delete D (a + n)) (a + j) = some (f j) := by
       intro j hj
-      rw [LawfulPartialMap.get?_delete, if_neg (by omega)]
+      rw [LawfulPartialMap.get?_delete, ite_eq_right (by omega)]
       exact hD j (by omega)
     ihave Hlo := ubytes_of_map γd a n _ f hD' $$ H
     iapply (ubytesq_succ γd _ a n f).2
@@ -798,11 +798,11 @@ instance uinstrIs_persistent (γt : GName) (pc : BitVec 64) (isRvc : Bool) (i : 
     Persistent (uinstrIs (GF := GF) γt pc isRvc i) := by
   unfold uinstrIs
   cases isRvc
-  · simp only [Bool.false_eq_true, if_false]; infer_instance
-  · simp only [if_true]
+  · simp only [Bool.false_eq_true, ite_false]; infer_instance
+  · simp only [ite_true]
     by_cases h : pc.toNat % 4 = 0
-    · simp only [h, if_true]; infer_instance
-    · simp only [h, if_false]; infer_instance
+    · simp only [h, ite_true]; infer_instance
+    · simp only [h, ite_false]; infer_instance
 
 /-- **Rocq `uheap_text_run`**: every byte of a text run is the byte the image
 holds. -/
@@ -853,7 +853,7 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
   unfold uinstrIs
   iintro Hh ⟨%hal, Hc⟩
   cases isRvc
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     icases Hc with ⟨%w, %hn, %hdec, #Hbs⟩
     ihave %hb := uheap_text_run (k := 4) γt γd γs M pm sz pc.toNat w 4 $$ Hh Hbs
     ihave #H0 := BigSepL.bigSepL_lookup (Φ := fun _ j => utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j))
@@ -870,11 +870,11 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
       rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
     have ht2 : upermAt pm (pc + 2#64) = some ⟨true, false⟩ := by unfold upermAt; rw [e2]; exact hp2
     exact ⟨hal, ht, fun _ _ => ⟨e2, ht2⟩,
-      by simp only [Bool.false_eq_true, if_false]; exact ⟨w, hn, hb, hdec⟩⟩
-  · simp only [if_true]
+      by simp only [Bool.false_eq_true, ite_false]; exact ⟨w, hn, hb, hdec⟩⟩
+  · simp only [ite_true]
     icases Hc with ⟨%h, %hrvc, %hdec, Hw⟩
     by_cases h4 : pc.toNat % 4 = 0
-    · simp only [h4, if_true]
+    · simp only [h4, ite_true]
       icases Hw with ⟨%w, %hlow, #Hbs⟩
       ihave %hb := uheap_text_run (k := 4) γt γd γs M pm sz pc.toNat w 4 $$ Hh Hbs
       ihave #H0 := BigSepL.bigSepL_lookup (Φ := fun _ j => utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 4) w j))
@@ -882,13 +882,13 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
       ihave %ht := uheap_text_pc γt γd γs M pm sz pc _ $$ Hh H0
       ipureintro
       refine ⟨hal, ht, fun e => absurd e (by decide), ?_⟩
-      simp only [if_true]
+      simp only [ite_true]
       refine ⟨h, hrvc, fun j hj => ?_, hdec, fun _ => ⟨by rw [hb 2 (by decide)]; rfl, by rw [hb 3 (by decide)]; rfl⟩⟩
       rw [hb j (by omega), ← hlow]
       rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
       · exact congrArg some (nthByte_lo0 w).symm
       · exact congrArg some (nthByte_lo1 w).symm
-    · simp only [h4, if_false]
+    · simp only [h4, ite_false]
       ihave #Hbs := Hw
       ihave %hb := uheap_text_run (k := 2) γt γd γs M pm sz pc.toNat h 2 $$ Hh Hbs
       ihave #H0 := BigSepL.bigSepL_lookup (Φ := fun _ j => utext (GF := GF) γt (pc.toNat + j) (nthByte (n := 2) h j))
@@ -896,7 +896,7 @@ theorem uinstrIs_ukInstr (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option
       ihave %ht := uheap_text_pc γt γd γs M pm sz pc _ $$ Hh H0
       ipureintro
       refine ⟨hal, ht, fun e => absurd e (by decide), ?_⟩
-      simp only [if_true]
+      simp only [ite_true]
       exact ⟨h, hrvc, hb, hdec, fun h4' => absurd h4' h4⟩
 
 /-- **Rocq `utext_all`**: A PROGRAM'S WHOLE TEXT, as one resource. -/
@@ -911,7 +911,7 @@ theorem utext_frag (γt : GName) (M : ElfMem) (pm : Nat → Option UPerm) (a : N
     (hM : M a = some b) (hx : uxAddr pm a) (hw : ¬ uwAddr pm a) (hcap : a < uCap) :
     utextAll (GF := GF) γt M pm ⊢ utext γt a b := by
   unfold utextAll
-  exact BigSepM.bigSepM_lookup (by rw [utextPart_get, if_pos ⟨hcap, hx, hw⟩, hM])
+  exact BigSepM.bigSepM_lookup (by rw [utextPart_get, ite_eq_left ⟨hcap, hx, hw⟩, hM])
 
 /-- **Rocq `utext_img_of_all`**: THE ONE CONVERSION, at the entry -- the
 process's text heap covers the program's bytes (a code segment `m`, U0-7's
@@ -972,7 +972,7 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
   isplitr
   · ipureintro; exact F.even
   cases rvc
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     obtain ⟨hn, -, hnr, hdec⟩ := F.base rfl
     subst hn
     iexists (BitVec.ofNat 32 w)
@@ -981,7 +981,7 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
     isplitr
     · ipureintro; exact ⟨true, hdec⟩
     iapply Xv6.User.utextImg_run (utext γt) m pc 4 _ (fun j hj => by rw [uwin_byte32 w j hj]; exact F.bytes j hj) $$ H
-  · simp only [if_true]
+  · simp only [ite_true]
     obtain ⟨hn, hr, hdec, hex⟩ := F.rvc rfl
     iexists (BitVec.ofNat 16 w)
     isplitr
@@ -989,7 +989,7 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
     isplitr
     · ipureintro; exact ⟨i₀, true, hdec, hex⟩
     by_cases h4 : pc % 4 = 0
-    · simp only [h4, if_true]
+    · simp only [h4, ite_true]
       have hn4 : n = 4 := by rw [hn]; simp; omega
       subst hn4
       iexists (BitVec.ofNat 32 w)
@@ -999,7 +999,7 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
         simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero]
         omega
       iapply Xv6.User.utextImg_run (utext γt) m pc 4 _ (fun j hj => by rw [uwin_byte32 w j hj]; exact F.bytes j hj) $$ H
-    · simp only [h4, if_false]
+    · simp only [h4, ite_false]
       have hn2 : n = 2 := by rw [hn]; have : pc % 4 = 2 := by have := F.even; omega
                              simp [this]
       subst hn2
@@ -1121,9 +1121,9 @@ theorem uword_byte_acc (γd : GName) (a j : Nat) (w : BitVec 64) (hj : j < 8) :
     iintro %k %y %hk %hne H
     obtain ⟨-, hy⟩ := uRange_get hk
     subst hy
-    simp only [hne, if_false]
+    simp only [hne, ite_false]
     iexact H
-  · simp only [if_true]
+  · simp only [ite_true]
     iexact Hc
 
 /-- **Rocq `ustack_body_of_ubytes`**: `n` words, indexed downward from sp,
@@ -1234,13 +1234,13 @@ theorem uheap_grow_run (γt γd γs : GName) (M : ElfMem) (pm pm' : Nat → Opti
     rw [LawfulPartialMap.get?_filter, uFin_get]
     by_cases h : sz ≤ a ∧ a < sz + n ∧ get? Md a = none
     · have hc : a < uCap := hcan' a (hM'run a h.1 h.2.1)
-      rw [if_pos hc, if_pos h]
+      rw [ite_eq_left hc, ite_eq_left h]
       cases hm : M' a with
       | none => rfl
       | some b => simp [inRun, h.1, h.2.1, h.2.2]
-    · rw [if_neg h]
+    · rw [ite_eq_right h]
       by_cases hc : a < uCap
-      · rw [if_pos hc]
+      · rw [ite_eq_left hc]
         cases hm : M' a with
         | none => rfl
         | some b =>
@@ -1251,26 +1251,26 @@ theorem uheap_grow_run (γt γd γs : GName) (M : ElfMem) (pm pm' : Nat → Opti
             | none => exact absurd hmd this
             | some _ => simp [inRun]
           · simp [inRun, h2]
-      · rw [if_neg hc]; rfl
+      · rw [ite_eq_right hc]; rfl
   have hNwMd : Nw ##ₘ Md := by
     rw [PartialMap.disjoint_iff]; intro a
     rw [hNw]
     by_cases h : sz ≤ a ∧ a < sz + n ∧ get? Md a = none
     · right; exact h.2.2
-    · left; rw [if_neg h]
+    · left; rw [ite_eq_right h]
   have hSinNw : Sin ##ₘ Nw := by
     rw [PartialMap.disjoint_iff]; intro a
     rw [hSin, hNw]
     by_cases h : sz ≤ a ∧ a < sz + n
-    · rw [if_pos h]
+    · rw [ite_eq_left h]
       cases hms : get? Ms a with
       | none => left; rfl
       | some b =>
         right
         have hmd := ((hok.slack a).1 (by rw [hms]; rfl)).1
         have : ¬ (sz ≤ a ∧ a < sz + n ∧ get? Md a = none) := fun e => by rw [e.2.2] at hmd; cases hmd
-        rw [if_neg this]
-    · left; rw [if_neg h]
+        rw [ite_eq_right this]
+    · left; rw [ite_eq_right h]
   -- the slack splits
   obtain ⟨hsu, hsd⟩ := uFilter_split inRun Ms
   have hslsplit : ([∗map] a ↦ b ∈ Ms, ubyte (GF := GF) γd a b) ⊢
@@ -1315,7 +1315,7 @@ theorem uheap_grow_run (γt γd γs : GName) (M : ElfMem) (pm pm' : Nat → Opti
             rw [hNw]
             by_cases h : sz ≤ a ∧ a < sz + n ∧ get? Md a = none
             · exact absurd (hnew a h.1 h.2.1) (uwAddr_ext_not hext hx hnw)
-            · rw [if_neg h]
+            · rw [ite_eq_right h]
           rw [hnwa, hmd]; rfl
       · rw [LawfulPartialMap.get?_union] at h
         cases hn : get? Nw a with
@@ -1328,10 +1328,10 @@ theorem uheap_grow_run (γt γd γs : GName) (M : ElfMem) (pm pm' : Nat → Opti
           exact uwAddr_ext hext (hok.dw a h)
       · rw [hSout, LawfulPartialMap.get?_union]
         by_cases h : sz ≤ a ∧ a < sz + n
-        · rw [if_pos h]; simp; omega
-        · rw [if_neg h, hok.slack a]
+        · rw [ite_eq_left h]; simp; omega
+        · rw [ite_eq_right h, hok.slack a]
           have hna : get? Nw a = none := by
-            rw [hNw, if_neg (fun e => h ⟨e.1, e.2.1⟩)]
+            rw [hNw, ite_eq_right (fun e => h ⟨e.1, e.2.1⟩)]
           rw [hna]; simp only [Option.orElse]
           constructor
           · rintro ⟨h1, h2⟩; exact ⟨h1, by omega⟩
@@ -1348,13 +1348,13 @@ theorem uheap_grow_run (γt γd γs : GName) (M : ElfMem) (pm pm' : Nat → Opti
       cases hmd : get? Md (sz + j) with
       | some b =>
         have hs := (hok.slack (sz + j)).2 ⟨by rw [hmd]; rfl, by omega⟩
-        rw [hSin, if_pos ⟨by omega, by omega⟩]
+        rw [hSin, ite_eq_left ⟨by omega, by omega⟩]
         cases hms : get? Ms (sz + j) with
         | none => rw [hms] at hs; cases hs
         | some _ => rfl
       | none =>
         have hin : get? Nw (sz + j) = M' (sz + j) := by
-          rw [hNw, if_pos ⟨by omega, by omega, hmd⟩]
+          rw [hNw, ite_eq_left ⟨by omega, by omega, hmd⟩]
         have hsome := hM'run (sz + j) (by omega) (by omega)
         cases hs : get? Sin (sz + j) with
         | some _ => rfl

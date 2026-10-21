@@ -239,10 +239,10 @@ def bmSlot (bm : Blkmap) (i : Nat) : BitVec 32 :=
 
 theorem bmSlot_lt (bm : Blkmap) (i : Nat) (hi : i < MAXFILE) :
     bmSlot bm i = blkmapGet bm i := by
-  unfold bmSlot; rw [if_neg (by omega)]
+  unfold bmSlot; rw [ite_eq_right (by omega)]
 
 theorem bmSlot_top (bm : Blkmap) : bmSlot bm MAXFILE = bm.bmInd := by
-  unfold bmSlot; rw [if_pos rfl]
+  unfold bmSlot; rw [ite_eq_left rfl]
 
 /-- Rocq's `blkmap_wf`. -/
 def blkmapWf (cov : ExtTreeSet Nat compare) (logstart : Nat) (bm : Blkmap) : Prop :=
@@ -304,7 +304,7 @@ theorem blkmapWf_ind_nz {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} 
   intro hiz
   apply hnz
   unfold blkmapGet
-  rw [if_neg (by omega), blkmapWf_no_ind h hiz,
+  rw [ite_eq_right (by omega), blkmapWf_no_ind h hiz,
     Xv6.replicate_getElem! NINDIRECT (0 : BitVec 32) (i - NDIRECT)
       (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
   rfl
@@ -312,10 +312,10 @@ theorem blkmapWf_ind_nz {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} 
 /-! ### Reading `blkmapGet` off the two components -/
 
 theorem blkmapGet_dir (bm : Blkmap) (i : Nat) (hi : i < NDIRECT) :
-    blkmapGet bm i = bm.bmDir[i]! := by unfold blkmapGet; rw [if_pos hi]
+    blkmapGet bm i = bm.bmDir[i]! := by unfold blkmapGet; rw [ite_eq_left hi]
 
 theorem blkmapGet_ent (bm : Blkmap) (i : Nat) (hi : NDIRECT ≤ i) :
-    blkmapGet bm i = bm.bmEnt[i - NDIRECT]! := by unfold blkmapGet; rw [if_neg (by omega)]
+    blkmapGet bm i = bm.bmEnt[i - NDIRECT]! := by unfold blkmapGet; rw [ite_eq_right (by omega)]
 
 /-! ## THE COVERAGE INVARIANT: every file block below the SIZE is allocated
 
@@ -384,10 +384,10 @@ def dataUpd (data : Nat → List (BitVec 8)) (i : Nat) (bs : List (BitVec 8)) :
   fun j => if j = i then bs else data j
 
 theorem dataUpd_eq (data : Nat → List (BitVec 8)) (i : Nat) (bs : List (BitVec 8)) :
-    dataUpd data i bs i = bs := by unfold dataUpd; rw [if_pos rfl]
+    dataUpd data i bs i = bs := by unfold dataUpd; rw [ite_eq_left rfl]
 
 theorem dataUpd_ne (data : Nat → List (BitVec 8)) (i j : Nat) (bs : List (BitVec 8))
-    (h : j ≠ i) : dataUpd data i bs j = data j := by unfold dataUpd; rw [if_neg h]
+    (h : j ≠ i) : dataUpd data i bs j = data j := by unfold dataUpd; rw [ite_eq_right h]
 
 /-- A HOLE READS AS ZEROS (Rocq's `blk_holes_zero`).  `inodeBlocks` leaves
 `data i` unconstrained at an UNALLOCATED index `i`, and `bmap` deposits a
@@ -479,14 +479,14 @@ theorem bmSlot_insert_dir (bm : Blkmap) (j : Nat) (w : BitVec 32) (i : Nat)
   unfold bmSlot blkmapGet
   by_cases hm : i = MAXFILE
   · subst hm
-    rw [if_pos rfl, if_pos rfl, if_neg (by unfold MAXFILE NDIRECT at *; omega)]
-  · rw [if_neg hm, if_neg hm]
+    rw [ite_eq_left rfl, ite_eq_left rfl, ite_eq_right (by unfold MAXFILE NDIRECT at *; omega)]
+  · rw [ite_eq_right hm, ite_eq_right hm]
     by_cases hlt : i < NDIRECT
-    · rw [if_pos hlt, if_pos hlt]
+    · rw [ite_eq_left hlt, ite_eq_left hlt]
       by_cases hij : i = j
-      · subst hij; rw [if_pos rfl, set_getElem!_self _ _ _ (by omega)]
-      · rw [if_neg hij, set_getElem!_ne _ _ _ _ hij]
-    · rw [if_neg hlt, if_neg hlt, if_neg (by omega)]
+      · subst hij; rw [ite_eq_left rfl, set_getElem!_self _ _ _ (by omega)]
+      · rw [ite_eq_right hij, set_getElem!_ne _ _ _ _ hij]
+    · rw [ite_eq_right hlt, ite_eq_right hlt, ite_eq_right (by omega)]
 
 theorem bmSlot_insert_ent (bm : Blkmap) (q : Nat) (w : BitVec 32) (i : Nat)
     (hlen : bm.bmEnt.length = NINDIRECT) (hq : q < NINDIRECT) (hi : i ≤ MAXFILE) :
@@ -495,15 +495,15 @@ theorem bmSlot_insert_ent (bm : Blkmap) (q : Nat) (w : BitVec 32) (i : Nat)
   unfold bmSlot blkmapGet
   by_cases hm : i = MAXFILE
   · subst hm
-    rw [if_pos rfl, if_pos rfl, if_neg (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
-  · rw [if_neg hm, if_neg hm]
+    rw [ite_eq_left rfl, ite_eq_left rfl, ite_eq_right (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
+  · rw [ite_eq_right hm, ite_eq_right hm]
     by_cases hlt : i < NDIRECT
-    · rw [if_pos hlt, if_pos hlt, if_neg (by omega)]
-    · rw [if_neg hlt, if_neg hlt]
+    · rw [ite_eq_left hlt, ite_eq_left hlt, ite_eq_right (by omega)]
+    · rw [ite_eq_right hlt, ite_eq_right hlt]
       by_cases hij : i = NDIRECT + q
       · subst hij
-        rw [if_pos rfl, Nat.add_sub_cancel_left, set_getElem!_self _ _ _ (by omega)]
-      · rw [if_neg hij, set_getElem!_ne _ _ _ _ (by omega)]
+        rw [ite_eq_left rfl, Nat.add_sub_cancel_left, set_getElem!_self _ _ _ (by omega)]
+      · rw [ite_eq_right hij, set_getElem!_ne _ _ _ _ (by omega)]
 
 theorem bmSlot_insert_ind (bm : Blkmap) (w : BitVec 32) (i : Nat)
     (hent : bm.bmEnt = List.replicate NINDIRECT 0) (hi : i ≤ MAXFILE) :
@@ -511,8 +511,8 @@ theorem bmSlot_insert_ind (bm : Blkmap) (w : BitVec 32) (i : Nat)
       = if i = MAXFILE then w else bmSlot bm i := by
   unfold bmSlot blkmapGet
   by_cases hm : i = MAXFILE
-  · subst hm; rw [if_pos rfl, if_pos rfl]
-  · simp only [if_neg hm]
+  · subst hm; rw [ite_eq_left rfl, ite_eq_left rfl]
+  · simp only [ite_eq_right hm]
     rw [← hent]
 
 /-- THE general step: replace slot `p` by a block `w` that no slot of `bm`
@@ -537,24 +537,24 @@ theorem blkmapWf_slot_upd (cov : ExtTreeSet Nat compare) (ls : Nat) (bm bm' : Bl
   · intro i hi hnz
     rw [hslot i hi] at hnz ⊢
     by_cases hip : i = p
-    · rw [if_pos hip]; exact hwhome
-    · rw [if_neg hip] at hnz ⊢; exact hcov i hi hnz
+    · rw [ite_eq_left hip]; exact hwhome
+    · rw [ite_eq_right hip] at hnz ⊢; exact hcov i hi hnz
   · intro i j hi hj hnz heq
     rw [hslot i hi] at hnz
     rw [hslot i hi, hslot j hj] at heq
     by_cases hip : i = p <;> by_cases hjp : j = p
     · rw [hip, hjp]
     · exfalso
-      rw [if_pos hip, if_neg hjp] at heq
+      rw [ite_eq_left hip, ite_eq_right hjp] at heq
       by_cases hzj : (bmSlot bm j).toNat = 0
       · exact hwnz (by rw [← heq] at hzj; exact hzj)
       · exact hfresh j hj hzj (by rw [heq])
     · exfalso
-      rw [if_neg hip, if_pos hjp] at heq
-      rw [if_neg hip] at hnz
+      rw [ite_eq_right hip, ite_eq_left hjp] at heq
+      rw [ite_eq_right hip] at hnz
       exact hfresh i hi hnz (by rw [heq])
-    · rw [if_neg hip] at hnz
-      rw [if_neg hip, if_neg hjp] at heq
+    · rw [ite_eq_right hip] at hnz
+      rw [ite_eq_right hip, ite_eq_right hjp] at heq
       exact hinj i j hi hj hnz heq
 
 /-! # The two resources
@@ -621,7 +621,7 @@ theorem indBlkQ_run (γfs : FsNames) (dq : DFrac) (bm : Blkmap) (bi : Nat)
     fsblockQ (GF := GF) γfs.bytes dq bi (indBytes bm.bmEnt) ⊣⊢ indBlkQ γfs dq bm := by
   subst hbi
   unfold indBlkQ
-  rw [if_neg hnz]
+  rw [ite_eq_right hnz]
   exact (gammaBlkOwnedQ γfs dq bm.bmInd.toNat (indBytes bm.bmEnt)).symm
 
 /-- Rocq's `ind_blk_run`. -/
@@ -689,7 +689,7 @@ theorem blkResQ_run (γfs : FsNames) (dq : DFrac) (w : BitVec 32) (bs : List (Bi
     (hnz : w.toNat ≠ 0) :
     blkResQ (GF := GF) γfs dq w bs ⊣⊢ fsblockQ γfs.bytes dq w.toNat bs := by
   unfold blkResQ
-  rw [if_neg hnz]
+  rw [ite_eq_right hnz]
   exact gammaBlkOwnedQ γfs dq w.toNat bs
 
 /-- Rocq's `blk_res_run`. -/
@@ -802,7 +802,7 @@ theorem inodeBlocks_of_slots (γfs : FsNames) (bm : Blkmap) (V : ExtTreeSet Nat 
     exact hinj i j (List.mem_range.1 hi) (List.mem_range.1 hj) hnz heq
   · intro i _ hz
     unfold blkResQ
-    rw [if_pos hz]
+    rw [ite_eq_left hz]
   · intro i hi hnz
     have hi' : i < MAXFILE := List.mem_range.1 hi
     rw [BiEntails.to_eq (blkResQ_run γfs (DFrac.own 1) (blkmapGet bm i) (data i) hnz),
@@ -847,7 +847,7 @@ theorem inodeBlocks_of_blocks (γfs : FsNames) (bm : Blkmap) (U : ExtTreeSet Nat
     · iapply (inodeBlocks_of_slots γfs bm U ct data hinj2 hmem2 hdata)
       iexact H
     · unfold indRes indBlk indBlkQ
-      rw [if_pos hz]
+      rw [ite_eq_left hz]
       iempintro
   · have hind : bm.bmInd.toNat ∈ U := by
       rw [← bmSlot_top bm]
@@ -930,8 +930,8 @@ theorem inodeBlocksQ_acc (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
     obtain ⟨hyk, _⟩ := Xv6.rangeGetElem? hky
     subst hyk
     by_cases hki : y = i
-    · simp only [hki, if_pos]
-    · simp only [if_neg hki, dataUpd_ne data i y bs hki]
+    · simp only [hki, ite_eq_left]
+    · simp only [ite_eq_right hki, dataUpd_ne data i y bs hki]
   rw [BiEntails.to_eq (BigSepL.bigSepL_delete_cond
       (Φ := fun _ (k : Nat) => blkResQ γfs dq (blkmapGet bm k) (dataUpd data i bs k)) hlk),
     dataUpd_eq, BiEntails.to_eq (blkResQ_run γfs dq (blkmapGet bm i) bs hnz), hmono]
@@ -970,8 +970,8 @@ theorem inodeBlocksQ_insert (γfs : FsNames) (dq : DFrac) (bm bm' : Blkmap)
     obtain ⟨hyk, hk⟩ := Xv6.rangeGetElem? hky
     subst hyk
     by_cases hki : y = bn
-    · simp only [hki, if_pos]
-    · simp only [if_neg hki, hag y hk hki, dataUpd_ne data bn y bs hki]
+    · simp only [hki, ite_eq_left]
+    · simp only [ite_eq_right hki, hag y hk hki, dataUpd_ne data bn y bs hki]
   unfold inodeBlocksQ
   rw [BiEntails.to_eq (BigSepL.bigSepL_delete_cond
       (Φ := fun _ (k : Nat) => blkResQ γfs dq (blkmapGet bm k) (data k)) hlk),
@@ -982,7 +982,7 @@ theorem inodeBlocksQ_insert (γfs : FsNames) (dq : DFrac) (bm bm' : Blkmap)
   isplitl [Hfs]
   · by_cases hbz : b.toNat = 0
     · unfold blkResQ
-      rw [if_pos hbz]
+      rw [ite_eq_left hbz]
       iempintro
     · rw [BiEntails.to_eq (blkResQ_run γfs dq b bs hbz)]
       iexact Hfs

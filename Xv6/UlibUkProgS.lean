@@ -52,7 +52,7 @@ theorem ulibUkS_urun_bnd (m : RegMap) (pc : BitVec 64) (av : Nat) (dq : DFrac) (
   cases tx
   · exact ulibUk_urun_ubyteq_bnd N γ m pc av dq a b
   · unfold ulibUkSbq ulibUkRun urun
-    simp only [if_true]
+    simp only [ite_true]
     iintro ⟨⟨%h, ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
       %hRut, %hx0, Hheap, -⟩, -⟩, Hb⟩
     ihave %hb := uheap_text N.t N.d N.s M pm sz a b $$ Hheap Hb
@@ -71,7 +71,7 @@ theorem ulibUkS_wp_lbuq (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (i
   cases tx
   · exact ulibUk_wp_lbuq UL N γ m pc av rvc imm rs1 rd dq a b h0 h2 ha
   · unfold ulibUkSbq
-    simp only [if_true]
+    simp only [ite_true]
     iintro #Hi #Hb Hr Hk
     iapply ulibUk_wp_lbu_text UL N γ m pc av rvc imm rs1 rd a b h0 h2 ha $$ Hi Hb Hr
     iapply Hk $$ Hb

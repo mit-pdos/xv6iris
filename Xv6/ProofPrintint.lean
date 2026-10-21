@@ -443,15 +443,15 @@ theorem pi_body (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (buf dg base : B
   iapply HΦ $$ %_ Hk Hpc Hbuf Hdig
   ipureintro
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]; exact h11
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]; exact h11
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
   · intro r q10 q12 q13 q14 q15 q17
-    simp only [RegMap.set_apply, q10, q12, q13, q14, q15, q17, if_false]
+    simp only [RegMap.set_apply, q10, q12, q13, q14, q15, q17, ite_false]
 
 set_option maxHeartbeats 4000000 in
 theorem pi_digits (kb : KCtx) (hsie : kb.sie = false) (cpu : CPU) (buf dg base : BitVec 64)
@@ -481,7 +481,7 @@ theorem pi_digits (kb : KCtx) (hsie : kb.sie = false) (cpu : CPU) (buf dg base :
     -- bgeu a5,a1 : not taken (x < base)
     k_step (wp_s_branch cpu _ (KA.«printint» + 0x40#64) false 8162#13 15#5 11#5 (by decide) bop.BGEU)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [hb15, hb11, pi_bgeu_ite, if_neg hnb]
+      with [hb15, hb11, pi_bgeu_ite, ite_eq_right hnb]
     iintro Hk Hpc
     iapply HΦ $$ %R1 %(i + 1) Hk Hpc Hbuf Hdig
     ipureintro
@@ -497,7 +497,7 @@ theorem pi_digits (kb : KCtx) (hsie : kb.sie = false) (cpu : CPU) (buf dg base :
     · -- the back edge: one more digit
       k_step (wp_s_branch cpu _ (KA.«printint» + 0x40#64) false 8162#13 15#5 11#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [hb15, hb11, pi_bgeu_ite, if_pos hcmp]
+        with [hb15, hb11, pi_bgeu_ite, ite_eq_left hcmp]
       iintro Hk Hpc
       have hq : (x / base).toNat < 10 ^ f := by
         rw [BitVec.toNat_udiv]
@@ -512,7 +512,7 @@ theorem pi_digits (kb : KCtx) (hsie : kb.sie = false) (cpu : CPU) (buf dg base :
     · -- fall through: done
       k_step (wp_s_branch cpu _ (KA.«printint» + 0x40#64) false 8162#13 15#5 11#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [hb15, hb11, pi_bgeu_ite, if_neg hcmp]
+        with [hb15, hb11, pi_bgeu_ite, ite_eq_right hcmp]
       iintro Hk Hpc
       iapply HΦ $$ %R1 %(i + 1) Hk Hpc Hbuf Hdig
       ipureintro
@@ -562,13 +562,13 @@ theorem pi_bne_ne (b v : BitVec 64) (h : v ≠ 0xFFFFFFFFFFFFFFFF#64) :
 already folded the `-1` of `addi s1,s1,-1` into the offset.) -/
 theorem pi_bne_ite {α : Type} (b : BitVec 64) (m : Nat) (hm : m < 24) (p q : α) :
     (if bcond bop.BNE (b + BitVec.ofNat 64 m) (b + 0xFFFFFFFFFFFFFFFF#64) then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact pi_bne_ne b _ (pi_ofNat_ne_max m hm))]
+  rw [ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact pi_bne_ne b _ (pi_ofNat_ne_max m hm))]
 
 /-- At offset zero the cursor IS the sentinel (the literal `0#64` has
 already been folded into the address, so `pi_bne_ite` does not apply). -/
 theorem pi_bne_self_ite {α : Type} (v : BitVec 64) (p q : α) :
     (if bcond bop.BNE v v then p else q) = q := by
-  rw [if_neg (by simp [bcond])]
+  rw [ite_eq_right (by simp [bcond])]
 
 /-- `prputc`'s contract as a `jal` rule at the call site. -/
 theorem pi_prputc_call (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (kb : KCtx) (Rc : RegMap)
@@ -638,23 +638,23 @@ theorem pi_pbody (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (kb : KCtx) (hsie : kb.sie 
   iapply HΦ $$ %_ %cs Hk Hpc Hbuf Hsent
   ipureintro
   refine ⟨?_, ?_⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
   · obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_false] <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
       first
-        | exact c2.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c8.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c18.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c19.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c20.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c21.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c22.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c23.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c24.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c25.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c26.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
-        | exact c27.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false])
+        | exact c2.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c8.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c18.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c19.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c20.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c21.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c22.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c23.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c24.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c25.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c26.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
+        | exact c27.trans (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])
 
 set_option maxHeartbeats 4000000 in
 /-- The print loop from `+0x74` with the cursor at `buf + j`. -/
@@ -750,8 +750,8 @@ theorem pi_self_neg (v : BitVec 64) : v + -v = 0#64 := by bv_omega_g
 theorem pi_beq0_ite {α : Type} (v : BitVec 64) (p q : α) :
     (if bcond bop.BEQ v 0#64 then p else q) = if v = 0#64 then p else q := by
   by_cases h : v = 0#64
-  · rw [if_pos h, if_pos (by simp [bcond, h])]
-  · rw [if_neg h, if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  · rw [ite_eq_left h, ite_eq_left (by simp [bcond, h])]
+  · rw [ite_eq_right h, ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- `bltz` on a value. -/
 theorem pi_blt0_ite {α : Type} (v : BitVec 64) (p q : α) :
@@ -829,16 +829,16 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   case hul => k_norm; exact huart
   case hj => omega
   case h9 =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   case h18 =>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   iintro %R2 %cs Hk Hpc Hbuf Hsent %hpk
   obtain ⟨p2, p8, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpk
   have hR2' : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
     rw [p2]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     exact hR2
   -- +0x82 c.ldsp s1,40(sp) : the lazy restore
   k_step (wp_s_ld cpu _ (KA.«printint» + 0x82#64) true 40#12 9#5 2#5 (by decide) (by decide)
@@ -849,7 +849,7 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   -- the epilogue
   iapply (wp_pi_epilogue cpu k hsie (KA.«printint» + 0x84#64) (by omega)
     (R2.set 9#5 (k.regs 9#5))
-    (by simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR2')
+    (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2')
     (k.regs 1#5) (k.regs 8#5) (k.regs 18#5)) $$ [- $Hk $Hpc $Hfr $Hbuf]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) HT
@@ -861,18 +861,18 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   · ipureintro
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte] <;>
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte] <;>
       first
         | rfl
-        | (rw [p19]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e19)
-        | (rw [p20]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e20)
-        | (rw [p21]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e21)
-        | (rw [p22]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e22)
-        | (rw [p23]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e23)
-        | (rw [p24]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e24)
-        | (rw [p25]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e25)
-        | (rw [p26]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e26)
-        | (rw [p27]; simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact e27)
+        | (rw [p19]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e19)
+        | (rw [p20]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e20)
+        | (rw [p21]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e21)
+        | (rw [p22]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e22)
+        | (rw [p23]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e23)
+        | (rw [p24]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e24)
+        | (rw [p25]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e25)
+        | (rw [p26]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e26)
+        | (rw [p27]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact e27)
   · iexact Hsent
 
 /-- The `'-'` store's address: `a2 - 24` is `buf + i`. -/
@@ -906,13 +906,13 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
   have hset : ∀ r : BitVec 5, r ≠ 2#5 → r ≠ 8#5 →
       ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)).set 8#5 (k.regs 2#5)) r = k.regs r := by
     intro r h2 h8
-    simp only [RegMap.set_apply, h2, h8, if_false]
+    simp only [RegMap.set_apply, h2, h8, ite_false]
   have hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
     rw [hkeep 2#5 (by decide) (by decide)]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
   have hR8 : R 8#5 = k.regs 2#5 := by
     rw [hkeep 8#5 (by decide) (by decide)]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
   have hR11 : R 11#5 = k.regs 11#5 := by
     rw [hkeep 11#5 (by decide) (by decide)]; exact hset 11#5 (by decide) (by decide)
   have hbase' : R 11#5 = 10#64 ∨ R 11#5 = 16#64 := by rw [hR11]; exact hbase
@@ -947,19 +947,19 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
   rotate_right 1
   case hs => k_norm
   case d10 =>
-    try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   case d11 =>
-    try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   case d13 =>
-    try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   case d14 =>
-    try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   case d16 =>
-    try simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
     try bv_omega_g
   iintro %R1 %i' Hk Hpc Hbuf Hdig %⟨hi1, hi21, hd12, hd14, hd17, hdk⟩
   have h6' : R1 6#5 = R 6#5 := hdk 6#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
@@ -969,13 +969,13 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     (hdk 2#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)).trans hR2
   have h18' : R1 18#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64 := by
     rw [hdk 18#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
   have hsv : ∀ (r : BitVec 5), r ≠ 6#5 → r ≠ 10#5 → r ≠ 2#5 → r ≠ 8#5 → r ≠ 12#5 → r ≠ 13#5 →
       r ≠ 14#5 → r ≠ 15#5 → r ≠ 16#5 → r ≠ 17#5 → r ≠ 18#5 → R1 r = k.regs r := by
     intro r a6 a10 a2 a8 a12 a13 a14 a15 a16 a17 a18
     have e1 : R1 r = R r := by
       rw [hdk r a10 a12 a13 a14 a15 a17]
-      simp only [RegMap.set_apply, a18, a13, a14, a16, if_false]
+      simp only [RegMap.set_apply, a18, a13, a14, a16, ite_false]
     exact (e1.trans (hkeep r a6 a10)).trans (hset r a2 a8)
   rcases ht1 with hz | hz
   · -- the value was not negative: no minus sign, i' digits
@@ -1041,16 +1041,16 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     rotate_right 1
     iframe #
     case e2 =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]; exact h2'
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]; exact h2'
     case e14 =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]
       rw [show i' + 1 = (i' - 1) + 2 from by omega]
       bv_omega_g
     case e18 =>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, reduceIte]; exact h18'
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, reduceIte]; exact h18'
     case esv =>
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, if_false] <;>
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
         first
           | exact hsv 9#5 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
               (by decide) (by decide) (by decide) (by decide) (by decide)
@@ -1108,8 +1108,8 @@ theorem printint_proof (PP : PRPUTC) : PRINTINT :=
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (pi_setup PP cpu k hsie hK hnoff huart γl γd bs hbase _
-      (by intro r h6 h10; simp only [RegMap.set_apply, h6, if_false])
-      (Or.inl (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true])))
+      (by intro r h6 h10; simp only [RegMap.set_apply, h6, ite_false])
+      (Or.inl (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])))
       $$ [- $Hk $Hpc $Hfr $Hbuf $Hdig $Hsent]
     iframe #
     iexact HΦ
@@ -1117,11 +1117,11 @@ theorem printint_proof (PP : PRPUTC) : PRINTINT :=
     · -- `sign` is set and the value is negative: negate it, remember the minus
       -- +0x0a c.beqz a2,+0x10 : not taken
       k_step (wp_s_branch cpu _ (KA.«printint» + 0xa#64) true 6#13 12#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_beq0_ite, if_neg h12]
+        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_beq0_ite, ite_eq_right h12]
       iintro Hk Hpc
       -- +0x0c bltz a0,+0x8e : taken
       k_step (wp_s_branch cpu _ (KA.«printint» + 0xc#64) false 130#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_blt0_ite, if_pos hneg]
+        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_blt0_ite, ite_eq_left hneg]
       iintro Hk Hpc
       -- +0x8e neg a0,a0
       k_step (wp_s_sub cpu _ (KA.«printint» + 0x8e#64) false 10#5 0#5 10#5 (by decide))
@@ -1136,27 +1136,27 @@ theorem printint_proof (PP : PRPUTC) : PRINTINT :=
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       iintro Hk Hpc
       iapply (pi_setup PP cpu k hsie hK hnoff huart γl γd bs hbase _
-        (by intro r h6 h10; simp only [RegMap.set_apply, h6, h10, if_false])
-        (Or.inr (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true])))
+        (by intro r h6 h10; simp only [RegMap.set_apply, h6, h10, ite_false])
+        (Or.inr (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])))
         $$ [- $Hk $Hpc $Hfr $Hbuf $Hdig $Hsent]
       iframe #
       iexact HΦ
     · -- `sign` is set but the value is not negative
       -- +0x0a c.beqz a2,+0x10 : not taken
       k_step (wp_s_branch cpu _ (KA.«printint» + 0xa#64) true 6#13 12#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_beq0_ite, if_neg h12]
+        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_beq0_ite, ite_eq_right h12]
       iintro Hk Hpc
       -- +0x0c bltz a0,+0x8e : not taken
       k_step (wp_s_branch cpu _ (KA.«printint» + 0xc#64) false 130#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_blt0_ite, if_neg hneg]
+        from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [pi_blt0_ite, ite_eq_right hneg]
       iintro Hk Hpc
       -- +0x10 c.li t1,0
       k_step (wp_s_addi cpu _ (KA.«printint» + 0x10#64) true 0#12 6#5 0#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
       iintro Hk Hpc
       iapply (pi_setup PP cpu k hsie hK hnoff huart γl γd bs hbase _
-        (by intro r h6 h10; simp only [RegMap.set_apply, h6, if_false])
-        (Or.inl (by simp only [RegMap.set_apply, BitVec.reduceEq, if_true])))
+        (by intro r h6 h10; simp only [RegMap.set_apply, h6, ite_false])
+        (Or.inl (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true])))
         $$ [- $Hk $Hpc $Hfr $Hbuf $Hdig $Hsent]
       iframe #
       iexact HΦ⟩

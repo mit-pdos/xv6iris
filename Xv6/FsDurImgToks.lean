@@ -135,8 +135,8 @@ theorem toksOfList_lookup_zero (fv : Nat → Ity) (L : List Nat) (z : Nat)
   | cons t L ih =>
     rw [fsTickCount_cons] at h
     have hne : t ≠ z := by
-      intro e; rw [if_pos e] at h; cases h
-    rw [if_neg hne] at h
+      intro e; rw [ite_eq_left e] at h; cases h
+    rw [ite_eq_right hne] at h
     rw [toksOfList_cons, Heap.get?_op, ih h]
     unfold linkTokElem linkToksElem
     rw [LawfulPartialMap.get?_singleton_ne (by omega)]
@@ -167,7 +167,7 @@ theorem toksOfList_lookup_pos (fv : Nat → Ity) (L : List Nat) (z : Nat)
     unfold linkTokElem linkToksElem
     by_cases htz : t = z
     · subst htz
-      rw [if_pos rfl, LawfulPartialMap.get?_singleton_eq rfl]
+      rw [ite_eq_left rfl, LawfulPartialMap.get?_singleton_eq rfl]
       by_cases h0 : fsTickCount L t = 0
       · rw [toksOfList_lookup_zero fv L t h0, h0]
         rfl
@@ -176,7 +176,7 @@ theorem toksOfList_lookup_pos (fv : Nat → Ity) (L : List Nat) (z : Nat)
           ◯ (LeibnizMultiSet.ofSet (linkReps (fsTickCount L t) (fv t)))) = _
         rw [← Auth.frag_op]
         rfl
-    · rw [if_neg htz] at h ⊢
+    · rw [ite_eq_right htz] at h ⊢
       rw [LawfulPartialMap.get?_singleton_ne (by omega), ih h]
       rfl
 

@@ -21,8 +21,11 @@ def satpOf : KTier → BitVec 44 → BitVec 64
 /-- The facts every S-mode instruction may assume of `mstatus`, all
 established by `start` and never touched by later code (the prototype's
 `sconf_ms_facts`): SIE at the arm's index, `MPRV = 0`, `SXL = 2`, `MXR = 0`,
-`TSR = 0`, `TVM = 0`, the extension-status fields `Off`, `SD = 0`, and a
-nominal `MPP`. -/
+`TSR = 0`, `TVM = 0`, the extension-status fields `Off`, `SD = 0`, a
+nominal `MPP`, and (sail-riscv 0.16, whose `mstatus` legalisation clears them
+on every write: `Ssdbltrp`, `H`, `Smdbltrp` absent) `SDT = 0` (bit 24),
+`GVA = 0` (bit 38), `MPV = 0` (bit 39) and `MDT = 0` (bit 42); and, last,
+`TW = 0` (bit 21). -/
 def smFacts (ms : BitVec 64) (sie : Bool) : Prop :=
   BitVec.extractLsb' 1 1 ms = (if sie then 1#1 else 0#1) ∧
   BitVec.extractLsb' 17 1 ms = 0#1 ∧
@@ -34,7 +37,14 @@ def smFacts (ms : BitVec 64) (sie : Bool) : Prop :=
   BitVec.extractLsb' 15 2 ms = 0#2 ∧
   BitVec.extractLsb' 9 2 ms = 0#2 ∧
   BitVec.extractLsb' 63 1 ms = 0#1 ∧
-  BitVec.extractLsb' 11 2 ms ≠ 2#2
+  BitVec.extractLsb' 11 2 ms ≠ 2#2 ∧
+  BitVec.extractLsb' 24 1 ms = 0#1 ∧
+  BitVec.extractLsb' 38 1 ms = 0#1 ∧
+  BitVec.extractLsb' 39 1 ms = 0#1 ∧
+  BitVec.extractLsb' 42 1 ms = 0#1 ∧
+  -- TW = 0: 0.16's forced WFI exit traps under TW; the board line sets mstatus = 0xA00000000,
+  -- `reset_sys` leaves TW, and S-mode cannot write it
+  BitVec.extractLsb' 21 1 ms = 0#1
 
 /-- **The cells `start()` does not fully determine** (BootReset phase 3): the
 values the S-mode configuration holds that are LEFTOVERS of the power-on

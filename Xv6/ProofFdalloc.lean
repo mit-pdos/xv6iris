@@ -59,12 +59,12 @@ theorem fdFreesFrom_eq_cons : ∀ (fs : List (BitVec 64)) (i fd : Nat),
     | zero =>
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hfd
       subst hfd
-      exact ⟨fdFreesFrom (i + 1) t, by simp only [fdFreesFrom, Nat.add_zero, if_true]⟩
+      exact ⟨fdFreesFrom (i + 1) t, by simp only [fdFreesFrom, Nat.add_zero, ite_true]⟩
     | succ m =>
       have ha : a ≠ 0#64 := by
         intro he
         exact hbel 0 (by omega) (by simp [he])
-      simp only [fdFreesFrom, if_neg ha]
+      simp only [fdFreesFrom, ite_eq_right ha]
       obtain ⟨l, hl⟩ := ih (i + 1) m (fun j hj => by
         have := hbel (j + 1) (by omega); simpa using this) (by simpa using hfd)
       exact ⟨l, by rw [hl]; congr 1; omega⟩
@@ -86,7 +86,7 @@ theorem fdFreesFrom_eq_nil : ∀ (fs : List (BitVec 64)) (i : Nat),
     have ha : a ≠ 0#64 := by
       intro he
       exact hbel 0 (by simp) (by simp [he])
-    simp only [fdFreesFrom, if_neg ha]
+    simp only [fdFreesFrom, ite_eq_right ha]
     exact ih (i + 1) (fun j hj => by
       have := hbel (j + 1) (by simp only [List.length_cons]; omega); simpa using this)
 

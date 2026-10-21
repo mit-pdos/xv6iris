@@ -154,7 +154,9 @@ def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb)
     (hX : X.curTier = KTier.bare) (hcpu : cpu ≠ startedPrimary) (hK : mainSecondarySlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64) :
+    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64)
+    -- the TLB holds supervisor-stage entries only (sail-riscv 0.16's `sfence.vma`): the reset TLB
+    (htlb : tlbStageS tlb0) :
     Prop :=
   kctxL (X := X) false cpu k ∗ pcIs cpu mainAddr ∗ cpuCtxFree cpu ∗
   startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ∗
@@ -169,8 +171,8 @@ structure MAIN_SECONDARY : Prop where
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc,
+    (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc htlb,
     wp_main_secondary_body (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
-      cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc
+      cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc htlb
 
 end Xv6

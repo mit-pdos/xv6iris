@@ -89,7 +89,7 @@ theorem mp_addr_id (va pa c : BitVec 64) : va + c + (pa - va) = pa + c := by
 /-- A branch on a value known to be zero / nonzero. -/
 theorem mp_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- The loop test `beq s1,s2`: taken exactly on the last page. -/
 theorem mp_beq_last {α : Type} (va : BitVec 64) (n i : Nat) (hi : i < n)
@@ -103,13 +103,13 @@ theorem mp_beq_last {α : Type} (va : BitVec 64) (n i : Nat) (hi : i < n)
   by_cases he : i + 1 = n
   · have hb : va + BitVec.ofNat 64 (4096 * i) = va + BitVec.ofNat 64 (4096 * (n-1)) := by
       rw [show i = n - 1 from by omega]
-    rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact hb)]
+    rw [ite_eq_left he, ite_eq_left (by simp only [bcond, beq_iff_eq]; exact hb)]
   · have hb : va + BitVec.ofNat 64 (4096 * i) ≠ va + BitVec.ofNat 64 (4096 * (n-1)) := by
       intro hc
       have hcc := congrArg BitVec.toNat hc
       rw [h1, h2] at hcc
       omega
-    rw [if_neg he, if_neg (by simp only [bcond, beq_iff_eq]; exact hb)]
+    rw [ite_eq_right he, ite_eq_right (by simp only [bcond, beq_iff_eq]; exact hb)]
 
 /-- The page-aligned size of the run is not zero, and is aligned. -/
 theorem mp_size_ne_zero (n : Nat) (h1 : 1 ≤ n) (h2 : 4096 * n ≤ 2 ^ 38) :
@@ -509,7 +509,7 @@ theorem mappages_loop [WchG GF] (W : WALK) [CurCtx]
     rw [hni]
     rcases hrest with ⟨hpc, hlen, hcomp⟩ | ⟨hpc, hm1, hzz, hnc⟩
     · subst hpc
-      rw [if_pos hlast]
+      rw [ite_eq_left hlast]
       have hmf2 : (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
           (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).2.1 = [] := by
         rw [PtRun.mapRun_one t _ _ perm fresh hlen hcomp]
@@ -578,7 +578,7 @@ theorem mappages_loop [WchG GF] (W : WALK) [CurCtx]
         Or.inr ⟨rfl, hm1, hzz, by rw [hmn3]; omega⟩⟩
     case inl =>
       subst hpc
-      rw [if_neg hlast]
+      rw [ite_eq_right hlast]
       have hmo1 : (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
           (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).1
             = (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1.setLeaf 2

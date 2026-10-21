@@ -241,8 +241,8 @@ theorem urc_frame_rut (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp G
     userTrapFrameAtm cpu C pt Rut sz M ms sc tv sep g ⊢
       userTrapFrameAtm cpu C pt (fun _ => iprop(emp)) sz M ms sc tv sep g ∗ Rut pt := by
   unfold userTrapFrameAtm
-  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hpt, Hcfg, Hrut, Hrc⟩
-  iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hck Hg Hpt Hcfg Hrut
+  iintro ⟨%Hok, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hh, Hg, Hpt, Hcfg, Hrut, Hrc⟩
+  iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hck Hh Hg Hpt Hcfg Hrut
   isplitl []
   · ipureintro; exact Hok
   isplitl []

@@ -271,7 +271,7 @@ theorem lmCont_pair_det (L : LmLaws M) (ps ps' : List Nat) (s s' : M.lmSt) (l : 
       · have h1 : M.lmCont s' l a' <+: lmContAll M ps' s' l a' := List.prefix_append _ _
         exact h1.trans ((List.prefix_append _ X').trans hp)
       · rw [lmContAll, L.lmlTermNopanic a hf]
-        simp only [Bool.false_eq_true, if_false, List.append_nil]
+        simp only [Bool.false_eq_true, ite_false, List.append_nil]
         exact L.lmlTermMerge s l a hs ha hf
   cases hpa : M.lmPanic a with
   | true =>
@@ -637,7 +637,7 @@ theorem lmSess_prefix_det (L : LmLaws M) (ps ps' cs cs' : List Nat) (s s' : M.lm
     intro hne
     apply hpin
     unfold nstarted
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     omega
   have hline : ∀ i, i < nlines I → M.lmLineOk (M.lmOf ((bodiesOf I)[i]!)) :=
     fun i hi => L.lmlBodyLine _ (lmDiscInput_at M I i hd hi)

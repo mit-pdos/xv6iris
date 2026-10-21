@@ -292,9 +292,9 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     DFrac.discard DFrac.discard hj hproc hK hnoff htier hcost hgo.fgoLog (hgo.iblockCov inum hnib)
     (hgo.iblockOut inum hnib) hnib hda hnz (diTypeStable_refl dn) (diNlinkStable_refl dn hnz) hwf
     hhz hcovs hsum hsz hgo.fgoBitmap (List.length_replicate) hpd ha0
-    (by simp only [if_true]; rw [ha1]; decide) ha3 ha4
+    (by simp only [ite_true]; rw [ha1]; decide) ha3 ha4
   unfold wp_writei_gen_eb_body at h
-  simp only [writeiAddr, if_true] at h
+  simp only [writeiAddr, ite_true] at h
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P Mv).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hkl Hav Hdev Hin Hmeta Hmap Hblk Hsi Hss Hsb Hbmi

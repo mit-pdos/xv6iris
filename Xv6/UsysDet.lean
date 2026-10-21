@@ -402,20 +402,20 @@ theorem uwaitWin_eq {perm : Nat → Option UPerm} {a0 : BitVec 64} {d : Nat} (h0
     (hd : d ≤ 4) (hpre : ∀ i, i < d → πWritable perm (a0 + BitVec.ofNat 64 i).toNat)
     (hstop : d < 4 → ¬ πWritable perm (a0 + BitVec.ofNat 64 d).toNat) : uwaitWin perm a0 = d := by
   unfold uwaitWin
-  rw [if_neg h0]
+  rw [ite_eq_right h0]
   have w : ∀ i, i < d → ¬ ¬ πWritable perm (a0 + BitVec.ofNat 64 i).toNat :=
     fun i hi h => h (hpre i hi)
   rcases (show d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 ∨ d = 4 by omega) with rfl | rfl | rfl | rfl | rfl
-  · rw [if_pos (hstop (by decide))]
-  · rw [if_neg (w 0 (by decide)), if_pos (hstop (by decide))]
-  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_pos (hstop (by decide))]
-  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_neg (w 2 (by decide)),
-      if_pos (hstop (by decide))]
-  · rw [if_neg (w 0 (by decide)), if_neg (w 1 (by decide)), if_neg (w 2 (by decide)),
-      if_neg (w 3 (by decide))]
+  · rw [ite_eq_left (hstop (by decide))]
+  · rw [ite_eq_right (w 0 (by decide)), ite_eq_left (hstop (by decide))]
+  · rw [ite_eq_right (w 0 (by decide)), ite_eq_right (w 1 (by decide)), ite_eq_left (hstop (by decide))]
+  · rw [ite_eq_right (w 0 (by decide)), ite_eq_right (w 1 (by decide)), ite_eq_right (w 2 (by decide)),
+      ite_eq_left (hstop (by decide))]
+  · rw [ite_eq_right (w 0 (by decide)), ite_eq_right (w 1 (by decide)), ite_eq_right (w 2 (by decide)),
+      ite_eq_right (w 3 (by decide))]
 
 theorem uwaitWin_null (perm : Nat → Option UPerm) : uwaitWin perm 0#64 = 4 := by
-  unfold uwaitWin; rw [if_pos rfl]
+  unfold uwaitWin; rw [ite_eq_left rfl]
 
 /-- **wait's answer at a cited prefix and a window** (M2-X; NI M2-G1e,
 ruling G1e-R2): the family ledger's lowest zombie child of the cited actor,
@@ -514,8 +514,8 @@ theorem usysCntW_lt (a2 : BitVec 64) : usysCntW a2 < 2 ^ 31 := by
 theorem uwriteCntOf_ansAt (a2 : BitVec 64) (d : Nat) : uwriteCntOf (usysWriteAnsAt a2 d) = usysWriteCnt a2 d := by
   unfold uwriteCntOf usysWriteAnsAt usysWriteCnt
   by_cases h : usysCntW a2 < 0
-  · simp only [h, if_true]
-  · simp only [h, if_false]
+  · simp only [h, ite_true]
+  · simp only [h, ite_false]
     have hc := consCnt_le (usysCntW a2).toNat d
     have hw := usysCntW_lt a2
     have hlt : consCnt (usysCntW a2).toNat d < 2 ^ 31 := by omega
@@ -524,7 +524,7 @@ theorem uwriteCntOf_ansAt (a2 : BitVec 64) (d : Nat) : uwriteCntOf (usysWriteAns
       have := congrArg BitVec.toNat he
       rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)] at this
       simp at this; omega
-    rw [if_neg hne, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
+    rw [ite_eq_right hne, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
 
 /-- The first index of a range a predicate holds at, read as a cut: it is at
 most the range's length, the predicate fails below it, and holds at it when
@@ -589,12 +589,12 @@ theorem consCnt_of_rd {π : Nat → Option UPerm} {ua : BitVec 64} {n i : Nat}
       · exact hge
     have hDn : D < n := by omega
     have := hiD hDn
-    rw [if_pos hDn]
+    rw [ite_eq_left hDn]
     omega
   · have hin' : i = n := by omega
     subst hin'
     have hDn : ¬ D < i := fun h => by have := hiD h; omega
-    rw [if_neg hDn]
+    rw [ite_eq_right hDn]
 
 /-! ### sbrk's readings (NI M2-G3)
 
@@ -753,44 +753,44 @@ def usysDet (n : Int) (W : Uvis) (ι : UIota) : Uvis :=
 theorem usysDet_quiet {n : Int} (W : Uvis) (ι : UIota) (h : usysDetQuiet n) :
     usysDet n W ι = bump W (usysDetRet n W ι) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.lazy W.secc := by
   unfold usysDet
-  rw [if_neg (usysDetQuiet_wait h), if_neg (usysDetQuiet_fork h), if_neg (usysDetQuiet_sbrk h), if_pos h]
+  rw [ite_eq_right (usysDetQuiet_wait h), ite_eq_right (usysDetQuiet_fork h), ite_eq_right (usysDetQuiet_sbrk h), ite_eq_left h]
 
 theorem usysDet_wait (W : Uvis) (ι : UIota) : usysDet USYS_wait W ι = usysDetWait W ι := by
-  unfold usysDet; rw [if_pos rfl]
+  unfold usysDet; rw [ite_eq_left rfl]
 
 theorem usysDet_fork (W : Uvis) (ι : UIota) : usysDet USYS_fork W ι = usysDetFork W ι := by
-  unfold usysDet; rw [if_neg (by decide), if_pos rfl]
+  unfold usysDet; rw [ite_eq_right (by decide), ite_eq_left rfl]
 
 theorem usysDet_sbrk (W : Uvis) (ι : UIota) : usysDet USYS_sbrk W ι = usysDetSbrk W ι := by
-  unfold usysDet; rw [if_neg (by decide), if_neg (by decide), if_pos rfl]
+  unfold usysDet; rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl]
 
 theorem usysDetRet_getpid (W : Uvis) (ι : UIota) :
     usysDetRet USYS_getpid W ι = BitVec.signExtend 64 W.pid := by
   unfold usysDetRet
-  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-    if_neg (by decide)]
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+    ite_eq_right (by decide)]
 
 /-- (NI M3 no-kill K1) pause's answer is `0`: its only `-1` is the kill,
 which never resumes (`UexecRet.uexecLiveOk`'s pause clause). -/
 theorem usysDetRet_pause (W : Uvis) (ι : UIota) : usysDetRet USYS_pause W ι = 0#64 := by
   unfold usysDetRet
-  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-    if_pos rfl]
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+    ite_eq_left rfl]
 
 theorem usysDetRet_uptime (W : Uvis) (ι : UIota) :
     usysDetRet USYS_uptime W ι = usysUptimeWord ι.ticks := by
-  unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
+  unfold usysDetRet; rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl]
 
 theorem usysDetRet_write (W : Uvis) (ι : UIota) :
     usysDetRet USYS_write W ι = usysWriteAns W.perm (tfW W.tf (tfArgIdx 1)) (tfW W.tf (tfArgIdx 2)) := by
-  unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl]
+  unfold usysDetRet; rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl]
 
 theorem usysDetRet_fork (W : Uvis) (ι : UIota) : usysDetRet USYS_fork W ι = usysForkAns ι := by
-  unfold usysDetRet; rw [if_neg (by decide), if_pos rfl]
+  unfold usysDetRet; rw [ite_eq_right (by decide), ite_eq_left rfl]
 
 theorem usysDetRet_sbrk (W : Uvis) (ι : UIota) :
     usysDetRet USYS_sbrk W ι = usysSbrkAns W.sz (tfW W.tf (tfArgIdx 0)) (tfW W.tf (tfArgIdx 1)) ι := by
-  unfold usysDetRet; rw [if_neg (by decide), if_neg (by decide), if_pos rfl]
+  unfold usysDetRet; rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl]
 
 /-- **wait's fit, at the key's readings** (NI G1d; NI M2-G1e): the answer
 `r`, the children set `cs'` and the image `M'` are the ones the family
@@ -922,19 +922,19 @@ theorem usysSbrk_ret_lazy (tf : List (BitVec 64)) (sz : Nat) (lz : Bool) (ι : U
   have heag : usysSbrkEager tf ↔ sbrkEagerW (tfW tf (tfArgIdx 1)) := Iff.rfl
   unfold usysSbrkAns usysSbrkSz usysSbrkLz
   by_cases hf : usysSbrkFails sz (tfW tf (tfArgIdx 0)) (tfW tf (tfArgIdx 1)) ι
-  · simp only [hf, if_true, not_true_eq_false, false_and, if_false]
+  · simp only [hf, ite_true, not_true_eq_false, false_and, ite_false]
     exact ⟨Or.inl ⟨rfl, rfl⟩, fun _ => id⟩
-  · simp only [hf, if_false, not_false_eq_true, true_and]
+  · simp only [hf, ite_false, not_false_eq_true, true_and]
     refine ⟨Or.inr ⟨rfl, fun hn => ?_⟩, fun hc => ?_⟩
     · rw [harg] at hn ⊢
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
       omega
     · split
       · rename_i h
         exfalso
         rcases hc with hc | hc
         · exact h.1 (heag.mp hc)
-        · rw [if_pos (by omega)] at hc
+        · rw [ite_eq_left (by omega)] at hc
           omega
       · exact id
 
@@ -955,16 +955,16 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
   · rw [usysDet_quiet W ι hq]
     obtain ⟨h7, h12, h3, h4, h5, h8, hf, -⟩ := usysDetQuiet_ne hq
     unfold usysMemOk
-    rw [if_neg h7, if_neg h12, if_neg h3, if_neg h4, if_neg h5, if_neg h8, if_neg hf]
+    rw [ite_eq_right h7, ite_eq_right h12, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5, ite_eq_right h8, ite_eq_right hf]
     rcases hq with rfl | rfl | rfl | rfl
-    · rw [if_neg (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
-    · rw [if_pos rfl, usysDetRet_uptime]; exact ⟨⟨ι.ticks, rfl⟩, rfl, rfl, rfl, rfl⟩
-    · rw [if_neg (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
-    · rw [if_neg (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
+    · rw [ite_eq_right (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
+    · rw [ite_eq_left rfl, usysDetRet_uptime]; exact ⟨⟨ι.ticks, rfl⟩, rfl, rfl, rfl, rfl⟩
+    · rw [ite_eq_right (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
+    · rw [ite_eq_right (by decide)]; exact ⟨rfl, rfl, rfl, rfl⟩
   · have hw := hwr rfl
     rw [usysDet_wait]
     unfold usysMemOk
-    rw [if_neg (by decide), if_neg (by decide), if_pos rfl]
+    rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl]
     unfold usysDetWait
     cases hr : ι.reap with
     | none =>
@@ -973,12 +973,12 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
       obtain ⟨_, pid, xs, γ⟩ := v
       dsimp only
       by_cases hwin : uwaitWin W.perm (tfW W.tf (tfArgIdx 0)) = 4
-      · rw [if_pos hwin]
+      · rw [ite_eq_left hwin]
         refine ⟨⟨usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs, usysWaitBytes_length _ _, fun h0 => ?_, rfl⟩,
           rfl, rfl, rfl, hw⟩
         rw [show tfW W.tf (tfArgIdx 0) = 0#64 from BitVec.eq_of_toNat_eq (by simpa using h0)]
         exact usysWaitBytes_null xs
-      · rw [if_neg hwin]
+      · rw [ite_eq_right hwin]
         refine ⟨⟨(usysWaitBytes (tfW W.tf (tfArgIdx 0)) xs).take (uwaitWin W.perm (tfW W.tf (tfArgIdx 0))),
           le_trans (List.length_take_le' _ _) (usysWaitBytes_length _ _), fun h0 => ?_, rfl⟩,
           rfl, rfl, rfl, hw⟩
@@ -987,13 +987,13 @@ theorem usysDet_mem {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
   · have hf := hfr rfl
     rw [usysDet_fork]
     unfold usysMemOk
-    rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-      if_neg (by decide), if_pos rfl]
+    rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+      ite_eq_right (by decide), ite_eq_left rfl]
     exact ⟨hf, rfl, rfl, rfl, rfl⟩
   · -- (NI M2-G3) sbrk: the image and view ARE the landed row's equations
     rw [usysDet_sbrk, usysDetRet_sbrk]
     unfold usysMemOk
-    rw [if_neg (by decide), if_pos rfl]
+    rw [ite_eq_right (by decide), ite_eq_left rfl]
     obtain ⟨hr, hl⟩ := usysSbrk_ret_lazy W.tf W.sz W.lazy ι
     exact ⟨(usysSbrkImg_iff _ _ _ _).mpr rfl, (usysSbrkPerm_iff _ _ _ _).mpr rfl, hr, hl⟩
 
@@ -1043,7 +1043,7 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) :
   · intro hw; subst hw
     rw [usysDet_wait]
     unfold usysWaitFits usysWaitFitsAt usysDetWait usysDetRet usysWaitAns
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     cases ι.reap with
     | none => exact ⟨rfl, rfl, rfl⟩
     | some v =>
@@ -1099,14 +1099,14 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
   · have hlz := usysMemOk_lazy (by decide) hm
     have hpw : π' = W.perm ∧ szv' = W.sz := by
       unfold usysMemOk at hm
-      rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at hm
+      rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at hm
       exact ⟨hm.2.1, hm.2.2.1⟩
     obtain ⟨hp, hsz⟩ := hpw
     have hf := hfit.2.1 rfl
     rw [usysDet_wait]
     unfold usysWaitFits usysWaitFitsAt at hf
     unfold usysDetWait usysDetRet usysWaitAns
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     subst hp hsz hlz hfd' hc' hs' hg'
     revert hf
     cases ι.reap with
@@ -1123,8 +1123,8 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
   · have hlz := usysMemOk_lazy (by decide) hm
     have hpw : M' = W.M ∧ π' = W.perm ∧ szv' = W.sz := by
       unfold usysMemOk at hm
-      rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-        if_neg (by decide), if_pos rfl] at hm
+      rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+        ite_eq_right (by decide), ite_eq_left rfl] at hm
       exact ⟨hm.2.1, hm.2.2.1, hm.2.2.2.1⟩
     obtain ⟨hM, hp, hsz⟩ := hpw
     obtain ⟨hr, hcc⟩ := hfit.2.2.1 rfl
@@ -1135,7 +1135,7 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     -- the fitted break, the answer, break and lazy bit off the fit
     have hpw : M' = usysSbrkImgF W.M W.sz szv' ∧ π' = usysSbrkPermF W.perm W.sz szv' := by
       unfold usysMemOk at hm
-      rw [if_neg (by decide), if_pos rfl] at hm
+      rw [ite_eq_right (by decide), ite_eq_left rfl] at hm
       exact ⟨(usysSbrkImg_iff _ _ _ _).mp hm.1, (usysSbrkPerm_iff _ _ _ _).mp hm.2.1⟩
     obtain ⟨hM, hp⟩ := hpw
     obtain ⟨hr, hsz, hlz⟩ := hfit.2.2.2.1 rfl

@@ -358,7 +358,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
       show ¬ FD_DEVICE = FD_INODE; decide
     ihave Hoff : sysOpenOffCell (GF := GF) kf (sysOpenAllocDev Cf dn) γil $$ [Hoff]
     · unfold sysOpenOffCell
-      rw [if_neg hnI]
+      rw [ite_eq_right hnI]
       iexact Hoff
     iapply hSt $$ %cpu %spie %spp %_ %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum %dn %bm
       %data %kf %fd %l %(sysOpenAllocDev Cf dn) %pn %γil %P2 %u %nsj
@@ -395,7 +395,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     have hI : (sysOpenAllocInode Cf).type = FD_INODE := rfl
     ihave Hoff : sysOpenOffCell (GF := GF) kf (sysOpenAllocInode Cf) γo $$ [Hw Hgv]
     · unfold sysOpenOffCell
-      rw [if_pos hI]
+      rw [ite_eq_left hI]
       iexists 0#32
       rw [wordAtN_cur]
       iframe Hw Hgv

@@ -270,7 +270,7 @@ instance runitPlain_timeless [Icfg] (z : Nat) : Timeless (runitPlain (GF := GF) 
 instance runitClaim_timeless [Icfg] (z : Nat) : Timeless (runitClaim (GF := GF) z) := by
   unfold runitClaim; infer_instance
 instance runit_timeless [Icfg] (b : Bool) (z : Nat) : Timeless (runit (GF := GF) b z) := by
-  unfold runit; cases b <;> simp only [Bool.false_eq_true, if_false, if_true] <;> infer_instance
+  unfold runit; cases b <;> simp only [Bool.false_eq_true, ite_false, ite_true] <;> infer_instance
 instance runitAny_timeless [Icfg] (z : Nat) : Timeless (runitAny (GF := GF) z) := by
   unfold runitAny; infer_instance
 instance ifreeze_timeless [Icfg] (ph : Frz) (z : Nat) : Timeless (ifreeze (GF := GF) ph z) := by

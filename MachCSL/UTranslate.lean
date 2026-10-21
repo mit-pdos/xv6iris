@@ -46,14 +46,23 @@ lane U2-M2's.
 
 Everything here is stated over a `UFoot` and `UWSt.file`, never over the
 register rules, so the D52 `hwConfig` refactor does not touch it.
+
+**sail-riscv 0.16.**  `translateAddr` takes the effective privilege as an
+argument (its caller computes it with `default_access_info`; here `User`), so
+the front no longer consults `mstatus.MPRV` (the pin stays in `utrMsOk` for the
+callers); it reads `misa` (`satp_mode`: `currentlyEnabled Ext_S`) and
+`senvcfg`/`menvcfg` (the Svukte check, nothing qualified at `senvcfg.UKTE = 0`),
+pinned in `UtrPins`; the walk is the S stage's `translate` (VMID `0`), and a
+fault is reported as an `ExceptionContext` (`utrCtx`).
 -/
 import MachCSL.URunRW
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -61,11 +70,10 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- A register read inside the footprint answers the file's value. -/
 theorem utr_readReg (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (h : D.Dr r = true) :
-    runRW D orc s (readReg r) = some (s.file r, s, orc) := by
-  show runRW D orc s (FreeM.impure (.ok (.regRead r)) FreeM.pure) = _
-  rw [runRW_regRead_dr D orc s r _ h]; rfl
+    runRW D orc s (readReg r) = some (s.file r, s, orc) :=
+  (runRW_regRead_dr D orc s r (a := none) (FreeM.pure : RegisterType r → SailM (RegisterType r)) h).trans rfl
 
-theorem utr_assert_true (msg : String) : (PreSail.assert true msg : SailM Unit) = pure () := rfl
+theorem utr_assert_true (msg : String) : (sail_assert true msg : SailM Unit) = pure () := rfl
 
 /-! ## §1 Access hygiene (Rocq `UserFaultCert` §1) -/
 
@@ -99,23 +107,34 @@ def utrTexc (acc : MemoryAccessType mem_payload) : PTW_Error → ExceptionType
 /-- Rocq `u_ssa_ret`. -/
 theorem utr_ssa (acc : MemoryAccessType mem_payload) (h : utrAcc acc = true) :
     is_shadow_stack_access acc = (pure false : SailM Bool) := by
-  rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at h <;> rfl
 
 /-- Rocq `u_texc_goodb`: the translation fault is a pure value. -/
 theorem utr_texc (acc : MemoryAccessType mem_payload) (h : utrAcc acc = true) (f : PTW_Error) :
     translationException acc f = (pure (utrTexc acc f) : SailM ExceptionType) := by
-  rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at h <;> cases f <;> rfl
 
 /-! ## §2 The pins -/
 
 theorem utr_sxl (ms : BitVec 64) : _get_Mstatus_SXL ms = BitVec.extractLsb' 34 2 ms := rfl
+theorem utr_misaS (v : BitVec 64) : _get_Misa_S v = BitVec.extractLsb' 18 1 v := rfl
 theorem utr_satpMode (x : BitVec 64) : _get_Satp64_Mode (Mk_Satp64 x) = BitVec.extractLsb' 60 4 x := rfl
 theorem utr_arch2 : architecture_bits_backwards 2#2 = pure Architecture.RV64 := rfl
-theorem utr_sv39 : satpMode_of_bits Architecture.RV64 8#4 = some SATPMode.Sv39 := rfl
+theorem utr_sv39 : satpMode_of_bits Architecture.RV64 8#4 = (pure (some SATPMode.Sv39) : SailM _) := rfl
 theorem utr_width39 : satp_mode_width_forwards SATPMode.Sv39 = (pure 39 : SailM Int) := rfl
-theorem utr_get_satp39 : get_satp 39 = readReg Register.satp := rfl
+/-- The S-stage reads of `translate_stage` (sail-riscv 0.16): ASID and root from `satp`, VMID `0`,
+MXR/SUM from `mstatus`. -/
+theorem utr_get_asid_S :
+    get_asid .S_Stage = (do pure (_get_Satp64_Asid (Mk_Satp64 (← readReg Register.satp))) : SailM _) := rfl
+theorem utr_xatp_to_ppn_S :
+    xatp_to_ppn .S_Stage = (do pure (_get_Satp64_PPN (Mk_Satp64 (← readReg Register.satp))) : SailM _) := rfl
+theorem utr_get_vmid_S : get_vmid .S_Stage = (pure 0#14 : SailM _) := rfl
+theorem utr_get_mxr_S :
+    get_mxr .S_Stage = (do pure (_get_Mstatus_MXR (← readReg Register.mstatus) == 1#1) : SailM Bool) := rfl
+theorem utr_get_sum_S :
+    get_sum .S_Stage = (do pure (_get_Mstatus_SUM (← readReg Register.mstatus) == 1#1) : SailM Bool) := rfl
 
 /-- The `mstatus` pins the front branches on (Rocq `user_mstatus_ok`'s SXL
 and MPRV conjuncts; Xv6 `userMstatusOk` has both). -/
@@ -153,8 +172,10 @@ def utrCanon (va : BitVec 64) : Prop := BitVec.signExtend 64 (BitVec.extractLsb'
 
 instance (va : BitVec 64) : Decidable (utrCanon va) := by unfold utrCanon; infer_instance
 
-/-- The hypotheses of the front: the footprint reads the three registers,
-the hart is in User mode, and `mstatus`/`satp` satisfy the pins. -/
+/-- The hypotheses of the front: the footprint reads the registers the front reads, the hart is
+in User mode, and `mstatus`/`satp` satisfy the pins.  Since sail-riscv 0.16 the front also reads
+`misa` (`satp_mode`: `currentlyEnabled Ext_S`, here `misa.S = 1`) and `senvcfg`/`menvcfg` (the
+Svukte check, `read_senvcfg`; here `senvcfg.UKTE = 0`, xv6's `senvcfg = 0`). -/
 structure UtrPins (D : UFoot) (s : UWSt) : Prop where
   dms : D.Dr .mstatus = true
   dcp : D.Dr .cur_privilege = true
@@ -162,6 +183,11 @@ structure UtrPins (D : UFoot) (s : UWSt) : Prop where
   cp : s.file .cur_privilege = .User
   ms : utrMsOk (s.file .mstatus)
   satp : utrSatpOk (s.file .satp)
+  dmisa : D.Dr .misa = true
+  dsenv : D.Dr .senvcfg = true
+  dmenv : D.Dr .menvcfg = true
+  misaS : BitVec.extractLsb' 18 1 (s.file .misa) = 1#1
+  ukte : BitVec.extractLsb' 8 1 (s.file .senvcfg) = 0#1
 
 /-! ## §3 The front's pieces -/
 
@@ -173,15 +199,33 @@ theorem utr_effPriv (acc : MemoryAccessType mem_payload) (ms : BitVec 64) (p : P
   rw [MachCSL.get_Mstatus_MPRV_eq, h]
   simp
 
-/-- Rocq `goodb_translationMode_U`: Sv39 at User. -/
+theorem utr_currentlyEnabled_Zicsr : currentlyEnabled extension.Ext_Zicsr = (pure true : SailM Bool) := by
+  unfold currentlyEnabled
+  simp only [hartSupports_Ext_Zicsr]
+
+/-- `S` is enabled iff `misa.S` (the model's `currentlyEnabled Ext_S`). -/
+theorem utr_currentlyEnabled_S : currentlyEnabled extension.Ext_S =
+    (do let m ← readReg Register.misa
+        if (_get_Misa_S m == 1#1) = true then pure true else pure false : SailM Bool) := by
+  unfold currentlyEnabled
+  simp only [hartSupports_Ext_S, ite_true, utr_currentlyEnabled_Zicsr]
+
+/-- Rocq `goodb_translationMode_U`: Sv39 at User (sail-riscv 0.16's `satp_mode User`: `S` enabled
+in `misa`, then `satp`'s mode at `mstatus.SXL`). -/
 theorem utr_translationMode_U (D : UFoot) (orc : UOrc) (s : UWSt) (hms : D.Dr .mstatus = true)
-    (hsatp : D.Dr .satp = true) (hsxl : BitVec.extractLsb' 34 2 (s.file .mstatus) = 2#2)
+    (hsatp : D.Dr .satp = true) (hmisa : D.Dr .misa = true)
+    (hS : BitVec.extractLsb' 18 1 (s.file .misa) = 1#1)
+    (hsxl : BitVec.extractLsb' 34 2 (s.file .mstatus) = 2#2)
     (hmode : BitVec.extractLsb' 60 4 (s.file .satp) = 8#4) :
-    runRW D orc s (translationMode Privilege.User) = some (SATPMode.Sv39, s, orc) := by
-  unfold translationMode architecture
+    runRW D orc s (Functions.satp_mode Privilege.User) = some (SATPMode.Sv39, s, orc) := by
+  unfold Functions.satp_mode architecture
+  rw [utr_currentlyEnabled_S]
   sail_norm
-  simp only [runRW_bind, utr_readReg D _ _ _ hms, utr_readReg D _ _ _ hsatp, Option.bind_some, utr_sxl,
-    utr_satpMode, hsxl, hmode, utr_arch2, runRW_pure, utr_assert_true, utr_sv39]
+  simp only [runRW_bind, utr_readReg D _ _ _ hmisa, Option.bind_some, utr_misaS, hS]
+  sail_norm
+  simp only [Bool.not_true, Bool.false_eq_true, ite_false, runRW_bind, runRW_pure, Option.bind_some,
+    utr_readReg D _ _ _ hms, utr_readReg D _ _ _ hsatp, utr_sxl, utr_satpMode, hsxl, hmode, utr_arch2,
+    utr_sv39]
 
 theorem utr_vpn (va : BitVec 64) :
     BitVec.setWidth 27 (BitVec.extractLsb' Functions.pagesize_bits (38 - Functions.pagesize_bits + 1)
@@ -192,79 +236,155 @@ theorem utr_vpn (va : BitVec 64) :
 /-! ## §4 `translateAddr` at User -/
 
 /-- The `translate` call the front makes (Rocq's `translate 39` premise):
-the TLB/walk stretch of lane U1-P1. -/
+the TLB/walk stretch of lane U1-P1.  sail-riscv 0.16: the S stage, VMID `0`. -/
 abbrev utrTranslate (s : UWSt) (va : BitVec 64) (acc : MemoryAccessType mem_payload) :
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
-  translate 39 0#16 (utrRoot (s.file .satp)) (vpnOf va) acc .User (utrMxr (s.file .mstatus))
-    (utrSum (s.file .mstatus)) ()
+  translate 39 0#16 0#14 (utrRoot (s.file .satp)) (vpnOf va) acc .User (utrMxr (s.file .mstatus))
+    (utrSum (s.file .mstatus)) .S_Stage ()
+
+/-- The exception context of a translation fault at `va` (the model's `build_exception_context`
+at the S stage, on the user kinds; sail-riscv 0.16 reports a context, not a bare exception). -/
+def utrCtx (acc : MemoryAccessType mem_payload) (va : BitVec 64) (f : PTW_Error) : ExceptionContext :=
+  { trap := utrTexc acc f, excinfo_is_gva := false, excinfo := va, excinfo2 := none, excinst := none,
+    excinst_offset := 0#5, ext := none }
 
 /-- The back of the front: a `translate` result as a `translateAddr` result. -/
 def utrBack (acc : MemoryAccessType mem_payload) (va : BitVec 64) :
     Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) →
-      Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit)
+      Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit)
   | .Ok (ppn, pbmt, e) => .Ok (.Physaddr (paOf ppn va), pbmt, e)
-  | .Err (f, e) => .Err (utrTexc acc f, e)
+  | .Err (f, e) => .Err (utrCtx acc va f, e)
 
-set_option hygiene false in
-/-- The common prefix of the two front lemmas: `translateAddr` at User, up
-to the canonical check. -/
-macro "utr_front" hp:term:max hacc:term:max : tactic => `(tactic| (
-  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩⟩ := $hp
-  unfold translateAddr
-  rw [utr_ssa _ $hacc]
+theorem utr_virt_user : privLevel_is_virtual Privilege.User = false := rfl
+
+theorem utr_ukte_sse (v : BitVec 64) (y : BitVec 1) :
+    _get_SEnvcfg_UKTE (_update_SEnvcfg_SSE v y) = BitVec.extractLsb' 8 1 v := by
+  unfold _get_SEnvcfg_UKTE _update_SEnvcfg_SSE
+  simp only [Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
+    BitVec.extractLsb]
+  bv_decide
+
+/-- The canonical check of an Sv39 address (sail-riscv 0.16, `translate_validate_address`). -/
+theorem utr_validate (va : BitVec 64) (hc : BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va) = va) :
+    translate_validate_address va 39 .S_Stage = .Ok (Sail.BitVec.truncate va 39) := by
+  unfold translate_validate_address
+  have h1 : (TranslationStage.S_Stage == TranslationStage.G_Stage) = false := rfl
+  have h2 : (va == sign_extend (m := 64) (Sail.BitVec.truncate va 39)) = true := by
+    simp only [sign_extend, Sail.BitVec.signExtend, Sail.BitVec.truncate, beq_iff_eq]
+    exact (canon_truncate va hc).symm
+  simp only [h1, Bool.false_eq_true, ite_false, h2, ite_true]
+
+/-- (Kept out of the proof below: its `bv_decide` would meet the `TranslationStage` hypothesis
+and add an enum encoding that clashes with `WpStepHooks`'s.) -/
+theorem utr_truncate39 (va : BitVec 64) : BitVec.truncate 39 va = BitVec.extractLsb' 0 39 va := by
+  bv_decide
+
+/-- A non-canonical Sv39 address is refused (`PTW_Invalid_Addr`). -/
+theorem utr_validate_noncanon (va : BitVec 64) (hc : ¬ BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va) = va) :
+    translate_validate_address va 39 .S_Stage = .Err (.PTW_Invalid_Addr ()) := by
+  unfold translate_validate_address
+  have h1 : (TranslationStage.S_Stage == TranslationStage.G_Stage) = false := rfl
+  have h2 : (va == sign_extend (m := 64) (Sail.BitVec.truncate va 39)) = false := by
+    simp only [sign_extend, Sail.BitVec.signExtend, Sail.BitVec.truncate, beq_eq_false_iff_ne, ne_eq]
+    intro h
+    apply hc
+    rw [← utr_truncate39]
+    exact h.symm
+  simp only [h1, Bool.false_eq_true, ite_false, h2]
+
+theorem utr_vpn39 (va : BitVec 64) :
+    BitVec.setWidth 27 (BitVec.extractLsb' Functions.pagesize_bits (38 - Functions.pagesize_bits + 1)
+      (Sail.BitVec.truncate va 39)) = vpnOf va := by
+  unfold vpnOf Functions.pagesize_bits Sail.BitVec.truncate
+  bv_decide
+
+theorem utr_off12 (va : BitVec 64) :
+    BitVec.extractLsb' 0 ((↑Functions.pagesize_bits - 1 : Int).toNat + 1) (Sail.BitVec.truncate va 39) =
+      BitVec.extractLsb' 0 12 va := by
+  show BitVec.extractLsb' 0 12 (BitVec.truncate 39 va) = BitVec.extractLsb' 0 12 va
+  bv_decide
+
+/-- The Svukte check at User (sail-riscv 0.16, `is_svukte_qualified`): with `senvcfg.UKTE = 0`
+(`read_senvcfg` only masks `SSE`) nothing is qualified. -/
+theorem utr_svukte (D : UFoot) (orc : UOrc) (s : UWSt) (acc : MemoryAccessType mem_payload)
+    (hcpD : D.Dr .cur_privilege = true) (hcp : s.file .cur_privilege = .User)
+    (hsenv : D.Dr .senvcfg = true) (hmenv : D.Dr .menvcfg = true)
+    (hukte : BitVec.extractLsb' 8 1 (s.file .senvcfg) = 0#1) :
+    runRW D orc s (is_svukte_qualified acc .User .Sv39) = some (false, s, orc) := by
+  unfold is_svukte_qualified read_senvcfg inVirtualPrivilege
   sail_norm
-  simp only [runRW_bind, utr_readReg _ _ _ _ hms, utr_readReg _ _ _ _ hcpD, Option.bind_some, hcp,
-    utr_effPriv _ _ _ hmprv, runRW_pure, utr_translationMode_U _ _ _ hms hsatp hsxl hmode]
-  sail_norm
-  simp only [utr_width39]
-  sail_norm
-  simp only [runRW_bind, utr_readReg _ _ _ _ hsatp, Option.bind_some, runRW_pure, utr_assert_true,
-    utr_get_satp39]))
+  simp only [runRW_bind, utr_readReg D _ _ _ hsenv, utr_readReg D _ _ _ hmenv, utr_readReg D _ _ _ hcpD,
+    Option.bind_some, hcp, utr_virt_user, Bool.false_eq_true, ite_false, runRW_pure, utr_ukte_sse, hukte]
+  simp
 
 /-- **`translateAddr` at User, canonical `va`** (Rocq
 `PtWalkCert.goodmb_translateAddr_pt_front` / `UserFaultCert
 .goodmb_translateAddr_pt_front_err`): the walk is `translate 39`'s, its
-result mapped by `utrBack`. -/
+result mapped by `utrBack`.  Since sail-riscv 0.16 the effective privilege is
+an argument (`User` here; the caller takes it from `default_access_info`). -/
 theorem utr_translateAddr_canon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hc : utrCanon va) :
-    runRW D orc s (translateAddr (.Virtaddr va) acc) =
+    runRW D orc s (translateAddr (.Virtaddr va) acc .User) =
       (runRW D orc s (utrTranslate s va acc)).map (fun r => (utrBack acc va r.1, r.2.1, r.2.2)) := by
+  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩, hmisa, hsenv, hmenv, hS, hukte⟩ := hp
   unfold utrCanon at hc
-  utr_front hp hacc
-  simp only [hc, bne_self_eq_false, Bool.false_eq_true, if_false]
+  unfold translateAddr
+  rw [utr_ssa _ hacc]
   sail_norm
-  simp only [runRW_bind, utr_readReg D _ _ _ hms, Option.bind_some,
-    satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn]
-  simp only [utrTranslate, utrRoot, utrMxr, utrSum]
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_svukte D _ _ acc hcpD hcp hsenv hmenv hukte, Bool.false_and, Bool.false_eq_true, ite_false]
+  sail_norm
+  unfold translate_vs_stage translate_stage
+  sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_width39]
+  sail_norm
+  simp only [utr_validate va hc, utr_get_asid_S, utr_get_vmid_S, utr_get_mxr_S, utr_get_sum_S,
+    utr_xatp_to_ppn_S]
+  sail_norm
+  simp only [runRW_bind, Option.bind_some, utr_readReg D _ _ _ hsatp, utr_readReg D _ _ _ hms,
+    satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn39]
+  simp only [utrTranslate, utrRoot, utrMxr, utrSum, init_ext_ptw]
   generalize runRW D orc s _ = R
   rcases R with _ | ⟨⟨⟨ppn, pbmt, e⟩ | ⟨f, e⟩, s', o'⟩⟩
   · rfl
-  · simp only [Option.bind_some, Option.map_some]
+  · simp only [Option.bind_some, Option.map_some, runRW_pure]
     sail_norm
-    simp only [runRW_pure, Option.bind_some, utrBack, paOf]
+    simp only [runRW_pure, utrBack, paOf, utr_off12]
     rfl
-  · simp only [Option.bind_some, Option.map_some]
+  · simp only [Option.bind_some, Option.map_some, runRW_pure]
     sail_norm
+    unfold build_exception_context
     simp only [utr_texc acc hacc]
     sail_norm
-    simp only [runRW_pure, Option.bind_some, utrBack]
+    simp only [runRW_pure, utrBack, utrCtx]
 
 /-- **The non-canonical fault** (Rocq `goodmb_translateAddr_pt_front_noncanon`):
 `PTW_Invalid_Addr`, before the TLB is consulted; the state does not move. -/
 theorem utr_translateAddr_noncanon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hc : ¬ utrCanon va) :
-    runRW D orc s (translateAddr (.Virtaddr va) acc) =
-      some (.Err (utrTexc acc (.PTW_Invalid_Addr ()), ()), s, orc) := by
+    runRW D orc s (translateAddr (.Virtaddr va) acc .User) =
+      some (.Err (utrCtx acc va (.PTW_Invalid_Addr ()), ()), s, orc) := by
+  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩, hmisa, hsenv, hmenv, hS, hukte⟩ := hp
   unfold utrCanon at hc
-  utr_front hp hacc
-  have hb : (va != BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va)) = true := by
-    simp only [bne_iff_ne, ne_eq]
-    exact fun h => hc h.symm
-  simp only [hb, if_true]
+  unfold translateAddr
+  rw [utr_ssa _ hacc]
   sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_svukte D _ _ acc hcpD hcp hsenv hmenv hukte, Bool.false_and, Bool.false_eq_true, ite_false]
+  sail_norm
+  unfold translate_vs_stage translate_stage
+  sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_width39]
+  sail_norm
+  simp only [utr_validate_noncanon va hc]
+  simp only [runRW_pure, Option.bind_some]
+  sail_norm
+  unfold build_exception_context
   simp only [utr_texc acc hacc]
   sail_norm
-  rfl
+  simp only [runRW_pure, utrCtx]
 
 /-- **Success composition**: lane U1-P1's walk to a page gives the
 translation to the page with `va`'s offset, landing where the walk did. -/
@@ -272,7 +392,7 @@ theorem utr_translateAddr_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : U
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hc : utrCanon va)
     (ppn : BitVec 44) (pbmt : page_based_mem_type)
     (htr : runRW D orc s (utrTranslate s va acc) = some (.Ok (ppn, pbmt, ()), s', orc')) :
-    runRW D orc s (translateAddr (.Virtaddr va) acc) =
+    runRW D orc s (translateAddr (.Virtaddr va) acc .User) =
       some (.Ok (.Physaddr (paOf ppn va), pbmt, ()), s', orc') := by
   rw [utr_translateAddr_canon D orc s hp va acc hacc hc, htr]
   rfl
@@ -283,18 +403,21 @@ did (on the user tier every fault arm leaves the state as it was). -/
 theorem utr_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hc : utrCanon va) (f : PTW_Error)
     (htr : runRW D orc s (utrTranslate s va acc) = some (.Err (f, ()), s', orc')) :
-    runRW D orc s (translateAddr (.Virtaddr va) acc) = some (.Err (utrTexc acc f, ()), s', orc') := by
+    runRW D orc s (translateAddr (.Virtaddr va) acc .User) = some (.Err (utrCtx acc va f, ()), s', orc') := by
   rw [utr_translateAddr_canon D orc s hp va acc hacc hc, htr]
   rfl
 
 /-- `translate` is the TLB lookup, then the hit or the miss (the split lane
-U1-P1's `UTlb` facts are stated over). -/
-theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 16) (root : BitVec 44)
-    (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool) :
-    runRW D orc s (translate 39 asid root vpn acc p mxr sum ()) =
-      (runRW D orc s (lookup_TLB 39 asid vpn)).bind (fun r => match r.1 with
-        | some (i, ent) => runRW D r.2.2 r.2.1 (translate_TLB_hit 39 asid vpn acc p mxr sum () i ent)
-        | none => runRW D r.2.2 r.2.1 (translate_TLB_miss 39 asid root vpn acc p mxr sum ())) := by
+U1-P1's `UTlb` facts are stated over).  sail-riscv 0.16: the TLB is keyed by VMID and stage
+too, and a miss first generates the `EV_TLB_MISS` event (a read of the privilege). -/
+theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 16) (vmid : BitVec 14)
+    (root : BitVec 44) (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool)
+    (stage : TranslationStage) :
+    runRW D orc s (translate 39 asid vmid root vpn acc p mxr sum stage ()) =
+      (runRW D orc s (lookup_TLB 39 asid vmid vpn stage)).bind (fun r => match r.1 with
+        | some (i, ent) => runRW D r.2.2 r.2.1 (translate_TLB_hit 39 asid vmid vpn acc p mxr sum i ent stage ())
+        | none => runRW D r.2.2 r.2.1 (do generate_event .EV_TLB_MISS
+                                          translate_TLB_miss 39 asid vmid root vpn acc p mxr sum stage ())) := by
   unfold translate
   rw [runRW_bind]
   congr 1
@@ -326,7 +449,7 @@ theorem utr_pmpMatchAddr0 (addr : BitVec 64) (width : Nat) (hram : pmpOk addr wi
 /-- Entry 0's R/W/X bits grant every user access kind. -/
 theorem utr_pmpCheckRWX (acc : MemoryAccessType mem_payload) (h : utrAcc acc = true) :
     pmpCheckRWX 15#8 acc = pure true := by
-  rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at h <;> rfl
 
 /-- **PMP under xv6's entry 0, at any privilege** (Rocq
@@ -349,7 +472,7 @@ theorem utr_pmpCheck_ent0 (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64)
   sail_norm
   simp only [hrwx]
   sail_norm
-  simp only [runRW_pure, Option.bind_some]
+  simp only [runRW_pure]
 
 /-- **PMP at User** (Rocq `exec/goodmb_pmpCheck_user_grant_load/_store`, all
 user access kinds at once): under xv6's entry 0 (`pmpEnt0Ok`, any other
@@ -396,9 +519,8 @@ theorem utr_pmaCheck_ok (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (w 
   sail_norm
   simp only [runRW_bind, utr_readReg D _ _ _ hD, Option.bind_some, hreg]
   sail_norm
-  simp only [runRW_pure, Option.bind_some]
   generalize override_PMA region.attributes pbmt = a at hok ⊢
-  rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨op, _, _, p, q⟩ | u | c <;>
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨op, _, _, p, q⟩ | u | c <;>
     (try cases u) <;> (try cases p) <;> (try cases q) <;>
     simp only [utrPmaOk, Bool.false_eq_true] at hok
   all_goals
@@ -409,7 +531,7 @@ theorem utr_pmaCheck_ok (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (w 
       | (obtain ⟨⟨⟨rfl, h1⟩, h2⟩, h3⟩ := hok; simp only [h1, h2, h3])
       | simp only [hok]
     sail_norm
-    simp only [runRW_bind, runRW_pure, Option.bind_some, utr_assert_true, mag_pma_check, halign,
+    simp only [runRW_bind, runRW_pure, Option.bind_some, mag_pma_check, halign,
       Bool.true_or, is_mag_applicable_access]
     sail_norm
     simp only [runRW_pure, Option.bind_some]

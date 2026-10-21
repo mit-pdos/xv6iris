@@ -126,7 +126,7 @@ theorem kxcSpFinal_mod8 (top : Int) (alen : Nat → Nat) (na : Nat) : kxcSpFinal
 /-- **Rocq `udata_lo_is_Some`** (deviation 4). -/
 theorem udataLo_isSome (M : ElfMem) (π : Nat → Option UPerm) (sz a : Nat) (b : BitVec 8) (hM : M a = some b)
     (hw : uwAddr π a) (hlt : a < sz) (hcap : a < uCap) : (get? (udataLo M π sz) a).isSome := by
-  rw [udataLo_get, if_pos hlt, udataPart_get, if_pos ⟨hcap, hw⟩, hM]
+  rw [udataLo_get, ite_eq_left hlt, udataPart_get, ite_eq_left ⟨hcap, hw⟩, hM]
   rfl
 
 /-- NEW (deviation 6): the page permissions `kxbPermOk` pins at sh's
@@ -188,9 +188,9 @@ theorem shPayKey_of_kexec (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat �
     unfold uwAddr uwB
     rw [show a / 4096 = 2 by omega, h2]
     rfl
-  rw [LawfulPartialMap.get?_filter, udataLo_get, if_pos (by rw [hszv, hszE]; omega),
-    udataPart_get, if_pos ⟨by unfold uCap; omega, hw⟩, himg a b hab]
+  rw [LawfulPartialMap.get?_filter, udataLo_get, ite_eq_left (by rw [hszv, hszE]; omega),
+    udataPart_get, ite_eq_left ⟨by unfold uCap; omega, hw⟩, himg a b hab]
   simp only [Option.bind_some, decide_eq_true_eq]
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
 
 end Xv6

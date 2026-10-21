@@ -249,19 +249,19 @@ theorem boRegs_set (k : KCtx) (R : RegMap) (h : boRegs k R) (i : BitVec 5) (v : 
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
-  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
-  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
-  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
-  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
-  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
-  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
-  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
-  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
-  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
-  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
-  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
-  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n2)]; exact a2
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n8)]; exact a8
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n9)]; exact a9
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n18)]; exact a18
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n19)]; exact a19
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n20)]; exact a20
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n21)]; exact a21
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n22)]; exact a22
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n23)]; exact a23
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n24)]; exact a24
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n25)]; exact a25
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n26)]; exact a26
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n27)]; exact a27
 
 /-- The register pins at the head of the first iteration: `s1` and `s2`
 just written, everything else preserved across the `acquire` call.  The
@@ -433,11 +433,11 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; exact hTlen
   cases cmt
   · ileft
-    isimp only [Bool.false_eq_true, if_false] at Hcmt
-    isimp only [Bool.false_eq_true, if_false] at Harm
+    isimp only [Bool.false_eq_true, ite_false] at Hcmt
+    isimp only [Bool.false_eq_true, ite_false] at Harm
     iframe Hcmt Harm Hhelp
   · iright
-    isimp only [if_true] at Hcmt
+    isimp only [ite_true] at Hcmt
     iframe Hcmt Hhelp
     ipureintro
     exact hcmt0 rfl
@@ -539,7 +539,7 @@ theorem bo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
   iapply (bo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
-  isimp only [if_true]
+  isimp only [ite_true]
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp
 
 /-! ## The loop's proposition -/

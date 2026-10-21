@@ -58,7 +58,7 @@ theorem ume_lrsc_inPage (va : BitVec 64) {w : Nat} (hw : w = 4 ∨ w = 8) (hal :
 or a user fault. -/
 theorem ume_vlr (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s) (va : BitVec 64) (w : Nat)
     (hw : w = 4 ∨ w = 8) (aq rl : Bool) (orc : UOrc) :
-    ∃ r s1, runRW ufFoot orc s (vmem_read_addr (.Virtaddr va) w (.LoadReserved (aq, rl, .Data)) aq (aq && rl) true) =
+    ∃ r s1, runRW ufFoot orc s (vmem_read_addr (.Virtaddr va) w (.LoadReserved (aq, rl, .Data)) umoAI aq (aq && rl) true) =
         some (r, s1, orc) ∧
       UstLand C P t0 mm0 s1 ∧ ∀ e, r = .Err e → UmeFault s1 e := by
   have hw' := ume_lrsc_umaW hw
@@ -71,20 +71,20 @@ theorem ume_vlr (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s) (
       obtain ⟨k, lw, hk, -, hram, hown⟩ := ume_page hwf1 hpg va w (ume_lrsc_inPage va hw hal)
       have hal2 := ume_pa_al hwf1 hpg va w (ume_lrsc_aw hw) hal
       obtain ⟨v, hv'⟩ := umm_bmRead_of_owned s1.mm _ w hown
-      have h := uma_vmem_read_addr_lr ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc aq rl ppn (hwalk orc)
+      have h := uma_vmem_read_addr_lr ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc aq rl umoAI rfl ppn (hwalk orc)
         ⟨hram, hal2⟩ v hv'
       exact ⟨_, _, h, ume_land_rv hl1 true, fun e he => by cases he⟩
-    · have h := uma_vmem_read_addr_terr ufFoot ume_trapFoot orc orc s s1 hp va w hw' hal _ aq (aq && rl) true e
-        (htr1 orc)
+    · have h := uma_vmem_read_addr_terr ufFoot ume_trapFoot orc orc s s1 hp va w hw' hal (.LoadReserved (aq, rl, .Data))
+        umoAI rfl aq (aq && rl) true rfl e (htr1 orc)
       refine ⟨_, _, h, hl1, fun e' he => ?_⟩
       injection he with he
       subst he
-      exact ⟨e, va, rfl, herr1 e rfl⟩
-  · have h := uma_vmem_read_addr_lr_mis ufFoot ume_trapFoot orc s va w hw' hal aq rl aq (aq && rl)
+      exact ⟨e, rfl, herr1 e rfl⟩
+  · have h := uma_vmem_read_addr_lr_mis ufFoot ume_trapFoot orc s va w hw' hal aq rl aq (aq && rl) umoAI rfl rfl
     refine ⟨_, _, h, hl, fun e' he => ?_⟩
     injection he with he
     subst he
-    exact ⟨_, va, rfl, rfl⟩
+    exact ume_fault_trap _ _ va rfl
 
 /-- **The LR arm** (`UclMemArms.loadres`). -/
 theorem ume_loadres (t0 : PTree) (mm0 : BMap) (s : UWSt) (aq rl : Bool) (rs1 : regidx)
@@ -100,7 +100,7 @@ theorem ume_loadres (t0 : PTree) (mm0 : BMap) (s : UWSt) (aq rl : Bool) (rs1 : r
   · obtain ⟨x, h⟩ := ume_exec_loadres ume_umoFoot orc s (ucl_uxcCfg hl) (ume_utrPins hl) aq rl i1 ird w hw' v s1 orc hr
     exact ⟨_, _, _, h, ucl_land_wr hl1 ird x⟩
   · exact ⟨_, _, _, ume_exec_loadres_err ume_umoFoot orc s (ucl_uxcCfg hl) (ume_utrPins hl) aq rl i1 ird w hw' e s1
-      orc hr, ume_resOk_fault hl1 (herr e rfl)⟩
+      orc hr, ume_resOk_fault hl1 (ume_fault_off (herr e rfl) _)⟩
 
 /-! ## §2 SC -/
 
@@ -109,7 +109,7 @@ theorem ume_loadres (t0 : PTree) (mm0 : BMap) (s : UWSt) (aq rl : Bool) (rs1 : r
 theorem ume_vsc (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s) (va : BitVec 64) (w : Nat)
     (hw : w = 4 ∨ w = 8) (aq rl : Bool) (orc : UOrc) (data : BitVec (8 * w)) :
     ∃ r s1, runRW ufFoot orc s (vmem_write_addr (.Virtaddr va) w data (.StoreConditional (aq, rl, .Data))
-        (aq && rl) rl true) = some (r, s1, orc) ∧
+        umoAI (aq && rl) rl true) = some (r, s1, orc) ∧
       UstLand C P t0 mm0 s1 ∧ ((∃ b, r = .Ok b) ∨ ∃ e, r = .Err e ∧ UmeFault s1 e) := by
   have hw' := ume_lrsc_umaW hw
   have hp := ume_utrPins hl
@@ -124,20 +124,20 @@ theorem ume_vsc (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s) (
       cases hm : Functions.match_reservation (paOf ppn va) with
       | true =>
         have ho := bmOwned_of_ummOwned _ _ _ hown
-        have h := uma_vmem_write_addr_sc_ok ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc data aq rl ppn
+        have h := uma_vmem_write_addr_sc_ok ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc data aq rl umoAI rfl ppn
           (hwalk orc) ⟨hram, hal2⟩ hm ho
         refine ⟨_, _, h, ume_land_fr hl1 hk (va.toNat % 4096) w hin _ rfl ?_, Or.inl ⟨_, rfl⟩⟩
         rw [← hpa]
         exact umeFr_write s1.mm (paOf ppn va) w data (by rcases hw with rfl | rfl <;> decide) ho
       | false =>
-        have h := uma_vmem_write_addr_sc_fail ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc data aq rl ppn
+        have h := uma_vmem_write_addr_sc_fail ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc data aq rl umoAI rfl ppn
           (hwalk orc) ⟨hram, hal2⟩ hm
         exact ⟨_, _, h, hl1, Or.inl ⟨_, rfl⟩⟩
-    · have h := uma_vmem_write_addr_terr ufFoot ume_trapFoot orc orc s s1 hp va w hw' hal data _ (aq && rl) rl true e
-        (htr1 orc)
-      exact ⟨_, _, h, hl1, Or.inr ⟨_, rfl, e, va, rfl, herr1 e rfl⟩⟩
-  · have h := uma_vmem_write_addr_sc_mis ufFoot ume_trapFoot orc s va w hw' hal data aq rl (aq && rl) rl
-    exact ⟨_, _, h, hl, Or.inr ⟨_, rfl, _, va, rfl, rfl⟩⟩
+    · have h := uma_vmem_write_addr_terr ufFoot ume_trapFoot orc orc s s1 hp va w hw' hal data
+        (.StoreConditional (aq, rl, .Data)) umoAI rfl (aq && rl) rl true rfl e (htr1 orc)
+      exact ⟨_, _, h, hl1, Or.inr ⟨_, rfl, e, rfl, herr1 e rfl⟩⟩
+  · have h := uma_vmem_write_addr_sc_mis ufFoot ume_trapFoot orc s va w hw' hal data aq rl (aq && rl) rl umoAI rfl rfl
+    exact ⟨_, _, h, hl, Or.inr ⟨_, rfl, ume_fault_trap _ _ va rfl⟩⟩
 
 /-- **The SC arm** (`UclMemArms.storecon`). -/
 theorem ume_storecon (t0 : PTree) (mm0 : BMap) (s : UWSt) (aq rl : Bool) (rs2 rs1 : regidx)
@@ -155,6 +155,6 @@ theorem ume_storecon (t0 : PTree) (mm0 : BMap) (s : UWSt) (aq rl : Bool) (rs2 rs
       orc hr
     exact ⟨_, _, _, h, ucl_land_wr hl1 ird x⟩
   · exact ⟨_, _, _, ume_exec_storecon_err ume_umoFoot orc s (ucl_uxcCfg hl) (ume_utrPins hl) aq rl i2 i1 ird w hw' e
-      s1 orc hr, ume_resOk_fault hl1 hf⟩
+      s1 orc hr, ume_resOk_fault hl1 (ume_fault_off hf _)⟩
 
 end Xv6

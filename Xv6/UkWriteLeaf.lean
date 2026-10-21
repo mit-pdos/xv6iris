@@ -236,7 +236,7 @@ theorem uwrite_post_cons (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvi
   unfold xkA
   rw [e]
   unfold filewriteExtra
-  simp only [if_true]
+  simp only [ite_true]
   dsimp only [xfamWr]
   iexact H
 

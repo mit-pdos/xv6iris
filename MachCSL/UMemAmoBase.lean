@@ -20,7 +20,9 @@ readable) and the configuration premises `UxcCfg s` (the file agrees with
 the pointer-masking length is 0 (`umo_get_pmlen`; `is_pmm_applicable` reads
 `mstatus.MXR`, a symbolic bit, so its two outcomes are split and both give
 0), and under Sv39 `pm_transform_VA _ 0` is the identity, so the effective
-address is `x[rs1] + offset`, state untouched.
+address is `x[rs1] + offset`, state untouched.  Since sail-riscv 0.16 the effective privilege
+and the masking length travel in the access information (`default_access_info`,
+`umo_default_access_info`), which `get_transformed_data_addr` takes.
 
 **The pair leaves** (`umo_rX_pair`, `umo_wX_pair`): the register INDEX is
 split as `x0` / not `x0` (the model branches on `rs ≠ zreg`); inside, the
@@ -36,7 +38,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -105,26 +107,39 @@ theorem umo_get_pmlen {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU :
 
 theorem umo_pm_transform_VA0 (v : BitVec 64) : pm_transform_VA (.Virtaddr v) 0 = .Virtaddr v := by
   simp only [pm_transform_VA, sign_extend, Sail.BitVec.signExtend, Sail.BitVec.extractLsb, Functions.xlen,
-    Int.reduceNatCast, Int.reduceNatCast', Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]
+    Int.reduceNatCast', Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]
   congr 1
   bv_decide
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-/-- **The data-address front at User** (Rocq's `Heff`/`Hpml`/`Htm` premises,
-discharged): the effective address is `x[rs1] + offset`; the state does not
-move. -/
-theorem umo_gtda {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (hp : UtrPins D s)
-    (i : BitVec 5) (off : BitVec 64) (acc : MemoryAccessType mem_payload) (w : Nat) :
-    runRW D orc s (get_transformed_data_addr (.Regidx i) off acc w) =
-      some (.Ext_DataAddr_OK (.Virtaddr (uxaXget s.file i + off)), s, orc) := by
+/-- **The access information at User** (sail-riscv 0.16's `default_access_info`): the effective
+privilege User (`MPRV = 0`), pointer masking off, not a guest access. -/
+theorem umo_default_access_info {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
+    (hp : UtrPins D s) (acc : MemoryAccessType mem_payload) :
+    runRW D orc s (default_access_info acc) =
+      some ({ eff_privilege := .User, pmlen := 0, as_guest := false }, s, orc) := by
   have hpl := umo_get_pmlen hD orc s hU acc
-  have hx := uxa_rX hD.ctl.alu orc s i
-  have htm := utr_translationMode_U D orc s hp.dms hp.dsatp hp.ms.1 hp.satp.1
   have hcp := hp.cp
   have hmprv := hp.ms.2
-  uwk_run [hpl, hx, htm, utr_effPriv]
-  rw [umo_pm_transform_VA0]
+  have hms := hD.ms
+  have hdcp := hp.dcp
+  uwk_run [hpl, utr_effPriv]
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- **The data-address front at User** (Rocq's `Heff`/`Hpml`/`Htm` premises,
+discharged; sail-riscv 0.16 takes the access information `ai`, here User with pointer masking
+off): the effective address is `x[rs1] + offset`; the state does not move. -/
+theorem umo_gtda {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hp : UtrPins D s)
+    (i : BitVec 5) (off : BitVec 64) (acc : MemoryAccessType mem_payload) (ai : AccessInfo)
+    (hai : ai.eff_privilege = .User) (hpl : ai.pmlen = 0) (w : Nat) :
+    runRW D orc s (get_transformed_data_addr (.Regidx i) off acc ai w) =
+      some (.Ext_DataAddr_OK (.Virtaddr (uxaXget s.file i + off)), s, orc) := by
+  have hx := uxa_rX hD.ctl.alu orc s i
+  have htm := utr_translationMode_U D orc s hp.dms hp.dsatp hp.dmisa hp.misaS hp.ms.1 hp.satp.1
+  uwk_run [hx, htm, hai, hpl]
+  rw [hpl, show Int.toNat 0 = 0 from rfl, umo_pm_transform_VA0]
 
 /-! ## §2 The GPR pair (`AMOCAS.Q`) -/
 
@@ -147,11 +162,11 @@ theorem umo_rX_pair {D : UFoot} (hD : UxaFoot D) (orc : UOrc) (s : UWSt) (i : Bi
     runRW D orc s (rX_pair_bits (.Regidx i)) = some (umoXpair s.file i, s, orc) := by
   have hx := uxa_rX hD
   by_cases h : i = 0
-  · subst h; simp only [umoXpair, if_true]; rfl
+  · subst h; simp only [umoXpair, ite_true]; rfl
   · have hb := umo_bne_zreg i h
     unfold rX_pair_bits
     uwk_run [hx, hb]
-    simp only [umoXpair, h, if_false]
+    simp only [umoXpair, h, ite_false]
     rfl
 
 set_option maxHeartbeats 4000000 in
@@ -161,11 +176,11 @@ theorem umo_wX_pair {D : UFoot} (hD : UxaFoot D) (orc : UOrc) (s : UWSt) (i : Bi
     runRW D orc s (wX_pair_bits (.Regidx i) v) = some ((), umoWrPair s i v, orc) := by
   have hx := uxa_wX hD
   by_cases h : i = 0
-  · subst h; simp only [umoWrPair, if_true]; rfl
+  · subst h; simp only [umoWrPair, ite_true]; rfl
   · have hb := umo_bne_zreg i h
     unfold wX_pair_bits
     uwk_run [hx, hb]
-    simp only [umoWrPair, h, if_false]
+    simp only [umoWrPair, h, ite_false]
     rfl
 
 /-! ## §3 The AMO result -/

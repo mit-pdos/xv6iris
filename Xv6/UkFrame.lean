@@ -48,9 +48,9 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
       ∃ v : UfVals, ⌜UfUser v ∧ v.hs = .HART_ACTIVE () ∧ v.va = pc ∧ v.va' = pc ∧ v.tlb = tlb ∧ v.g = m⌝ ∗
         (ufRegF cpu C).F (ufFile C P v) ∗ ufAside cpu := by
   iintro ⟨#Hhw, Hregs, Hg, Hpc, Hcfg, Hr⟩
-  unfold uvRegs clockCells
+  unfold uvRegs clockCells cycleAux
   icases Hregs with ⟨%ms, %sc, %stv, %sep, %hms, Hhs, Hpr, Hms, Hsc, Hstv, Hsep,
-    ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip⟩⟩
+    ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip, ⟨%msv, Hmsip⟩, ⟨%wei, Hwei⟩, Hwti⟩, Hht⟩
   unfold pcIs
   icases Hpc with ⟨Hpc, Hnpc⟩
   unfold userCfg userHwCells
@@ -58,18 +58,21 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
   unfold ubPtRegs userPmp
   icases Hr with ⟨Hsatp, ⟨%cfg, %paddr, %h0, Hpcfg, Hpaddr⟩, Htlb⟩
   icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm, #Hscen⟩
+  icases hwConfig_hgeie cpu $$ Hhw with ⟨%hge, #Hhge⟩
+  icases hwConfig_hcounteren cpu $$ Hhw with ⟨%hcen, #Hhcen⟩
+  icases hwConfig_henvcfg cpu $$ Hhw with ⟨%henv, #Hhenv⟩
   iexists (⟨.HART_ACTIVE (), ms, sc, stv, sep, pc, pc, m, mi, mst, cy, ti, ip, tlb, stc, ctr,
-    ⟨mc, mtc, cfg, paddr⟩⟩ : UfVals)
+    ⟨mc, mtc, cfg, paddr⟩, hge, hcen, henv, bootHid cpu, msv, wei⟩ : UfVals)
   isplitr
   · ipureintro
     exact ⟨⟨trivial, hms, fun _ _ => rfl, htm, h0⟩, rfl, rfl, rfl, rfl, rfl⟩
-  isplitr [Hmepc]
+  isplitr [Hmepc Hht]
   · iapply (uf_F_split cpu C (ufFile C P _)).2
     isplitl [Hpr Hms Hsc Hstv Hsep Hpc Hnpc]
     · iapply (uf_trapRw_cells cpu (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
-    isplitl [Hhs Hmi Hmst Hcy Hti Hip Htlb]
+    isplitl [Hhs Hmi Hmst Hcy Hti Hip Htlb Hwei]
     · iapply (uf_rwNamed_cells cpu (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
@@ -80,16 +83,16 @@ theorem uk_regs_open (cpu : CPU) (C : UCfg) (P : UPtd) (m : RegMap) (pc : BitVec
     · iapply (uf_cfgRo_cells cpu C.dqc (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
-    isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr]
+    isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr Hmsip Hwti]
     · iapply (uf_ownRo_cells cpu C.dqc (ufFile C P _)).2
       dsimp only [ufFile]
       iframe
-    · iapply uf_hw_cells cpu C.dqc (ufFile C P _) (ufCfg_file C P _ ⟨htm, h0⟩).hw
+    · iapply uf_hw_cells cpu C.dqc (ufFile C P _) (ufCfg_file C P _ ⟨htm, h0⟩).hw rfl
       iframe Hhw
       dsimp only [ufFile]
-      iframe Hmci Hmic Hmcc Hhpm
-      iexact Hscen
+      iframe Hmci Hmic Hmcc Hhpm Hscen Hhge Hhcen Hhenv
   · unfold ufAside
+    iframe Hht
     iexists mepc
     iexact Hmepc
 
@@ -105,16 +108,16 @@ theorem uk_regs_close (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (m' : RegM
   iintro ⟨HF, Ha⟩
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, Hwei, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   ihave Hg := MachCSL.gprFile_ext cpu (uxaXget f) m' (fun i hi => ukRegs_ne f m' hg i hi) $$ Hg
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
-  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc]
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, Hmsip, Hwti, -⟩
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc, hc.wti]
   unfold ufAside
-  icases Ha with ⟨%mepc, Hmepc⟩
-  unfold uvRegs clockCells pcIs userCfg userHwCells ubPtRegs userPmp
-  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hmi Hmst Hcy Hti Hip]
+  icases Ha with ⟨⟨%mepc, Hmepc⟩, Hht⟩
+  unfold uvRegs clockCells cycleAux pcIs userCfg userHwCells ubPtRegs userPmp
+  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hmi Hmst Hcy Hti Hip Hmsip Hwei Hwti Hht]
   · iexists f .mstatus, f .scause, f .stval, f .sepc
     isplitr
     · ipureintro; exact hms
@@ -143,21 +146,21 @@ theorem uk_regs_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile)
       Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
       Register.mstatus ↦ᵣ[cpu] f .mstatus ∗ Register.scause ↦ᵣ[cpu] f .scause ∗
       Register.stval ↦ᵣ[cpu] f .stval ∗ Register.sepc ↦ᵣ[cpu] f .sepc ∗
-      pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu (uxaXget f) ∗ userCfg cpu C ∗
+      pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ hTrapCsrs cpu ∗ gprFile cpu (uxaXget f) ∗ userCfg cpu C ∗
       ubPtRegs cpu P (f .tlb) := by
   iintro ⟨HF, Ha⟩
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, Hwei, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
-  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc]
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, Hmsip, Hwti, -⟩
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc, hc.wti]
   unfold ufAside
-  icases Ha with ⟨%mepc, Hmepc⟩
-  unfold clockCells pcIs userCfg userHwCells ubPtRegs userPmp
-  iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hnpc Hg Hstvec Hmie Hmdl Hmedl Hmenv Hsatp Htlb
-  isplitl [Hmi Hmst Hcy Hti Hip]
+  icases Ha with ⟨⟨%mepc, Hmepc⟩, Hht⟩
+  unfold clockCells cycleAux pcIs userCfg userHwCells ubPtRegs userPmp
+  iframe Hhs Hpr Hms Hsc Hstv Hsep Hpc Hnpc Hg Hstvec Hmie Hmdl Hmedl Hmenv Hsatp Htlb Hht
+  isplitl [Hmi Hmst Hcy Hti Hip Hmsip Hwei Hwti]
   · iexists f .minstret_increment, f .minstret, f .mcycle, f .mtime, f .mip
     iframe
   isplitl [Hmcen Hmtc Hmepc Hstc]
@@ -219,8 +222,8 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
         (if ukTextLeaf kv.2 then byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1) else iprop(emp))) := by
     intro kv
     cases ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]; exact ⟨sep_emp.2, sep_emp.1⟩
-    · simp only [if_true]; exact ⟨emp_sep.2, emp_sep.1⟩
+    · simp only [Bool.false_eq_true, ite_false]; exact ⟨sep_emp.2, sep_emp.1⟩
+    · simp only [ite_true]; exact ⟨emp_sep.2, emp_sep.1⟩
   iapply BigSepL.bigSepL_mono (fun {k kv} _ => (e kv).2)
   iapply BigSepL.bigSepL_sep_eqv.2
   unfold ukDataBytes ukTextBytes
@@ -230,10 +233,10 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
-    · simp only [if_true]
+    · simp only [ite_true]
       iintro _ _
       iempintro
   · rw [ubOwnA_flatMap]
@@ -241,10 +244,10 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       iintro _ _
       iempintro
-    · simp only [if_true]
+    · simp only [ite_true]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
 

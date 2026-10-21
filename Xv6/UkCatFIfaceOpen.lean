@@ -37,8 +37,8 @@ theorem cifHf_insert_std (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : Li
     (fdm fd).bind (cifHf vs) = (fdInsert fdm (k : Int) d fd).bind (cifHf (insert vs d (.UDIn true nm i γo))) := by
   unfold fdInsert
   by_cases hx : fd = (k : Int)
-  · subst hx; rw [hnone, if_pos rfl]; simp [cifHf, LawfulPartialMap.get?_insert_eq]
-  · rw [if_neg hx]
+  · subst hx; rw [hnone, ite_eq_left rfl]; simp [cifHf, LawfulPartialMap.get?_insert_eq]
+  · rw [ite_eq_right hx]
     cases e : fdm fd with
     | none => rfl
     | some d' =>
@@ -148,7 +148,7 @@ theorem open_taint (l : List FdState) (ret : BitVec 64) (fdm : Fdmap) (vs : RegM
       rw [hr, MachCSL.toInt_ofNat fd (by unfold NOFILE at hfdlt; omega)]
     rw [hsig]
     unfold openHeld
-    rw [if_pos (Int.natCast_nonneg fd)]
+    rw [ite_eq_left (Int.natCast_nonneg fd)]
     cases elc : fdLowestClosed l with
     | some k0 =>
       ihave ⟨%hfk, Hstd⟩ := ualloc_std E.N.fd l fd k0 _ elc $$ Hal
@@ -199,7 +199,7 @@ theorem open_taint (l : List FdState) (ret : BitVec 64) (fdm : Fdmap) (vs : RegM
         · iexact Hm
   · rw [hr]
     unfold openHeld
-    rw [if_neg (by decide)]
+    rw [ite_eq_right (by decide)]
     iexists l, hm
     iframe Hstd Hm
     ipureintro; exact hho

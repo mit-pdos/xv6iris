@@ -20,7 +20,7 @@ import MachCSL.WpPmp
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -58,16 +58,24 @@ theorem pmpRangeMatch_xv6 (addr : BitVec 64) (width : Nat) (hram : pmpOk addr wi
     · rfl
     · rename_i h; exfalso; simp at h; omega
 
+/-- With the model's PMP grain (`sys_pmp_grain = 0`) the TOR bound is the
+address register itself. -/
+theorem pmpTORBound_grain (x : BitVec 64) : pmpTORBound x sys_pmp_grain = x := by
+  unfold pmpTORBound sys_pmp_grain
+  simp only [zero_extend, ones, sail_ones, Sail.BitVec.zeroExtend]
+  ext i; simp
+
 /-- The same, in the form the symbolic executor meets it (before it unfolds
-the model's integer conversions); used as a rewriting hypothesis. -/
+the model's integer conversions and the TOR bounds); used as a rewriting
+hypothesis. -/
 theorem pmpRangeMatch_xv6' (addr : BitVec 64) (width : Nat) (hram : pmpOk addr width) :
-    pmpRangeMatch (Sail.BitVec.toNatInt (0#64) * 4).toNat
-      (Sail.BitVec.toNatInt (0x3fffffffffffff#64) * 4).toNat
+    pmpRangeMatch (Sail.BitVec.toNatInt (pmpTORBound 0#64 sys_pmp_grain) * 4).toNat
+      (Sail.BitVec.toNatInt (pmpTORBound 0x3fffffffffffff#64 sys_pmp_grain) * 4).toNat
       (Sail.BitVec.toNatInt addr).toNat
       (Sail.BitVec.toNatInt (to_bits (l := 64) width)).toNat = pmpAddrMatch.PMP_Match := by
   have h := pmpRangeMatch_xv6 addr width hram
-  simp only [Sail.BitVec.toNatInt, to_bits, Sail.get_slice_int, Nat.reduceAdd, BitVec.toNat_ofNat,
-    Nat.reducePow, Nat.reduceMod] at h ⊢
+  simp only [pmpTORBound_grain, Sail.BitVec.toNatInt, to_bits, Sail.get_slice_int, Nat.reduceAdd,
+    BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod] at h ⊢
   exact h
 
 /-! ### The stage lemma -/

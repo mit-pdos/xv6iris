@@ -79,9 +79,9 @@ theorem base_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (p
   | succ n ih =>
     rw [mapRun_succ_eq]
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-    · rw [if_pos hc]
+    · rw [ite_eq_left hc]
       simp only [ih _ _ _ _, PTree.base_setLeaf, MachCSL.PTree.base_fill]
-    · rw [if_neg hc]
+    · rw [ite_eq_right hc]
       exact MachCSL.PTree.base_fill 2 t vpn fr
 
 theorem wf_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
@@ -91,9 +91,9 @@ theorem wf_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (per
   | succ n ih =>
     rw [mapRun_succ_eq]
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-    · rw [if_pos hc]
+    · rw [ite_eq_left hc]
       exact ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (MachCSL.PTree.wf_fill 2 t vpn fr hwf) hc)
-    · rw [if_neg hc]
+    · rw [ite_eq_right hc]
       exact MachCSL.PTree.wf_fill 2 t vpn fr hwf
 
 theorem mem_pages_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
@@ -104,7 +104,7 @@ theorem mem_pages_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 4
   | succ n ih =>
     rw [mapRun_succ_eq] at hb
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-    · rw [if_pos hc] at hb
+    · rw [ite_eq_left hc] at hb
       simp only at hb
       rcases ih _ _ _ _ hb with h | h
       · rw [PTree.pages_setLeaf] at h
@@ -113,7 +113,7 @@ theorem mem_pages_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 4
         · exact Or.inr (List.mem_of_mem_take h')
       · rw [supply_fill] at h
         exact Or.inr (List.mem_of_mem_drop h)
-    · rw [if_neg hc] at hb
+    · rw [ite_eq_right hc] at hb
       simp only at hb
       rcases (mem_pages_fill 2 t vpn fr b).mp hb with h' | h'
       · exact Or.inl h'
@@ -132,13 +132,13 @@ theorem walk_mapRun_outside (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVe
       rwa [bv_add_zero] at this
     rw [mapRun_succ_eq]
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-    · rw [if_pos hc]
+    · rw [ite_eq_left hc]
       simp only
       rw [ih _ _ _ _ (wf_setLeaf_complete 2 _ vpn ppn perm 0#1 0#1 (MachCSL.PTree.wf_fill 2 t vpn fr hwf) hc)
         (fun j hj => by rw [bv_succ_add]; exact hne (j+1) (by omega))]
       rw [walk_setLeaf_ne _ vpn w _ hc (fun he => h0 he.symm)]
       exact MachCSL.PTree.walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
-    · rw [if_neg hc]
+    · rw [ite_eq_right hc]
       exact MachCSL.PTree.walk_fill 2 t vpn fr (PTree.wf_wfU 2 t hwf) w
 
 /-- The composable form: a page outside every region mapped so far is still
@@ -181,9 +181,9 @@ theorem path_setLeaf (lvl : Nat) (t : PTree) (w : BitVec 27) (v : BitVec 64) (vp
     | some c =>
       simp only [PTree.path, PTree.setKid, PTree.kids_node]
       by_cases hj : vpnIdx vpn (lvl+1) = vpnIdx w (lvl+1)
-      · rw [if_pos hj, hj, hk]
+      · rw [ite_eq_left hj, hj, hk]
         simp only [ih]
-      · rw [if_neg hj]
+      · rw [ite_eq_right hj]
 
 theorem complete_of_path_eq (lvl : Nat) (t u : PTree) (vpn : BitVec 27)
     (h : u.path lvl vpn = t.path lvl vpn) (hc : t.complete lvl vpn) : u.complete lvl vpn := by
@@ -197,7 +197,7 @@ theorem walk_setLeaf_self' (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitVec
     (hv : v ≠ 0#64) :
     (t.setLeaf lvl vpn v).walk lvl vpn
       = some (pteAddr (t.slot lvl vpn).1 (t.slot lvl vpn).2, v) := by
-  rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, if_neg hv]
+  rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, ite_eq_right hv]
 
 theorem mapsTo_setLeaf_self (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm) :
     (t.setLeaf 2 vpn (kLeaf ppn perm 0#1 0#1)).mapsTo vpn ppn perm :=
@@ -226,7 +226,7 @@ theorem mapRun_one_of_complete (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (
     (fr : List (BitVec 44)) (h : t.complete 2 vpn) :
     t.mapRun vpn ppn (permBits perm) 1 fr = (t.setLeaf 2 vpn (kLeaf ppn perm 0#1 0#1), fr, 1) := by
   rw [mapRun_succ_eq, fill_of_complete 2 t vpn fr h]
-  simp only [if_pos h, PTree.mapRun]
+  simp only [ite_eq_left h, PTree.mapRun]
 
 /-- A one-page run that mapped its page leaves the path complete. -/
 theorem complete_mapRun_one (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm)
@@ -234,10 +234,10 @@ theorem complete_mapRun_one (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (per
     (t.mapRun vpn ppn (permBits perm) 1 fr).1.complete 2 vpn := by
   rw [mapRun_succ_eq] at hfull ⊢
   by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-  · rw [if_pos hc]
+  · rw [ite_eq_left hc]
     simp only [PTree.mapRun]
     exact complete_setLeaf 2 _ vpn _ vpn hc
-  · rw [if_neg hc] at hfull
+  · rw [ite_eq_right hc] at hfull
     exact absurd (show (0 : Nat) = 1 from hfull) (by decide)
 
 /-! ## Completeness depends only on the two upper indices -/
@@ -283,8 +283,8 @@ theorem sameShape_fill' (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : Lis
         intro j
         simp only [PTree.setKid, PTree.kids_node]
         by_cases hj : j = vpnIdx vpn (lvl+1)
-        · rw [if_pos hj, if_pos hj]; exact ih c d fr gr hi hf' hg'
-        · rw [if_neg hj, if_neg hj]; exact h j
+        · rw [ite_eq_left hj, ite_eq_left hj]; exact ih c d fr gr hi hf' hg'
+        · rw [ite_eq_right hj, ite_eq_right hj]; exact h j
     | none =>
       rw [hk] at hi
       cases hk' : u.kids (vpnIdx vpn (lvl+1)) with
@@ -301,12 +301,12 @@ theorem sameShape_fill' (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : Lis
             intro j
             simp only [PTree.setKid, PTree.setEnt, PTree.kids_node]
             by_cases hj : j = vpnIdx vpn (lvl+1)
-            · rw [if_pos hj, if_pos hj]
+            · rw [ite_eq_left hj, ite_eq_left hj]
               refine ih (PTree.zeroNode b) (PTree.zeroNode e) fr' gr'
                 (sameShape_zeroNode lvl b e) ?_ ?_
               · rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at hf; omega
               · rw [MachCSL.PTree.zeroNode_missingOn]; simp only [List.length_cons] at hg; omega
-            · rw [if_neg hj, if_neg hj]; exact h j
+            · rw [ite_eq_right hj, ite_eq_right hj]; exact h j
 
 theorem missingRun_step' (t : PTree) (vpn : BitVec 27) (m : Nat) (fr : List (BitVec 44))
     (v : BitVec 64) (hlen : t.missingOn 2 vpn ≤ fr.length) :
@@ -332,7 +332,7 @@ theorem mapRun_shape (n : Nat) (t u : PTree) (vpn : BitVec 27) (ppn qpn : BitVec
       rw [← hmo]; exact le_trans (by rw [hmo]; exact missingOn_le_missingRun u vpn n) hg
     have hct : (t.fill 2 vpn fr).1.complete 2 vpn := (complete_fill 2 t vpn fr).mpr hft
     have hcu : (u.fill 2 vpn gr).1.complete 2 vpn := (complete_fill 2 u vpn gr).mpr hgu
-    rw [mapRun_succ_eq, mapRun_succ_eq, if_pos hct, if_pos hcu]
+    rw [mapRun_succ_eq, mapRun_succ_eq, ite_eq_left hct, ite_eq_left hcu]
     simp only
     refine ih _ _ _ _ _ _ _
       (sameShape_setLeaf 2 _ _ vpn _ _ (sameShape_fill' 2 t u vpn fr gr h hft hgu)) ?_ ?_
@@ -355,7 +355,7 @@ theorem mapsTo_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) 
   | succ n ih =>
     rw [mapRun_succ_eq] at hfull ⊢
     by_cases hc : (t.fill 2 vpn fr).1.complete 2 vpn
-    · rw [if_pos hc] at hfull ⊢
+    · rw [ite_eq_left hc] at hfull ⊢
       simp only at hfull ⊢
       have hfull := Nat.add_right_cancel hfull
       have hwf1 : ((t.fill 2 vpn fr).1.setLeaf 2 vpn (kLeaf ppn perm 0#1 0#1)).wf 2 :=
@@ -382,7 +382,7 @@ theorem mapsTo_mapRun (n : Nat) (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) 
         have := ih _ (vpn + 1#27) (ppn + 1#44) _ hwf1 hspan1 hfull j (by omega)
         rw [bv_succ_add, bv_succ_add] at this
         exact this
-    · rw [if_neg hc] at hfull
+    · rw [ite_eq_right hc] at hfull
       exact absurd (show (0 : Nat) = n + 1 from hfull) (by omega)
 
 /-! ## The kernel stacks -/
@@ -446,7 +446,7 @@ theorem pageAddr_of_valid (p : BitVec 64) (h : pageValid p) :
     pageAddr (BitVec.extractLsb' 12 44 p) = p := by
   obtain ⟨h1, -, h3⟩ := h
   unfold physTop at h3
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   revert h1 h3
   bv_decide
 

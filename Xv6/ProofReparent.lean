@@ -71,8 +71,8 @@ theorem rp_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
     (if bcond bop.BEQ (procAddr (i + 1)) KA.«tickslock» then p else q)
       = if i + 1 = NPROC then p else q := by
   by_cases he : i + 1 = NPROC
-  · rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact (rp_cursor_eq i hi).mpr he)]
-  · rw [if_neg he, if_neg (by
+  · rw [ite_eq_left he, ite_eq_left (by simp only [bcond, beq_iff_eq]; exact (rp_cursor_eq i hi).mpr he)]
+  · rw [ite_eq_right he, ite_eq_right (by
       simp only [bcond, beq_iff_eq]
       exact fun hc => he ((rp_cursor_eq i hi).mp hc))]
 
@@ -88,7 +88,7 @@ theorem rp_off0 (a : BitVec 64) : a + 0#64 = a := BitVec.add_zero a
 
 theorem rp_bne_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
+  rw [ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
 /-! ## Context reshaping -/
 
@@ -119,11 +119,11 @@ def reparentedUpto (parents : Nat → BitVec 64) (p ip : BitVec 64) (i : Nat) : 
 
 theorem reparentedUpto_zero (parents : Nat → BitVec 64) (p ip : BitVec 64) :
     reparentedUpto parents p ip 0 = parents := by
-  funext j; simp only [reparentedUpto, Nat.not_lt_zero, if_false]
+  funext j; simp only [reparentedUpto, Nat.not_lt_zero, ite_false]
 
 theorem reparentedUpto_read (parents : Nat → BitVec 64) (p ip : BitVec 64) (i : Nat) :
     reparentedUpto parents p ip i i = parents i := by
-  simp only [reparentedUpto, Nat.lt_irrefl, if_false]
+  simp only [reparentedUpto, Nat.lt_irrefl, ite_false]
 
 theorem reparentedUpto_succ_match (parents : Nat → BitVec 64) (p ip : BitVec 64) (i : Nat)
     (hm : parents i = p) :
@@ -131,14 +131,14 @@ theorem reparentedUpto_succ_match (parents : Nat → BitVec 64) (p ip : BitVec 6
       = reparentedUpto parents p ip (i + 1) := by
   funext x
   by_cases hx : x = i
-  · rw [if_pos hx, hx]
-    simp only [reparentedUpto, Nat.lt_succ_self, if_true]
-    rw [if_pos hm]
-  · rw [if_neg hx]
+  · rw [ite_eq_left hx, hx]
+    simp only [reparentedUpto, Nat.lt_succ_self, ite_true]
+    rw [ite_eq_left hm]
+  · rw [ite_eq_right hx]
     simp only [reparentedUpto]
     by_cases hlt : x < i
-    · rw [if_pos hlt, if_pos (show x < i + 1 by omega)]
-    · rw [if_neg hlt, if_neg (show ¬ x < i + 1 by omega)]
+    · rw [ite_eq_left hlt, ite_eq_left (show x < i + 1 by omega)]
+    · rw [ite_eq_right hlt, ite_eq_right (show ¬ x < i + 1 by omega)]
 
 theorem reparentedUpto_succ_nomatch (parents : Nat → BitVec 64) (p ip : BitVec 64) (i : Nat)
     (hm : parents i ≠ p) :
@@ -146,19 +146,19 @@ theorem reparentedUpto_succ_nomatch (parents : Nat → BitVec 64) (p ip : BitVec
       = reparentedUpto parents p ip (i + 1) := by
   funext x
   by_cases hx : x = i
-  · rw [if_pos hx, hx]
-    simp only [reparentedUpto, Nat.lt_irrefl, if_false, Nat.lt_succ_self, if_true]
-    rw [if_neg hm]
-  · rw [if_neg hx]
+  · rw [ite_eq_left hx, hx]
+    simp only [reparentedUpto, Nat.lt_irrefl, ite_false, Nat.lt_succ_self, ite_true]
+    rw [ite_eq_right hm]
+  · rw [ite_eq_right hx]
     simp only [reparentedUpto]
     by_cases hlt : x < i
-    · rw [if_pos hlt, if_pos (show x < i + 1 by omega)]
-    · rw [if_neg hlt, if_neg (show ¬ x < i + 1 by omega)]
+    · rw [ite_eq_left hlt, ite_eq_left (show x < i + 1 by omega)]
+    · rw [ite_eq_right hlt, ite_eq_right (show ¬ x < i + 1 by omega)]
 
 theorem reparentedUpto_full (parents : Nat → BitVec 64) (p ip : BitVec 64) (j : Nat)
     (hj : j < NPROC) :
     reparentedUpto parents p ip NPROC j = reparented parents p ip j := by
-  simp only [reparentedUpto, if_pos hj, reparented]
+  simp only [reparentedUpto, ite_eq_left hj, reparented]
 
 variable [CurCtx]
 
@@ -404,7 +404,7 @@ theorem rp_loop (WK : WAKEUP) [CurCtx]
     iframe #
     iapply wpNext_intro_pin_lc
     iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hpost
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     ihave HW := waitResAt_eq curCtx _ (reparentedUpto parents p ip NPROC)
       (show reparentedUpto parents p ip (i + 1) = reparentedUpto parents p ip NPROC by rw [hlast])
       $$ HW
@@ -423,7 +423,7 @@ theorem rp_loop (WK : WAKEUP) [CurCtx]
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hq1 %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hpost
-    rw [if_neg hlast]
+    rw [ite_eq_right hlast]
     obtain ⟨hkept2, hcur2⟩ := hpost
     ihave HPhi := wpNext_shift _ _ _ _ _ hq1 $$ HPhi
     iapply (ih (i + 1) (by unfold NPROC at hf ⊢; omega) spie2 spp2 R2 hcur2

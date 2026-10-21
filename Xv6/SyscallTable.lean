@@ -164,11 +164,11 @@ theorem syscall_srl_and1 (secc : BitVec 64) (k : Nat) :
   apply BitVec.eq_of_getLsbD_eq
   intro i hi
   by_cases h : secc.getLsbD k
-  · simp only [h, if_true, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight, BitVec.getLsbD_one]
+  · simp only [h, ite_true, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight, BitVec.getLsbD_one]
     by_cases hi0 : i = 0
     · subst hi0; simp [h]
     · simp [hi0]
-  · simp only [h, Bool.false_eq_true, if_false, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight,
+  · simp only [h, Bool.false_eq_true, ite_false, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight,
       BitVec.getLsbD_one, BitVec.getLsbD_zero]
     by_cases hi0 : i = 0
     · subst hi0; simp [h]
@@ -206,7 +206,7 @@ theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt �
     split at h2 <;> split at h1 <;> omega
   have hle : x ≤ 24#32 := by rw [BitVec.le_def]; simpa using hsmall
   have hti : x.toInt.toNat = x.toNat := by
-    rw [BitVec.toInt_eq_toNat_cond, if_pos (by omega)]; simp
+    rw [BitVec.toInt_eq_toNat_cond, ite_eq_left (by omega)]; simp
   rw [hti]
   have e1 : BitVec.ofNat 64 x.toNat = BitVec.setWidth 64 x := by
     apply BitVec.eq_of_toNat_eq
@@ -243,10 +243,10 @@ theorem syscImg_faulted (P P' : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
     | some w =>
       have hk := hlt _ w hP hP'
       have hn : n < pgRoundUpN sz.toNat := by unfold pgRoundUpN; omega
-      simp only [Option.isSome_some, Option.isNone_none, and_self, if_true, Option.isSome_none,
-        Bool.false_eq_true, if_false, hn]
+      simp only [Option.isSome_some, Option.isNone_none, and_self, ite_true, Option.isSome_none,
+        Bool.false_eq_true, ite_false, hn]
       rw [List.getElem?_replicate]
-      rw [if_pos (Nat.mod_lt _ (by decide))]
+      rw [ite_eq_left (Nat.mod_lt _ (by decide))]
 
 /-- **A copyout moves exactly its run of the image** (Rocq `umem_wr` at the
 kernel's view): writing `bs` at `a` into the page view, over pages the table
@@ -271,9 +271,9 @@ theorem syscImg_write (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (a : B
     have hidx : (a.toNat + j) % 4096 < (M ((a.toNat + j) / 4096)).length := by
       rw [hl]; exact Nat.mod_lt _ (by decide)
     unfold umemLazy umemWrite
-    rw [if_pos hm, List.getElem?_mapIdx, List.getElem?_eq_getElem hidx]
+    rw [ite_eq_left hm, List.getElem?_mapIdx, List.getElem?_eq_getElem hidx]
     simp only [Option.map_some]
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
     have e : (a.toNat + j) / 4096 * 4096 + (a.toNat + j) % 4096 - a.toNat = j := by omega
     rw [e, List.getElem?_eq_getElem hj]
     rfl
@@ -290,7 +290,7 @@ theorem syscImg_write (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (a : B
       | none => rfl
       | some b =>
         simp only [Option.map_some]
-        rw [if_neg (by omega)]
+        rw [ite_eq_right (by omega)]
     · rfl
 
 /-! ## §3 The arm interface -/

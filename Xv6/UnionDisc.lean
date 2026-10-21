@@ -96,20 +96,20 @@ def ualtDec (n : Nat) : Ualt :=
 
 theorem ualtDec_R (k : Nat) : ualtDec (4 * k) = UR (raltDec k) := by
   simp only [ualtDec]
-  rw [if_pos (by omega), show 4 * k / 4 = k by omega]
+  rw [ite_eq_left (by omega), show 4 * k / 4 = k by omega]
 
 theorem ualtDec_E (k : Nat) : ualtDec (4 * k + 1) = UPE (plaltOf k) := by
   simp only [ualtDec]
-  rw [if_neg (by omega), if_pos (by omega), show (4 * k + 1) / 4 = k by omega]
+  rw [ite_eq_right (by omega), ite_eq_left (by omega), show (4 * k + 1) / 4 = k by omega]
 
 theorem ualtDec_C (k : Nat) : ualtDec (4 * k + 2) = UPC (plaltOf k) := by
   simp only [ualtDec]
-  rw [if_neg (by omega), if_neg (by omega), if_pos (by omega),
+  rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_left (by omega),
     show (4 * k + 2) / 4 = k by omega]
 
 theorem ualtDec_S (k : Nat) : ualtDec (4 * k + 3) = US (bytesDecode k) := by
   simp only [ualtDec]
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
+  rw [ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
     show (4 * k + 3) / 4 = k by omega]
 
 theorem ualtDec_0 : ualtDec 0 = UR (raltDec 0) := ualtDec_R 0
@@ -431,7 +431,7 @@ theorem plParse_not_secc (b : List (BitVec 8)) (l : Pline') (hq : plParse b = so
     obtain ⟨ws, hws⟩ := ulineWs_head_secc _ (ulineOk_ofPl_all l hok) hh
     cases l <;> cases hws
   unfold seccParse
-  rw [if_neg hn]
+  rw [ite_eq_right hn]
 
 /-- a seccomp body is read as its line -/
 theorem ulineOfU_secc_parse (b : List (BitVec 8)) (ws : List (List (BitVec 8)))
@@ -473,7 +473,7 @@ theorem ulineOfU_sync_parse (b : List (BitVec 8)) (hs : syncParse b = true) :
     | none =>
       cases hc : seccParse b with
       | some ws => rw [syncParse_secc b ws hc] at hs; cases hs
-      | none => simp only [hs, if_true]
+      | none => simp only [hs, ite_true]
 
 /-- **Rocq `uline_of_u_sync`**. -/
 theorem ulineOfU_sync : ulineOfU (lineBody .LSync) = .LSync :=
@@ -517,7 +517,7 @@ theorem ulineOfU_ok (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → B
         cases hc : seccParse b with
         | some ws => rw [syncParse_secc b ws hc] at hsync; cases hsync
         | none =>
-          simp only [hsync, if_true]
+          simp only [hsync, ite_true]
           exact ⟨trivial, trivial⟩
 
 /-- **Rocq `sfx_term_pos`**: a terminal run proves its line has a stage. -/

@@ -18,7 +18,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -39,7 +39,7 @@ theorem swp_checked_mem_read_pte8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_au cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_au cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAU_wand cpu pa 8 K ts Ψ $$ HAU
@@ -61,7 +61,7 @@ theorem swp_read_pte (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, #HK, HAU, HΦ⟩
-  unfold read_pte mem_read_priv mem_read_priv_meta
+  unfold read_pte mem_read mem_read_priv_meta
   swp_run 20
   iapply swp_bind
   iapply (swp_checked_mem_read_pte8_S_au cpu dq c sie hok pa hram hal K ts Ψ)
@@ -91,7 +91,7 @@ theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (s
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide) r)
+  mem_iapply (swp_sail_mem_read_excl_au cpu) false rfl rfl (by decide) r
   iframe Hfrag
   iapply exclReadAU_wand pa 8 _ _ $$ HAU
   inext
@@ -114,7 +114,7 @@ theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
-  unfold read_pte_exclusive mem_read_priv mem_read_priv_meta
+  unfold read_pte_exclusive mem_read mem_read_priv_meta
   swp_run 20
   iapply swp_bind
   iapply (swp_checked_mem_read_pte8_excl_S cpu dq c sie hok pa hram hal r Ψ)
@@ -143,7 +143,7 @@ theorem swp_checked_mem_write_pte8_cond_S (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_excl_au cpu _ w0 data false rfl rfl (by decide))
+  mem_iapply (swp_sail_mem_write_excl_au cpu) w0 data false (vecbytes_to_bitvec_to_bytes_le_8 _) rfl (by decide)
   iframe Hfrag
   iapply exclWriteAU_wand cpu pa 8 false w0 data Ψ $$ HAU
   inext
@@ -165,7 +165,7 @@ theorem swp_write_pte_conditional (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (write_pte_conditional (physaddr.Physaddr pa) 8 data) Φ := by
   iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
-  unfold write_pte_conditional mem_write_value_priv mem_write_value_priv_meta
+  unfold write_pte_conditional mem_write_value mem_write_value_priv_meta
   swp_run 20
   iapply swp_bind
   iapply (swp_checked_mem_write_pte8_cond_S cpu dq c sie hok pa w0 data hram hal Ψ)
@@ -177,30 +177,31 @@ theorem swp_write_pte_conditional (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
 
 /-! ## The walk's checks on the kernel's entries -/
 
-/-- `check_leaf_pte` at Sv39 with the entry typed plainly.  The model's
+/-- `check_leaf_pte` at Sv39, supervisor stage, with the entry typed plainly.  The model's
 `BitVec (if 39 = 32 then 32 else 64)` is not reducibly `BitVec 64`, which
 defeats the proof mode's unifier once a `BitVec 64` value sits in that slot;
 the spec lemmas are stated over these wrappers and the goal is rewritten to
-them at the call. -/
+them at the call.  (Since sail-riscv 0.16 the walk takes the translation
+stage; xv6 translates in one stage, `S_Stage`, which the wrappers fix.) -/
 noncomputable def check_leaf_pte39 (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (priv : Privilege)
     (mxr do_sum : Bool) (pte : BitVec 64) (addr : physaddr) (level : Nat) (u : Unit) :
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
-  check_leaf_pte 39 vpn acc priv mxr do_sum pte addr level u
+  check_leaf_pte 39 vpn acc priv mxr do_sum pte addr level TranslationStage.S_Stage u
 
 theorem check_leaf_pte39_eq (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (priv : Privilege)
     (mxr do_sum : Bool) (pte : BitVec 64) (addr : physaddr) (level : Nat) (u : Unit) :
-    check_leaf_pte 39 vpn acc priv mxr do_sum pte addr level u =
+    check_leaf_pte 39 vpn acc priv mxr do_sum pte addr level TranslationStage.S_Stage u =
       check_leaf_pte39 vpn acc priv mxr do_sum pte addr level u := rfl
 
-/-- `update_and_write_pte` at Sv39 with the entry typed plainly. -/
+/-- `update_and_write_pte` at Sv39, supervisor stage, with the entry typed plainly. -/
 noncomputable def update_and_write_pte39 (vpn : BitVec 27) (addr : physaddr) (pte : BitVec 64) (level : Nat)
     (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
     SailM (Result (Option (BitVec 64) × Unit) (PTW_Error × Unit)) :=
-  update_and_write_pte 39 vpn addr pte level acc priv mxr do_sum u
+  update_and_write_pte 39 vpn addr pte level acc priv mxr do_sum TranslationStage.S_Stage u
 
 theorem update_and_write_pte39_eq (vpn : BitVec 27) (addr : physaddr) (pte : BitVec 64) (level : Nat)
     (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
-    update_and_write_pte 39 vpn addr pte level acc priv mxr do_sum u =
+    update_and_write_pte 39 vpn addr pte level acc priv mxr do_sum TranslationStage.S_Stage u =
       update_and_write_pte39 vpn addr pte level acc priv mxr do_sum u := rfl
 
 /-- The accesses a kernel leaf permits: fetch needs `rx`, a store or AMO
@@ -220,7 +221,7 @@ theorem swp_pte_is_invalid_kLeaf (cpu : CPU) (dq : DFrac) (c : MConf)
     (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) (Φ : Bool → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
     ⊢ swp cpu (pte_is_invalid (Mk_PTE_Flags (BitVec.extractLsb' 0 8 (kLeaf ppn perm a d)))
-        0#10) Φ := by
+        0#10 TranslationStage.S_Stage) Φ := by
   iintro ⟨HmConf, HΦ⟩
   conf_cases HmConf
   rw [flags_of_kLeaf']
@@ -237,7 +238,7 @@ set_option maxHeartbeats 4000000 in
 theorem swp_pte_is_invalid_kPtr (cpu : CPU) (dq : DFrac) (c : MConf)
     (ppn : BitVec 44) (Φ : Bool → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ (confCells cpu dq Privilege.Supervisor c -∗ Φ false)
-    ⊢ swp cpu (pte_is_invalid (Mk_PTE_Flags ptrFlags) 0#10) Φ := by
+    ⊢ swp cpu (pte_is_invalid (Mk_PTE_Flags ptrFlags) 0#10 TranslationStage.S_Stage) Φ := by
   iintro ⟨HmConf, HΦ⟩
   conf_cases HmConf
   simp only [ptrFlags]
@@ -262,7 +263,7 @@ theorem swp_check_PTE_permission_kLeaf (cpu : CPU) (acc : MemoryAccessType mem_p
     (hacc : kernelAccess acc) (mxr do_sum : Bool) (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
     (hperm : perm.allows acc = true) (e : BitVec 10) (u : Unit) (Φ : PTE_Check → IProp GF) :
     Φ (PTE_Check.PTE_Check_Success ()) ⊢
-      swp cpu (check_PTE_permission acc Privilege.Supervisor mxr do_sum
+      swp cpu (check_PTE_permission acc Privilege.Supervisor TranslationStage.S_Stage mxr do_sum
         (Mk_PTE_Flags (BitVec.extractLsb' 0 8 (kLeaf ppn perm a d))) e u) Φ := by
   iintro HΦ
   rw [flags_of_kLeaf']
@@ -314,6 +315,19 @@ theorem kernelAccess_plain (acc : MemoryAccessType mem_payload) (hacc : kernelAc
     accPlain acc := by
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
 
+/-- The `A`/`D` update on a kernel leaf, at any stage (a `SailM` computation since
+sail-riscv 0.16, pure on this platform: `update_PTE_Bits_pteSetAD`): nothing to do, or the leaf
+at other bits. -/
+theorem update_PTE_Bits_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1)
+    (acc : MemoryAccessType mem_payload) (hpl : accPlain acc) (stage : TranslationStage) :
+    ∃ o : Option (BitVec 64), update_PTE_Bits (kLeaf ppn perm a d) acc stage = pure o ∧
+      (o = none ∨ ∃ a2 d2, o = some (kLeaf ppn perm a2 d2)) := by
+  rw [kLeaf, update_PTE_Bits_pteSetAD _ _ _ _ hpl]
+  refine ⟨_, rfl, ?_⟩
+  split
+  · exact Or.inr ⟨_, _, rfl⟩
+  · exact Or.inl rfl
+
 /-- What the write-back may report: nothing, or some variant of the leaf. -/
 def pteOptVariant (ppn : BitVec 44) (perm : KPerm) : Option (BitVec 64) → Prop
   | none => True
@@ -321,23 +335,26 @@ def pteOptVariant (ppn : BitVec 44) (perm : KPerm) : Option (BitVec 64) → Prop
 
 /-! ## The walk -/
 
-/-- The entry address in the executor's normal form. -/
+/-- The entry address in the executor's normal form (sail-riscv 0.16 adds the index to the
+page base, `pt_base +++ zeros + zero_extend (vpn_i +++ zeros)`, where it used to concatenate). -/
 theorem pteAddr_setWidth (b : BitVec 44) (i : BitVec 9) :
-    BitVec.setWidth 64 (b +++ (i +++ 0#3)) = pteAddr b i := rfl
+    BitVec.setWidth 64 (b +++ 0#12 + BitVec.setWidth 56 (i +++ 0#3)) = pteAddr b i := by
+  unfold pteAddr zero_extend Sail.BitVec.zeroExtend
+  bv_decide
 
 theorem vpnIdx_two' (vpn : BitVec 27) : BitVec.extractLsb' 18 9 vpn = vpnIdx vpn 2 := rfl
 theorem vpnIdx_one' (vpn : BitVec 27) : BitVec.extractLsb' 9 9 vpn = vpnIdx vpn 1 := rfl
 theorem vpnIdx_zero' (vpn : BitVec 27) : BitVec.extractLsb' 0 9 vpn = vpnIdx vpn 0 := rfl
 
-/-- `pt_walk` at Sv39 with the root typed plainly. -/
+/-- `pt_walk` at Sv39, supervisor stage, with the root typed plainly. -/
 noncomputable def pt_walk39 (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (priv : Privilege)
     (mxr do_sum : Bool) (base : BitVec 44) (level : Nat) (global : Bool) (u : Unit) :
     SailM (Result (PTW_Output 39 × Unit) (PTW_Error × Unit)) :=
-  pt_walk 39 vpn acc priv mxr do_sum base level global u
+  pt_walk 39 vpn acc priv mxr do_sum base level global TranslationStage.S_Stage u
 
 theorem pt_walk39_eq (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (priv : Privilege)
     (mxr do_sum : Bool) (base : BitVec 44) (level : Nat) (global : Bool) (u : Unit) :
-    pt_walk 39 vpn acc priv mxr do_sum base level global u =
+    pt_walk 39 vpn acc priv mxr do_sum base level global TranslationStage.S_Stage u =
       pt_walk39 vpn acc priv mxr do_sum base level global u := rfl
 
 /-- What the walk reports for a kernel leaf at level 0. -/
@@ -369,8 +386,10 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   have hnlp : pte_is_non_leaf (Mk_PTE_Flags ptrFlags) = true := nonLeaf_ptr
   -- level 2
   rw [pt_walk]
+  delta Functions.pagesize_bits
   reduce_closed_widths
   swp_run 40
+  reduce_closed_widths
   rw [vpnIdx_two']; erw [pteAddr_setWidth]
   icases kpt_readAU cpu t M _ _ m2 $$ [Hkpt Hctx] with ⟨Hctx, %K, %tsl, HK, HAU⟩
   · iframe Hctx; iexact Hkpt
@@ -393,8 +412,10 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   swp_run 40
   -- level 1
   rw [pt_walk]
+  delta Functions.pagesize_bits
   reduce_closed_widths
   swp_run 40
+  reduce_closed_widths
   rw [vpnIdx_one']; erw [pteAddr_setWidth]
   icases kpt_readAU cpu t M _ _ m1 $$ [Hkpt Hctx] with ⟨Hctx, %K1, %tsl1, HK, HAU⟩
   · iframe Hctx; iexact Hkpt
@@ -417,8 +438,10 @@ theorem swp_pt_walk_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
   swp_run 40
   -- level 0
   rw [pt_walk]
+  delta Functions.pagesize_bits
   reduce_closed_widths
   swp_run 40
+  reduce_closed_widths
   rw [vpnIdx_zero']; erw [pteAddr_setWidth]
   subst haddr
   icases kpt_readAU cpu t M _ _ m0 $$ [Hkpt Hctx] with ⟨Hctx, %K0, %tsl0, HK, HAU⟩
@@ -482,13 +505,13 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
   have hpl : accPlain acc := kernelAccess_plain acc hacc
   unfold update_and_write_pte39 update_and_write_pte
   reduce_closed_widths
-  cases hupd : update_PTE_Bits (kLeaf ppn perm a d) acc with
-  | none =>
-    swp_run 40
+  obtain ⟨o, hupd, ho⟩ := update_PTE_Bits_kLeaf ppn perm a d acc hpl TranslationStage.S_Stage
+  rw [hupd]
+  rcases ho with rfl | ⟨ap, dp, rfl⟩
+  · swp_run 40
     iapply HΦ $$ HmConf Hctx %r0 Hfrag %none
     ipureintro; trivial
-  | some p =>
-    conf_cases HmConf
+  · conf_cases HmConf
     swp_run 60
     conf_intro HmConf
     ihave HAU := kpt_exclReadAU t M addr _ hmem $$ Hkpt
@@ -512,20 +535,14 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     iframe HmConf
     inext
     iintro HmConf
-    cases hupd2 : update_PTE_Bits (kLeaf ppn perm a1 d1) acc with
-    | none =>
-      swp_run 40
+    obtain ⟨o2, hupd2, ho2⟩ := update_PTE_Bits_kLeaf ppn perm a1 d1 acc hpl TranslationStage.S_Stage
+    rw [hupd2]
+    rcases ho2 with rfl | ⟨a2, d2, rfl⟩
+    · swp_run 40
       ihave Hfrag := resvFragAny_of cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false $$ Hfrag
       iapply HΦ $$ HmConf Hctx %(some (snapOf addr 8 (kLeaf ppn perm a1 d1))) Hfrag %(some (kLeaf ppn perm a1 d1))
       ipureintro; exact ⟨a1, d1, rfl⟩
-    | some p2 =>
-      have hp2 : ∃ a2 d2, p2 = kLeaf ppn perm a2 d2 := by
-        rw [kLeaf, update_PTE_Bits_pteSetAD _ _ _ _ hpl] at hupd2
-        split at hupd2
-        · exact ⟨_, _, (Option.some.inj hupd2).symm⟩
-        · exact absurd hupd2 (by simp)
-      obtain ⟨a2, d2, rfl⟩ := hp2
-      swp_run 40
+    · swp_run 40
       ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
         (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ Hkpt
       iapply swp_bind
@@ -541,31 +558,38 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
 
 /-! ## The TLB -/
 
-/-- `add_to_TLB` at Sv39 with the page and entry typed plainly. -/
+/-- `add_to_TLB` at Sv39, supervisor stage (VMID 0), with the page and entry typed plainly. -/
 noncomputable def add_to_TLB39 (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte : BitVec 64)
     (pteAddr : physaddr) (level : Nat) (global : Bool) : SailM Unit :=
-  add_to_TLB 39 asid vpn ppn pte pteAddr level global
+  add_to_TLB 39 asid 0#14 vpn ppn pte pteAddr level global TranslationStage.S_Stage
 
 theorem add_to_TLB39_eq (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte : BitVec 64)
     (pteAddr : physaddr) (level : Nat) (global : Bool) :
-    add_to_TLB 39 asid vpn ppn pte pteAddr level global = add_to_TLB39 asid vpn ppn pte pteAddr level global :=
+    add_to_TLB 39 asid 0#14 vpn ppn pte pteAddr level global TranslationStage.S_Stage =
+      add_to_TLB39 asid vpn ppn pte pteAddr level global :=
   rfl
 
 /-- `tlbEntryOf` in the normal form the executor leaves the record in. -/
 theorem tlbEntryOf_mk' (vpn : BitVec 27) (ppn : BitVec 44) (pte addr : BitVec 64) :
-    ({ asid := 0#16, global := false,
-       vpn := BitVec.signExtend 45 (vpn &&& ~~~BitVec.setWidth 27 (ones (n := 0))),
-       levelMask := BitVec.setWidth 45 (ones (n := 0)),
+    ({ asid := 0#16, vmid := 0#14, stage := TranslationStage.S_Stage, global := false,
+       vpn := BitVec.signExtend 47 (vpn &&& ~~~BitVec.setWidth 27 (ones (n := 0))),
+       levelMask := BitVec.setWidth 47 (ones (n := 0)),
        ppn := ppn &&& ~~~BitVec.setWidth 44 (ones (n := 0)), pte := pte,
        pteAddr := physaddr.Physaddr addr } : TLB_Entry) = tlbEntryOf 0#16 vpn ppn pte addr := by
   have h27 : (BitVec.setWidth 27 (ones (n := 0)) : BitVec 27) = 0#27 := by decide
   have h44 : (BitVec.setWidth 44 (ones (n := 0)) : BitVec 44) = 0#44 := by decide
-  have h45 : (BitVec.setWidth 45 (ones (n := 0)) : BitVec 45) = 0#45 := by decide
-  rw [h27, h44, h45, and_not_zero_27, and_not_zero_44]
+  have h47 : (BitVec.setWidth 47 (ones (n := 0)) : BitVec 47) = 0#47 := by decide
+  rw [h27, h44, h47, and_not_zero_27, and_not_zero_44]
   rfl
 
-/-- The hash in the normal form the executor leaves. -/
-theorem tlbHash_norm (vpn : BitVec 27) : (BitVec.extractLsb' 0 6 vpn).toNat = tlbHash vpn := rfl
+/-- The hash in the normal form the executor leaves (since sail-riscv 0.16 the hash XORs in the
+stage's code, 0 for `S_Stage`). -/
+theorem tlbHash_norm (vpn : BitVec 27) : (BitVec.extractLsb' 0 6 vpn ^^^ 0#6).toNat = tlbHash vpn := by
+  rw [BitVec.xor_zero]
+  rfl
+
+/-- The root level of an Sv39 walk. -/
+theorem get_root_level_39 : get_root_level 39 = 2 := rfl
 
 /-- A slot of the `tlb` register, with the model's `!` indexing. -/
 theorem tlb_get! (tlb : Tlb) (i : Nat) (h : i < 2 ^ 6) : tlb[i]! = tlb[i] := by
@@ -588,7 +612,7 @@ theorem swp_lookup_TLB_kpt (cpu : CPU) (t : PTree) (tlb : Tlb) (htlb : tlbOk t t
     (Φ : Option (Nat × TLB_Entry) → IProp GF) :
     Register.tlb ↦ᵣ[cpu] tlb ∗
     ▷ (Register.tlb ↦ᵣ[cpu] tlb -∗ ∀ r, ⌜lookupRes t tlb vpn r⌝ -∗ Φ r)
-    ⊢ swp cpu (lookup_TLB 39 0#16 vpn) Φ := by
+    ⊢ swp cpu (lookup_TLB 39 0#16 0#14 vpn TranslationStage.S_Stage) Φ := by
   iintro ⟨Htlb, HΦ⟩
   unfold lookup_TLB
   swp_run 20
@@ -600,8 +624,9 @@ theorem swp_lookup_TLB_kpt (cpu : CPU) (t : PTree) (tlb : Tlb) (htlb : tlbOk t t
     ipureintro; trivial
   | some ent =>
     obtain ⟨vpn₁, addr, ppn, perm, a, d, a', d', hh, hw, rfl⟩ := htlb (tlbHash vpn) (tlbHash_lt vpn) ent hget
-    have hm : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ ppn (kLeaf ppn perm a' d') addr) 0#16
-        (BitVec.signExtend 45 vpn) = decide (vpn = vpn₁) := match_tlbEntryOf vpn₁ vpn ppn _ addr
+    have hm : match_TLB_Entry (tlbEntryOf 0#16 vpn₁ ppn (kLeaf ppn perm a' d') addr) 0#16 0#14
+        (BitVec.signExtend 47 vpn) TranslationStage.S_Stage = decide (vpn = vpn₁) :=
+      match_tlbEntryOf vpn₁ vpn ppn _ addr
     by_cases heq : vpn = vpn₁
     · subst heq
       have hd : decide (vpn = vpn) = true := by simp
@@ -636,31 +661,32 @@ theorem swp_add_to_TLB_kpt (cpu : CPU) (tlb : Tlb) (vpn : BitVec 27) (ppn : BitV
 
 /-! ## Translation at the kernel page table -/
 
-/-- The Sv39 translation functions with their pages and entries typed plainly. -/
+/-- The Sv39 translation functions, supervisor stage (VMID 0), with their pages and entries
+typed plainly. -/
 noncomputable def translate_TLB_hit39 (asid : BitVec 16) (vpn : BitVec 27) (acc : MemoryAccessType mem_payload)
     (priv : Privilege) (mxr do_sum : Bool) (u : Unit) (i : Nat) (ent : TLB_Entry) :
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
-  translate_TLB_hit 39 asid vpn acc priv mxr do_sum u i ent
+  translate_TLB_hit 39 asid 0#14 vpn acc priv mxr do_sum i ent TranslationStage.S_Stage u
 
 theorem translate_TLB_hit39_eq (asid : BitVec 16) (vpn : BitVec 27) (acc : MemoryAccessType mem_payload)
     (priv : Privilege) (mxr do_sum : Bool) (u : Unit) (i : Nat) (ent : TLB_Entry) :
-    translate_TLB_hit 39 asid vpn acc priv mxr do_sum u i ent =
+    translate_TLB_hit 39 asid 0#14 vpn acc priv mxr do_sum i ent TranslationStage.S_Stage u =
       translate_TLB_hit39 asid vpn acc priv mxr do_sum u i ent := rfl
 
 noncomputable def translate_TLB_miss39 (asid : BitVec 16) (base : BitVec 44) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
-  translate_TLB_miss 39 asid base vpn acc priv mxr do_sum u
+  translate_TLB_miss 39 asid 0#14 base vpn acc priv mxr do_sum TranslationStage.S_Stage u
 
 theorem translate_TLB_miss39_eq (asid : BitVec 16) (base : BitVec 44) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
-    translate_TLB_miss 39 asid base vpn acc priv mxr do_sum u =
+    translate_TLB_miss 39 asid 0#14 base vpn acc priv mxr do_sum TranslationStage.S_Stage u =
       translate_TLB_miss39 asid base vpn acc priv mxr do_sum u := rfl
 
 noncomputable def translate39 (asid : BitVec 16) (base : BitVec 44) (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (priv : Privilege) (mxr do_sum : Bool) (u : Unit) :
     SailM (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
-  translate 39 asid base vpn acc priv mxr do_sum u
+  translate 39 asid 0#14 base vpn acc priv mxr do_sum TranslationStage.S_Stage u
 
 /-- The memory type a cached kernel leaf reports. -/
 theorem tlb_get_pbmt_kLeaf (asid : BitVec 16) (vpn : BitVec 27) (ppn ppn' : BitVec 44) (perm : KPerm)
@@ -754,7 +780,7 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
   unfold translate_TLB_miss39 translate_TLB_miss
   reduce_closed_widths
   swp_run 20
-  rw [pt_walk39_eq]
+  rw [get_root_level_39, pt_walk39_eq]
   iapply swp_bind
   iapply (swp_pt_walk_kpt cpu dq c sie hok t M vpn acc hacc mxr do_sum addr ppn perm hmaps hperm u)
   iframe HmConf Hkpt Hctx
@@ -796,25 +822,38 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     ipureintro; exact tlbOk_write t tlb htlb vpn addr ppn perm a₀ d₀ a2 d2 hw
 
 
-/-- The page number of a canonical Sv39 address, as the executor spells it. -/
+/-- The page number of a canonical Sv39 address, as the executor spells it (since sail-riscv
+0.16 the walk takes it from the validated address `BitVec.truncate 39 va`). -/
 theorem extract_vpnOf (va : BitVec 64) :
-    BitVec.setWidth 27 (BitVec.extractLsb' Functions.pagesize_bits 27 (BitVec.extractLsb' 0 39 va)) = vpnOf va := by
+    BitVec.setWidth 27 (BitVec.extractLsb' Functions.pagesize_bits 27 (BitVec.truncate 39 va)) = vpnOf va := by
   unfold vpnOf Functions.pagesize_bits
   rw [BitVec.setWidth_eq]
   bv_decide
 
-/-- The ASID and root of an Sv39 `satp`. -/
-theorem satp_to_asid_of (s : BitVec 64) (h : BitVec.extractLsb' 44 16 s = 0#16) : satp_to_asid s = 0#16 := by
-  unfold satp_to_asid _get_Satp64_Asid Mk_Satp64
-  simp only [Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte, Sail.BitVec.extractLsb,
-    BitVec.extractLsb, Nat.reduceAdd, Nat.reduceSub]
+/-- The page offset of the validated address. -/
+theorem extract_offset_truncate (va : BitVec 64) :
+    BitVec.extractLsb' 0 12 (BitVec.truncate 39 va) = BitVec.extractLsb' 0 12 va := by
+  bv_decide
+
+/-- A canonical Sv39 address passes the walk's validation (`translate_validate_address`, which
+compares the address with its truncation sign-extended). -/
+theorem canon_truncate (va : BitVec 64) (hcanon : BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va) = va) :
+    BitVec.signExtend 64 (BitVec.truncate 39 va) = va := by
+  bv_decide
+
+/-- The ASID and root of an Sv39 `satp` (sail-riscv 0.16 reads them with `get_asid S_Stage` and
+`xatp_to_ppn S_Stage`, through the `Satp64` field accessors; `satp_to_asid`/`satp_to_ppn` are
+gone). -/
+theorem satp_to_asid_of (s : BitVec 64) (h : BitVec.extractLsb' 44 16 s = 0#16) :
+    _get_Satp64_Asid (Mk_Satp64 s) = 0#16 := by
+  unfold _get_Satp64_Asid Mk_Satp64
+  simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, Nat.reduceAdd, Nat.reduceSub]
   exact h
 
 theorem satp_to_ppn_of (s : BitVec 64) (root : BitVec 44) (h : BitVec.extractLsb' 0 44 s = root) :
-    satp_to_ppn s = root := by
-  unfold satp_to_ppn _get_Satp64_PPN Mk_Satp64
-  simp only [Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte, Sail.BitVec.extractLsb,
-    BitVec.extractLsb, Nat.reduceAdd, Nat.reduceSub]
+    _get_Satp64_PPN (Mk_Satp64 s) = root := by
+  unfold _get_Satp64_PPN Mk_Satp64
+  simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, Nat.reduceAdd, Nat.reduceSub]
   exact h
 
 set_option maxHeartbeats 4000000 in
@@ -822,12 +861,12 @@ set_option maxHeartbeats 4000000 in
 theorem swp_translationMode_kpt (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (root : BitVec 44)
     (hok : SConfKpt (GF := GF) c root sie) (Φ : SATPMode → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ SATPMode.Sv39)
-    ⊢ swp cpu (translationMode Privilege.Supervisor) Φ := by
+    ⊢ swp cpu (Functions.satp_mode Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, HΦ⟩
   obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode, hasid, hroot, hadue⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   conf_cases HmConf
-  unfold translationMode
+  unfold Functions.satp_mode
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf
@@ -845,7 +884,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps (vpnOf va) addr ppn perm)
     (hperm : perm.allows acc = true)
-    (r0 : Option Resv) (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
+    (r0 : Option Resv) (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r0 ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
@@ -853,7 +892,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
         ∀ (tlb' : Tlb), Register.tlb ↦ᵣ[cpu] tlb' -∗ ⌜tlbOk t tlb'⌝ -∗
         Φ (.Ok (physaddr.Physaddr (BitVec.setWidth 64 (ppn ++ BitVec.extractLsb' 0 12 va)),
           page_based_mem_type.PBMT_PMA, ())))
-    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ := by
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, #Hkpt, Hctx, Hfrag, Htlb, HΦ⟩
   conf_cases HmConf
   have hok0 := hok
@@ -862,6 +901,7 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   have hok' : SConfPhys (GF := GF) c sie :=
     ⟨hpmp, ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩, hpmm, hlpe⟩
   subst hbase
+  have hcanon' := canon_truncate va hcanon
   unfold translateAddr
   rw [is_shadow_stack_access_kernel acc hacc]
   swp_run 40
@@ -872,9 +912,18 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   inext
   iintro HmConf
   conf_cases HmConf
+  -- the Svukte check, then `translate_vs_stage` reads the mode again
+  swp_run 120
+  conf_intro HmConf
+  iapply swp_bind
+  iapply (swp_translationMode_kpt cpu dq c sie t.base hok0)
+  iframe HmConf
+  inext
+  iintro HmConf
+  conf_cases HmConf
   swp_run 120
   reduce_closed_widths
-  rw [extract_vpnOf, satp_to_asid_of c.satp hasid, satp_to_ppn_of c.satp t.base hroot]
+  rw [extract_vpnOf, extract_offset_truncate, satp_to_asid_of c.satp hasid, satp_to_ppn_of c.satp t.base hroot]
   conf_intro HmConf
   iapply swp_bind
   iapply (swp_lookup_TLB_kpt cpu t tlb htlb (vpnOf va))
@@ -883,7 +932,10 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   iintro Htlb %r %hres
   cases r with
   | none =>
+    -- the miss event (`generate_event`) reads the privilege
+    conf_cases HmConf
     swp_run 10
+    conf_intro HmConf
     rw [translate_TLB_miss39_eq]
     iapply swp_bind
     iapply (swp_translate_TLB_miss_kpt cpu dq c sie hok' hadue t M tlb htlb (vpnOf va) acc hacc _ _ addr ppn perm

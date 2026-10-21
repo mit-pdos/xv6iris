@@ -73,7 +73,7 @@ theorem un_page_add (va : BitVec 64) (i : Nat) :
 /-- A branch on a value known to be zero / nonzero. -/
 theorem un_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- The entry test `bgeu a1,s3`: taken exactly on an empty run. -/
 theorem un_bgeu0 (va : BitVec 64) (n : Nat) (hr : va.toNat + 4096 * n ≤ 2 ^ 38) :
@@ -608,7 +608,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
     by_cases hv : t.entAt 2 vi &&& 1#64 = 0#64
     · -- `V` is clear: the entry is zero, nothing mapped here
       have hent0 : t.entAt 2 vi = 0#64 := entAt_eq_zero_of_invalid 2 t vi hrep.1 hcomp hv
-      have hwn : t.walk 2 vi = none := by rw [PTree.walk_eq, hent0, if_pos rfl]
+      have hwn : t.walk 2 vi = none := by rw [PTree.walk_eq, hent0, ite_eq_left rfl]
       have hLn : get? Lm vi.toNat = none := ptRep_none_of_walk hrep vi hwn
       have hQn : get? Qm vi.toNat = none := by
         cases hb : df with
@@ -643,7 +643,7 @@ theorem uvmunmap_iter (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
       have hent : t.entAt 2 vi ≠ 0#64 := by
         intro hc; rw [hc] at hv; exact hv (by decide)
       have hwalk : t.walk 2 vi = some (pteAddr (t.slot 2 vi).1 (t.slot 2 vi).2, t.entAt 2 vi) := by
-        rw [PTree.walk_eq, if_neg hent]
+        rw [PTree.walk_eq, ite_eq_right hent]
       obtain ⟨w, hw⟩ : ∃ w, get? Lm vi.toNat = some w := by
         cases hg : get? Lm vi.toNat with
         | some w => exact ⟨w, rfl⟩
@@ -767,7 +767,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
     rotate_right 1
     · iapply wpNext_intro_pin
       iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Htree Hum Hfree %hkept
-      rw [if_pos hlast, hLd, hQd]
+      rw [ite_eq_left hlast, hLd, hQd]
       icases unFrame_split _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7⟩
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       have hR22 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := hkept.1.1.trans h2
@@ -834,7 +834,7 @@ theorem uvmunmap_loop (W : WALK_NOALLOC) [WchG GF] (KF : KFREE) [CurCtx]
     rotate_right 1
     · iapply wpNext_intro_pin
       iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Htree Hum Hfree %hkept
-      rw [if_neg hlast, hLd, hQd]
+      rw [ite_eq_right hlast, hLd, hQd]
       ihave HΦ := wpNext_shift _ _ _ _ _ hp1 $$ HΦ
       iapply (ih (i + 1) (by omega) spie2 spp2 ?hsp' R2 ?g2 hkept.2 ?g19 ?g20 ?g21 ?g22
         ?g23 ?g24 ?g25 ?g26 ?g27 c1)
@@ -972,7 +972,7 @@ theorem uvmunmap_gen [WchG GF] (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
   by_cases hn0 : n = 0
   · -- an empty run: straight to the epilogue
     subst hn0
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     simp only [Xv6.delRunL_zero]
     ihave Hframe := unFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) $$ [F0 F1 F2 F3 F4 F5 F6 F7]
@@ -994,7 +994,7 @@ theorem uvmunmap_gen [WchG GF] (W : WALK_NOALLOC) (KF : KFREE) [CurCtx]
     case e26 => simp [RegMap.set_apply]
     case e27 => simp [RegMap.set_apply]
   · -- save `s1` and enter the loop
-    rw [if_neg hn0]
+    rw [ite_eq_right hn0]
     k_step_gen (wp_s_sd c18 _ (KA.«uvmunmap» + 0x2a#64) true 40#12 2#5 9#5 (by decide) w2)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
     iintro Hk Hpc F2

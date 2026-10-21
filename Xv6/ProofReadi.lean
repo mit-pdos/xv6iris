@@ -126,7 +126,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h15, h14, rd_bgeu_clamp _ s hsz31 (by omega), decide_eq_true hfit]
     iintro Hk Hpc
-    have hN : rdClamp dn.diSize off n = n := by unfold rdClamp; rw [if_neg (by omega)]
+    have hN : rdClamp dn.diSize off n = n := by unfold rdClamp; rw [ite_eq_right (by omega)]
     iapply (rd_body0 BM BR BE EC Γ cpu c0 k k.spie k.spp _ γl γb V γdl pd pav pu γfs logstart dev
         γkl γk j ip bm data dn user off n (rdClamp dn.diSize off n) olds pidv Vp M dqp dq dqd hst
         hcl hdt hpd w2 w8 w9 w10 w11 w13 ?f2 ?f8 ?f9 ?f19 ?f18 ?f20 ?f21 ?f22 ?f23 ?f24 ?f25 ?f26
@@ -146,7 +146,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
       with [h15, h13, MachCSL.signExtend_ofNat32 off hoff31, rd_subw _ off hle hsz31]
     iintro Hk Hpc
     have hN : rdClamp dn.diSize off n = dn.diSize.toNat - off := by
-      unfold rdClamp; rw [if_pos (by omega)]
+      unfold rdClamp; rw [ite_eq_left (by omega)]
     iapply (rd_body0 BM BR BE EC Γ cpu c0 k k.spie k.spp _ γl γb V γdl pd pav pu γfs logstart dev
         γkl γk j ip bm data dn user off n (rdClamp dn.diSize off n) olds pidv Vp M dqp dq dqd hst
         hcl hdt hpd w2 w8 w9 w10 w11 w13 ?g2 ?g8 ?g9 ?g19 ?g18 ?g20 ?g21 ?g22 ?g23 ?g24 ?g25 ?g26

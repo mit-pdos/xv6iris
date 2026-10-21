@@ -832,7 +832,7 @@ theorem vdi_ident (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 : Vir
   iapply HΦ $$ %_ Hk Hpc Htok
   ipureintro
   intro r h14 h15
-  simp only [RegMap.set_apply, if_neg h14, if_neg h15]
+  simp only [RegMap.set_apply, ite_eq_right h14, ite_eq_right h15]
 
 end
 
@@ -997,8 +997,8 @@ theorem vdi_negotiate (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames) (c0 :
   ipureintro
   refine ⟨?_, ?_⟩
   · intro r h13 h14 h15 h18
-    simp only [RegMap.set_apply, if_neg h13, if_neg h14, if_neg h15, if_neg h18]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_true, if_false, ite_true, ite_false]
+    simp only [RegMap.set_apply, ite_eq_right h13, ite_eq_right h14, ite_eq_right h15, ite_eq_right h18]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false]
 
 end
 
@@ -1094,7 +1094,7 @@ theorem vdi_qcheck (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   iapply HΦ $$ %_ Hk Hpc Htok
   ipureintro
   intro r h14 h15
-  simp only [RegMap.set_apply, if_neg h14, if_neg h15]
+  simp only [RegMap.set_apply, ite_eq_right h14, ite_eq_right h15]
 
 end
 
@@ -1327,14 +1327,14 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
   · simp only [RegMap.set_apply]; simp
   · simp only [RegMap.set_apply, c3_9, c2_9]; simp [vdi_disk_ptr]
   · simp only [RegMap.set_apply]
-    simp only [BitVec.reduceEq, if_false, c3_2, c2_2, c1_2]
+    simp only [BitVec.reduceEq, ite_false, c3_2, c2_2, c1_2]
   · simp only [RegMap.set_apply]
-    simp only [BitVec.reduceEq, if_false, c3_18, c2_18, c1_18]
+    simp only [BitVec.reduceEq, ite_false, c3_18, c2_18, c1_18]
   · obtain ⟨a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := vdiKept_of_cs hcs1'
     obtain ⟨b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := vdiKept_of_cs hcs2'
     obtain ⟨d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := vdiKept_of_cs hcs3'
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_false,
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false,
         d19, d20, d21, d22, d23, d24, d25, d26, d27,
         b19, b20, b21, b22, b23, b24, b25, b26, b27,
         a19, a20, a21, a22, a23, a24, a25, a26, a27]
@@ -1466,7 +1466,7 @@ theorem vdi_zero (MS : MEMSET) (cpu : CPU) (k : KCtx) (R : RegMap) (pd pav pu : 
     obtain ⟨b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := vdiKept_of_cs hcs2'
     obtain ⟨d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := vdiKept_of_cs hcs3'
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_false,
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false,
         d19, d20, d21, d22, d23, d24, d25, d26, d27,
         b19, b20, b21, b22, b23, b24, b25, b26, b27,
         a19, a20, a21, a22, a23, a24, a25, a26, a27]
@@ -1697,12 +1697,12 @@ theorem vdi_queue_regs (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   iapply HΦ $$ %_ Hk Hpc Htok Hd Ha Hu
   ipureintro
   refine ⟨?_, ?_, ?_, ?_, ?_⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; exact hR9
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, if_false]; simp
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; simp
   · refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
 
 end
 
@@ -1893,7 +1893,7 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
   iapply HΦ $$ %_ Hk Hpc Hgeom Hres
   ipureintro
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_false]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
 
 end
 
@@ -2036,7 +2036,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
     rw [h2_8, h2_7, h2_6, h2_5, hp4 2#5 (by decide) (by decide),
       hp3.1 2#5 (by decide) (by decide) (by decide) (by decide),
       hp2 2#5 (by decide) (by decide), hcs0.1]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   have hkept : vdiKept k.regs R8 := by
     obtain ⟨a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := vdiKept_of_cs hcs0
     obtain ⟨b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := vdiKept_of_pres2 hp2
@@ -2055,7 +2055,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
         c19, c20, c21, c22, c23, c24, c25, c26, c27,
         b19, b20, b21, b22, b23, b24, b25, b26, b27,
         a19, a20, a21, a22, a23, a24, a25, a26, a27,
-        RegMap.set_apply, BitVec.reduceEq, if_false]
+        RegMap.set_apply, BitVec.reduceEq, ite_false]
   obtain ⟨j19, j20, j21, j22, j23, j24, j25, j26, j27⟩ := hkept
   iapply (wp_epilogue4s2_gen cpu k (KA.«virtio_disk_init» + 0x174#64) (by omega) R8 hR2
     (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5))
@@ -2070,7 +2070,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   case hcs =>
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true,
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true,
         j19, j20, j21, j22, j23, j24, j25, j26, j27]⟩
 
 end Xv6

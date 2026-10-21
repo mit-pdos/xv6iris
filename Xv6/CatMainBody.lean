@@ -121,7 +121,7 @@ theorem catMain_body (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
   rw [h5a0, catMain_blt0]
   by_cases hlt : ret.toInt < 0
   · -- IT FAILED: the diagnostic, and no return
-    rw [decide_eq_true hlt, if_pos rfl,
+    rw [decide_eq_true hlt, ite_eq_left rfl,
       show BitVec.ofNat 64 0xb2 + BitVec.signExtend 64 0x2c#13 = BitVec.ofNat 64 0xde from by decide,
       show 8 + (10 + (12 + (4 + n))) = 10 + (12 + (4 + (8 + n))) by omega]
     icases Hpick with ⟨Hdg, -⟩
@@ -130,7 +130,7 @@ theorem catMain_body (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
     iapply Hdg
     ipureintro; exact hlt
   · -- IT SUCCEEDED: cat(fd), close(fd)
-    rw [decide_eq_false hlt, if_neg (by decide), ukPc 0xb2 0xb6 false rfl]
+    rw [decide_eq_false hlt, ite_eq_right (by decide), ukPc 0xb2 0xb6 false rfl]
     icases Hpick with ⟨-, Hok⟩
     ihave Hok := Hok $$ []
     · ipureintro; omega

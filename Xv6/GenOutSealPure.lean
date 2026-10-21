@@ -111,7 +111,7 @@ theorem lmNext_input_of_complete (B : LmByteLaws M) (ps cs : List Nat) (s : M.lm
     exact hw.eq_of_length (Nat.le_antisymm hw.length_le h2.length_le)
   · have hne : E.map Prod.snd ≠ [] := fun hq => hr (by rw [hq]; rfl)
     have hp : lmPending M ps cs s E = [] := by
-      unfold lmPending lmPendingAt; rw [if_neg hne, if_neg hr]
+      unfold lmPending lmPendingAt; rw [ite_eq_right hne, ite_eq_right hr]
     rw [hp] at hw ⊢
     exact List.prefix_nil.mp hw
 

@@ -210,9 +210,9 @@ theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
   have e_nr : aPnread pi = pi + 536#64 := by unfold aPnread poffOf; congr 1
   have e_nw : aPnwrite pi = pi + 540#64 := by unfold aPnwrite poffOf; congr 1
   have e_ro : aPopen pi false = pi + 544#64 := by
-    unfold aPopen poffOf; simp only [Bool.false_eq_true, if_false]; congr 1
+    unfold aPopen poffOf; simp only [Bool.false_eq_true, ite_false]; congr 1
   have e_wo : aPopen pi true = pi + 548#64 := by
-    unfold aPopen poffOf; simp only [if_true]; congr 1
+    unfold aPopen poffOf; simp only [ite_true]; congr 1
   rw [e_nr, e_nw, e_ro, e_wo]
   iintro H
   icases bb_cut0 pi 5#8 4 4092 4096 rfl $$ H with ⟨Hlk, H⟩
@@ -261,7 +261,7 @@ theorem pipe_ends_alloc :
   imodintro
   iexists (PipeNames.mk g1 g2 g3 g4 gq)
   unfold pipeEndFull pipeRef pipeOpenmark pnEnd pnMark
-  simp only [Bool.false_eq_true, if_false, if_true]
+  simp only [Bool.false_eq_true, ite_false, ite_true]
   iframe H1 H2 H3 H4 Hqa Hqf
 
 /-! ## The pipe's birth -/

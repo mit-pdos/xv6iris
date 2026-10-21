@@ -19,7 +19,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-- The durable disk image of a device state vector. -/
@@ -54,8 +54,8 @@ theorem ite_some_pres {α : Type} {P : α → Prop} {c : Prop} [Decidable c] {a 
     ∀ x, (if c then a else b) = some x → P x := by
   intro x h
   by_cases hc : c
-  · rw [if_pos hc] at h; exact ha x h
-  · rw [if_neg hc] at h; exact hb x h
+  · rw [ite_eq_left hc] at h; exact ha x h
+  · rw [ite_eq_right hc] at h; exact hb x h
 
 theorem Virtio.write_disk (v v' : VirtioState) (off : Nat) (w : BitVec 32)
     (h : Virtio.write v off w = some v') : v'.disk = v.disk := by
@@ -137,7 +137,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
     (h : hartStep cpu m σ m' σ') : diskOf σ'.devs = diskOf σ.devs := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rfl
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hev⟩ | ⟨hb, _⟩
@@ -153,7 +153,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         · exact devRead_diskOf _ _ _ _ _ hr
         all_goals rfl
       · -- a store: MMIO or DRAM
-        rcases hev with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+        rcases hev with ⟨_, ds', hw, _, rfl⟩ | ⟨_, _, _, rfl⟩
         · exact devWrite_diskOf _ _ _ _ _ hw
         · rfl
     · cases o <;> simp only [blockedStep] at hb
@@ -161,6 +161,8 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         | exact hb.elim
         | (obtain ⟨_, _, rfl⟩ := hb; rfl)
         | (obtain ⟨_, rfl⟩ := hb; rfl)
+  · -- a finite choice: nothing moves
+    obtain ⟨_, _, rfl⟩ := h; rfl
 
 /-! ## A device step frames the image, unless it is the disk's own -/
 

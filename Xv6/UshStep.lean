@@ -301,7 +301,7 @@ theorem ushS_j (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : B
     ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
-  have e : ∀ v, ukWr m 0#5 v = m := fun v => by unfold ukWr; rw [if_pos rfl]
+  have e : ∀ v, ukWr m 0#5 v = m := fun v => by unfold ukWr; rw [ite_eq_left rfl]
   iapply ushS_jal UL N hi t (x + (if rvc then 2 else 4)) h m av ht rfl hal (by unfold unotSp spIdx; decide)
     $$ HC Hrun
   rw [e]
@@ -345,7 +345,7 @@ theorem ushS_brT (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (hal : (BitVec.ofNat 64 x + BitVec.signExtend 64 imm).getLsbD 0 = false := by decide) :
     ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h :=
-  ushS_br UL N hi t h m av (by rw [hb, if_pos rfl, ht]) hal
+  ushS_br UL N hi t h m av (by rw [hb, ite_eq_left rfl, ht]) hal
 
 /-- A branch NOT taken: the fall-through. -/
 theorem ushS_brN (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 rs1 : BitVec 5} {op : bop}
@@ -355,7 +355,7 @@ theorem ushS_brN (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (hal : (BitVec.ofNat 64 x + BitVec.signExtend 64 imm).getLsbD 0 = false := by decide) :
     ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h :=
-  ushS_br UL N hi y h m av (by rw [hb]; simp only [Bool.false_eq_true, if_false]; exact ukPc x y rvc hy) hal
+  ushS_br UL N hi y h m av (by rw [hb]; simp only [Bool.false_eq_true, ite_false]; exact ukPc x y rvc hy) hal
 
 /-- `ld rd, imm(rs1)` of a word held at a fraction (Rocq `wp_uk_ld`,
 `cldsp`). -/

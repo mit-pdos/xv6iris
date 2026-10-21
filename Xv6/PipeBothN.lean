@@ -337,7 +337,7 @@ theorem wstNFireMk (γc γm : W → GName) (md : W → Option (List (BitVec 8)))
       wstN dep γc γm (mdupd md w s) (sel ++ [w]) w := by
   unfold wstN
   rw [cntN_self_snoc, hc0, cmtNFireSelf, srcN_mdupd_self]
-  simp only [mdupd, if_pos, Nat.zero_add]
+  simp only [mdupd, ite_eq_left, Nat.zero_add]
   iintro H
   iexact H
 
@@ -485,12 +485,12 @@ theorem ghostVarsAlloc {A : Type} [GhostVarG GF A] (l : List W) (a : A) (hl : l.
       apply BigSepL.bigSepL_mono
       intro k y hk
       have hyx : y ≠ x := fun h => hl.1 (h ▸ List.mem_of_getElem? hk)
-      simp only [if_neg hyx]
+      simp only [ite_eq_right hyx]
       iintro H
       iexact H
     ihave Hl := hl' $$ Hl
     iapply BigSepL.bigSepL_cons.2
-    simp only [if_pos]
+    simp only [ite_eq_left]
     isplitl [Hx1 Hx2]
     · isplitl [Hx1]
       · iexact Hx1
@@ -615,7 +615,7 @@ theorem blkNFirePure (hnd : ws.Nodup)
     intro x hx
     by_cases h : x = w
     · rw [h]; exact hw
-    · simp only [mdupd, h, if_false] at hx; exact hmin x hx
+    · simp only [mdupd, h, ite_false] at hx; exact hmin x hx
   have hfd' : sel_firedN (mdupd md w s) (sel ++ [w]) :=
     sel_firedN_snoc _ _ _ (sel_firedN_mdupd md sel w s hfd) (by simp [hmw'])
   have hwf'' : sel_wfN (srcN (mdupd md w s)) (sel ++ [w]) :=
@@ -924,7 +924,7 @@ theorem blkNSilencePure (w : W) (EXCL : W → List (BitVec 8) → Prop)
     intro x hx
     by_cases h : x = w
     · rw [h]; exact hw
-    · simp only [mdupd, h, if_false] at hx; exact hmin x hx
+    · simp only [mdupd, h, ite_false] at hx; exact hmin x hx
   have hbase := fun (hi : invN RUN TERM TOK (mdupd md w []) sel) =>
     (⟨hin, hmin', sel_firedN_mdupd md sel w [] hfd, sel_wfN_mdupd md sel w [] hwsel hwf, hi⟩ :
       famN ws RUN TERM TOK (mdupd md w []) sel)

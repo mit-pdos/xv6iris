@@ -77,8 +77,8 @@ theorem catf_env_res (pn : PNames) (gp : PipeNames) (w : Wid) (A X ds xs : List 
     intro d'
     show get? (insert (∅ : RegMapF CfDev) 0 (CfDev.UDProd pn gp w A X)) d' = _
     by_cases h : d' = 0
-    · subst h; rw [LawfulPartialMap.get?_insert_eq rfl, if_pos rfl]
-    · rw [LawfulPartialMap.get?_insert_ne (Ne.symm h), if_neg h, LawfulPartialMap.get?_empty]
+    · subst h; rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left rfl]
+    · rw [LawfulPartialMap.get?_insert_ne (Ne.symm h), ite_eq_right h, LawfulPartialMap.get?_empty]
   have hv0 : get? vs 0 = some (CfDev.UDProd pn gp w A X) := by rw [hvs]; rfl
   have hdom : ∀ x, dom vs x ↔ (x = 0 ∨ False) := by
     intro x; unfold dom; rw [hvs]; by_cases h : x = 0 <;> simp [h]

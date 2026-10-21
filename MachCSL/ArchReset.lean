@@ -40,7 +40,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 open Register
 
@@ -74,7 +74,9 @@ register pinned to an ISA-unspecified simulator value.  Real hardware that
 powers up with garbage in a register the spec does not reset would then fall
 OUTSIDE the theorem.  The chosen model is the weaker, honest one: garbage
 everywhere except a SHORT, EXPLICIT list of board obligations, each of which
-is a claim about the BOARD a reader can check against real hardware.
+is a claim about the BOARD a reader can check against real hardware -- except
+one piece of the model's own bookkeeping (`written_trigger_index`, below, since
+sail-riscv 0.16), which a real board has no counterpart for.
 
 KEEP THE LIST MINIMAL: a register belongs here only if some consumed reset
 fact does NOT follow from `init_model` over an OPEN file.  Register by
@@ -106,6 +108,11 @@ register, and each line is an obligation on the board:
    the board.
  - sstateen0 = 0: `reset_stateen` zeroes mstateen0..3 and STOPS, so the
    S-mode word is a board obligation (its M-mode sibling is NOT here).
+ - written_trigger_index = none (sail-riscv 0.16): NOT an architectural
+   register but the model's own Sdtrig bookkeeping (no hardware counterpart;
+   Sail declares it `= None()`).  With Sdtrig disabled nothing writes it, and
+   the end of EVERY cycle asserts it is none (`update_triggers`), so over
+   garbage the first cycle could fail its assertion.  `reset` never touches it.
 
 NOT HERE, on purpose -- every one of these is DERIVED by `init_model` over
 arbitrary garbage (`MachCSL.bootProg_run`): PC, nextPC, cur_privilege,
@@ -120,9 +127,10 @@ def boardWired (hid : BitVec 64) : SailM Unit := do
   set_pc_reset_address resetVector
   writeReg mhartid hid
 
-/-- THE BOARD'S POWER-ON REGISTER VALUES (Rocq `board_regs`): the ten the
-privileged spec's `reset` does not establish over garbage.  `pma` is a
-parameter (the table, `MachCSL.bootPMA`, is supplied by the caller). -/
+/-- THE BOARD'S POWER-ON REGISTER VALUES (Rocq `board_regs`, plus the 0.16
+model's `written_trigger_index`): the eleven the privileged spec's `reset` does
+not establish over garbage.  `pma` is a parameter (the table,
+`MachCSL.bootPMA`, is supplied by the caller). -/
 def boardRegs (pma : List PMA_Region) : SailM Unit := do
   writeReg pma_regions pma
   writeReg mstatus 0xA00000000#64
@@ -137,6 +145,8 @@ def boardRegs (pma : List PMA_Region) : SailM Unit := do
   writeReg senvcfg 0#64
   -- sstateen0: `reset_stateen` zeroes the M-mode four and stops
   writeReg sstateen0 0#32
+  -- the model's Sdtrig bookkeeping, asserted none at every cycle end (see above)
+  writeReg written_trigger_index none
 
 /-- The board's writes (Rocq `board_init`). -/
 def boardInit (hid : BitVec 64) (pma : List PMA_Region) : SailM Unit := do

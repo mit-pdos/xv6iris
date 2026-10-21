@@ -44,7 +44,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -71,121 +71,117 @@ theorem uwk_congr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM X
 theorem uwk_ite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : c) (h : runRW D orc s a = r) :
     runRW D orc s (@ite _ c inst a b) = r := by
-  rw [if_pos hc]; exact h
+  rw [ite_eq_left hc]; exact h
 
 theorem uwk_ite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c) (h : runRW D orc s b = r) :
     runRW D orc s (@ite _ c inst a b) = r := by
-  rw [if_neg hc]; exact h
+  rw [ite_eq_right hc]; exact h
 
 theorem uwk_dite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : c)
     (h : runRW D orc s (a hc) = r) : runRW D orc s (@dite _ c inst a b) = r := by
-  rw [dif_pos hc]; exact h
+  rw [dite_eq_left hc]; exact h
 
 theorem uwk_dite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c)
     (h : runRW D orc s (b hc) = r) : runRW D orc s (@dite _ c inst a b) = r := by
-  rw [dif_neg hc]; exact h
+  rw [dite_eq_right hc]; exact h
 
 theorem uwk_error (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (e : Sail.Error exception)
     (k : Empty → SailM X) :
-    runRW D orc s (FreeM.impure (Except.error e) k : SailM X) = none := rfl
+    runRW D orc s (FreeM.impure (.inl (Except.error e)) k : SailM X) = none := rfl
 
-theorem uwk_rr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
-    (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
+theorem uwk_rr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+    (v : RegisterType r) (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dr r = true) (hv : s.file r = v) (h : runRW D orc s (k v) = res) :
-    runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = res := by
-  rw [← h, ← hv]; exact runRW_regRead_dr D orc s r k hd
+    runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = res := by
+  rw [← h, ← hv]; exact runRW_regRead_dr D orc s r (a := a) k hd
 
 theorem uwk_file_of_pin (s : UWSt) (r : Register) (v : RegisterType r) (h : s.pin r = some v) :
     s.file r = v := by
   unfold UWSt.file; rw [h]; rfl
 
-theorem uwk_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register)
+theorem uwk_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
     (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dr r = false) (ha : D.Dany r = true) (h : runRW D orc.tail s (k ((orc 0).reg r)) = res) :
-    runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = res := by
-  rw [← h]; simp only [runRW, hd, ha, if_true, Bool.false_eq_true, if_false]
+    runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = res := by
+  rw [← h]; exact runRW_regRead_any D orc s r (a := a) k hd ha
 
-theorem uwk_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
-    (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
+theorem uwk_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+    (v : RegisterType r) (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dw r = true) (h : runRW D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
-    runRW D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
-  rw [← h]; simp only [runRW, hd, if_true]
+    runRW D orc s (FreeM.impure (.inl (.ok (.regWrite r a v))) k) = res := by
+  rw [← h]; exact runRW_regWrite_dw D orc s r (a := a) v k hd
 
-theorem uwk_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = false)
-    (hr : bmRead s.mm req.pa n = some w) (h : runRW D orc s (k (.Ok (w, none))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
+theorem uwk_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = false)
+    (hr : bmRead s.mm R.pa R.size = some w) (h : runRW D orc s (k (Except.ok (w, 0#R.numTag))) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res := by
   rw [← h]; simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
 /-- An exclusive read, acquire or not (Rocq `resv_any`: the walker does not
 know about the reservation). -/
-theorem uwk_mrdxA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
-    (hr : bmRead s.mm req.pa n = some w)
-    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
+theorem uwk_mrdxA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = true)
+    (hr : bmRead s.mm R.pa R.size = some w)
+    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (Except.ok (w, 0#R.numTag))) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res := by
   rw [← h]; simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
 /-- `uwk_mrdxA` at a non-acquire read (the stepper's first choice: its shape
 is the one the fetch walker's twin lemmas mirror). -/
-theorem uwk_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
-    (_hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
-    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res :=
-  uwk_mrdxA X D orc s n vasize req k res w hif hn hex hr h
+theorem uwk_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = true)
+    (_hacq : akAcq R.accessKind = false) (hr : bmRead s.mm R.pa R.size = some w)
+    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (Except.ok (w, 0#R.numTag))) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res :=
+  uwk_mrdxA X D orc s R k res w hif hn hex hr h
 
 /-- A write of owned bytes, plain or exclusive, from any reservation state
-(Rocq `resv_any`). -/
-theorem uwk_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
-  rw [← h]; simp only [runRW, hn, hv, ho, ↓reduceIte]
+(Rocq `resv_any`); concurrency interface v2: the value rides in the event, the
+interface answers `.ok ()`. -/
+theorem uwk_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res := by
+  rw [← h]; simp only [runRW, hn, ho, ↓reduceIte]
 
 /-- `uwk_mwrA` at a plain write (the stepper's first choice; the fetch
 walker's twin lemmas mirror this shape and `uwk_mwrx`'s). -/
-theorem uwk_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (_hex : akExcl req.access_kind = false)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
+theorem uwk_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (_hex : akExcl R.accessKind = false)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res :=
+  uwk_mwrA X D orc s R w tags k res hn ho h
 
 /-- `uwk_mwrA` at an exclusive write whose walk took the reservation bit. -/
-theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (_hex : akExcl req.access_kind = true) (_hrv : s.rv = true)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
+theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (_hex : akExcl R.accessKind = true) (_hrv : s.rv = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res :=
+  uwk_mwrA X D orc s R w tags k res hn ho h
 
-theorem uwk_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
-    (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))
-    (h : runRW D orc.tail s (k ((orc 0).ch p)) = res) :
-    runRW D orc s (FreeM.impure (.ok (.choose p)) k) = res := by
-  rw [← h]; rfl
+/-- A finite choice (among at least one): the oracle's `ch .nat` mod `n`. -/
+theorem uwk_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n : FinChoice)
+    (k : Fin (fcN n) → SailM X) (res : Option (X × UWSt × UOrc)) (hn : 0 < fcN n)
+    (h : runRW D orc.tail s (k (Fin.mk ((orc 0).ch .nat % fcN n) (Nat.mod_lt _ hn))) = res) :
+    runRW D orc s (FreeM.impure (.inr n) k : SailM X) = res := by
+  rw [← h]; simp only [runRW, hn, dite_true]
 
 /-- The silent events: one step, the state unchanged (by definition). -/
 theorem uwk_silent (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM X)
@@ -201,8 +197,8 @@ theorem uwk_ite_merge (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) 
     (ha : c → runRW D orc s a = some (x1, s', orc')) (hb : ¬ c → runRW D orc s b = some (x2, s', orc')) :
     runRW D orc s (@ite _ c inst a b) = some (@ite X c inst x1 x2, s', orc') := by
   by_cases hc : c
-  · rw [if_pos hc, if_pos hc]; exact ha hc
-  · rw [if_neg hc, if_neg hc]; exact hb hc
+  · rw [ite_eq_left hc, ite_eq_left hc]; exact ha hc
+  · rw [ite_eq_right hc, ite_eq_right hc]; exact hb hc
 
 /-! ## The stepper -/
 
@@ -231,6 +227,9 @@ structure Cfg where
   condition) and, when they end in the same state and oracle, return the `if`
   of the two results -/
   merge : Bool := false
+  /-- the early-return normaliser (concurrency interface v2: `SailME.run` through its lifted
+  actions, `MachCSL.run_lift_bind` & co.) -/
+  runCtx : Option (Simp.Context × Simp.SimprocsArray) := none
 
 def whnfI (e : Lean.Expr) : MetaM Lean.Expr := withTransparency .instances <| whnf e
 
@@ -610,6 +609,11 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
       throwError "uwk_run: sub-walk result not in normal form{indentExpr r1}"
   if fn.isConstOf ``FreeM.impure then
     return ← walkEvent cx X orc s m
+  if fn.isConstOf ``LeanRV64D.SailME.run then
+    return ← walkRun cx X orc s m
+  if fn.isConstOf ``Sail.ArchSem.PreSail.PreSailME.run then
+    -- an unfolded block (the model's `SailME.run` is this, definitionally): fold it back
+    return ← walkRun cx X orc s (← mkAppM ``LeanRV64D.SailME.run #[m.appArg!])
   if fn.isConstOf ``ite then
     let a := m.getAppArgs
     let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
@@ -678,6 +682,96 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
       return ← walk cx X orc s m'
   throwError "uwk_run: stuck at{indentExpr m}"
 
+/-- The first computation of a block: the head of its leading binds. -/
+partial def firstComp (e : Lean.Expr) : MetaM Lean.Expr := do
+  let e ← whnfI e
+  if e.getAppFn.isConstOf ``FreeM.bind then
+    let a := e.getAppArgs
+    return ← firstComp a[a.size - 2]!
+  return e
+
+/-- An early-return block `SailME.run b` (concurrency interface v2: lean-sail v7's `PreSailME`,
+whose `Except.error` node is the early return).  In order: the run lemmas push `SailME.run`
+through the block's lifted actions, passing sub-computations to the walk as they are (so their
+sub-walk facts apply), and stop it at an early return (`MachCSL.run_lift_bind` & co.); an `if` or
+a `match` at the head of the block is decided (its condition, or its discriminant evaluated) and
+rewritten in place; as a last resort, a definitional step to the block's head event. -/
+partial def walkRun (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
+  trace m!"uwk run-block"
+  -- the run lemmas
+  if let some (ctx, sp) := cx.runCtx then
+    let ctx ← ctx.setLctxInitIndices
+    let (r, _) ← Lean.Meta.simp m ctx sp
+    if r.expr != m then
+      let hm ← match r.proof? with | some pf => pure pf | none => mkEqRefl m
+      let (res, p) ← walk cx X orc s r.expr
+      return (res, mkAppN (mkConst ``uwk_congr) #[X, cx.D, orc, s, m, r.expr, res, hm, p])
+  -- a decision at the head of the block
+  let core ← firstComp m.appArg!
+  let rewriteAt (t t' eq : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
+    let mAbs ← kabstract m t
+    unless mAbs.hasLooseBVars do throwError "uwk_run: cannot rewrite in the block{indentExpr t}"
+    let motive := Lean.mkLambda `z .default (← inferType t) mAbs
+    let hm ← mkCongrArg motive eq
+    let m' := mAbs.instantiate1 t'
+    let (res, p) ← walk cx X orc s m'
+    return (res, mkAppN (mkConst ``uwk_congr) #[X, cx.D, orc, s, m, m', res, hm, p])
+  -- (the decision proofs are up to closed evaluation, so the lemma instances are built
+  -- unchecked; the kernel sees the definitional step)
+  if core.isAppOfArity ``ite 5 then
+    let a := core.getAppArgs
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
+    match ← decideProp cx c with
+    | some (hc, true) =>
+      return ← rewriteAt core tb (mkAppN (mkConst ``ite_eq_left [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | some (hc, false) =>
+      return ← rewriteAt core eb (mkAppN (mkConst ``ite_eq_right [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | none => throwError "uwk_run: cannot decide{indentExpr c}"
+  if core.isAppOfArity ``dite 5 then
+    let a := core.getAppArgs
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
+    match ← decideProp cx c with
+    | some (hc, true) =>
+      return ← rewriteAt core (tb.beta #[hc]) (mkAppN (mkConst ``dite_eq_left [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | some (hc, false) =>
+      return ← rewriteAt core (eb.beta #[hc]) (mkAppN (mkConst ``dite_eq_right [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | none => throwError "uwk_run: cannot decide{indentExpr c}"
+  if let some mi ← matchMatcherApp? core then
+    for i in [0:mi.discrs.size] do
+      let d := mi.discrs[i]!
+      if ← isValue d then continue
+      match ← evalTo cx d with
+      | some (v, pd) => return ← rewriteAt d v pd
+      | none => throwError "uwk_run: cannot evaluate the discriminant{indentExpr d}"
+    -- every discriminant a value: the match reduces (a definitional step)
+    let core' ← withTransparency .default <| whnf core
+    if core' != core then
+      return ← rewriteAt core core' (← mkExpectedTypeHint (← mkEqRefl core) (← mkEq core core'))
+  -- a combinator of the block (a loop, a helper returning early): one unfolding, in place, so that
+  -- the calls it makes stay calls (their sub-walk facts apply)
+  if let .const n _ := core.getAppFn then
+    unless n == ``FreeM.bind || n == ``FreeM.pure || n == ``FreeM.impure do
+      if ← isIrreducible n then
+        if let some eqn ← getUnfoldEqnFor? n (nonRec := true) then
+          let c ← mkConstWithFreshMVarLevels eqn
+          let (args, _, ty) ← forallMetaTelescopeReducing (← inferType c)
+          if let some (_, lhs, rhs) := ty.eq? then
+            if ← isDefEq lhs core then
+              let core' ← instantiateMVars rhs
+              return ← rewriteAt core core' (← instantiateMVars (mkAppN c args))
+      match ← withTransparency .all <| unfoldDefinition? core with
+      | some core' =>
+        let core' := core'.headBeta
+        return ← rewriteAt core core' (← mkExpectedTypeHint (← mkEqRefl core) (← mkEq core core'))
+      | none => pure ()
+  -- a definitional step to the head event
+  trace m!"uwk run-block: definitional step at{indentExpr core}"
+  let m' ← withTransparency .all <| whnf m
+  let hd := m'.getAppFn
+  if hd.isConstOf ``FreeM.pure || hd.isConstOf ``FreeM.impure then
+    return ← walk cx X orc s m'
+  throwError "uwk_run: stuck early-return block at{indentExpr core}"
+
 /-- `+merge` at an undecided `if c then a else b`: walk `a` under `c` and `b`
 under `¬ c`; if both end in the same state and oracle (and their results do
 not mention the branch hypothesis), the `if` of the results. -/
@@ -741,6 +835,7 @@ partial def bySubFact (cx : Cfg) (X orc s m : Lean.Expr) (retry : Bool := true) 
         let (r, _) ← Lean.Meta.simp m1 ctx sp
         pure r
       | none => simpProp cx m
+    trace m!"uwk bySubFact retry at{indentExpr r.expr}"
     if r.expr != m && r.expr.getAppFn == mfn then
       if let some (res, p) ← bySubFact cx X orc s r.expr false then
         let hm ← match r.proof? with | some pf => pure pf | none => mkEqRefl m
@@ -777,27 +872,47 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
   let margs := m.getAppArgs
   let call ← whnf margs[margs.size - 2]!
   let k := margs[margs.size - 1]!
-  if call.isAppOfArity ``Except.error 3 then
-    return (mkNone X, mkAppN (mkConst ``uwk_error) #[X, cx.D, orc, s, call.appArg!, k])
-  unless call.isAppOfArity ``Except.ok 3 do throwError "uwk_run: unexpected call{indentExpr call}"
-  let o ← whnf call.appArg!
-  let ofn := o.getAppFn
-  trace m!"uwk event: {ofn}"
   let target := mkApp4 (mkApp (mkConst ``runRW) X) cx.D orc s m
-  -- try the step lemmas for this event, in order
-  let lems : List Name :=
-    if ofn.isConstOf ``Outcome.regRead then [``uwk_rr, ``uwk_rr_any]
-    else if ofn.isConstOf ``Outcome.regWrite then [``uwk_rw]
-    else if ofn.isConstOf ``Outcome.memRead then [``uwk_mrd, ``uwk_mrdx, ``uwk_mrdxA]
-    else if ofn.isConstOf ``Outcome.memWrite then [``uwk_mwr, ``uwk_mwrx, ``uwk_mwrA]
-    else if ofn.isConstOf ``Outcome.choose then [``uwk_choose]
-    else []
+  -- concurrency interface v2: `.inl (.ok o)` an event, `.inl (.error e)` a failure,
+  -- `.inr n` a finite choice
+  let mut ofn : Lean.Expr := mkConst ``Unit.unit
+  let mut lems : List Name := []
+  if call.isAppOfArity ``Sum.inr 3 then
+    trace m!"uwk event: a finite choice"
+    lems := [``uwk_choose]
+  else
+    unless call.isAppOfArity ``Sum.inl 3 do throwError "uwk_run: unexpected call{indentExpr call}"
+    let inner ← whnf call.appArg!
+    if inner.isAppOfArity ``Except.error 3 then
+      return (mkNone X, mkAppN (mkConst ``uwk_error) #[X, cx.D, orc, s, inner.appArg!, k])
+    unless inner.isAppOfArity ``Except.ok 3 do throwError "uwk_run: unexpected call{indentExpr call}"
+    let o ← whnf inner.appArg!
+    ofn := o.getAppFn
+    trace m!"uwk event: {ofn}"
+    -- the step lemmas for this event, in order
+    lems :=
+      if ofn.isConstOf ``InstructionEffect.regRead then [``uwk_rr, ``uwk_rr_any]
+      else if ofn.isConstOf ``InstructionEffect.regWrite then [``uwk_rw]
+      else if ofn.isConstOf ``InstructionEffect.memRead then [``uwk_mrd, ``uwk_mrdx, ``uwk_mrdxA]
+      else if ofn.isConstOf ``InstructionEffect.memWrite then [``uwk_mwr, ``uwk_mwrx, ``uwk_mwrA]
+      else []
+  trace m!"uwk step lemmas: {lems}"
   for lem in lems do
     let saved ← saveState
     let (args, _, concl) ← forallMetaTelescopeReducing (← inferType (mkConst lem))
     let some (_, lhs, rhs) := concl.eq? | restoreState saved; continue
-    unless ← isDefEq lhs target do restoreState saved; continue
-    unless ← dischargeArgs cx args true do restoreState saved; continue
+    unless ← isDefEq lhs target do
+      restoreState saved
+      trace m!"uwk step {lem}: no match{indentExpr target}"
+      continue
+    unless ← dischargeArgs cx args true do
+      let a ← args.filterMapM fun a => do
+        if ← a.mvarId!.isAssigned then return none
+        let t ← instantiateMVars (← inferType a)
+        if ← isProp t then return some t else return none
+      restoreState saved
+      trace m!"uwk step {lem}: side condition failed among{indentD (MessageData.joinSep (a.toList.map MessageData.ofExpr) Format.line)}"
+      continue
     let hlast := args[args.size - 1]!
     let hty ← instantiateMVars (← inferType hlast)
     let some (_, l2, _) := hty.eq? | restoreState saved; continue
@@ -812,18 +927,21 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
     return (r, ← instantiateMVars (mkAppN (mkConst lem) args))
   -- a silent event: the state unchanged, by definition
   let silent : List (Name × Lean.Expr) :=
-    [(``Outcome.barrier, mkConst ``Unit.unit), (``Outcome.cacheOp, mkConst ``Unit.unit),
-     (``Outcome.tlbi, mkConst ``Unit.unit), (``Outcome.translationStart, mkConst ``Unit.unit),
-     (``Outcome.translationEnd, mkConst ``Unit.unit), (``Outcome.takeException, mkConst ``Unit.unit),
-     (``Outcome.returnException, mkConst ``Unit.unit), (``Outcome.cycleCount, mkConst ``Unit.unit),
-     (``Outcome.message, mkConst ``Unit.unit), (``Outcome.getCycleCount, mkNatLit 0)]
+    [(``InstructionEffect.memWriteAnnounce, mkConst ``Unit.unit),
+     (``InstructionEffect.barrier, mkConst ``Unit.unit), (``InstructionEffect.cacheOp, mkConst ``Unit.unit),
+     (``InstructionEffect.tlbOp, mkConst ``Unit.unit), (``InstructionEffect.clockCycle, mkConst ``Unit.unit),
+     (``InstructionEffect.translationStart, mkConst ``Unit.unit),
+     (``InstructionEffect.translationEnd, mkConst ``Unit.unit),
+     (``InstructionEffect.archException, mkConst ``Unit.unit),
+     (``InstructionEffect.returnException, mkConst ``Unit.unit),
+     (``InstructionEffect.printMessage, mkConst ``Unit.unit), (``InstructionEffect.getCycleCount, mkNatLit 0)]
   for (c, u) in silent do
     if ofn.isConstOf c then
       let m' := k.beta #[u]
       let (r, p) ← walk cx X orc s m'
       let hdef ← mkEqRefl target
       return (r, mkAppN (mkConst ``uwk_silent) #[X, cx.D, orc, s, m, m', r, hdef, p])
-  throwError "uwk_run: cannot step the event{indentExpr o}"
+  throwError "uwk_run: cannot step the event{indentExpr call}"
 
 end
 
@@ -833,7 +951,7 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
       reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, reduceClosedEq, reduceClosedNe,
       reduceClosedLe, reduceClosedLt, reduceClosedMem, sail_facts,
       Bool.true_and, Bool.and_true, Bool.false_and, Bool.and_false, Bool.true_or, Bool.or_true,
-      Bool.false_or, Bool.or_false, Bool.not_true, Bool.not_false, Bool.not_not, LeanRV64D.Functions.not,
+      Bool.false_or, Bool.or_false, Bool.not_true, Bool.not_false, Bool.not_not, LeanRV64D.not,
       bne_self_eq_false, beq_self_eq_true, Bool.false_eq_true, true_iff, false_iff, not_true_eq_false,
       not_false_eq_true, Bool.not_eq_true, Bool.not_eq_false, beq_iff_eq, bne_iff_ne, ne_eq,
       decide_eq_true_eq, decide_eq_false_iff_not, Option.some.injEq, reduceCtorEq,
@@ -846,7 +964,7 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
       Nat.reduceDiv, Nat.reduceMod, Nat.reducePow, Nat.reduceLeDiff, Nat.reduceEqDiff,
       Int.reduceToNat, Int.reduceMul, Int.reduceAdd, Int.reduceSub, Int.reduceNeg,
       Sail.BitVec.toNatInt, Int.toNat_natCast, uwk_toNat_ofNat, BitVec.add_zero, BitVec.reduceOfInt,
-      Int.cast_ofNat_Int, Int.natCast_mul, BitVec.setWidth_eq, *])
+      Int.cast_ofNat_Int, Int.natCast_mul, BitVec.setWidth_eq, Sail.ArchSem.Mem_request.toArchSem, *])
   let stx ← if lemmas.isEmpty then pure stx else
     match stx with
     | `(tactic| simp only [$ls,*]) =>
@@ -876,8 +994,15 @@ def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) (merge : Bool
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars e
   let steps ← IO.mkRef 0
+  let runCtx ← do
+    let stx ← `(tactic| simp only [MachCSL.run_lift_bind, MachCSL.run_lift, MachCSL.run_pure,
+      MachCSL.run_throw, MachCSL.run_throw_bind, bind_assoc, pure_bind, MachCSL.FreeMLemmas.freeM_pure_bind,
+      ite_true, ite_false, dite_true, dite_false, ↓reduceIte, ↓reduceDIte])
+    let { ctx, simprocs, .. } ← Lean.Elab.Tactic.mkSimpContext stx (eraseLocal := false)
+    pure (some (ctx, simprocs))
   let cx : Cfg :=
-    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv, merge := merge }
+    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv,
+      merge := merge, runCtx := runCtx }
   let (r, p) ← walk cx X orc s m
   trace m!"uwk_run: {← steps.get} steps"
   -- the result's closed data evaluated (a definitional step)

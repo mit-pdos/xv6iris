@@ -26,7 +26,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -56,23 +56,27 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
 
 /-- **The ordered plain-store leaf**: `swp_sail_mem_write_plain_au` with the
 order receipt. -/
-theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (w' : BitVec (8 * n)) (hv : req.value = some w')
+theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (bytes : Vector (BitVec 8) n) (tags : Vector Bool nt)
+    (w' : BitVec (8 * n)) (hv : vecbytes_to_bitvec bytes = w')
     (hk : akExcl req.access_kind = false)
-    (r : Option Resv) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
+    (r : Option Resv) (Φ : Result (Option Bool) Unit → IProp GF) :
     resvFragAny cpu r ∗
-    writeAUT cpu req.pa n w' iprop(resvFrag cpu none false -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAUT
+    writeAUT cpu req.address n w' iprop(resvFrag cpu none false -∗ Φ (.Ok none))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags) Φ := by
+  subst hv
+  unfold writeAUT
   iintro ⟨Hfrag, H⟩
   iloeb as IH
-  iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_step_at cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags)
+    (.memWrite (memReq req) (vecbytes_to_bitvec bytes) (vecbool_to_bitvec tags))
+    (fun v => FreeM.pure (memWriteAns v)) (sail_mem_write_def req bytes tags) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  by_cases hno : othersReserve σ.resv cpu req.pa n
+  by_cases hno : othersReserve σ.resv cpu req.address n
   · -- blocked: retry
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
@@ -83,7 +87,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, hno', _, _⟩
       · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · exact absurd hno hno'
     · iintro %Hbk
@@ -95,35 +99,35 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
-    ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
-    · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+    ihave %hget : ⌜histsAt σ.mem req.address n Hs⌝ $$ [Hmem Hb]
+    · iapply histBytes_valid σ.mem req.address n _ Hs $$ [Hmem Hb]
       iframe
     ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
     · iapply memModel_topLb _ σ T $$ [Hmm HT]
       iframe Hmm
       iexact HT
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+    have hram : ramBytes req.address n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
     · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+      rcases Hev with ⟨hdev, ds₀, hdw, _, _⟩ | ⟨_, _, rfl, rfl⟩
       · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
-      rw [hv] at hv'
-      obtain rfl := Option.some.inj hv'
       icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
-      imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
-      imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
-        with ⟨Hmem, Hb⟩
+      imod memModel_store_plain _ σ cpu req.address n (vecbytes_to_bitvec bytes) r b hram hno
+        $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+      imod histBytes_update σ.mem req.address n Hs (σ.top + 1) (hartAgent cpu)
+        (vecbytes_to_bitvec bytes) $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
       imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' with HΦ
       rw [hk]
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+      · iapply Hclose $$ %(σ.store cpu req.address n (vecbytes_to_bitvec bytes) false)
+          %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply swp_ret
         iapply HΦ $$ Hfrag
     · iintro %Hbk
@@ -147,7 +151,7 @@ theorem swp_checked_mem_write_store4_S_auT (cpu : CPU) (dq : DFrac) (c : MConf) 
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_auT cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_auT cpu) data (vecbytes_to_bitvec_to_bytes_le_4 _) rfl r
   iframe Hfrag
   iapply writeAUT_wand cpu pa 4 data Ψ $$ HAU
   inext

@@ -45,10 +45,10 @@ theorem lmPending_filed (ps cs : List Nat) (s : M.lmSt) (I : List (BitVec 8)) (a
   have hpos := nlines_pos_of_rest_nil I hne hr
   have hn : nlines I = cs.length + 1 := by omega
   unfold lmPendingAt
-  rw [if_neg hne, if_pos hr]
+  rw [ite_eq_right hne, ite_eq_left hr]
   unfold lmContAt
   rw [lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s I a hn, hnp]
-  simp only [Bool.false_eq_true, if_false, List.append_nil]
+  simp only [Bool.false_eq_true, ite_false, List.append_nil]
 
 /-- Rocq `gcl_pure_o_arm`. -/
 theorem gclPureO_arm (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat) (pre : List (BitVec 8))

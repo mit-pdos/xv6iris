@@ -109,7 +109,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   · -- ===== create REFUSED: the "-1" tail =====
     ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Htx, Hfail⟩
-    simp only [Bool.false_eq_true, if_false] at hns'
+    simp only [Bool.false_eq_true, ite_false] at hns'
     -- +0x2c  c.beqz a0,+0x14 : taken
     k_step_e (wp_s_branch cpu _ (KA.«sys_mkdir» + 0x2c#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
@@ -126,7 +126,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   · -- ===== create SUCCEEDED: the LOCKED inode =====
     ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%⟨h10, hkk, hpos, hnib, hpure⟩, Hlk, Harms⟩
-    simp only [if_true] at hns'
+    simp only [ite_true] at hns'
     have hmade : made = true :=
       creMade_of_ne_file T_DIR (0#16) (0#16) made dn sys_mkdir_tdir_ne_file hpure
     subst hmade

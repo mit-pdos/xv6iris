@@ -84,7 +84,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   iintro %spie %spp %R' %hsp Hk Hpc #Hlk Hav _ %_
   obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_72]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_72]
   iapply HΦ $$ %R' Hk Hpc Hlk Hav
 
 end
@@ -130,7 +130,7 @@ theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) 
   iintro %spie %spp %R' %t %pas %hsp Hk Hpc Htree Hstk Hav Hroot %⟨_, hok⟩
   obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_76]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_76]
   iapply HΦ $$ %R' %t %pas %hok Hk Hpc Htree Hstk Hav Hroot
 
 end
@@ -138,7 +138,7 @@ end
 /-! ## The table publication and `kvminithart()` -/
 
 theorem mn_pageAddr_hi (t : BitVec 44) : BitVec.extractLsb' 56 8 (pageAddr t) = 0#8 := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem mn_ret_7a : jumpPc (KA.«main» + 122#64) = KA.«main» + 122#64 := by decide
@@ -169,7 +169,7 @@ set_option maxHeartbeats 4000000 in
 table: the ambient context moves to `X.toKpt`. -/
 theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.bare) (cpu : CPU)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : 2 ≤ k.avail) (tlb0 : Tlb) (t : PTree)
-    (M : RegMapF (BitVec 64)) :
+    (M : RegMapF (BitVec 64)) (htlb : tlbStageS tlb0) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 118#64) ∗ Register.tlb ↦ᵣ[cpu] tlb0 ∗
     kptOn t M ∗ pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗
     (∀ R : RegMap, kctxL (X := X.toKpt) false cpu ((k.toKpt t.base).withRegs R) -∗
@@ -182,13 +182,13 @@ theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.ba
   iintro Hk Hpc
   have hkv := KVH.wp_kvminithart (GF := GF) X cpu (k.withRegs (R0.set 1#5 (KA.«main» + 122#64)))
     tlb0 (pageAddr t.base) DFrac.discard t M hX (by simp [hsie]) (by simp; omega) (mn_pageAddr_hi t.base)
-    (Xv6.kxc_tfp_extract t.base).symm
+    (Xv6.kxc_tfp_extract t.base).symm htlb
   unfold wp_kvminithart_body at hkv
   simp only [kvminithartAddr] at hkv
   iapply hkv
   iframe Hk Hpc Htlb Hkpt Hroot
   iintro %R' Hk Hpc Hstv _ _
-  simp only [KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7a, KCtx.toKpt_withRegs,
+  simp only [KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_7a, KCtx.toKpt_withRegs,
     Xv6.kxc_tfp_extract, KCtx.withRegs_withRegs]
   iapply HΦ $$ %R' Hk Hpc Hstv
 
@@ -230,7 +230,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hpid Hwait Hready %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7e]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_7e]
   iapply HΦ $$ %R' Hk Hpc Hpid Hwait Hready
 
 /-- A byte buffer travels to the kernel table. -/
@@ -275,7 +275,7 @@ theorem mn_slotIn [CurCtx] (hct : curTier = KTier.kpt) (Γ : SchedNames) (pas : 
   · iexists startedPrimary; iexact Hh
   isplitl [Hsf]
   · unfold pavSlot
-    rw [if_pos mn_unused_isUnused]
+    rw [ite_eq_left mn_unused_isUnused]
     ileft; iexact Hsf
   iapply kstackOwn_of_page pas i hi (List.replicate 4096 5#8) mn_replicate_len hct hpv $$ HS Hst Hbuf
 

@@ -31,7 +31,7 @@
    `List.nodup_append`, `List.pairwise_flatten`'s projection; only the cross
    form `nodup_flatten_cross` (Rocq's `NoDup_mjoin_cross`, with
    `NoDup_app_cross` as its inline step) is stated.  `NoDup_alt` is
-   `List.getElem?_inj`.
+   `List.Nodup.getElem?_inj`.
 3. `fs_inode_blocks_disjoint`'s `##` and `fs_inode_blocks_set_sub`'s `⊆`
    are stated pointwise (`∀ b, b ∈ _ → …`); `Std.ExtTreeSet` has no
    `Disjoint`/`HasSubset` instances.
@@ -90,7 +90,7 @@ theorem fsUsedBlocks_getElem? (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat
       if dn.diType.toNat = 0 then [] else fsInodeBlocks P dn))[i]? =
       some (fsInodeBlocks P (fsDinode P sb i)) := by
   rw [List.getElem?_map, List.getElem?_range hi]
-  simp only [Option.map_some, if_neg hnz]
+  simp only [Option.map_some, ite_eq_right hnz]
 
 /-- Rocq's `fs_used_blocks_inode`. -/
 theorem fsUsedBlocks_inode (P : Nat → List (BitVec 8)) (sb : FsSb) (i b : Nat)
@@ -114,19 +114,19 @@ def fsSlotInj (P : Nat → List (BitVec 8)) (dn : Dinode) : Prop :=
 /-- Rocq's `fs_slot_max`. -/
 theorem fsSlot_max (P : Nat → List (BitVec 8)) (dn : Dinode) :
     fsSlot P dn MAXFILE = (dn.diAddrs[12]!).toNat := by
-  unfold fsSlot; rw [if_pos rfl]
+  unfold fsSlot; rw [ite_eq_left rfl]
 
 /-- Rocq's `fs_slot_direct`. -/
 theorem fsSlot_direct (P : Nat → List (BitVec 8)) (dn : Dinode) (i : Nat) (hi : i < NDIRECT) :
     fsSlot P dn i = (dn.diAddrs[i]!).toNat := by
   unfold fsSlot fsBlkAddr
-  rw [if_neg (by unfold MAXFILE NDIRECT at *; omega), if_pos hi]
+  rw [ite_eq_right (by unfold MAXFILE NDIRECT at *; omega), ite_eq_left hi]
 
 /-- Rocq's `fs_slot_ent`. -/
 theorem fsSlot_ent (P : Nat → List (BitVec 8)) (dn : Dinode) (i : Nat) (h1 : NDIRECT ≤ i)
     (h2 : i < MAXFILE) : fsSlot P dn i = (fsIndEnts P dn)[i - NDIRECT]! := by
   unfold fsSlot fsBlkAddr
-  rw [if_neg (by omega), if_neg (by omega)]
+  rw [ite_eq_right (by omega), ite_eq_right (by omega)]
 
 /-- A nonzero indirect block means the file HAS indirect blocks (Rocq's
 `fs_slot_ind_nb`). -/
@@ -150,9 +150,9 @@ theorem fsInodeBlocks_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Din
   by_cases hm : i = MAXFILE
   · subst hm
     rw [fsSlot_max] at hnz ⊢
-    rw [if_pos rfl, if_pos (fsSlot_indNb P sb dn hok hnz)]
+    rw [ite_eq_left rfl, ite_eq_left (fsSlot_indNb P sb dn hok hnz)]
     rfl
-  · rw [if_neg hm]
+  · rw [ite_eq_right hm]
     rcases Nat.lt_or_ge i NDIRECT with hd | hd
     · rw [fsSlot_direct P dn i hd] at hnz ⊢
       have hnbi : i < fsNblk dn.diSize.toNat := by
@@ -163,9 +163,9 @@ theorem fsInodeBlocks_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Din
           (fun k => (dn.diAddrs[k]!).toNat))[i]? = some (dn.diAddrs[i]!).toNat := by
         rw [List.getElem?_map, List.getElem?_range (by omega)]; rfl
       by_cases hg : NDIRECT < fsNblk dn.diSize.toNat
-      · rw [if_pos hg, if_pos hg, List.singleton_append, List.getElem?_cons_succ,
+      · rw [ite_eq_left hg, ite_eq_left hg, List.singleton_append, List.getElem?_cons_succ,
           List.getElem?_append_left (by simp; omega), hB]
-      · rw [if_neg hg, if_neg hg, List.nil_append,
+      · rw [ite_eq_right hg, ite_eq_right hg, List.nil_append,
           List.getElem?_append_left (by simp; omega), hB]
     · have hlt : i < MAXFILE := by omega
       rw [fsSlot_ent P dn i hd hlt] at hnz ⊢
@@ -175,7 +175,7 @@ theorem fsInodeBlocks_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Din
         · exact absurd (hok.fioEntZero (i - NDIRECT)
             (by unfold MAXFILE NDIRECT NINDIRECT at *; omega) h) hnz
       have hg : NDIRECT < fsNblk dn.diSize.toNat := by omega
-      rw [if_pos hg, if_pos hg, List.singleton_append, List.getElem?_cons_succ,
+      rw [ite_eq_left hg, ite_eq_left hg, List.singleton_append, List.getElem?_cons_succ,
         List.getElem?_append_right (by simp; omega), List.getElem?_map,
         List.getElem?_range (by simp; omega)]
       simp only [List.length_map, List.length_range, Option.map_some]
@@ -194,17 +194,17 @@ theorem fsSlotInj_of_nodup (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinod
       rcases h : (fsInodeBlocks P dn)[fsSlotPos (fsNblk dn.diSize.toNat) i]? with _ | x
       · rw [h] at hli; cases hli
       · exact (List.getElem?_eq_some_iff.1 h).1
-    exact (List.getElem?_inj hlen hnd).1 (by rw [hli, hlj, heq])
+    exact (List.Nodup.getElem?_inj hlen hnd).1 (by rw [hli, hlj, heq])
   unfold fsSlotPos at hpos
   by_cases him : i = MAXFILE <;> by_cases hjm : j = MAXFILE
   · omega
   · rw [him, fsSlot_max] at hnz
-    rw [if_pos him, if_neg hjm, if_pos (fsSlot_indNb P sb dn hok hnz)] at hpos
+    rw [ite_eq_left him, ite_eq_right hjm, ite_eq_left (fsSlot_indNb P sb dn hok hnz)] at hpos
     omega
   · rw [hjm, fsSlot_max] at hnzj
-    rw [if_neg him, if_pos hjm, if_pos (fsSlot_indNb P sb dn hok hnzj)] at hpos
+    rw [ite_eq_right him, ite_eq_left hjm, ite_eq_left (fsSlot_indNb P sb dn hok hnzj)] at hpos
     omega
-  · rw [if_neg him, if_neg hjm] at hpos
+  · rw [ite_eq_right him, ite_eq_right hjm] at hpos
     split at hpos <;> omega
 
 /-- `NoDup` of a join, crossed between two DIFFERENT members (Rocq's

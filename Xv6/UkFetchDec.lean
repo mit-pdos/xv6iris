@@ -60,7 +60,7 @@ theorem uk_fetchDec_of_instr {π : Nat → Option UPerm} {sz : Nat} {M : ElfMem}
   have hcode := hI.code
   cases isRvc with
   | true =>
-    simp only [if_true] at hcode
+    simp only [ite_true] at hcode
     obtain ⟨h, hrvc, hb, ⟨i₀, b, hrd, hexa⟩, -⟩ := hcode
     refine ⟨.F_RVC h, Or.inr ⟨h, i₀, b, rfl, rfl, hrd, hexa⟩, ?_⟩
     intro C pt T V hlo hpm hlf hsz hM hlen
@@ -68,7 +68,7 @@ theorem uk_fetchDec_of_instr {π : Nat → Option UPerm} {sz : Nat} {M : ElfMem}
     exact ukFetch_rvc C pt T pc V lw h hal2 hk hU hR hX ht hrvc
       (uk_view_bytes hM hk (by omega) hb)
   | false =>
-    simp only [Bool.false_eq_true, if_false] at hcode
+    simp only [Bool.false_eq_true, ite_false] at hcode
     obtain ⟨w, hrvc, hb, hdec⟩ := hcode
     refine ⟨.F_Base w, Or.inl ⟨w, rfl, rfl, hdec⟩, ?_⟩
     intro C pt T V hlo hpm hlf hsz hM hlen

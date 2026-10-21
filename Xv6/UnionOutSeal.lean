@@ -8,7 +8,7 @@ of Rocq `UnionOut.v` §5-§7 reached through the instance `union_laws`:
 ## DEVIATIONS from Rocq
 
 1. The counter cases classically (`UnionOutLed` deviation 1): `decide_ext`
-   is `if_pos`/`if_neg` at the landed `open Classical` ite.
+   is `ite_eq_left`/`ite_eq_right` at the landed `open Classical` ite.
 2. Rocq's section parameter `ug` is explicit; `S (obs_boots h)` is
    `obsBoots h + 1`.
 3. `union_led_tx`'s premise `match i with Uart0 => udrain_ret … | _ =>
@@ -79,7 +79,7 @@ theorem unionLed_init (ug : UnionGn) : ⊢ unionClAll (GF := GF) ug -∗ unionLe
   unfold unionClAll fileClAll fileCl echoCl unionLed pinMap f0Map peraMap
   iintro ⟨⟨⟨⟨Ht, Hm⟩, Hfl⟩, Hmf⟩, Hme, ⟨%γ0, Hreg⟩, #Hlb0⟩
   have hd : lmDisc ulmG [] := lmDisc_nil ulmG
-  rw [if_pos hd, show ulinesOf ([] : List Obs) = [] from rfl]
+  rw [ite_eq_left hd, show ulinesOf ([] : List Obs) = [] from rfl]
   dsimp only [fgnEcho, ugnPipe]
   isplitl [Ht]
   · iexact Ht
@@ -219,8 +219,8 @@ theorem unionLed_pow (ug : UnionGn) (h : List Obs) (on : Bool) :
   have hite : (if lmDisc ulmG (h ++ [powerEv on]) then (0 : Nat) else 1) =
       (if lmDisc ulmG h then (0 : Nat) else 1) := by
     unfold powerEv; by_cases hd : lmDisc ulmG h
-    · rw [if_pos hd, if_pos (hdp.2 hd)]
-    · rw [if_neg hd, if_neg (fun h' => hd (hdp.1 h'))]
+    · rw [ite_eq_left hd, ite_eq_left (hdp.2 hd)]
+    · rw [ite_eq_right hd, ite_eq_right (fun h' => hd (hdp.1 h'))]
   have hul : ulinesOf (h ++ [powerEv on]) = ulinesOf h := ulinesOf_power h on
   unfold unionLed
   rw [hite, hul]
@@ -235,7 +235,7 @@ theorem unionLed_pow (ug : UnionGn) (h : List Obs) (on : Bool) :
     imodintro
     isplitl [Ht Hpm Hfm Hme Hfl Hphi Hreg]
     · iframe Ht Hpm Hfm Hme Hfl
-      simp only [powerEv, if_true]
+      simp only [powerEv, ite_true]
       isplitl [Hphi]
       · icases Hphi with (Hphi | HT)
         · ileft; iapply unionPhiRes_off ug h $$ Hphi
@@ -404,7 +404,7 @@ theorem unionLed_rx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
     ipureintro; rw [hbo]; exact hR
   unfold utag
   by_cases hd' : lmDisc ulmG (h ++ [Obs.dev (.uartIn i b)])
-  · rw [if_pos hd', if_pos (hin hd')]
+  · rw [ite_eq_left hd', ite_eq_left (hin hd')]
     imodintro
     iframe Hcnt Hpm Hfm Hme Hfl Hphi Hfllb Hreg
     isplitr
@@ -414,7 +414,7 @@ theorem unionLed_rx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
     isplitr
     · ileft; ipureintro; exact hd'
     · iexists vf; rw [hbo]; iframe Hvf; ipureintro; exact hu'
-  · rw [if_neg hd']
+  · rw [ite_eq_right hd']
     imod (MonoNat.own_update (fgnEcho ug.ugnFile).taint _ (.ofNat 1)
       (by split <;> simp [MaxNat.le_toNat])) $$ Hcnt with ⟨Hcnt, #Hlb⟩
     imodintro
@@ -470,8 +470,8 @@ theorem unionLed_tx (ug : UnionGn) (h : List Obs) (i : UartId) (b : BitVec 8) (h
   have hite : (if lmDisc ulmG (h ++ [Obs.dev (.uartOut i b)]) then (0 : Nat) else 1) =
       (if lmDisc ulmG h then (0 : Nat) else 1) := by
     by_cases hd : lmDisc ulmG h
-    · rw [if_pos hd, if_pos (hdo.2 hd)]
-    · rw [if_neg hd, if_neg (fun h' => hd (hdo.1 h'))]
+    · rw [ite_eq_left hd, ite_eq_left (hdo.2 hd)]
+    · rw [ite_eq_right hd, ite_eq_right (fun h' => hd (hdo.1 h'))]
   unfold unionLed
   rw [hite, ulinesOf_out h i b hsh]
   iintro Hgo ⟨Hcnt, Hpm, Hfm, Hme, Hfl, Hphi, Hreg, #Hbase⟩

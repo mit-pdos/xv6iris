@@ -151,7 +151,7 @@ theorem wp_uk_ecall_open_recv_gimg_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU
   subst M' pm' sz' lz' cw' secc' g' cs'
   have hfd2 : usysFdOk USYS_open (tfOf m pc) r fdv fdv' := hfd
   unfold usysFdOk at hfd2
-  rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at hfd2
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at hfd2
   iapply uslot_bupd
   rcases hfd2 with ⟨fd, rd, wr, t, hr, hcl, rfl, hnp⟩ | ⟨hr, rfl⟩
   · imod ufd_alloc_least_at N.fd fdv l v fd (.open rd wr t) hcl (by simp) $$ Hufd Hstd

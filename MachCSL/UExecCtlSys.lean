@@ -25,7 +25,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -44,7 +44,7 @@ environment call, at the current `PC`, nothing written. -/
 theorem uxc_ecall (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
     (hp : s.file .cur_privilege = Privilege.User) :
     runRW D orc s (execute (.ECALL ())) =
-      some (.Trap (Privilege.User, { trap := .E_U_EnvCall (), excinfo := none, ext := none }, s.file .PC),
+      some (.Trap (Privilege.User, make_exception_context (.E_U_EnvCall ()) 0#64 false none, s.file .PC),
         s, orc) := by
   show runRW D orc s (execute_ECALL ()) = _
   simp only [execute_ECALL, trap, bind_assoc, pure_bind, uxa_readReg_bind D orc s _ _ hD.priv,
@@ -52,14 +52,17 @@ theorem uxc_ecall (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
   rfl
 
 /-- **EBREAK** (Rocq `exec_execute_EBREAK_U` + `goodmb_…`): the breakpoint,
-`tval` the `PC`. -/
+`tval` the `PC` (sail-riscv 0.16: an `ExceptionContext`, not a guest address at User). -/
 theorem uxc_ebreak (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
     (hp : s.file .cur_privilege = Privilege.User) :
     runRW D orc s (execute (.EBREAK ())) =
-      some (.Trap (Privilege.User, make_sync_exception (.E_Breakpoint .Brk_Software) (s.file .PC),
+      some (.Trap (Privilege.User, make_exception_context (.E_Breakpoint .Brk_Software) (s.file .PC) false none,
         s.file .PC), s, orc) := by
   show runRW D orc s (execute_EBREAK ()) = _
-  simp only [execute_EBREAK, uxa_readReg_bind D orc s _ _ hD.pc, uxc_trap D orc s _ hD.priv hD.pc, hp]
+  simp only [execute_EBREAK, exception_context, inVirtualPrivilege, bind_assoc, pure_bind,
+    uxa_readReg_bind D orc s _ _ hD.pc, uxa_readReg_bind D orc s _ _ hD.priv, hp]
+  rw [uxc_trap D orc s _ hD.priv hD.pc, hp]
+  rfl
 
 theorem uxc_c_ebreak_as : execute (.C_EBREAK ()) = pure (.ExecuteAs (.EBREAK ())) := rfl
 
@@ -67,7 +70,7 @@ theorem uxc_c_ebreak_as : execute (.C_EBREAK ()) = pure (.ExecuteAs (.EBREAK ())
 theorem uxc_c_ebreak (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
     (hp : s.file .cur_privilege = Privilege.User) :
     runRW D orc s (uxaExecAs (.C_EBREAK ())) =
-      some (.Trap (Privilege.User, make_sync_exception (.E_Breakpoint .Brk_Software) (s.file .PC),
+      some (.Trap (Privilege.User, make_exception_context (.E_Breakpoint .Brk_Software) (s.file .PC) false none,
         s.file .PC), s, orc) := by
   rw [uxc_execAs_redirect D orc s uxc_c_ebreak_as, uxc_ebreak hD orc s hp]
 
@@ -108,7 +111,8 @@ theorem uxc_sfence_vma (hD : UxcFoot D) (orc : UOrc) (s : UWSt)
   show runRW D orc s (execute_SFENCE_VMA _ _) = _
   simp only [execute_SFENCE_VMA]
   split <;> split <;>
-    simp only [runRW_bind, uxa_rX hD.alu, Option.bind, runRW_pure, MachCSL.utr_readReg D orc s _ hD.priv, hp] <;>
+    simp (config := { decide := true }) only [runRW_bind, uxa_rX hD.alu, Option.bind, runRW_pure,
+      MachCSL.utr_readReg D orc s _ hD.priv, hp, ↓reduceIte] <;>
     rfl
 
 /-- **SFENCE.W.INVAL** at User: illegal. -/
@@ -199,20 +203,34 @@ theorem uxc_fence_tso (orc : UOrc) (s : UWSt) :
 theorem uxc_fencei (orc : UOrc) (s : UWSt) (imm : BitVec 12) (rs rd : regidx) :
     runRW D orc s (execute (.FENCEI (imm, rs, rd))) = some (RETIRE_SUCCESS, s, orc) := rfl
 
+/-- A barrier is silent. -/
+theorem uxc_barrier (orc : UOrc) (s : UWSt) (b : barrier_kind) :
+    runRW D orc s (LeanRV64D.ArchSem.sail_barrier b) = some ((), s, orc) := rfl
+
+/-- `generate_event` (sail-riscv 0.16) reads the privilege for its callback, and changes
+nothing. -/
+theorem uxc_generate_event (orc : UOrc) (s : UWSt) (e : Event) (hp : D.Dr .cur_privilege = true) :
+    runRW D orc s (generate_event e) = some ((), s, orc) := by
+  unfold generate_event
+  rw [uxa_readReg_bind D orc s _ _ hp]
+  rfl
+
 /-- **FENCE, generic** (Rocq `exec_execute_FENCE_total_U` + `goodmb_…`): the
-`FIOM` read, then a silent barrier (whichever the ordering bits select). -/
-theorem uxc_fence_gen (orc : UOrc) (s : UWSt) (fi : Bool)
+`FIOM` read, then a silent barrier (whichever the ordering bits select), then the fence event
+(sail-riscv 0.16's `generate_event`, which reads the privilege). -/
+theorem uxc_fence_gen (orc : UOrc) (s : UWSt) (fi : Bool) (hDp : D.Dr .cur_privilege = true)
     (hf : runRW D orc s (is_fiom_active ()) = some (fi, s, orc)) (fm pred succ : BitVec 4) (rs rd : regidx) :
     runRW D orc s (execute (.FENCE (fm, pred, succ, rs, rd))) = some (RETIRE_SUCCESS, s, orc) := by
   show runRW D orc s (execute_FENCE fm pred succ rs rd) = _
   simp only [execute_FENCE, runRW_bind, hf, Option.bind]
-  split <;> rfl
+  split <;> (try rw [runRW_bind_some D _ _ orc orc s s _ (uxc_barrier orc s _)]) <;>
+    rw [runRW_bind_some D _ _ orc orc s s _ (uxc_generate_event orc s _ hDp)] <;> rfl
 
 /-- **FENCE at the user tier**. -/
 theorem uxc_fence (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (fm pred succ : BitVec 4)
     (rs rd : regidx) :
     runRW D orc s (execute (.FENCE (fm, pred, succ, rs, rd))) = some (RETIRE_SUCCESS, s, orc) :=
-  uxc_fence_gen orc s false (uxc_fiom hD orc s hU) fm pred succ rs rd
+  uxc_fence_gen orc s false hD.priv (uxc_fiom hD orc s hU) fm pred succ rs rd
 
 end
 

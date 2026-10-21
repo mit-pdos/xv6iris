@@ -62,7 +62,7 @@ theorem initArgvMap_range (a : Nat) (b : BitVec 8) (h : initArgvMap a = some b) 
 /-- NEW (deviation 3): the map at `initArgv`'s `j`-th byte. -/
 theorem initArgvMap_byte (j : Nat) (hj : j < 16) : initArgvMap (0x1000 + j) = some (initArgvByte j) := by
   unfold initArgvMap User.USeg.byte
-  rw [initData_vaddr, initData_size, if_pos (by omega), Nat.add_sub_cancel_left]
+  rw [initData_vaddr, initData_size, ite_eq_left (by omega), Nat.add_sub_cancel_left]
   rfl
 
 end Xv6

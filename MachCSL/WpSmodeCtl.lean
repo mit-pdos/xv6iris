@@ -15,7 +15,7 @@ import MachCSL.SConfPhysDefs
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -270,11 +270,11 @@ theorem beq_ne (v : BitVec 64) (h : v ≠ 0#64) : bcond bop.BEQ v 0#64 = false :
 
 theorem bne_ne {α : Type} (a b : BitVec 64) (h : a ≠ b) (p q : α) :
     (if bcond bop.BNE a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 theorem bne_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
+  rw [ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
 /-- `blez a2,dfc` with `a2 = 16` is not taken. -/
 theorem blez_ite {α : Type} (p q : α) :
@@ -299,7 +299,7 @@ theorem bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 
 theorem beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, beq_iff_eq]; exact h)]
 
 theorem bltz_nat (n : Nat) (h : n < 16) : bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
   show (BitVec.ofNat 64 n).slt 0#64 = false

@@ -10,7 +10,8 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 ## Later rulings (Sept 26–30 2026)
 
 - **Zkr / eager `&&`**: regenerate the Sail model with the short-circuit-patched Lean backend
-  (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e)
+  (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e;
+  since the 0.16 bump onto `sail2` `e4982101` in `dongjaelee1/sail`, `notes/model-diffs.md` §2)
   rather than adding a Zkr clause; `hZkr` is gone.  The patch is proposed upstream; once a Sail release
   contains it, regenerate with that release and drop the cherry-pick.
 - **Rocq drift** (Sept 29): the Lean proofs were brought in step with Rocq's latest proofs (drift waves
@@ -71,6 +72,131 @@ where noted.
   class fails if the base logic's universe moves); step-index binders are `Iris.SI`, not `Nat`.
 - **Trusted base.** The ordinal order instance (`Iris.instSIdxSI`) depends on `Classical.choice`,
   which therefore enters `xv6FsAdequacy_closed`'s statement (the other roots already reached it).
+
+## The sail-riscv 0.16 bump (Oct 2026)
+
+The machine model was regenerated from sail-riscv 0.16 (e5acebb0) with lean-sail v7 and the Sail
+compiler's `sail2` branch, before the liveness work.  The standard every deviation is judged by is
+`notes/model-policy.md` (2026-10-19); the rulings below are instances of it.  The owner's rulings of 2026-10-18 and 2026-10-19
+(the bump plan's decisions "bump D1"-"bump D11", not this file's D1-D54):
+
+- **Sources.** The model fork is `dongjaelee1/sail-riscv` branch `xv6`: upstream 0.16 plus the
+  atomic PTE A/D update and only the fixes the Lean backend or this verification needs.  The Sail
+  compiler is `dongjaelee1/sail` branch `xv6` (`sail2` `e4982101` plus the fixes).  lean-sail v7 is pinned by
+  git.  `tools/regen_sail_model.sh` pins all three.
+- **The interface is used natively.** MachCSL is re-expressed over lean-sail's
+  `InstructionEffect` free monad; no compatibility layer imitates the V1 `Outcome` monad.
+  `MachCSL/Lang.lean`'s header lists the semantic deltas.  In short: register events ignore their
+  system-register id; memory answers carry no tags; the memory never fails a conditional write; the
+  store announcement (`memWriteAnnounce`) is silent; choices are finite (`Fin n`).
+- **Configuration.** H is kept and Sdtrig compiled in, both disabled by the configuration.  The
+  external-interrupt pin registers are read unconditionally: not a configuration value but fork
+  commit 2, a platform-integration patch that restores the reading upstream's #1899 made
+  conditional on its Simple Interrupt Generator (MachCSL's PLIC drives the pins).  The deviations from the 0.16 default configuration are the seven items of
+  `model/sail-config-rv64d.json`'s header, each marked "xv6iris" inline: the SIG, B/V and the V
+  family, H and its family and Sdtrig, the 128 MiB RAM, and three forced or kept ones -- `medeleg`'s
+  delegatable set keeps the previous value, `mstateen0.CONTEXT` is read-only zero, and a misaligned
+  AMO faults, as before the bump (the first 0.16 refresh had dropped that one silently; restored on
+  review, 2026-10-19).
+- **Board obligations for model bookkeeping.** `written_trigger_index := none` is a board line
+  (owner, 2026-10-19), justified by the power-on policy's minimality rule (0.16 asserts it at every
+  cycle's end; `init_model` does not establish it).  Unlike the other board lines it is not a claim
+  a reader can check against hardware: it is the model's own Sdtrig bookkeeping, whose Sail initial
+  value is `None()`.  Running the model's initialisers instead would pin ISA-unspecified registers to
+  simulator values (`MachCSL/ArchReset.lean`).
+- **No float instructions.** Upstream's `postlude` requires `FD_instructions` (for the H
+  extension's transformed FP loads and stores), which compiled every F/D instruction and the
+  softfloat externs into `execute`.  The fork drops that dependency and the two FP arms.  The
+  generated model has no F/D instructions, as before the bump, and the softfloat axioms stay
+  outside every audited cone (`notes/adequacy_axioms_baseline.md`).
+- **Follow the model; fix only clear bugs** (owner, 2026-10-19).  Every deviation from upstream
+  -- fork commits, compiler patches, post-generation patches, module subset, configuration, and how
+  MachCSL runs the model -- is tracked in `notes/model-diffs.md`.
+- **`hideleg` without H.** 0.16's interrupt check split the delegated interrupts with `hideleg`
+  whether or not H is enabled, though nothing resets it and without H nothing can write its S
+  bits; under this development's arbitrary power-on state a delegated supervisor interrupt could go
+  to VS and never be taken.  A bug: the model fork guards the read exactly as the model already
+  guards `mideleg` without S.
+- **The frozen bundle grows.** `hwConfig cpu` also holds `mhartid ↦□ bootHid cpu` (every physical
+  access reads it in `within_clint` since 0.16), `hgeie` at an arbitrary value (read by
+  `read_mip`, used only when H is enabled, written by nothing here) and, likewise, `hcounteren`
+  (read by every counter-CSR access check since 0.16, used only at a virtual privilege; policy
+  section 5: held, not reset, not a board line) and `henvcfg` (read by 0.16's CBO enable checks,
+  likewise).  The U-mode reference walks answer these reads the same way.  `hedeleg`, read by
+  `exception_delegatee` on every trap and used only under H, needs no cell: the trap rules answer
+  the read off-frame, universally over its value (`swp_readReg_any_bind`, `MachCSL/UTrap.lean`).
+- **`TW = 0` in the kernel's `mstatus` invariant** (2026-10-19). With `exit_wait` chosen by the
+  driver, a parked S-mode WFI may be forced out, which 0.16 retires only under `mstatus.TW = 0`
+  (otherwise an illegal-instruction trap).  TW is 0 on every reachable state (the board line,
+  `reset_sys`, S-mode cannot write it), so it is the last conjunct of `smFacts`; the WFI rules keep
+  their statements.  The USER-side twins (`userMstatusOk`, `trapMstatusOk`) grew the same bit with
+  the other 0.16 `mstatus` bits (SDT, GVA, MPV, MDT) on 2026-10-19 (the contract change the policy
+  review flagged; `Xv6/UserExec.lean`).
+- **The user frames carry H's trap CSRs** (2026-10-19). 0.16 writes `hstatus`/`htval`/`htinst` on
+  every trap and `sret` writes `hstatus`, H enabled or not, so `uRegs`/`uvRegs`/`userTrapFrame`
+  hold `hTrapCsrs` (at some value) beside sepc/scause/stval through USERRET, USERTRAP and
+  PREPARE_RETURN (deviation 10 of `Xv6/UserExec.lean`'s header): resources the model forces, not a
+  weakening; invisible without H.
+- **The TLB after `sfence.vma`** (2026-10-19). 0.16's `flush_TLB` is stage-aware, so the cell-form
+  rules return `tlbFlushS tlb0`; `KVMINITHART` takes `tlbStageS tlb0`, which the boot chain
+  discharges from the empty TLB `init_model` derives (`reset_vmem` -> `reset_TLB`; a `bootPost`
+  fact, never a board line), and the page-table slots hand `tlbStageS` out with their TLB.
+- **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
+  definition's reducibility cannot be changed without a check-disabling option.  So the WP's
+  event rules come with `_at` variants that take the program and an equation to its event node.
+  The register rules spell out their continuations' binder types.
+- **The policy** (owner, 2026-10-19): `notes/model-policy.md` is approved, and the decisions it had
+  left open are taken there (section 8): the A/D update's step-7 compare in a later lane, a
+  nondeterministic `exit_wait` (`riscvStep tick ew`; the cycle schemas introduce `%ew` beside
+  `%tick`, and the WFI leaves cover the forced-exit arm), nothing filed upstream, F and D off in
+  the configuration (item 8) -- **reversed 2026-10-20**: the device-conformance runs showed every
+  validated platform has F and D and `misa` had come to read a value no platform reports, so F and
+  D are advertised again (their instructions still uncompiled, as always), and the policy's T0(a)
+  now says the configuration follows the validated platforms wherever they agree; Sdtrig stays off
+  with QEMU/CoreCsrprobe recorded as its finding (the pre-bump green was a `tselect` stub).
+- **The user tier's and the kernel's contracts, ratified** (owner, 2026-10-20).  The 2026-10-19
+  changes -- the five 0.16 `mstatus` bits (SDT, GVA, MPV, MDT, TW) in `userMstatusOk`/`trapMstatusOk`,
+  `hTrapCsrs` in the user frames, `TW = 0` in `smFacts` -- were reported when made and are approved;
+  the policy's who-decides table now names such changes the owner's.
+- **`bv_decide`, not `native_decide`** (the enum encodings of `MachCSL/BvEnums.lean`, the literal
+  tables).  Both rest on `Lean.ofReduceBool`; what differs is what is compiled and trusted.
+  `bv_decide` compiles one fixed function, the LRAT certificate checker, whose correctness is proved
+  in Lean, and each call's certificate is data the audit enumerates
+  (`notes/adequacy_axioms_baseline.md`); `native_decide` compiles the goal's own arbitrary decision
+  code and trusts the compiler afresh on each goal.  The vtest harness, in no theorem's cone, uses
+  `native_decide`.
+- **The independent audit** (2026-10-20; a clean-context review of the bump's decisions, kept at
+  `local-plan/model-bump/policy-review/audit-2026-10-20.md`, outside the repository): every
+  soundness-critical decision held; the owner's dispositions are `notes/model-policy.md` section 8,
+  decisions (6)-(10).  Two facts it surfaced, now in the records: the platforms disagree on Sdtrig
+  (CVA6 traps on `csrr tselect`; QEMU and the JH7110 do not: `core_csrprobe` slot 35), so Sdtrig
+  off follows CVA6 rather than, as the notes had said, lacking a feature every platform has; and
+  the one "stuck" green-set run (`core_csrwide`, M-mode `csrr mseccfg`) is the pre-bump finding 32,
+  caused by an uncompiled Zkr clause behind `is_CSR_accessible`, which no configuration flag removes.
+- **The second independent audit** (2026-10-20, later; `local-plan/model-bump/policy-review/audit2-2026-10-20.md`):
+  the proofs' decisions held again; it caught a false claim the morning's record fix had made --
+  "every validated platform reports `misa` without B" -- when `core_csrvals` reads B on both boards
+  (QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F; Rocq finding 29).  Owner rulings (policy section 8,
+  (11)-(13)): B stays off as a platform disagreement resolved toward QEMU (the kernel never uses it;
+  B on regrows the complete U-mode decode image, `MachCSL/UDecode.lean` pins `misa`); T0(a) gains a
+  disagreement rule (the integrator proposes with kernel-use, cost and the conformance result; the
+  owner rules; the other platforms' runs are findings), applied to H (follows the boards), Sdtrig
+  (follows CVA6) and B (follows QEMU); and the record fixes: the stuck run is finding 32, the A/D
+  `Ok(false)` arm is an `internal_error` (stuck, not a retry) and upstream's `write_ram` discards the
+  conditional-write result, fork 2 also reads `sig_hgeip`, fork 5's arms are absent by construction
+  and the edit is behaviour-changing under H+FD, fork 6 cites upstream's emulator,
+  `claude-notes/LEAN.md`'s fork line, patch B's scope, the compiler row's `rewrites.ml` nuance and
+  both hash conventions, the adequacy note's heading.
+- **The third independent audit** (2026-10-20, later still; `local-plan/model-bump/policy-review/audit3-2026-10-20.md`):
+  the proofs' decisions held; every witness sentence about `misa` and `tselect` matched its decode;
+  the configuration diffs from upstream's template in exactly the 30 fields the seven header items
+  name.  Its corrections, all record: the function is `is_CSR_accessible` (0.16 has no
+  `is_CSR_defined`); the surviving line-wrapped xlen ites are fourteen, not two or three; the
+  conformance note and the policy's own decision cells now say the owner rules a T0 disagreement;
+  the H and Sdtrig rulings carry the kernel-use and cost arguments the rule asks for (Sdtrig's an
+  estimate); README names the sealed boot image beside the two opaque predicates and says the sixth
+  fork commit and the compiler merge await the owner's push -- pushed 2026-10-21 (`ls-remote`: both
+  branches at the pins), the one blocking item of all three audits closed.
 
 ## From `notes/briefs/crash_layer.md`
 

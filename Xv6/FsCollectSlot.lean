@@ -74,7 +74,7 @@ theorem colInodeOwnedEra_free (γfs : FsNames) (γi : GName) (inum : BitVec 32) 
   have hind : fnIndb (freeNode d) = 0 := fnBare_indb _ (fnBare_freeNode d hb hnl)
   have hloc := inodeLocal_freeNode inum.toNat d hb hnl ht0
   unfold inodeOwnedEra inodeDat indOwned
-  rw [if_pos hind, freeNode_rec]
+  rw [ite_eq_left hind, freeNode_rec]
   iintro Hd Htop
   have hblk : (freeNode d).fnBlk = ∅ := rfl
   rw [hblk]
@@ -303,13 +303,13 @@ theorem colKeep_retag (γfs : FsNames) (z : Nat) (m : Nat) (w kv : Ity) :
       FsStateLink.linkAuth (fsGammaL γfs) (z : Int) m w ∗ iregKeep γfs z w := by
   unfold iregKeep
   by_cases hr : (z : Int) = iregRoot
-  · simp only [if_pos hr]
+  · simp only [ite_eq_left hr]
     iintro Ha Hk
     ihave %hag := FsStateLink.linkAuth_tok_agree (fsGammaL γfs) (z : Int) m w kv $$ [Ha Hk]
     · iframe Ha Hk
     obtain ⟨rfl, -⟩ := hag
     iframe Ha Hk
-  · simp only [if_neg hr]
+  · simp only [ite_eq_right hr]
     iintro Ha -
     iframe Ha
 

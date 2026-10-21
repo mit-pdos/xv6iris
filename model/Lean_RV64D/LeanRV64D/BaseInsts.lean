@@ -1,8 +1,10 @@
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Xlen
 import LeanRV64D.PlatformConfig
 import LeanRV64D.PcAccess
 import LeanRV64D.AddrChecks
+import LeanRV64D.SyncException
 import LeanRV64D.InstsBegin
 
 set_option maxHeartbeats 1_000_000_000
@@ -11,12 +13,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -60,6 +62,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -93,10 +97,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -142,6 +149,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -160,17 +168,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -185,12 +200,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -201,7 +219,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -213,7 +234,7 @@ def encdec_uop_backwards (arg_ : (BitVec 7)) : SailM uop := do
   | 0b0010111 => (pure AUIPC)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def encdec_uop_forwards_matches (arg_ : uop) : Bool :=
@@ -233,7 +254,7 @@ def utype_mnemonic_backwards (arg_ : String) : SailM uop := do
   | "auipc" => (pure AUIPC)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def utype_mnemonic_forwards_matches (arg_ : uop) : Bool :=
@@ -251,12 +272,12 @@ def jump_to (target : (BitVec 64)) : SailM ExecutionResult := SailME.run do
   match (ext_control_check_pc target) with
   | .some e => SailME.throw ((Ext_ControlAddr_Check_Failure e) : ExecutionResult)
   | none => (pure ())
-  (assert ((BitVec.access target 0) == 0#1) "extensions/I/base_insts.sail:59.25-59.26")
+  sail_assert ((BitVec.access target 0) == 0#1) "extensions/I/base_insts.sail:59.25-59.26"
   if ((← do
        if ((bit_to_bool (BitVec.access target 1)) : Bool)
        then (pure (not (← (currentlyEnabled Ext_Zca))))
        else (pure false)) : Bool)
-  then (memory_exception (Virtaddr target) (E_Fetch_Addr_Align ()))
+  then (trap (← (exception_context (E_Fetch_Addr_Align ()) target)))
   else
     (do
       (set_next_pc target)
@@ -272,7 +293,7 @@ def encdec_bop_backwards (arg_ : (BitVec 3)) : SailM bop := do
   | 0b111 => (pure BGEU)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def encdec_bop_forwards_matches (arg_ : bop) : Bool :=
@@ -304,7 +325,7 @@ def btype_mnemonic_backwards (arg_ : String) : SailM bop := do
   | "bgeu" => (pure BGEU)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def btype_mnemonic_forwards_matches (arg_ : bop) : Bool :=
@@ -336,7 +357,7 @@ def encdec_iop_backwards (arg_ : (BitVec 3)) : SailM iop := do
   | 0b100 => (pure XORI)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def encdec_iop_forwards_matches (arg_ : iop) : Bool :=
@@ -368,7 +389,7 @@ def itype_mnemonic_backwards (arg_ : String) : SailM iop := do
   | "andi" => (pure ANDI)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def itype_mnemonic_forwards_matches (arg_ : iop) : Bool :=
@@ -402,7 +423,7 @@ def encdec_sop_backwards (arg_ : (BitVec 3)) : SailM sop := do
   | 0b101 => (pure SRLI)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def encdec_sop_forwards_matches (arg_ : sop) : Bool :=
@@ -425,7 +446,7 @@ def shiftiop_mnemonic_backwards (arg_ : String) : SailM sop := do
   | "srai" => (pure SRAI)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def shiftiop_mnemonic_forwards_matches (arg_ : sop) : Bool :=
@@ -455,7 +476,7 @@ def rtype_mnemonic_backwards (arg_ : String) : SailM rop := do
   | "sra" => (pure SRA)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def rtype_mnemonic_forwards_matches (arg_ : rop) : Bool :=
@@ -485,7 +506,7 @@ def rtype_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "sra" => true
   | _ => false
 
-/-- Type quantifiers: k_ex673535_ : Bool, k_n : Nat, k_n ≥ 0, 0 < k_n ∧ k_n ≤ xlen -/
+/-- Type quantifiers: k_ex1173385_ : Bool, k_n : Nat, k_n ≥ 0, 0 < k_n ∧ k_n ≤ xlen -/
 def extend_value (is_unsigned : Bool) (value : (BitVec k_n)) : (BitVec 64) :=
   if (is_unsigned : Bool)
   then (zero_extend (m := 64) value)
@@ -497,10 +518,10 @@ def maybe_u_backwards (arg_ : String) : SailM Bool := do
   | "" => (pure false)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-/-- Type quantifiers: k_ex673536_ : Bool -/
+/-- Type quantifiers: k_ex1173386_ : Bool -/
 def maybe_u_forwards_matches (arg_ : Bool) : Bool :=
   match arg_ with
   | true => true
@@ -521,7 +542,7 @@ def rtypew_mnemonic_backwards (arg_ : String) : SailM ropw := do
   | "sraw" => (pure SRAW)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def rtypew_mnemonic_forwards_matches (arg_ : ropw) : Bool :=
@@ -548,7 +569,7 @@ def shiftiwop_mnemonic_backwards (arg_ : String) : SailM sopw := do
   | "sraiw" => (pure SRAIW)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def shiftiwop_mnemonic_forwards_matches (arg_ : sopw) : Bool :=
@@ -564,7 +585,7 @@ def shiftiwop_mnemonic_backwards_matches (arg_ : String) : Bool :=
   | "sraiw" => true
   | _ => false
 
-/-- Type quantifiers: k_ex673537_ : Bool -/
+/-- Type quantifiers: k_ex1173387_ : Bool -/
 def effective_fence_set (set : (BitVec 4)) (fiom : Bool) : (BitVec 4) :=
   if (fiom : Bool)
   then
@@ -578,7 +599,7 @@ def bit_maybe_r_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def bit_maybe_r_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -599,7 +620,7 @@ def bit_maybe_w_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def bit_maybe_w_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -620,7 +641,7 @@ def bit_maybe_i_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def bit_maybe_i_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -641,7 +662,7 @@ def bit_maybe_o_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def bit_maybe_o_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -662,12 +683,56 @@ def fence_bits_backwards (arg_ : String) : SailM (BitVec 4) := do
   | _ => throw Error.Exit
 
 def fence_bits_forwards_matches (arg_ : (BitVec 4)) : Bool :=
-  match arg_ with
-  | 0b0000 => true
-  | v__9 => true
+  let b__0 := arg_
+  if ((b__0 == (0x0#4 : (BitVec 4))) : Bool)
+  then true
+  else true
 
 def fence_bits_backwards_matches (arg_ : String) : SailM Bool := do
   match arg_ with
   | "0" => (pure true)
   | _ => throw Error.Exit
+
+def xret_modifies_vsstatus (prev_priv : Privilege) (new_priv : Privilege) : SailM Bool := do
+  if ((← (currentlyEnabled Ext_H)) : Bool)
+  then
+    (pure (((_get_HEnvcfg_DTE (← (read_henvcfg ()))) == 1#1) && ((new_priv == VirtualUser) || (prev_priv == VirtualSupervisor))))
+  else (pure false)
+
+def xret_clear_dbltrp (prev_priv : Privilege) (new_priv : Privilege) : SailM Unit := do
+  if (((← (currentlyEnabled Ext_Smdbltrp)) && (prev_priv == Machine)) : Bool)
+  then
+    (do
+      let _ : Unit :=
+        if (((get_config_print_exception ()) || (get_config_print_interrupt ())) : Bool)
+        then (print_endline "clearing mstatus[MDT] for Double Trap")
+        else ()
+      writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) 42 42 0#1))
+  else (pure ())
+  if (((← (currentlyEnabled Ext_Ssdbltrp)) && (match prev_priv with
+       | .Machine =>
+         ((new_priv == User) || ((new_priv == VirtualSupervisor) || (new_priv == VirtualUser)))
+       | .Supervisor => true
+       | _ => false : Bool)) : Bool)
+  then
+    (do
+      let _ : Unit :=
+        if (((get_config_print_exception ()) || (get_config_print_interrupt ())) : Bool)
+        then (print_endline "clearing mstatus[SDT] for Double Trap")
+        else ()
+      writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) 24 24 0#1))
+  else (pure ())
+  if ((← do
+       if ((← (currentlyEnabled Ext_H)) : Bool)
+       then
+         (pure (((_get_HEnvcfg_DTE (← (read_henvcfg ()))) == 1#1) && ((new_priv == VirtualUser) || (prev_priv == VirtualSupervisor))))
+       else (pure false)) : Bool)
+  then
+    (do
+      let _ : Unit :=
+        if (((get_config_print_exception ()) || (get_config_print_interrupt ())) : Bool)
+        then (print_endline "clearing vsstatus[SDT] for Double Trap")
+        else ()
+      writeReg vsstatus (Sail.BitVec.updateSubrange (← readReg vsstatus) 24 24 0#1))
+  else (pure ())
 

@@ -454,15 +454,15 @@ theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName)
   iframe Hch Hev
   isplitl [Hsg]
   · unfold genHalvesDorm
-    rw [if_neg (show ¬ (UNUSED = ZOMBIE) by decide)]
+    rw [ite_eq_right (show ¬ (UNUSED = ZOMBIE) by decide)]
     iframe Hsg
     ipureintro; rw [hpid]; rfl
   isplitl [Hxs]
   · iexists xsv
-    rw [if_neg (show ¬ (UNUSED = ZOMBIE) by decide)]
+    rw [ite_eq_right (show ¬ (UNUSED = ZOMBIE) by decide)]
     iframe Hxs
   unfold dormantSpace
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   iframe Hstk
   ipureintro; exact ⟨hpg, htf, hsz, hpid⟩
 

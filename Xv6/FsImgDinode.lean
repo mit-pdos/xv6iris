@@ -165,7 +165,7 @@ theorem fsDataOf_addr (P : Nat → List (BitVec 8)) (dn : Dinode) (k : Nat) :
 /-- Rocq's `fs_data_of_holes`. -/
 theorem fsDataOf_holes (P : Nat → List (BitVec 8)) (dn : Dinode) (k : Nat)
     (h : fsBlkAddr P dn k = 0) : fsDataOf P dn k = List.replicate BSIZE 0 := by
-  rw [fsDataOf_addr, if_pos h]
+  rw [fsDataOf_addr, ite_eq_left h]
 
 /-- Every block a whole image hands back is `BSIZE` bytes (Rocq's
 `fs_blocks_full`; `inodeSized`'s premise). -/
@@ -222,7 +222,7 @@ theorem fsIndBytes_round_trip (P : Nat → List (BitVec 8)) (dn : Dinode)
     indBytes ((fsIndEnts P dn).map (BitVec.ofNat 32)) = P (dn.diAddrs[12]!).toNat := by
   generalize hib : (dn.diAddrs[12]!).toNat = ib at hnz
   have hents : fsIndEnts P dn = (List.range NINDIRECT).map (fun q => fsLeAt (P ib) (4 * q) 4) := by
-    unfold fsIndEnts; simp only [hib, if_neg hnz]
+    unfold fsIndEnts; simp only [hib, ite_eq_right hnz]
   have hlen : (P ib).length = 1024 := hfull ib
   have hle : ((fsIndEnts P dn).map (BitVec.ofNat 32)).length = 256 := by
     rw [List.length_map, fsIndEnts_length]; rfl

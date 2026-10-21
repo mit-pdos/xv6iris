@@ -56,7 +56,7 @@ theorem nodeAt_live (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     (h : (fsDinode P sb i).diType.toNat ≠ 0) :
     nodeAt P sb i = some (nodeOf (fsDinode P sb i) (fsFileData P sb i)) := by
   unfold nodeAt fsFileData
-  simp only [if_neg h]
+  simp only [ite_eq_right h]
 
 /-- The node store: fuel counts DOWN, entries are inserted as they are met,
 nothing is reversed (Rocq's `fs_nodes_upto`). -/
@@ -79,7 +79,7 @@ theorem fsNodesUpto_lookup_out (P : Nat → List (BitVec 8)) (sb : FsSb) (n i : 
   | succ m ih =>
     unfold fsNodesUpto
     split
-    · rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rw [Std.compare_eq_iff_eq]; omega)]
+    · rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rw [Std.compare_eq_iff_eq]; omega)]
       exact ih (by omega)
     · exact ih (by omega)
 
@@ -100,7 +100,7 @@ theorem fsNodesUpto_lookup (P : Nat → List (BitVec 8)) (sb : FsSb) (n i : Nat)
       · rename_i hn
         rw [fsNodesUpto_lookup_out P sb i i (Nat.le_refl _), hn]
     · split
-      · rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rw [Std.compare_eq_iff_eq]; omega)]
+      · rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rw [Std.compare_eq_iff_eq]; omega)]
         exact ih (by omega)
       · exact ih (by omega)
 
@@ -143,7 +143,7 @@ theorem pathAt_disk_dir (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (f :
   rw [pathAt_disk_singleton P sb i f hi,
     nodeAt_live P sb i (by rw [hty]; unfold T_DIR_z; omega)]
   unfold nodeOf
-  rw [if_pos hty]
+  rw [ite_eq_left hty]
   exact dirView_lookup _ _ f
 
 /-! ### the file-bytes reduction -/
@@ -225,7 +225,7 @@ theorem nodeAt_file (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat) (hP : fs
         (fsNblk (fsDinode P sb i).diSize.toNat)).take (fsDinode P sb i).diSize.toNat)) := by
   rw [nodeAt_live P sb i hnz]
   unfold nodeOf
-  rw [if_neg hnd]
+  rw [ite_eq_right hnd]
   congr 2
   exact fileBytes_takeBlocks _ _ _ (fun q => fsDataOf_sized P _ hP q) (fsNblk_cover _)
 

@@ -50,7 +50,7 @@
 # summary over 1 MiB WHOLE (the upload fails and nothing is shown), so every
 # step writes to a scratch file first and what is appended is cut to
 # $XV6_SUMMARY_MAX bytes (default 1000 KiB) with a note saying so.  Today's
-# largest is the trusted-base tables, ~85 KB.
+# largest is the trusted-base tables, ~160 KB.
 #
 # ENVIRONMENT
 #   XV6_CI_OUT        where reports and logs go            (default .lake/ci)

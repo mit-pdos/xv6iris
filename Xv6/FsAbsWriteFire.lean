@@ -199,20 +199,20 @@ theorem wrfFile_bytes_splice_dist (data data' : Nat → List (BitVec 8)) (sz off
   rw [wrfFb_lookup data' _ j hj, hbytes j hj]
   by_cases hlt : j < off
   · rw [blkSplice_getElem?_lt _ _ _ j (by rw [hbs]; exact hoff) hlt,
-      wrfFb_lookup data sz j (by omega), if_neg (by omega), if_neg (by omega)]
+      wrfFb_lookup data sz j (by omega), ite_eq_right (by omega), ite_eq_right (by omega)]
   by_cases hmid : j < off + tot
   · rw [blkSplice_getElem?_mid _ _ _ j (by rw [hbs]; exact hoff) (by omega) (by rw [hsub]; omega)]
     unfold wrfLanded
     rw [List.getElem?_append_left (by rw [wrfRun_length]; omega),
-      wrfRun_lookup wrote tot (j - off) (by omega), if_pos ⟨by omega, hmid⟩]
+      wrfRun_lookup wrote tot (j - off) (by omega), ite_eq_left ⟨by omega, hmid⟩]
   by_cases hmid2 : j < off + tot + min dist (sz - (off + tot))
   · rw [blkSplice_getElem?_mid _ _ _ j (by rw [hbs]; exact hoff) (by omega) (by rw [hsub]; omega)]
     unfold wrfLanded
     rw [List.getElem?_append_right (by rw [wrfRun_length]; omega), wrfRun_length,
       show j - off - tot = j - (off + tot) by omega,
-      wrfRun_lookup dstb _ _ (by omega), if_neg (by omega), if_pos ⟨by omega, by omega⟩]
+      wrfRun_lookup dstb _ _ (by omega), ite_eq_right (by omega), ite_eq_left ⟨by omega, by omega⟩]
   · rw [blkSplice_getElem?_ge _ _ _ j (by rw [hbs]; exact hoff) (by rw [hsub]; omega),
-      wrfFb_lookup data sz j (by omega), if_neg (by omega), if_neg (by omega)]
+      wrfFb_lookup data sz j (by omega), ite_eq_right (by omega), ite_eq_right (by omega)]
 
 /-! ### The era node's transport -/
 

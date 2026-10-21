@@ -147,9 +147,9 @@ theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
   have h := DL.wp_dirlookup_eb (GF := GF) Γ c k' γl pd pav pu j γkl γk ip dinum bm
     data dn dr fn false 0#32 pidv dqp dqd dqn kd sd rootv rti dqr hj hproc hK hnoff htier htype
     hgeom hwf hcov hsz hholes hinums hdisj horph hdrnz hdrnl hpd ha0 hkd hkdn
-    (by simp only [Bool.false_eq_true, if_false]; exact ha2)
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha2)
   unfold wp_dirlookup_eb_body at h
-  simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
+  simp only [dirlookupAddr, Bool.false_eq_true, ite_false] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, #Hkl, #Hav, Hdev, Hmeta, Hmap, Hblk, Hsh, Hru,
     Hnm, Hpid, Hrt, Hrh, Hbs, #Hit, #Hiti, #Hinv, Hslot, Hlk, Hdi, Hnext⟩
   iapply h
@@ -294,14 +294,14 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
   · unfold dirlinkKeep; iframe
   cases found with
   | false =>
-    rw [if_neg (by decide)]
+    rw [ite_eq_right (by decide)]
     icases Harm with ⟨%⟨-, hnone, hra0⟩, Hslot, -⟩
     iapply (dirlink_setup RD SN WI PA Γ cpu k spie1 spp1 R1 j γl pd pav pu γkl γk ip dinum bm data
         dn dn0 fn inum ncount Sb tid qtx pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr w1 w3 w4 _ hs hpd hr1
         hnone hra0)
       $$ [$Hk $Hpc $Hframe $Hde $Hte $Hce $Hkeep $Hbs $Hslot $Hlk $Hop $Htx $Henv $Hpost]
   | true =>
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     icases Harm with ⟨%inum2, %⟨hkslot, hra0⟩, %hsel, Href, Hru2, -⟩
     -- THE CHILD'S RANGE AND THE ARM, on both of the inner lookup's arms: the
     -- record arm reads them off the matched record; the SELF arm is `..` at
@@ -311,11 +311,11 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
           dlSelf (bname 14 fn) dinum rti) := by
       cases self with
       | true =>
-        simp only [if_true] at hsel
+        simp only [ite_true] at hsel
         obtain ⟨hself, heq, -⟩ := hsel
         rw [heq]; exact ⟨hdnib, Or.inr hself⟩
       | false =>
-        simp only [Bool.false_eq_true, if_false] at hsel
+        simp only [Bool.false_eq_true, ite_false] at hsel
         obtain ⟨-, hfound, heq⟩ := hsel
         rw [heq]
         refine ⟨?_, Or.inl (by rw [hfound]; exact Option.some_ne_none kk)⟩

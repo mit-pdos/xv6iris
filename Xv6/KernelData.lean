@@ -2383,7 +2383,7 @@ theorem kernelData_buf_nat [CurCtx] (a : Nat) (bs : List (BitVec 8)) (h : rodata
     intro j b hj
     have hjl : j < bs.length := (List.getElem?_eq_some_iff.1 hj).1
     have hg := congrArg (·[j]?) hl
-    simp only [List.getElem?_take, List.getElem?_drop, List.getElem?_mapIdx, hjl, if_true, hj,
+    simp only [List.getElem?_take, List.getElem?_drop, List.getElem?_mapIdx, hjl, ite_true, hj,
       Option.map_some] at hg
     obtain ⟨hram, hcl⟩ := hr j hjl
     have e : BitVec.ofNat 64 a + BitVec.ofNat 64 j = BitVec.ofNat 64 (a + j) := by simp [BitVec.ofNat_add]

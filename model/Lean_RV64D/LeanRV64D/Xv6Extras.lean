@@ -11,13 +11,14 @@
 -- regen script checks the two are identical.
 --
 -- WHAT IT IS FOR.  The platform hooks below are Sail `val`s with no Sail
--- body.  Their `lean`-backend spelling is their Sail name (the pinned fork
--- gives them no `lean:` extern binding), and the fork's
--- `RiscvExtras.lean` declares each one as a bare root-level `axiom` so the
--- model compiles for a consumer that supplies nothing else.  An opaque
--- `SailM` term cannot be stepped by the free-monad language, so under those
--- axioms an `lr`/`sc` in arbitrary user code is IRREDUCIBLE (a NotStuck
--- hole, not an inconvenience), and the decode gates on
+-- body.  Their `lean`-backend spelling is their Sail name (upstream gives
+-- them no `lean:` extern binding), and upstream's
+-- `handwritten_support/RiscvExtras.lean` (which the fork leaves untouched)
+-- declares each one as a bare root-level `axiom` so the model compiles for
+-- a consumer that supplies nothing else.  An opaque `SailM` term cannot be
+-- stepped by the free-monad language, so under those axioms an `lr`/`sc`
+-- in arbitrary user code is IRREDUCIBLE (a NotStuck hole, not an
+-- inconvenience), and the decode gates on
 -- `sys_enable_experimental_extensions` are undecided.
 --
 -- HOW IT OVERRIDES.  Rocq overrides by `Require` order.  Lean has no
@@ -27,7 +28,8 @@
 -- the root (and at `open`s).  So the definitions below, in
 -- `LeanRV64D.Functions`, are what the generated model calls; the fork's
 -- root-level axioms stay declared but unused, and drop out of every
--- `#print axioms`.  Nothing generated and nothing from the fork is patched.
+-- `#print axioms`.  The override needs no patch of the generated files or of
+-- the fork's `RiscvExtras.lean`.
 --
 -- WHAT IS DEFINED OUTRIGHT (as in Rocq).  The three `SailM`-valued hooks
 -- have NO observable effect on the state this model carries: the LR/SC
@@ -49,20 +51,25 @@
 -- NOT OVERRIDDEN (as in Rocq): `plat_term_read`, `get_16_random_bits` and the
 -- softfloat `riscv_f*` family.  Their results are CONSUMED, so any
 -- realisation would fabricate data; a hart that reaches one stays stuck.
+--
+-- Since the 0.16 bump (concurrency interface v2, lean-sail v7): the Sail
+-- library namespace is `Sail.ArchSem`, and the reservation hooks take the
+-- architecture's address width (`BitVec Arch.addr_size` = `physaddrbits`),
+-- exactly as the fork's `RiscvExtras.lean` declares the axioms.
 -- ======================================================================
 
 import Sail.Sail
 import LeanRV64D.Defs
 
 open Sail
-open ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 namespace LeanRV64D.Functions
 
 -- ---- LR/SC reservation: the two effectful hooks ----------------------
 -- Both are the identity on the modelled state, so `pure ()` is exact.
 
-def load_reservation (_addr : physaddrbits) (_width : Nat) : SailM Unit :=
+def load_reservation (_addr : BitVec Arch.addr_size) (_width : Nat) : SailM Unit :=
   pure ()
 
 def cancel_reservation (_ : Unit) : SailM Unit :=
@@ -72,10 +79,10 @@ def cancel_reservation (_ : Unit) : SailM Unit :=
 -- Arbitrary but fixed.  These two opaque constants are the whole unknown
 -- content of this file.
 
-opaque xv6_resv_matches : physaddrbits → Bool
+opaque xv6_resv_matches : BitVec Arch.addr_size → Bool
 opaque xv6_resv_is_valid : Bool
 
-def match_reservation (addr : physaddrbits) : Bool := xv6_resv_matches addr
+def match_reservation (addr : BitVec Arch.addr_size) : Bool := xv6_resv_matches addr
 
 def valid_reservation (_ : Unit) : Bool := xv6_resv_is_valid
 

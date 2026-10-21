@@ -1,12 +1,10 @@
 import LeanRV64D.LeanRV64D
-import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
 import LeanRV64D.PlatformConfig
 import LeanRV64D.MemTypeUtils
-import LeanRV64D.Callbacks
 import LeanRV64D.SysRegs
-import LeanRV64D.InterruptRegs
 import LeanRV64D.Smcntrpmf
 import LeanRV64D.SimpleInterruptGenerator
 
@@ -16,12 +14,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -65,6 +63,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -98,10 +98,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -147,6 +150,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -165,17 +169,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -190,12 +201,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -206,7 +220,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -223,10 +240,14 @@ def within_clint (typ_0 : physaddr) (width : Nat) : SailM Bool := do
   if ((not plat_have_clint) : Bool)
   then (pure false)
   else
-    (let addr_int := (BitVec.toNatInt addr)
-    let clint_base_int := (BitVec.toNatInt plat_clint_base)
-    let clint_size_int := (BitVec.toNatInt plat_clint_size)
-    (pure ((clint_base_int ≤b addr_int) && ((addr_int +i width) ≤b (clint_base_int +i clint_size_int)))))
+    (do
+      if (((BitVec.toNatInt (← readReg mhartid)) ≥b 4095) : Bool)
+      then (pure false)
+      else
+        (let addr_int := (BitVec.toNatInt addr)
+        let clint_base_int := (BitVec.toNatInt plat_clint_base)
+        let clint_size_int := (BitVec.toNatInt plat_clint_size)
+        (pure ((clint_base_int ≤b addr_int) && ((addr_int +i width) ≤b (clint_base_int +i clint_size_int))))))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
 def within_sig (typ_0 : physaddr) (width : Nat) : SailM Bool := do
@@ -264,9 +285,15 @@ def MTIME_BASE_HI : physaddrbits := (zero_extend (m := 64) 0x0BFFC#20)
 
 /-- Type quantifiers: width : Nat, width ≥ 0, width > 0 -/
 def clint_load (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (width : Nat) : SailM (Result (BitVec (8 * width)) (physaddr × ExceptionType)) := do
+  let hart_msip_addr ← do
+    (pure (MSIP_BASE + (zero_extend (m := 64) ((← readReg mhartid) <<< 2))))
+  let hart_mtimecmp_addr ← do
+    (pure (MTIMECMP_BASE + (zero_extend (m := 64) ((← readReg mhartid) <<< 3))))
+  let hart_mtimecmp_hi_addr ← do
+    (pure (MTIMECMP_BASE_HI + (zero_extend (m := 64) ((← readReg mhartid) <<< 3))))
   let .Physaddr addr := paddr
   let addr := (addr - plat_clint_base)
-  if (((addr == MSIP_BASE) && ((width == 8) || (width == 4))) : Bool)
+  if (((addr == hart_msip_addr) && ((width == 8) || (width == 4))) : Bool)
   then
     (do
       if ((get_config_print_clint ()) : Bool)
@@ -274,13 +301,12 @@ def clint_load (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (wid
         (discard <| pure (print_endline
             (HAppend.hAppend "clint["
               (HAppend.hAppend (BitVec.toFormatted addr)
-                (HAppend.hAppend "] -> "
-                  (BitVec.toFormatted (_get_Minterrupts_MSI (← readReg mip))))))))
+                (HAppend.hAppend "] -> " (BitVec.toFormatted (← readReg msip)))))))
       else (pure ())
-      (pure (Ok (zero_extend (m := (8 *i width)) (_get_Minterrupts_MSI (← readReg mip))))))
+      (pure (Ok (zero_extend (m := (8 *i width)) (← readReg msip)))))
   else
     (do
-      if (((addr == MTIMECMP_BASE) && (width == 4)) : Bool)
+      if (((addr == hart_mtimecmp_addr) && (width == 4)) : Bool)
       then
         (do
           if ((get_config_print_clint ()) : Bool)
@@ -294,7 +320,7 @@ def clint_load (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (wid
           (pure (Ok (zero_extend (m := 32) (Sail.BitVec.extractLsb (← readReg mtimecmp) 31 0)))))
       else
         (do
-          if (((addr == MTIMECMP_BASE) && (width == 8)) : Bool)
+          if (((addr == hart_mtimecmp_addr) && (width == 8)) : Bool)
           then
             (do
               if ((get_config_print_clint ()) : Bool)
@@ -307,7 +333,7 @@ def clint_load (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (wid
               (pure (Ok (zero_extend (m := 64) (← readReg mtimecmp)))))
           else
             (do
-              if (((addr == MTIMECMP_BASE_HI) && (width == 4)) : Bool)
+              if (((addr == hart_mtimecmp_hi_addr) && (width == 4)) : Bool)
               then
                 (do
                   if ((get_config_print_clint ()) : Bool)
@@ -376,32 +402,17 @@ def clint_load (access : (MemoryAccessType mem_payload)) (paddr : physaddr) (wid
                                 else ()
                               (pure (Err (paddr, (← (accessFaultFromAccessType access))))))))))))
 
-/-- Type quantifiers: k_ex673306_ : Bool -/
-def clint_dispatch (mip_was_written : Bool) : SailM Unit := do
-  let old_mip ← do readReg mip
-  writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 7 7
-    (bool_to_bit (zopz0zIzJ_u (← readReg mtimecmp) (← readReg mtime))))
-  if ((← do
-       if ((← (currentlyEnabled Ext_Sstc)) : Bool)
-       then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
-       else (pure false)) : Bool)
-  then
-    writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 5 5
-      (bool_to_bit (zopz0zIzJ_u (← readReg stimecmp) (← readReg mtime))))
-  else (pure ())
-  if ((get_config_print_clint ()) : Bool)
-  then
-    (discard <| pure (print_endline (HAppend.hAppend "clint mtime " (BitVec.toFormatted (← readReg mtime)))))
-  else (pure ())
-  if (((old_mip != (← readReg mip)) || mip_was_written) : Bool)
-  then (csr_name_write_callback "mip" (← (read_mip IncludePlatformInterrupts)))
-  else (pure ())
-
 /-- Type quantifiers: width : Nat, width ≥ 0, width > 0 -/
 def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : SailM (Result Bool (physaddr × ExceptionType)) := do
+  let hart_msip_addr ← do
+    (pure (MSIP_BASE + (zero_extend (m := 64) ((← readReg mhartid) <<< 2))))
+  let hart_mtimecmp_addr ← do
+    (pure (MTIMECMP_BASE + (zero_extend (m := 64) ((← readReg mhartid) <<< 3))))
+  let hart_mtimecmp_hi_addr ← do
+    (pure (MTIMECMP_BASE_HI + (zero_extend (m := 64) ((← readReg mhartid) <<< 3))))
   let .Physaddr addr := paddr
   let addr := (addr - plat_clint_base)
-  if (((addr == MSIP_BASE) && ((width == 8) || (width == 4))) : Bool)
+  if (((addr == hart_msip_addr) && ((width == 8) || (width == 4))) : Bool)
   then
     (do
       let _ : Unit :=
@@ -412,16 +423,13 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
               (HAppend.hAppend (BitVec.toFormatted addr)
                 (HAppend.hAppend "] <- "
                   (HAppend.hAppend (BitVec.toFormatted data)
-                    (HAppend.hAppend " (mip.MSI <- "
-                      (HAppend.hAppend (BitVec.toFormatted (Sail.BitVec.extractLsb data 0 0)) ")")))))))
+                    (HAppend.hAppend " (msip <- " (HAppend.hAppend (BitVec.toFormatted data) ")")))))))
         else ()
-      writeReg mip (Sail.BitVec.updateSubrange (← readReg mip) 3 3
-        (BitVec.join1 [(BitVec.access data 0)]))
-      (clint_dispatch true)
+      writeReg msip (BitVec.update (← readReg msip) 0 (BitVec.access data 0))
       (pure (Ok true)))
   else
     (do
-      if (((addr == MTIMECMP_BASE) && (width == 8)) : Bool)
+      if (((addr == hart_mtimecmp_addr) && (width == 8)) : Bool)
       then
         (do
           let _ : Unit :=
@@ -434,11 +442,10 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                       (HAppend.hAppend (BitVec.toFormatted data) " (mtimecmp)")))))
             else ()
           writeReg mtimecmp (zero_extend (m := 64) data)
-          (clint_dispatch false)
           (pure (Ok true)))
       else
         (do
-          if (((addr == MTIMECMP_BASE) && (width == 4)) : Bool)
+          if (((addr == hart_mtimecmp_addr) && (width == 4)) : Bool)
           then
             (do
               let _ : Unit :=
@@ -452,11 +459,10 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                 else ()
               writeReg mtimecmp (Sail.BitVec.updateSubrange (← readReg mtimecmp) 31 0
                 (zero_extend (m := 32) data))
-              (clint_dispatch false)
               (pure (Ok true)))
           else
             (do
-              if (((addr == MTIMECMP_BASE_HI) && (width == 4)) : Bool)
+              if (((addr == hart_mtimecmp_hi_addr) && (width == 4)) : Bool)
               then
                 (do
                   let _ : Unit :=
@@ -470,7 +476,6 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                     else ()
                   writeReg mtimecmp (Sail.BitVec.updateSubrange (← readReg mtimecmp) 63 32
                     (zero_extend (m := 32) data))
-                  (clint_dispatch false)
                   (pure (Ok true)))
               else
                 (do
@@ -487,7 +492,6 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                                   (HAppend.hAppend (BitVec.toFormatted data) " (mtime)")))))
                         else ()
                       writeReg mtime data
-                      (clint_dispatch false)
                       (pure (Ok true)))
                   else
                     (do
@@ -504,7 +508,6 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                                       (HAppend.hAppend (BitVec.toFormatted data) " (mtime)")))))
                             else ()
                           writeReg mtime (Sail.BitVec.updateSubrange (← readReg mtime) 31 0 data)
-                          (clint_dispatch false)
                           (pure (Ok true)))
                       else
                         (do
@@ -522,7 +525,6 @@ def clint_store (paddr : physaddr) (width : Nat) (data : (BitVec (8 * width))) :
                                 else ()
                               writeReg mtime (Sail.BitVec.updateSubrange (← readReg mtime) 63 32
                                 data)
-                              (clint_dispatch false)
                               (pure (Ok true)))
                           else
                             (let _ : Unit :=
@@ -546,12 +548,11 @@ def should_inc_minstret (priv : Privilege) : SailM Bool := do
   then (pure ((counter_priv_filter_bit (← readReg minstretcfg) priv) == 0#1))
   else (pure false)
 
-def tick_clock (_ : Unit) : SailM Unit := do
+def clint_tick_clock (_ : Unit) : SailM Unit := do
   if ((← (should_inc_mcycle (← readReg cur_privilege))) : Bool)
   then writeReg mcycle (BitVec.addInt (← readReg mcycle) 1)
   else (pure ())
   writeReg mtime (BitVec.addInt (← readReg mtime) 1)
-  (clint_dispatch false)
 
 def undefined_htif_cmd (_ : Unit) : SailM (BitVec 64) := do
   (undefined_bitvector 64)
@@ -607,7 +608,7 @@ def htif_load (access : (MemoryAccessType mem_payload)) (addr : physaddr) (width
   let base ← (( do
     match (← readReg htif_tohost_base) with
     | .some base => (pure base)
-    | none => (internal_error "sys/platform.sail" 271 "HTIF load while HTIF isn't enabled") ) :
+    | none => (internal_error "sys/platform.sail" 286 "HTIF load while HTIF isn't enabled") ) :
     SailM physaddrbits )
   if (((width == 8) && (paddr == base)) : Bool)
   then (pure (Ok (zero_extend (m := 64) (← readReg htif_tohost))))
@@ -637,7 +638,7 @@ def htif_store (addr : physaddr) (width : Nat) (data : (BitVec (8 * width))) : S
   let base ← (( do
     match (← readReg htif_tohost_base) with
     | .some base => (pure base)
-    | none => (internal_error "sys/platform.sail" 292 "HTIF store while HTIF isn't enabled") ) :
+    | none => (internal_error "sys/platform.sail" 307 "HTIF store while HTIF isn't enabled") ) :
     SailME (Result Bool (physaddr × ExceptionType)) physaddrbits )
   if (((width == 8) && (paddr == base)) : Bool)
   then

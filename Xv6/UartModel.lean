@@ -18,7 +18,7 @@ open MachCSL MachCSL.Uart
 theorem readN_one (u : UartState) (off : Nat) :
     Uart.readN u off 1 = (Uart.read u off).map fun p => (p.1, p.2) := by
   unfold Uart.readN
-  simp only [true_or, if_true]
+  simp only [true_or, ite_true]
   cases Uart.read u off with
   | none => rfl
   | some p => simp [BitVec.setWidth_eq]
@@ -26,7 +26,7 @@ theorem readN_one (u : UartState) (off : Nat) :
 theorem writeN_one (u : UartState) (off : Nat) (b : BitVec 8) :
     Uart.writeN u off 1 b = Uart.write u off b := by
   unfold Uart.writeN
-  simp only [true_or, if_true]
+  simp only [true_or, ite_true]
   congr 1
   apply BitVec.eq_of_toNat_eq
   simp []

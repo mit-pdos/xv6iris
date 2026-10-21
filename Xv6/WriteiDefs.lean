@@ -251,12 +251,12 @@ theorem wiSrc_pid (A : WiArgs) (src : BitVec 64) (P : UPtd) :
       (wordPointsTo (pPid (procAddr A.j)) 4 (wiQ A) A.pidv -∗ wiSrc A src P) := by
   unfold wiSrc wiQ
   cases A.user
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iintro ⟨Hb, Hp⟩
     iframe Hp
     iintro Hp
     iframe Hb Hp
-  · simp only [if_true]
+  · simp only [ite_true]
     unfold procPrivExt
     iintro ⟨%kv, %hkv, %h, Hp, Hf, Ht, Htf, %hl, Hev⟩
     iframe Hp
@@ -376,12 +376,12 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
     simp only [eitherCopyinAddr] at h
     exact h
   · -- the block at the count the earlier rounds raised it to
-    simp only [if_true]
+    simp only [ite_true]
     iintro ⟨Hk, Hpc, #Hl, #Hav, Hold, ⟨%kv, %hkv, Hpriv⟩, HΦ⟩
     have h := EC.wp_either_copyin (GF := GF) c k' γl γk j pid (V.updEv kv) P M true
       dqs bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
     unfold wp_either_copyin_body at h
-    simp only [eitherCopyinAddr, if_true] at h
+    simp only [eitherCopyinAddr, ite_true] at h
     iapply h
     iframe Hk Hpc Hl Hav Hold Hpriv
     iapply wpNext_mono _ _ _ _ _ $$ HΦ

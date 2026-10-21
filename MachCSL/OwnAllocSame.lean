@@ -53,7 +53,7 @@ theorem iOwn_alloc_same_name (hτ : E1.τ ≠ E2.τ)
     have hv2 : ✓{n} (iSingleton F2 γ a2 • mf) := validN_iSingleton_op Hvalid h2.validN Hf2
     have hfree : IsFree ((iSingleton F2 γ a2 • mf) E1.τ).car γ := by
       show ((iSingleton F2 γ a2 E1.τ • mf E1.τ).car γ) = none
-      simp only [iSingleton, dif_neg hτ]
+      simp only [iSingleton, dite_eq_right hτ]
       simp [ORA.op, GenMap.empty, optionOp, Hf1]
     exact ORA.validN_ne Op.assoc.dist (validN_iSingleton_op hv2 h1.validN hfree)
   · refine BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨γ, Hm⟩ => ?_))

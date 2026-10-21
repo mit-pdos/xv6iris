@@ -94,7 +94,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
   iintro %h5 Hrun
   rw [ha04, kgrep_bnez_b01]
   cases ebh : matchhere ((List.range lr).map fr) ((List.range lt).map ft)
-  · rw [if_neg (by decide), ukPc 0xd6 0xd8 true rfl]
+  · rw [ite_eq_right (by decide), ukPc 0xd6 0xd8 true rfl]
     -- 0xd8  c.addi s1,s1,1
     gfetch 0xd8 true (.ITYPE (1#12, .Regidx 9#5, .Regidx 9#5, .ADDI))
     iapply wp_uk_itype UL N h5 m4 (BitVec.ofNat 64 0xd8) true 1#12 9#5 9#5 .ADDI n
@@ -132,7 +132,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
     cases lt with
     | zero =>
       -- the text is used up: 0
-      rw [show (!decide ((0 : Nat) = 0)) = false from rfl, if_neg (by decide), ukPc 0xde 0xe0 true rfl]
+      rw [show (!decide ((0 : Nat) = 0)) = false from rfl, ite_eq_right (by decide), ukPc 0xde 0xe0 true rfl]
       -- 0xe0  c.j 0xec
       gfetch 0xe0 true (.JAL (12#21, .Regidx 0#5))
       iapply wp_uk_jal UL N h8 m6 (BitVec.ofNat 64 0xe0) true 12#21 0#5 n (by unfold unotSp spIdx; decide)
@@ -140,7 +140,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
       inext
       iintro %h9 Hrun
       rw [show BitVec.ofNat 64 0xe0 + BitVec.signExtend 64 12#21 = BitVec.ofNat 64 0xec from by decide,
-        show ukWr m6 0#5 (BitVec.ofNat 64 0xe0 + instrLen true) = m6 by unfold ukWr; rw [if_pos rfl]]
+        show ukWr m6 0#5 (BitVec.ofNat 64 0xe0 + instrLen true) = m6 by unfold ukWr; rw [ite_eq_left rfl]]
       iapply Hcont $$ Hre Htx %h9 %m6 [] [] Hrun
       · ipureintro
         rw [ha06, show (List.range 0).map ft = [] from rfl, grepMa_nil]
@@ -148,7 +148,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
         rw [ebh]
       · ipureintro; exact hk6
     | succ lt1 =>
-      rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), show (!false) = true from rfl, if_pos rfl,
+      rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), show (!false) = true from rfl, ite_eq_left rfl,
         show BitVec.ofNat 64 0xde + BitVec.signExtend 64 8176#13 = BitVec.ofNat 64 0xce from by decide]
       have eT : (List.range (lt1 + 1)).map ft = ft 0 :: (List.range lt1).map (fun j => ft (j + 1)) :=
         grepMapRange_succ ft lt1
@@ -165,7 +165,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
         rw [ebh]
       · ipureintro; exact grepRkeep_trans _ _ _ _ hk6 hkx
   · -- matchhere(re, text) held: 1
-    rw [if_pos rfl, show BitVec.ofNat 64 0xd6 + BitVec.signExtend 64 20#13 = BitVec.ofNat 64 0xea from by decide]
+    rw [ite_eq_left rfl, show BitVec.ofNat 64 0xd6 + BitVec.signExtend 64 20#13 = BitVec.ofNat 64 0xea from by decide]
     -- 0xea  c.li a0,1
     gfetch 0xea true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
     iapply wp_uk_itype UL N h5 m4 (BitVec.ofNat 64 0xea) true 1#12 0#5 10#5 .ADDI n
@@ -399,7 +399,7 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (G
   have g18 : m6.get 18#5 = BitVec.ofNat 64 ar := by ureg; rw [ukMv]; exact ha0
   cases ecar : bdec (grepUstrHd lr fr) cCaret
   · -- no anchor: every suffix
-    rw [if_neg (by decide), ukPc 0xca 0xce false rfl]
+    rw [ite_eq_right (by decide), ukPc 0xca 0xce false rfl]
     have hmr : matchRe ((List.range lr).map fr) ((List.range lt).map ft) =
         matchAny ((List.range lr).map fr) ((List.range lt).map ft) := by
       cases lr with
@@ -407,21 +407,21 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (G
       | succ lr1 =>
         rw [grepMapRange_succ]
         simp only [matchRe]
-        rw [if_neg (by simpa [grepUstrHd] using ecar)]
+        rw [ite_eq_right (by simpa [grepUstrHd] using ecar)]
     have hnr : grepMhWords ((List.range lr).map fr) ≤ n1 := by
       cases lr with
       | zero => simp [grepMhWords]
       | succ lr1 =>
         rw [grepMapRange_succ] at hn ⊢
         simp only [grepBody] at hn
-        rw [if_neg (by simpa [grepUstrHd] using ecar)] at hn
+        rw [ite_eq_right (by simpa [grepUstrHd] using ecar)] at hn
         omega
     iapply grepMatch_loop UL MH N lr lt h11 m6 dqr dqt ar ax fr ft n1 g9 g18 hnr $$ Hc Hre Htx Hrun
     iintro Hre Htx %h12 %mc %ha0c %hkc Hrun
     iapply hTail h12 mc (by rw [ha0c, hmr]) hkc $$ Hc Hw1 Hw2 Hw3 Hw4 Hrun
     iapply Hcont $$ Hre Htx
   · -- '^' : matchhere(re+1, text)
-    rw [if_pos rfl, show BitVec.ofNat 64 0xca + BitVec.signExtend 64 24#13 = BitVec.ofNat 64 0xe2 from by decide]
+    rw [ite_eq_left rfl, show BitVec.ofNat 64 0xca + BitVec.signExtend 64 24#13 = BitVec.ofNat 64 0xe2 from by decide]
     cases lr with
     | zero => exact absurd ecar (by rw [show grepUstrHd 0 fr = ubyte0 from rfl]; decide)
     | succ lr1 =>
@@ -450,7 +450,7 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (G
       have f10 : m8.get 10#5 = BitVec.ofNat 64 (ar + 1) := by ureg; rw [ha0]; exact ukAddi ar 1 1#12 (by decide)
       have f11 : m8.get 11#5 = BitVec.ofNat 64 ax := by ureg; exact ha1
       have hnr : grepMhWords ((List.range lr1).map (fun j => fr (j + 1))) ≤ n1 := by
-        rw [eR] at hn; simp only [grepBody, ec, if_true] at hn; omega
+        rw [eR] at hn; simp only [grepBody, ec, ite_true] at hn; omega
       iapply MH.wp_grepMatchhere lr1 N h13 m8 dqr dqt (ar + 1) ax lt (fun j => fr (j + 1)) ft n1 f10 f11 hnr
         $$ Hc Hre1 Htx Hrun
       iintro Hre1 Htx %h14 %m9 %hcs9 %ha09 Hrun
@@ -462,14 +462,14 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (G
       inext
       iintro %h15 Hrun
       rw [show BitVec.ofNat 64 0xe8 + BitVec.signExtend 64 4#21 = BitVec.ofNat 64 0xec from by decide,
-        show ukWr m9 0#5 (BitVec.ofNat 64 0xe8 + instrLen true) = m9 by unfold ukWr; rw [if_pos rfl]]
+        show ukWr m9 0#5 (BitVec.ofNat 64 0xe8 + instrLen true) = m9 by unfold ukWr; rw [ite_eq_left rfl]]
       ihave Hre := grepUstr_cons_join N.d dqr ar lr1 fr hfr0 hrlen $$ Hr0 Hre1
       have hk8 : grepRkeep (9 :: grepWcaller) m6 m8 := by
         refine grepRkeep_upd _ _ _ _ _ (by decide) ?_
         refine grepRkeep_upd _ _ _ _ _ (by decide) ?_
         exact grepRkeep_refl _ _
       have ha : m9.get 10#5 = kgrepB01 (matchRe ((List.range (lr1 + 1)).map fr) ((List.range lt).map ft)) := by
-        rw [ha09, eR]; simp only [matchRe, ec, if_true]
+        rw [ha09, eR]; simp only [matchRe, ec, ite_true]
       iapply hTail h15 m9 ha (grepRkeep_call _ m6 m8 m9 (grepRin_caller [9]) hk8 hcs9)
         $$ Hc Hw1 Hw2 Hw3 Hw4 Hrun
       iapply Hcont $$ Hre Htx

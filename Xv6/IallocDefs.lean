@@ -95,15 +95,15 @@ theorem iallocBody_set [Icfg] (k : KCtx) (ty : BitVec 16) (R : RegMap) (r : BitV
   obtain ⟨a2, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption)
-      | (rw [if_neg (Ne.symm n20)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- `iallocBody` survives the writes of the scan's scratch registers. -/
 macro "ialloc_body_tac" : tactic =>
@@ -181,7 +181,7 @@ theorem ialloc_refb_claim {GF : BundledGFunctors.{0}} [MachGS GF] [Icfg] [CurCtx
     inodeRefb (GF := GF) (isClaim (.claimL ty t qt)) kk q dev inum ⊢
       inodeRef kk q dev inum ∗ runitClaim inum.toNat := by
   unfold inodeRefb isClaim runit
-  simp only [if_true]
+  simp only [ite_true]
   exact .rfl
 
 /-! ## The claim's atomic update (the ghost step log_write runs) -/

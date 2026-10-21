@@ -37,7 +37,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -46,11 +46,13 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 instruction-fetch translation of `va` lands on `pa`, handing the translation
 resource `T` back. -/
 def transSpecX (cpu : CPU) (c : MConf) (T : IProp GF) (va pa : BitVec 64) : Prop :=
-  ∀ Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF,
+  ∀ Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit) → IProp GF,
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ T ∗
     (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ T -∗
       Φ (.Ok (physaddr.Physaddr pa, page_based_mem_type.PBMT_PMA, ())))
-    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) (MemoryAccessType.InstructionFetch ())) Φ
+    -- 0.16: the effective privilege is the caller's argument; a failure reports an `ExceptionContext`
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) (MemoryAccessType.InstructionFetch ())
+        Privilege.Supervisor) Φ
 
 /-! ## The fetch through an abstract translation -/
 
@@ -336,11 +338,11 @@ access then uses). -/
 `pa`. -/
 def transSpecA (cpu : CPU) (c : MConf) (T : IProp GF) (va : BitVec 64) (acc : MemoryAccessType mem_payload)
     (pa : BitVec 64) : Prop :=
-  ∀ Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF,
+  ∀ Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit) → IProp GF,
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ T ∗
     (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ T -∗
       Φ (.Ok (physaddr.Physaddr pa, page_based_mem_type.PBMT_PMA, ())))
-    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc Privilege.Supervisor) Φ
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -377,7 +379,7 @@ theorem execSpecF_ldX [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : BitV
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _)
   iframe HmConf
   inext
   iintro HmConf
@@ -460,8 +462,7 @@ theorem execSpecF_sdX [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (root : BitV
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _ _
-    (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu (DFrac.own 1) c sie KTier.kpt root hokA _)
   iframe HmConf
   inext
   iintro HmConf

@@ -61,13 +61,13 @@ omit [MachGS GF] in
 theorem pinned_open_cur_whole (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat)
     (htr : omTrunc vom = false) : curKept vom P k d ⊢ P k d := by
   unfold curKept
-  rw [if_neg (by simp [htr])]
+  rw [ite_eq_right (by simp [htr])]
 
 omit [MachGS GF] in
 /-- An `if` on a key known to be `true`. -/
 theorem pinned_open_ite_t (b : Bool) (X Y : IProp GF) (hb : b = true) :
     (if b then X else Y) ⊢ X := by
-  rw [if_pos hb]
+  rw [ite_eq_left hb]
 
 /-! ## 1.  THE BUNDLE -/
 

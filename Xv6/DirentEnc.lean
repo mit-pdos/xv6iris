@@ -248,7 +248,7 @@ theorem cutNul_eq_bytesString : ∀ l : List (BitVec 8), cutNul l = bytesString 
     rw [cutNul, bytesString]
     by_cases hb : b = 0#8
     · simp [hb]
-    · simp only [hb, if_false]; rw [cutNul_eq_bytesString l]
+    · simp only [hb, ite_false]; rw [cutNul_eq_bytesString l]
 
 theorem cutNul_cons_nul (l : List (BitVec 8)) : cutNul (0#8 :: l) = [] := by
   rw [cutNul]; simp
@@ -268,7 +268,7 @@ theorem cutNul_length : ∀ l : List (BitVec 8), (cutNul l).length ≤ l.length
     rw [cutNul]
     by_cases hb : b = 0#8
     · simp [hb]
-    · simp only [hb, if_false, List.length_cons]
+    · simp only [hb, ite_false, List.length_cons]
       exact Nat.succ_le_succ (cutNul_length l)
 
 theorem cutNul_nonul (l : List (BitVec 8)) : nonul (cutNul l) := by

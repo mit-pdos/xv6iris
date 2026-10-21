@@ -40,7 +40,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## The decision -/
@@ -92,7 +92,7 @@ theorem dispatchU_cases (mie mideleg ip : BitVec 64) (hmie : mie = 0x220#64) (i 
   -- through the supervisor decision at `SIE = 1`
   have hS : dispatchS { bootConf with mstatus := 2#64, mie := mie, mideleg := mideleg } ip = some (i, p) := by
     rw [dispatchS_eq_dispatchU]
-    exact (if_pos (rfl : BitVec.extractLsb' 1 1 (2#64 : BitVec 64) = 1#1)).trans h
+    exact (ite_eq_left (rfl : BitVec.extractLsb' 1 1 (2#64 : BitVec 64) = 1#1)).trans h
   exact dispatchS_cases _ ip hmie i p hS
 
 end MachCSL

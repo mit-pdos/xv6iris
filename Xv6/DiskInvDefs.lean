@@ -1706,7 +1706,7 @@ theorem permOk_arm (v : VirtioState) (pm : RegMapF PermVal) (st : Nat → HState
   refine ⟨hlt, ?_, h3, h4, h5, h6⟩
   have hne : h'.toNat ≠ i := by
     intro he; rw [he, hfree] at hst; exact absurd hst (by simp)
-  simp only [if_neg hne]
+  simp only [ite_eq_right hne]
   exact hst
 
 /-- A head that is NOT in flight has no permit out. -/
@@ -2308,7 +2308,7 @@ theorem window_lt_of_inj_excl (lo np : Nat) (f : Nat → Nat) (x : Nat) (hx : x 
     have hnb := hne _ hb1 hb2
     have hff : f (lo + a) = f (lo + b) := by
       by_cases h1 : f (lo + a) < x <;> by_cases h2 : f (lo + b) < x <;>
-        simp only [h1, h2, if_true, if_false] at he <;> omega
+        simp only [h1, h2, ite_true, ite_false] at he <;> omega
     have := hinj (lo + a) (lo + b) ha1 ha2 hb1 hb2 hff
     omega
   have hb : ∀ i ∈ (List.range (np - lo)).map
@@ -2318,7 +2318,7 @@ theorem window_lt_of_inj_excl (lo np : Nat) (f : Nat → Nat) (x : Nat) (hx : x 
     obtain ⟨h1, h2⟩ := hmem j hj
     have hfa := hlt _ h1 h2
     have hna := hne _ h1 h2
-    by_cases hc : f (lo + j) < x <;> simp only [hc, if_true, if_false] <;> omega
+    by_cases hc : f (lo + j) < x <;> simp only [hc, ite_true, ite_false] <;> omega
   have := queue_nodup_length_le (NUM - 1) _ hnd hb
   simp only [List.length_map, List.length_range] at this
   omega
@@ -2596,8 +2596,8 @@ theorem diskBig_upd_acc {α : Type} (l : List α) (n : Nat) (i : α)
     refine BigSepL.bigSepL_mono ?_
     intro k x hkx
     by_cases hk : k = n
-    · rw [if_pos hk, if_pos hk]
-    · rw [if_neg hk, if_neg hk, heq k x hkx hk]
+    · rw [ite_eq_left hk, ite_eq_left hk]
+    · rw [ite_eq_right hk, ite_eq_right hk, heq k x hkx hk]
   iintro H
   icases (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (x : α) => Φ x) hidx).1 $$ H
     with ⟨Hi, Hrest⟩
@@ -2676,10 +2676,10 @@ def bufW (c : Chain) : IProp GF :=
 
 theorem bufW_read (c : Chain) (h : c.dwr = false) :
     bufW (GF := GF) c = ctxBytes c.ctx c.data BSIZE (DFrac.own 1) c.payw := by
-  unfold bufW; exact if_neg (by simp [h])
+  unfold bufW; exact ite_eq_right (by simp [h])
 
 theorem bufW_write (c : Chain) (h : c.dwr = true) : bufW (GF := GF) c = iprop(emp) := by
-  unfold bufW; exact if_pos h
+  unfold bufW; exact ite_eq_left h
 
 instance bufW_timeless (c : Chain) : Timeless (bufW (GF := GF) c) := by
   cases hd : c.dwr
@@ -2700,14 +2700,14 @@ def bufDone (c : Chain) (ts : Nat) : IProp GF :=
   if c.dwr then iprop(∃ t : Nat, ⌜t ≤ ts⌝ ∗ dmaOwnT c.data BSIZE c.payw t) else iprop(emp)
 
 theorem bufFree_read (c : Chain) (h : c.dwr = true) :
-    bufFree (GF := GF) c = bufLease c := by unfold bufFree; exact if_pos h
+    bufFree (GF := GF) c = bufLease c := by unfold bufFree; exact ite_eq_left h
 theorem bufFree_write (c : Chain) (h : c.dwr = false) :
-    bufFree (GF := GF) c = iprop(emp) := by unfold bufFree; exact if_neg (by simp [h])
+    bufFree (GF := GF) c = iprop(emp) := by unfold bufFree; exact ite_eq_right (by simp [h])
 theorem bufDone_read (c : Chain) (ts : Nat) (h : c.dwr = true) :
     bufDone (GF := GF) c ts = iprop(∃ t : Nat, ⌜t ≤ ts⌝ ∗ dmaOwnT c.data BSIZE c.payw t) := by
-  unfold bufDone; exact if_pos h
+  unfold bufDone; exact ite_eq_left h
 theorem bufDone_write (c : Chain) (ts : Nat) (h : c.dwr = false) :
-    bufDone (GF := GF) c ts = iprop(emp) := by unfold bufDone; exact if_neg (by simp [h])
+    bufDone (GF := GF) c ts = iprop(emp) := by unfold bufDone; exact ite_eq_right (by simp [h])
 
 instance bufFree_timeless (c : Chain) : Timeless (bufFree (GF := GF) c) := by
   cases hd : c.dwr
@@ -3881,7 +3881,7 @@ theorem bigSepL_two_acc {α : Type _} (l : List α) (Φ : α → IProp GF)
   iframe Hn
   have hl := BigSepL.bigSepL_lookup
     (Φ := fun (k : Nat) (z : α) => iprop(if k = n then emp else Φ z)) hm
-  rw [if_neg (Ne.symm hnm)] at hl
+  rw [ite_eq_right (Ne.symm hnm)] at hl
   iapply hl
   iexact Hrest
 
@@ -4062,7 +4062,7 @@ theorem dryOk_pushed (v : VirtioState) (h : BitVec 16) (r : VioReq)
       cases this; rfl
     subst hrr
     unfold Virtio.completeOk at hgate
-    rw [if_pos hty, hwce] at hgate
+    rw [ite_eq_left hty, hwce] at hgate
     simp only [Bool.and_eq_true, Bool.false_or, Bool.not_eq_true'] at hgate
     exact hgate.2
   · exact hx k r' (by rw [← phase_setPhase_other v h k _ hk]; exact hp) hty

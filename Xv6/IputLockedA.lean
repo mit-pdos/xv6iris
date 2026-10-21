@@ -121,14 +121,14 @@ theorem iput_lk_a_unpack (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkma
   unfold icLoadedFlatBody
   icases Hflat with ⟨%data, %hok, -, -, -, -, -, -, Hdat, Hmeta, Haddrs, Hind, Hblks, Htop⟩
   cases crz
-  · simp only [Bool.or_false, Bool.false_eq_true, if_false]
+  · simp only [Bool.or_false, Bool.false_eq_true, ite_false]
     imodintro
     iexists data
     iframe Hmeta Hblks Hdat Htop Hcrd
     isplitr
     · ipureintro; exact hok
     unfold inodeMap; iframe Haddrs Hind
-  · simp only [if_true, Bool.or_true]
+  · simp only [ite_true, Bool.or_true]
     icases Hnlz with #Hobs
     imod iregObs_use ⊤ fscIreg fscFs icfgIst icfgNib inum dn icfgLog e0
         CoPset.subseteq_top hin rfl hnl0 he0 $$ Hireg Hdat Hobs with ⟨Hdat, %e, %hle, #Hwit⟩

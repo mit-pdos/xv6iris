@@ -128,9 +128,9 @@ theorem sys_open_cr_key_plain (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List
   iapply (openTruncAt_kept_intro Γ vom (truncTermAt pl (sysOpenCrP i0)) i0 Ft) $$ H
   unfold truncTermAt sysOpenCrP
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     ipureintro; trivial
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iempintro
 
 /-- The FRESH flavour: a PURE row receipt (Rocq's `socr_Phio_pure`). -/
@@ -233,12 +233,12 @@ theorem sys_open_cr_cur_split (vom : BitVec 64) (P : Nat → Nat → IProp GF) (
     P k d ⊢ curKept vom P k d ∗ (if omTrunc vom then P k d else iprop(emp)) := by
   unfold curKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro H
     isplitr
     · iempintro
     · iexact H
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro H
     isplitl [H]
     · iexact H
@@ -252,12 +252,12 @@ theorem sys_open_cr_rcpt_split (vom : BitVec 64) (F : Pfam GF (Aview → Nat →
       creRcptKept vom F av d nm i ∗ (if omTrunc vom then F.pfRecv av d nm i else iprop(emp)) := by
   unfold creRcptKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     iintro H
     isplitr
     · iempintro
     · iexact H
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro H
     isplitl [H]
     · iexact H
@@ -273,11 +273,11 @@ theorem sys_open_cr_child_split (Γ : FsViewNames GF) (vom : BitVec 64)
        else iprop(emp)) := by
   unfold creChildKept
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold creChildUnfired
     iintro ⟨Harm, Hun⟩
     iframe Harm Hun
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro H
     isplitl [H]
     · iexact H
@@ -295,7 +295,7 @@ theorem sys_open_cr_permit_fresh (Γ : FsViewNames GF) (vom : BitVec 64) (P : Na
       (if omTrunc vom then Fok.pfRecv av d nm i0 else iprop(emp)) ⊢
       if omTrunc vom then crePermit Γ pl P Farm Fok Fex i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold crePermit truncPermitOf truncTieAt creAcreFired
     iintro ⟨HP, HF⟩
     iexists d, nm
@@ -308,7 +308,7 @@ theorem sys_open_cr_permit_fresh (Γ : FsViewNames GF) (vom : BitVec 64) (P : Na
       isplitr
       · ipureintro; exact hpre
       · iexact HF
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _
     iempintro
 
@@ -328,7 +328,7 @@ theorem sys_open_cr_permit_ex (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat �
        else iprop(emp)) ⊢
       if omTrunc vom then crePermitEx Γ pl P Farm Fex i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold crePermitEx truncPermitEx truncTieAt creExFired
     iintro ⟨HP, HF, Harm⟩
     iexists d, nm
@@ -344,7 +344,7 @@ theorem sys_open_cr_permit_ex (Γ : FsViewNames GF) (vom : BitVec 64) (P : Nat �
         · ipureintro; exact hent
         · iexact HF
       · iexact Harm
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _
     iempintro
 
@@ -447,11 +447,11 @@ omit [MachGS GF] in
 theorem sys_open_cr_term_arg (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermArg (GF := GF) Mim pv (sysOpenCrP i0) i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold truncTermArg sysOpenCrP
     iintro %pl _
     ipureintro; trivial
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iempintro
 
 omit [MachGS GF] in
@@ -459,10 +459,10 @@ omit [MachGS GF] in
 theorem sys_open_cr_term_at (pl : List (BitVec 8)) (vom : BitVec 64) (i0 : Nat) :
     ⊢ if omTrunc vom then truncTermAt (GF := GF) pl (sysOpenCrP i0) i0 else iprop(emp) := by
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold truncTermAt sysOpenCrP
     ipureintro; trivial
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iempintro
 
 /-- Every arm hands the observation piece back (unfired, or fired at the

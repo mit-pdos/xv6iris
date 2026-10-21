@@ -44,17 +44,19 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## The read set and its values -/
 
 /-- The registers a CSR instruction's check chain reads at User privilege
-(besides the source GPR of `CSRReg`). -/
+(besides the source GPR of `CSRReg`).  Since sail-riscv 0.16 `counter_enabled` also
+reads `hcounteren` (H enabled or not; its bit is ignored at User), a cell of the
+frozen bundle (`hwAny`). -/
 def uxrReads : List Register :=
   [.cur_privilege, .misa, .mstatus, .menvcfg, .senvcfg, .mcounteren, .scounteren,
-   .mstateen0, .sstateen0, .mcycle, .mtime, .minstret, .mhpmcounter]
+   .mstateen0, .sstateen0, .mcycle, .mtime, .minstret, .mhpmcounter, .hcounteren]
 
 /-- The values the check chain runs at: User privilege, the frozen cells at
 their `hwVal` values, `menvcfg` at the kernel's user-time value; the DATA

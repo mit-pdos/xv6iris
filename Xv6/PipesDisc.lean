@@ -148,7 +148,7 @@ theorem splitSep_nb (x : BitVec 8) (u : List (BitVec 8)) (hh : u.head? ≠ some 
   | [], _ => rfl
   | [y], _ => rfl
   | y :: z :: r, hh =>
-    rw [splitSep_cons3, if_neg]
+    rw [splitSep_cons3, ite_eq_right]
     intro heq
     simp only [plSep, List.cons.injEq] at heq
     exact hh (by simp [heq.2.1])
@@ -205,9 +205,9 @@ theorem splitSep_join (b : List (BitVec 8)) : joinSep (splitSep b) = b := by
   | case2 x => rfl
   | case3 x y => rfl
   | case4 x y z r hsep ih =>
-    rw [splitSep_cons3, if_pos hsep, join_nil_cons _ (splitSep_ne _), ih, ← hsep]; rfl
+    rw [splitSep_cons3, ite_eq_left hsep, join_nil_cons _ (splitSep_ne _), ih, ← hsep]; rfl
   | case5 x y z r hsep ih =>
-    rw [splitSep_cons3, if_neg hsep, join_hdCons _ _ (splitSep_ne _), ih]
+    rw [splitSep_cons3, ite_eq_right hsep, join_hdCons _ _ (splitSep_ne _), ih]
 
 /-- Rocq `split_sep_join_nb`: a join of bar-free segments splits back into
 them. -/
@@ -276,14 +276,14 @@ theorem prodParse_body (p : Producer) (hp : prodOk p) : prodParse (prodBody p) =
     -- an `if` stale when a rewrite happens under its condition)
     simp only [prodBody, prodWords] at hwf ⊢
     unfold prodParse
-    rw [if_pos (by exact ⟨by rw [wlWords_body_fn ws hwf], by rw [wlWords_body_fn ws hwf]; exact hp⟩),
+    rw [ite_eq_left (by exact ⟨by rw [wlWords_body_fn ws hwf], by rw [wlWords_body_fn ws hwf]; exact hp⟩),
       wlWords_body_fn ws hwf]
   | PrCatF f =>
     simp only [prodBody, prodWords] at hwf ⊢
     unfold prodParse
-    rw [if_neg (cat_not_echo_ok f hp), wlWords_body_fn _ hwf]
+    rw [ite_eq_right (cat_not_echo_ok f hp), wlWords_body_fn _ hwf]
     simp only
-    rw [if_pos (by exact ⟨rfl, hp, rfl⟩)]
+    rw [ite_eq_left (by exact ⟨rfl, hp, rfl⟩)]
 
 theorem prodParse_some (r : List (BitVec 8)) (p : Producer) (h : prodParse r = some p) :
     prodOk p ∧ r = prodBody p := by
@@ -309,9 +309,9 @@ theorem filtParse_body (F : Filt) (hF : filtOk F) : filtParse (filtBody F) = som
   | FGrep w =>
     have hwf := filtWf _ hF
     have hwb : wlWords (filtBody (.FGrep w)) = [fdWGrep, w] := wlWords_body _ hwf
-    rw [if_neg, hwb]
+    rw [ite_eq_right, hwb]
     · simp only
-      rw [if_pos ⟨rfl, hF, rfl⟩]
+      rw [ite_eq_left ⟨rfl, hF, rfl⟩]
     · intro h
       have := congrArg wlWords h
       rw [hwb] at this
@@ -393,7 +393,7 @@ theorem plParse_body (l : Pline') (hok : plOk l) : plParse (plBody l) = some l :
     simp only [plBody]
     rw [splitSep_nosep _ (fun h => wlBar_not_body (wlBody_bytes ws hwf _ h))]
     simp only
-    rw [if_pos ⟨by rw [wlWords_body ws hwf], by rw [wlWords_body ws hwf]; exact hok⟩,
+    rw [ite_eq_left ⟨by rw [wlWords_body ws hwf], by rw [wlWords_body ws hwf]; exact hok⟩,
       wlWords_body ws hwf]
   | LPipes p fs =>
     obtain ⟨hp, hne, hF, hlen⟩ := hok
@@ -403,7 +403,7 @@ theorem plParse_body (l : Pline') (hok : plOk l) : plParse (plBody l) = some l :
     | nil => exact absurd rfl hne
     | cons F fs' =>
       simp only [List.map_cons]
-      rw [if_pos hlen, prodParse_body p hp]
+      rw [ite_eq_left hlen, prodParse_body p hp]
       have := filtsParse_body (F :: fs') hF
       simp only [List.map_cons] at this
       rw [this]
@@ -709,7 +709,7 @@ theorem bytesDecode_code (b : List (BitVec 8)) : bytesDecode (bytesCode b) = b :
   induction b with
   | nil => simp [bytesCode, bytesDecode]
   | cons x t ih =>
-    rw [bytesDecode, dif_neg (by simp [bytesCode])]
+    rw [bytesDecode, dite_eq_right (by simp [bytesCode])]
     have hx := x.isLt
     have h1 : (bytesCode (x :: t) - 1) % 256 = x.toNat := by simp [bytesCode]; omega
     have h2 : (bytesCode (x :: t) - 1) / 256 = bytesCode t := by simp [bytesCode]; omega
@@ -745,11 +745,11 @@ theorem plaltOf_code (a : PLAlt) : plaltOf (plaltCode a) = a := by
   | PLRun b =>
     simp only [plaltOf, plaltCode]
     fix_dec
-    rw [if_pos (by omega), show 3 * bytesCode b / 3 = bytesCode b by omega, bytesDecode_code]
+    rw [ite_eq_left (by omega), show 3 * bytesCode b / 3 = bytesCode b by omega, bytesDecode_code]
   | PLTerm b =>
     simp only [plaltOf, plaltCode]
     fix_dec
-    rw [if_neg (by omega), if_pos (by omega), show (3 * bytesCode b + 1) / 3 = bytesCode b by omega,
+    rw [ite_eq_right (by omega), ite_eq_left (by omega), show (3 * bytesCode b + 1) / 3 = bytesCode b by omega,
       bytesDecode_code]
 
 /-- **Rocq `plpanic`**. -/

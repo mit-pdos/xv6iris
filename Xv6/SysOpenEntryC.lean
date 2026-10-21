@@ -545,14 +545,14 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
   have hrep := creOkPure_file 0#16 0#16 made dn hpure
   cases made
   · -- ARM F-OK: the name was there
-    simp only [Bool.false_eq_true, if_false] at hrep
+    simp only [Bool.false_eq_true, ite_false] at hrep
     iapply (sys_open_ec_exists Γ k A Farm Fun Fok Fex hJ cpu spie spp (R.set 9#5 (ientry kk)) w4 w5 w6
       lo w24 γil γisl loc tlc kk s g inum dn bm data P2 u nsj pl ⟨hkk, hinb, hipos, hle, hu⟩ hrep hns
       hP2 hp1 hal hpl)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hlk $Hflat $Hkeep $Hblk $Hop $Hbs $Hir $Hfd $Hfr
         $Hcauf $Hoc $Htc $HΦ]
   · -- ARM C-OK: a FRESH child
-    simp only [if_true] at hrep
+    simp only [ite_true] at hrep
     subst hrep
     iapply (sys_open_ec_fresh Γ k A Farm Fun Fok Fex hJ cpu spie spp (R.set 9#5 (ientry kk)) w4 w5 w6
       lo w24 γil γisl loc tlc kk s g inum bm data P2 u nsj pl ⟨hkk, hinb, hipos, hle, hu⟩ hns hP2 hp1
@@ -678,7 +678,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs GF Γ] (k : KC
   · -- ===== create REFUSED: ARM A-FAIL =====
     ihave Harm := Xv6.kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Htx, Hcf⟩
-    simp only [Bool.false_eq_true, if_false] at hns'
+    simp only [Bool.false_eq_true, ite_false] at hns'
     subst hns'
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     iapply (sys_open_ec_fail Γ k A hS Farm Fun Fok Fex hTA cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 P2
@@ -687,7 +687,7 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs GF Γ] (k : KC
   · -- ===== create SUCCEEDED: the locked inode =====
     ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
     icases Harm with ⟨%hA, Hlocked, Hcauf⟩
-    simp only [if_true] at hns'
+    simp only [ite_true] at hns'
     iapply (sys_open_ec_ok Γ k A Farm Fun Fok Fex hJ cpu spie1 spp1 R1 s1v w4 w5 w6 lo w24 made kk qi
         s g inum dn bm P2 u' ns' Sb' (bview plen bp) hA (hf rfl) hns' hP2 hp1 hal hpl)
       $$ [$Hk $Hpc $Hte $Hce $Henv $Hcells $Hbuf $Hblk $Hop $Hbs $Hir $Hfd $Hfr $Hlocked $Hcauf $Hoc

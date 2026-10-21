@@ -153,7 +153,7 @@ theorem bm_ent_store (e : List (BitVec 32)) (q : Nat) (w : BitVec 32) (hq : q < 
       = indBytes (e.set q w) := by
   have hl := bm_indBytes_take_length e q hq
   have hset : e.set q w = e.take q ++ w :: e.drop (q + 1) := by
-    rw [List.set_eq_take_append_cons_drop, if_pos hq]
+    rw [List.set_eq_take_append_cons_drop, ite_eq_left hq]
   rw [hset, bm_indBytes_append, indBytes_cons, bm_indBytes_split e q hq,
     List.take_left' hl, ← List.append_assoc (indBytes (e.take q)),
     List.drop_left' (by rw [List.length_append, hl, wordToBytes4_length]),
@@ -219,7 +219,7 @@ theorem dsPay_contentQ [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
   unfold bioPay
   cases d
-  · simp only [Bool.false_eq_true, if_false, fsView_clean]
+  · simp only [Bool.false_eq_true, ite_false, fsView_clean]
     unfold fsMclean
     iintro Hany Hc ⟨⟨HL, HD⟩, %heq⟩
     ihave Hag := fsBytes_agree_any_q E γfs dq bno.toNat bs0 bs hE $$ Hany Hc HL
@@ -229,7 +229,7 @@ theorem dsPay_contentQ [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
     · ipureintro; exact he
     · iframe Hc HL HD
       ipureintro; exact heq
-  · simp only [if_true, fsView_dirty]
+  · simp only [ite_true, fsView_dirty]
     unfold fsMdirty
     iintro Hany Hc ⟨⟨HL, HD⟩, Hb⟩
     ihave Hag := fsBytes_agree_any_q E γfs dq bno.toNat bs0 bs hE $$ Hany Hc HL

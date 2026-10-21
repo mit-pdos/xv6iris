@@ -91,8 +91,7 @@ jobs:
           path: |
             .lake/packages
             model/Lean_RV64D/.lake
-            vendor/lean-sail/.lake
-          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**', 'vendor/lean-sail/**') }}
+          key: ${{ runner.os }}-${{ runner.name }}-lake-deps-${{ hashFiles('lean-toolchain', 'lake-manifest.json', 'lakefile.toml', 'model/**') }}
 
       - name: Install toolchain (elan, Lean per lean-toolchain) and fetch packages
         run: tools/ci/run_all.sh toolchain

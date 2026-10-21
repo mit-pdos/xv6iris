@@ -1,4 +1,5 @@
 import LeanRV64D.LeanRV64D
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Types
 import LeanRV64D.VmemTypes
@@ -10,12 +11,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -59,6 +60,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -92,10 +95,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -141,6 +147,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -159,17 +166,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -184,12 +198,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -200,51 +217,42 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-def tlb_vpn_bits := (57 -i 12)
+def tlb_vpn_bits := (59 -i 12)
 
 def tlb_ppn_bits := 44
 
-/-- Type quantifiers: pte_size : Nat, pte_size ≥ 0, pte_size ∈ {4, 8} -/
+/-- Type quantifiers: pte_size : Nat, pte_size ≥ 0, List.elem pte_size [4, 8] -/
 def tlb_get_pte (pte_size : Nat) (ent : TLB_Entry) : (BitVec (pte_size * 8)) :=
   (Sail.BitVec.extractLsb ent.pte ((pte_size *i 8) -i 1) 0)
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ∈ {4, 8} -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, List.elem k_n [4, 8] -/
 def tlb_set_pte (ent : TLB_Entry) (pte : (BitVec (k_n * 8))) : TLB_Entry :=
   { ent with pte := (zero_extend (m := 64) pte) }
 
-/-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
+/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
 def tlb_get_ppn (sv_width : Nat) (ent : TLB_Entry) (vpn : (BitVec (sv_width - 12))) : (BitVec (if ( sv_width
-  = 32  : Bool) then 22 else 44)) :=
+  = 32 ∨ sv_width = 34  : Bool) then 22 else 44)) :=
   let vpn : (BitVec 64) := (sign_extend (m := 64) vpn)
   let levelMask : (BitVec 64) := (zero_extend (m := 64) ent.levelMask)
   let ppn : (BitVec 64) := (zero_extend (m := 64) ent.ppn)
   (trunc
-    (m := (if ((sv_width == 32) : Bool)
+    (m := (if (((sv_width == 32) || (sv_width == 34)) : Bool)
     then 22
     else 44)) (ppn ||| (vpn &&& levelMask)))
 
-/-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
+/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
 def tlb_get_level (sv_width : Nat) (ent : TLB_Entry) : Nat := Id.run do
-  let bits_per_level :=
-    if ((sv_width == 32) : Bool)
-    then 10
-    else 9
-  let max_level :=
-    if ((sv_width == 32) : Bool)
-    then 1
-    else
-      (if ((sv_width == 39) : Bool)
-      then 2
-      else
-        (if ((sv_width == 48) : Bool)
-        then 3
-        else 4))
+  let bits_per_level := (get_vpn_level_size sv_width)
+  let max_level := (get_root_level sv_width)
   let level : (level_range sv_width) := 0
   let loop_l_lower := 1
   let loop_l_upper := max_level
@@ -277,9 +285,14 @@ def tlb_flush_callback (x_0 : Nat) : Unit :=
 def tlb_flush_end_callback (x_0 : (Vector (Option TLB_Entry) (2 ^ 6))) : Unit :=
   ()
 
-/-- Type quantifiers: _sv_mode : Nat, is_sv_mode(_sv_mode) -/
-def tlb_hash (_sv_mode : Nat) (vpn : (BitVec (_sv_mode - 12))) : Nat :=
-  (BitVec.toNatInt (Sail.BitVec.extractLsb vpn (num_tlb_entries_exp -i 1) 0))
+/-- Type quantifiers: _sv_mode : Nat, (is_sv_or_svx4_mode _sv_mode) -/
+def tlb_hash (_sv_mode : Nat) (vpn : (BitVec (_sv_mode - 12))) (stage : TranslationStage) : Nat :=
+  let stage_bits : (BitVec num_tlb_entries_exp) :=
+    match stage with
+    | .S_Stage => (zero_extend (m := 6) 0b00#2)
+    | .VS_Stage => (zero_extend (m := 6) 0b01#2)
+    | .G_Stage => (zero_extend (m := 6) 0b10#2)
+  (BitVec.toNatInt ((Sail.BitVec.extractLsb vpn (num_tlb_entries_exp -i 1) 0) ^^^ stage_bits))
 
 def reset_TLB (_ : Unit) : SailM Unit := do
   writeReg tlb (vectorInit none)
@@ -288,65 +301,91 @@ def reset_TLB (_ : Unit) : SailM Unit := do
 def write_TLB (index : Nat) (entry : TLB_Entry) : SailM Unit := do
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
 
-def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec 16)) (vpn : (BitVec (57 - 12))) : Bool :=
-  ((ent.global || (ent.asid == asid)) && (ent.vpn == (vpn &&& (Complement.complement ent.levelMask))))
+def match_TLB_Entry (ent : TLB_Entry) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
+  = 32  : Bool) then 7 else 14))) (vpn : (BitVec (59 - 12))) (stage : TranslationStage) : Bool :=
+  let asid_matches := (ent.global || (ent.asid == asid))
+  let vmid_matches := (ent.vmid == vmid)
+  let vpn_matches := (ent.vpn == (vpn &&& (Complement.complement ent.levelMask)))
+  let stage_matches := (ent.stage == stage)
+  match stage with
+  | .S_Stage => (asid_matches && (vpn_matches && stage_matches))
+  | .VS_Stage => (asid_matches && (vmid_matches && (vpn_matches && stage_matches)))
+  | .G_Stage => (vmid_matches && (vpn_matches && stage_matches))
 
-def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec 16))) (vaddr : (Option (BitVec 64))) : Bool :=
+def flush_TLB_Entry (ent : TLB_Entry) (asid : (Option (BitVec 16))) (vmid : (Option (BitVec (if ( 64
+  = 32  : Bool) then 7 else 14)))) (vaddr : (Option (BitVec 64))) (stage : TranslationStage) : Bool :=
   let asid_matches : Bool :=
     match asid with
     | .some asid => ((ent.asid == asid) && (not ent.global))
     | none => true
+  let vmid_matches : Bool :=
+    match vmid with
+    | .some vmid => (ent.vmid == vmid)
+    | none => true
   let addr_matches : Bool :=
     match vaddr with
     | .some vaddr =>
-      (let vaddr : (BitVec 64) := (sign_extend (m := 64) vaddr)
-      (ent.vpn == ((Sail.BitVec.extractLsb vaddr 56 pagesize_bits) &&& (Complement.complement
+      (let vaddr : (BitVec 64) :=
+        match stage with
+        | .G_Stage => ((zero_extend (m := 64) vaddr) <<< 2)
+        | _ => (sign_extend (m := 64) vaddr)
+      (ent.vpn == ((Sail.BitVec.extractLsb vaddr 58 pagesize_bits) &&& (Complement.complement
             ent.levelMask))))
     | none => true
-  (asid_matches && addr_matches)
+  let stage_matches := (ent.stage == stage)
+  (asid_matches && (vmid_matches && (addr_matches && stage_matches)))
 
-/-- Type quantifiers: sv_width : Nat, is_sv_mode(sv_width) -/
-def lookup_TLB (sv_width : Nat) (asid : (BitVec 16)) (vpn : (BitVec (sv_width - 12))) : SailM (Option (Nat × TLB_Entry)) := do
-  let index := (tlb_hash sv_width vpn)
+/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
+def lookup_TLB (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
+  = 32  : Bool) then 7 else 14))) (vpn : (BitVec (sv_width - 12))) (stage : TranslationStage) : SailM (Option (Nat × TLB_Entry)) := do
+  let index := (tlb_hash sv_width vpn stage)
   match (GetElem?.getElem! (← readReg tlb) index) with
   | none => (pure none)
   | .some entry =>
-    (if ((match_TLB_Entry entry asid (sign_extend (m := (57 -i 12)) vpn)) : Bool)
+    (let vpn : (BitVec tlb_vpn_bits) :=
+      if ((stage == G_Stage) : Bool)
+      then (zero_extend (m := (59 -i 12)) vpn)
+      else (sign_extend (m := (59 -i 12)) vpn)
+    if ((match_TLB_Entry entry asid vmid vpn stage) : Bool)
     then (pure (some (index, entry)))
     else (pure none))
 
-/-- Type quantifiers: k_ex673423_ : Bool, level : Nat, sv_width : Nat, is_sv_mode(sv_width), 0 ≤
-  level ∧
+/-- Type quantifiers: k_ex1173207_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode sv_width), 0
+  ≤ level ∧
   level ≤
-  (if ( sv_width = 32  : Bool) then 1 else (if ( sv_width = 39  : Bool) then 2 else (if ( sv_width =
-  48  : Bool) then 3 else 4))) -/
-def add_to_TLB (sv_width : Nat) (asid : (BitVec 16)) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (if ( sv_width
-  = 32  : Bool) then 22 else 44))) (pte : (BitVec (if ( sv_width = 32  : Bool) then 32 else 64))) (pteAddr : physaddr) (level : Nat) (global : Bool) : SailM Unit := do
-  let shift :=
-    (level *i (if ((sv_width == 32) : Bool)
-      then 10
-      else 9))
+  (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
+  = 48 ∨ sv_width = 50  : Bool) then 3 else 4))) -/
+def add_to_TLB (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
+  = 32  : Bool) then 7 else 14))) (vpn : (BitVec (sv_width - 12))) (ppn : (BitVec (if ( sv_width =
+  32 ∨ sv_width = 34  : Bool) then 22 else 44))) (pte : (BitVec (if ( sv_width = 32 ∨
+  sv_width = 34  : Bool) then 32 else 64))) (pteAddr : physaddr) (level : Nat) (global : Bool) (stage : TranslationStage) : SailM Unit := do
+  let shift := (level *i (get_vpn_level_size sv_width))
   let levelMask := (ones (n := shift))
-  let index := (tlb_hash sv_width vpn)
+  let index := (tlb_hash sv_width vpn stage)
   let vpn := (vpn &&& (Complement.complement (zero_extend (m := (sv_width -i 12)) levelMask)))
   let ppn :=
     (ppn &&& (Complement.complement
         (zero_extend
-          (m := (if ((sv_width == 32) : Bool)
+          (m := (if (((sv_width == 32) || (sv_width == 34)) : Bool)
           then 22
           else 44)) levelMask)))
   let entry : TLB_Entry :=
     { asid := asid
+      vmid := vmid
+      stage := stage
       global := global
       pte := (zero_extend (m := 64) pte)
       pteAddr := pteAddr
-      levelMask := (zero_extend (m := (57 -i 12)) levelMask)
-      vpn := (sign_extend (m := (57 -i 12)) vpn)
+      levelMask := (zero_extend (m := (59 -i 12)) levelMask)
+      vpn := if ((stage == G_Stage) : Bool)
+        then (zero_extend (m := (59 -i 12)) vpn)
+        else (sign_extend (m := (59 -i 12)) vpn)
       ppn := (zero_extend (m := 44) ppn) }
   writeReg tlb (vectorUpdate (← readReg tlb) index (some entry))
   (pure (tlb_add_callback (← readReg tlb) index))
 
-def flush_TLB (asid : (Option (BitVec 16))) (addr : (Option (BitVec 64))) : SailM Unit := do
+def flush_TLB (asid : (Option (BitVec 16))) (vmid : (Option (BitVec (if ( 64
+  = 32  : Bool) then 7 else 14)))) (addr : (Option (BitVec 64))) (stage : TranslationStage) : SailM Unit := do
   let _ : Unit := (tlb_flush_begin_callback ())
   let loop_i_lower := 0
   let loop_i_upper ← do (pure ((Vector.length (← readReg tlb)) -i 1))
@@ -358,7 +397,7 @@ def flush_TLB (asid : (Option (BitVec 16))) (addr : (Option (BitVec 64))) : Sail
       | none => (pure ())
       | .some entry =>
         (do
-          if ((flush_TLB_Entry entry asid addr) : Bool)
+          if ((flush_TLB_Entry entry asid vmid addr stage) : Bool)
           then
             (do
               writeReg tlb (vectorUpdate (← readReg tlb) i none)

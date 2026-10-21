@@ -28,7 +28,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -36,27 +36,33 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- Walk `m` answering register reads from `dref`; `some (x, b)` if `m` only
 reads `dref`-registers (and takes silent events), returning `x`, with `b` iff
-at least one event was taken. -/
+at least one event was taken.  Concurrency interface v2 (the shapes of
+`MachCSL.bootRun`): an event node is `.impure (.inl (.ok o)) k`, a failure
+`.impure (.inl (.error _)) _` and a finite choice `.impure (.inr n) k` give
+`none`; a register read's access type is ignored; the silent events are those
+`evStep` answers without moving the state (the write announce among them). -/
 def runRead {X : Type} (dref : (r : Register) → Option (RegisterType r)) :
     SailM X → Option (X × Bool)
   | .pure x => some (x, false)
-  | .impure (.error _) _ => none
-  | .impure (.ok o) k =>
+  | .impure (.inl (.error _)) _ => none
+  | .impure (.inr _) _ => none
+  | .impure (.inl (.ok o)) k =>
     match o, k with
-    | .regRead r, k =>
+    | .regRead r _, k =>
       match dref r with
       | some v => (runRead dref (k v)).map fun p => (p.1, true)
       | none => none
+    | .memWriteAnnounce _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .barrier _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .cacheOp _, k => (runRead dref (k ())).map fun p => (p.1, true)
-    | .tlbi _, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .tlbOp _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .translationStart _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .translationEnd _, k => (runRead dref (k ())).map fun p => (p.1, true)
-    | .takeException _, k => (runRead dref (k ())).map fun p => (p.1, true)
-    | .returnException _, k => (runRead dref (k ())).map fun p => (p.1, true)
-    | .cycleCount, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .archException _, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .returnException, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .clockCycle, k => (runRead dref (k ())).map fun p => (p.1, true)
     | .getCycleCount, k => (runRead dref (k (0 : Nat))).map fun p => (p.1, true)
-    | .message _, k => (runRead dref (k ())).map fun p => (p.1, true)
+    | .printMessage _, k => (runRead dref (k ())).map fun p => (p.1, true)
     | _, _ => none
 
 /-- The machine-mode reference map: what the decoder may read in machine
@@ -74,24 +80,47 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 /-- `▷ Q` if an event was taken, else `Q`. -/
 def laterIf (b : Bool) (Q : IProp GF) : IProp GF := if b then iprop(▷ Q) else Q
 
-/-- A register read with its continuation, in raw event form. -/
-theorem swp_regRead_k (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r) {X : Type}
+/-- A register read with its continuation, in raw event form (at any access
+type: `evStep` ignores it; the model's `readReg` passes `none`). -/
+theorem swp_regRead_k (cpu : CPU) (r : Register) (a : Option Arch.sys_reg_id) (dq : DFrac)
+    (v : RegisterType r) {X : Type}
     (k : RegisterType r → SailM X) (Φ : X → IProp GF) :
     r ↦ᵣ[cpu]{dq} v ∗ ▷ (r ↦ᵣ[cpu]{dq} v -∗ swp cpu (k v) Φ) ⊢
-      swp cpu (FreeM.impure (.ok (.regRead r)) k) Φ :=
-  swp_readReg_bind cpu r dq v k Φ
+      swp cpu (FreeM.impure (.inl (.ok (.regRead r a))) k) Φ := by
+  iintro ⟨Hr, HΦ⟩
+  iapply swp_event_at cpu (FreeM.impure (.inl (.ok (.regRead r a))) k) (.regRead r a)
+    (fun (v : RegisterType r) => k v) rfl Φ (fun _ _ h => h)
+  iintro %σ Hσ
+  icases machInterp_acc_read σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (σ.regs cpu) r dq v $$ [$Hregs $Hr] with %_
+    itrivial
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨σ.regs cpu r, σ, rfl, rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain ⟨rfl, rfl⟩ := Hev
+  imod Hmask
+  imodintro
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ Hregs
+  · rw [Hv]
+    iapply HΦ $$ Hr
 
 /-- A silent event with its continuation. -/
-theorem swp_silent_k (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
+theorem swp_silent_k (cpu : CPU) (o : InstructionEffect) (u : InstructionEffect.ret o)
     (h : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ)) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
-    {X : Type} (k : o.ret → SailM X) (Φ : X → IProp GF) :
-    ▷ swp cpu (k u) Φ ⊢ swp cpu (FreeM.impure (.ok o) k) Φ := by
-  have e : (FreeM.impure (.ok o) k : SailM X) =
-      (FreeM.impure (.ok o) (fun v => FreeM.pure v) >>= k) := rfl
+    {X : Type} (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) :
+    ▷ swp cpu (k u) Φ ⊢ swp cpu (FreeM.impure (.inl (.ok o)) k) Φ := by
+  have e : (FreeM.impure (.inl (.ok o)) k : SailM X) =
+      (FreeM.impure (.inl (.ok o)) (fun v => FreeM.pure v) >>= k) := rfl
   rw [e]
   iintro H
   iapply swp_bind
-  iapply swp_silent cpu o u h hnb
+  iapply swp_silent cpu o u h hnb (fun v => swp cpu (k v) Φ)
   inext
   iexact H
 
@@ -99,9 +128,9 @@ theorem swp_silent_k (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
 the walk does not look at). -/
 theorem swp_barrier_k (cpu : CPU) (bk : barrier_kind) {X : Type}
     (k : Unit → SailM X) (Φ : X → IProp GF) :
-    ▷ swp cpu (k ()) Φ ⊢ swp cpu (FreeM.impure (.ok (.barrier bk)) k) Φ := by
-  have e : (FreeM.impure (.ok (.barrier bk)) k : SailM X) =
-      (ConcurrencyInterfaceV1.sail_barrier bk >>= k) := rfl
+    ▷ swp cpu (k ()) Φ ⊢ swp cpu (FreeM.impure (.inl (.ok (.barrier bk))) k) Φ := by
+  have e : (FreeM.impure (.inl (.ok (.barrier bk))) k : SailM X) =
+      (LeanRV64D.ArchSem.sail_barrier bk >>= k) := rfl
   rw [e]
   iintro H
   iapply swp_bind
@@ -140,14 +169,14 @@ theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType 
     iapply swp_ret
     iapply HΦ $$ HP
   | impure call k ih =>
-    cases call with
-    | error e => simp [runRead] at h
-    | ok o =>
-      -- the silent events: one step, then the walk of the continuation
-      have silent : ∀ (u : o.ret) (hd : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ))
+    rcases call with (e | o) | n
+    · simp [runRead] at h
+    · -- the silent events: one step, then the walk of the continuation
+      have silent : ∀ (u : InstructionEffect.ret o)
+          (hd : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ))
           (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
           (b' : Bool) (h' : runRead dref (k u) = some (x, b')),
-          P ∗ laterIf true iprop(P -∗ Φ x) ⊢ swp cpu (FreeM.impure (.ok o) k) Φ := by
+          P ∗ laterIf true iprop(P -∗ Φ x) ⊢ swp cpu (FreeM.impure (.inl (.ok o)) k) Φ := by
         intro u hd hnb b' h'
         show P ∗ iprop(▷ (P -∗ Φ x)) ⊢ _
         iintro ⟨HP, HΦ⟩
@@ -158,7 +187,7 @@ theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType 
         iapply laterIf_of_later
         iexact HΦ
       cases o with
-      | regRead r =>
+      | regRead r a =>
         simp only [runRead] at h
         cases hd : dref r with
         | none => simp [hd] at h
@@ -170,7 +199,7 @@ theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType 
           show P ∗ iprop(▷ (P -∗ Φ _)) ⊢ _
           iintro ⟨HP, HΦ⟩
           icases (hacc r v hd) $$ HP with ⟨%dq, Hr, Hclose⟩
-          iapply swp_regRead_k cpu r dq v k Φ
+          iapply swp_regRead_k cpu r a dq v k Φ
           iframe Hr
           inext
           iintro Hr
@@ -190,48 +219,19 @@ theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType 
         iframe HP
         iapply laterIf_of_later
         iexact HΦ
-      | cacheOp _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | tlbi _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | translationStart _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | translationEnd _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | takeException _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | returnException _ =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | cycleCount =>
-        simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
-        obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
-        exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
       | getCycleCount =>
         simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
         obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
         exact silent (0 : Nat) (fun _ _ _ => Iff.rfl) (fun _ _ h => h) b' h'
-      | message _ =>
+      | regWrite _ _ _ => simp [runRead] at h
+      | memRead _ => simp [runRead] at h
+      | memWrite _ _ _ => simp [runRead] at h
+      | memWriteAnnounce _ | cacheOp _ | tlbOp _ | translationStart _ | translationEnd _
+        | archException _ | returnException | clockCycle | printMessage _ =>
         simp only [runRead, Option.map_eq_some_iff, Prod.mk.injEq] at h
         obtain ⟨⟨x', b'⟩, h', hx, rfl⟩ := h; subst hx
         exact silent () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) b' h'
-      | regWrite _ _ => simp [runRead] at h
-      | memRead _ _ _ => simp [runRead] at h
-      | memWrite _ _ _ => simp [runRead] at h
-      | readRam _ _ _ => simp [runRead] at h
-      | writeRam _ _ _ _ => simp [runRead] at h
-      | choose _ => simp [runRead] at h
+    · simp [runRead] at h
 
 /-! ## At the machine-mode configuration -/
 

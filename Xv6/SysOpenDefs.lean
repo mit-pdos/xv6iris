@@ -428,7 +428,7 @@ air -- the whole content of the tightening for init's
 theorem openTruncPiece_none (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat → IProp GF)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = false) :
     ⊢ openTruncPiece Γ vom Kt Ft := by
-  unfold openTruncPiece; rw [if_neg (by simp [hv])]; exact .rfl
+  unfold openTruncPiece; rw [ite_eq_right (by simp [hv])]; exact .rfl
 
 /-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `open_trunc_piece_of_all`): a
 caller that can answer at EVERY file row answers at the permitted one and
@@ -532,7 +532,7 @@ theorem creFtKept_pfRecv (Kt : Nat → IProp GF) (i : Nat)
 theorem openTruncAt_true (Γ : FsViewNames GF) (vom : BitVec 64) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (hv : omTrunc vom = true) :
     openTruncAt Γ vom i Ft ⊣⊢ pfAt (atruncCommitI Γ appE i) Ft := by
-  unfold openTruncAt; rw [if_pos hv]; exact .rfl
+  unfold openTruncAt; rw [ite_eq_left hv]; exact .rfl
 
 /-- PAYING THE PERMIT (Rocq `open_trunc_at_of_permit`): the piece keyed at
 one inum, the permit kept on the refund side. -/
@@ -542,7 +542,7 @@ theorem openTruncAt_of_permit (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat 
       openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncPiece openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt atruncOfPermit creFtKept
     dsimp only
     iintro H Hk
@@ -551,7 +551,7 @@ theorem openTruncAt_of_permit (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat 
       iapply H $$ %i Hk
     · icases H with ⟨-, H⟩
       iframe H Hk
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro H _
     iexact H
 
@@ -565,7 +565,7 @@ theorem openTruncAt_of_permit_at (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt'
       openTruncAt Γ vom i (creFtKept Kt' i Ft) := by
   unfold openTruncPiece openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt atruncOfPermit creFtKept
     dsimp only
     iintro Hmv H Hk
@@ -575,7 +575,7 @@ theorem openTruncAt_of_permit_at (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt'
       iapply H $$ %i Hk
     · icases H with ⟨-, H⟩
       iframe H Hk
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _ H _
     iexact H
 
@@ -587,7 +587,7 @@ theorem openTruncAt_kept_mono (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : 
       openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt creFtKept
     dsimp only
     iintro Hmv H
@@ -597,7 +597,7 @@ theorem openTruncAt_kept_mono (Γ : FsViewNames GF) (vom : BitVec 64) (Kt Kt' : 
     · icases H with ⟨-, ⟨Hr, Hk⟩⟩
       iframe Hr
       iapply Hmv $$ Hk
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro _ H
     iexact H
 
@@ -608,7 +608,7 @@ theorem openTruncAt_kept_forget (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Na
     openTruncAt Γ vom i (creFtKept Kt i Ft) ⊢ openTruncAt Γ vom i Ft := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt creFtKept
     dsimp only
     iintro H
@@ -617,7 +617,7 @@ theorem openTruncAt_kept_forget (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Na
       iexact H
     · icases H with ⟨-, ⟨Hr, -⟩⟩
       iexact Hr
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     exact .rfl
 
 /-- Rocq `open_trunc_at_kept_intro`: a keyed piece takes a permit onto its
@@ -630,7 +630,7 @@ theorem openTruncAt_kept_intro (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat
       openTruncAt Γ vom i (creFtKept Kt i Ft) := by
   unfold openTruncAt
   by_cases hv : omTrunc vom = true
-  · simp only [if_pos hv]
+  · simp only [ite_eq_left hv]
     unfold pfAt creFtKept
     dsimp only
     iintro H Hk
@@ -639,7 +639,7 @@ theorem openTruncAt_kept_intro (Γ : FsViewNames GF) (vom : BitVec 64) (Kt : Nat
       iexact H
     · icases H with ⟨-, H⟩
       iframe H Hk
-  · simp only [if_neg hv]
+  · simp only [ite_eq_right hv]
     iintro H _
     iexact H
 

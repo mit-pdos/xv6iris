@@ -13,7 +13,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -77,7 +77,8 @@ theorem clockCells_cases (cpu : CPU) :
       Register.minstret ↦ᵣ[cpu] minstret ∗
       Register.mcycle ↦ᵣ[cpu] mcycle ∗
       Register.mtime ↦ᵣ[cpu] mtime ∗
-      Register.mip ↦ᵣ[cpu] mip := by
+      Register.mip ↦ᵣ[cpu] mip ∗
+      cycleAux cpu := by
   unfold clockCells; exact .rfl
 
 /-- `clockCells` reassembled from its cells, curried: by name, no `iframe`
@@ -87,11 +88,36 @@ theorem clockCells_introW (cpu : CPU) (mi : Bool) (minstret mcycle mtime mip : B
     Register.minstret ↦ᵣ[cpu] minstret -∗
     Register.mcycle ↦ᵣ[cpu] mcycle -∗
     Register.mtime ↦ᵣ[cpu] mtime -∗
-    Register.mip ↦ᵣ[cpu] mip -∗ clockCells (GF := GF) cpu := by
-  iintro H1 H2 H3 H4 H5
+    Register.mip ↦ᵣ[cpu] mip -∗
+    cycleAux cpu -∗ clockCells (GF := GF) cpu := by
+  iintro H1 H2 H3 H4 H5 H6
   unfold clockCells
   iexists mi, minstret, mcycle, mtime, mip
   iframe
+
+theorem cycleAux_cases (cpu : CPU) :
+    cycleAux (GF := GF) cpu ⊢
+    ∃ (msip : BitVec 32) (wei : Option (Nat × event_csr)),
+      Register.msip ↦ᵣ[cpu] msip ∗
+      Register.written_event_index ↦ᵣ[cpu] wei ∗
+      Register.written_trigger_index ↦ᵣ[cpu] none := by
+  unfold cycleAux
+  iintro ⟨⟨%msip, H1⟩, ⟨%wei, H2⟩, H3⟩
+  iexists msip, wei
+  iframe
+
+/-- `cycleAux` reassembled from its cells, curried. -/
+theorem cycleAux_introW (cpu : CPU) (msip : BitVec 32) (wei : Option (Nat × event_csr)) :
+    ⊢ Register.msip ↦ᵣ[cpu] msip -∗
+    Register.written_event_index ↦ᵣ[cpu] wei -∗
+    Register.written_trigger_index ↦ᵣ[cpu] none -∗ cycleAux (GF := GF) cpu := by
+  iintro H1 H2 H3
+  unfold cycleAux
+  isplitl [H1]
+  · iexists msip; iexact H1
+  isplitl [H2]
+  · iexists wei; iexact H2
+  · iexact H3
 
 theorem pcIs_cases (cpu : CPU) (pc : BitVec 64) :
     pcIs (GF := GF) cpu pc ⊢ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] pc := by

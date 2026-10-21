@@ -116,7 +116,7 @@ theorem colBlk (γfs : FsNames) (Lb : RegMapF (BitVec 8)) (C : BlockMap) (home :
     mapSeq_inj bs bsi (b * BSZ) Lb (by rw [hlb, hlens b bsi hbsi]) (by simpa using hsub)
       (htie b bsi hbsi)
   refine ⟨hhome, ?_⟩
-  rw [colView_lookup, if_pos hhome, he]
+  rw [colView_lookup, ite_eq_left hhome, he]
   unfold dvOfD
   rw [hbsi]
   rfl
@@ -164,10 +164,10 @@ theorem colPoolElt_join (γfs : FsNames) (Lb : RegMapF (BitVec 8)) (C : BlockMap
       colAuth γfs Lb C home ∗ poolElt (fsGammaL γfs) u b := by
   unfold poolElt
   by_cases hu : b ∈ u
-  · simp only [if_pos hu]
+  · simp only [ite_eq_left hu]
     iintro Ha - -
     iframe Ha
-  · simp only [if_neg hu]
+  · simp only [ite_eq_right hu]
     iintro Ha ⟨%bs1, Hb1⟩ ⟨%bs2, Hb2⟩
     ihave Hq1 := (FsView.gammaQ_blkOwned (fsGammaL γfs) _ b bs1).1 $$ Hb1
     ihave Hq2 := (FsView.gammaQ_blkOwned (fsGammaL γfs) _ b bs2).1 $$ Hb2
@@ -361,7 +361,7 @@ theorem colBytes_leDbytes (Lb : RegMapF (BitVec 8)) (C : BlockMap) (home : List 
   rw [ha] at hLb
   cases hLb
   have hres : PartialMap.get? (colView C home) b = some bs := by
-    rw [colView_lookup, if_pos hb]
+    rw [colView_lookup, ite_eq_left hb]
     unfold dvOfD; rw [hbs]; rfl
   have hfd := fsDbytes_lookup (colView C home) b bs (a - b * BSZ) v hok hres hw
   have heq : b * BSIZE + (a - b * BSZ) = a := by

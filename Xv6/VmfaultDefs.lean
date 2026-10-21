@@ -60,11 +60,11 @@ theorem vf_ret_1502 : jumpPc (KA.«vmfault» + 0x6a#64) = (KA.«vmfault» + 0x6a
 /-- A `beqz` on a value known to be nonzero. -/
 theorem vf_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
 
 theorem vf_bne_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 /-- `UPtFault`'s `uptWf` lemma at `UPtd.clearU` (the same record). -/
 theorem vf_uptWf_clearU (P : UPtd) (vpn : Nat) (w : BitVec 64) (hwf : uptWf P)
@@ -82,11 +82,11 @@ theorem vf_notU_num : (18446744073709551599#64 : BitVec 64) = ~~~PTE_U := by dec
 
 theorem vf_bltu_lt {α : Type} (x y : BitVec 64) (h : x.toNat < y.toNat) (p q : α) :
     (if bcond bop.BLTU x y then p else q) = p :=
-  if_pos (by simp only [bcond, BitVec.ult, decide_eq_true_eq]; exact h)
+  ite_eq_left (by simp only [bcond, BitVec.ult, decide_eq_true_eq]; exact h)
 
 theorem vf_bltu_ge {α : Type} (x y : BitVec 64) (h : ¬ x.toNat < y.toNat) (p q : α) :
     (if bcond bop.BLTU x y then p else q) = q :=
-  if_neg (by simp only [bcond, BitVec.ult, decide_eq_true_eq]; exact h)
+  ite_eq_right (by simp only [bcond, BitVec.ult, decide_eq_true_eq]; exact h)
 
 /-- `PGROUNDDOWN` keeps the page number. -/
 theorem vf_vpn_round (va : BitVec 64) : vpnOf (va &&& 0xFFFFFFFFFFFFF000#64) = vpnOf va := by
@@ -214,7 +214,7 @@ theorem vmfault_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegM
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   · intro i h1 h2 h3 h4 h5
-    simp only [RegMap.set_apply, if_neg h1, if_neg h2, if_neg h3, if_neg h4, if_neg h5]
+    simp only [RegMap.set_apply, ite_eq_right h1, ite_eq_right h2, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5]
 
 /-! ## `walk`'s contract at its entry address -/
 

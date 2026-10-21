@@ -1,21 +1,25 @@
-import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
-import LeanRV64D.MemAddrtype
-import LeanRV64D.Common0
-import LeanRV64D.RvfiDii
 import LeanRV64D.PlatformConfig
 import LeanRV64D.Types
+import LeanRV64D.Common0
 import LeanRV64D.Callbacks
-import LeanRV64D.Regs
 import LeanRV64D.PcAccess
 import LeanRV64D.SysRegs
+import LeanRV64D.Events
 import LeanRV64D.ExtRegs
+import LeanRV64D.InterruptRegs
+import LeanRV64D.Counters
 import LeanRV64D.AddrChecks
 import LeanRV64D.SysExceptions
+import LeanRV64D.SyncException
+import LeanRV64D.SdtrigTypes
+import LeanRV64D.SdtrigControl
 import LeanRV64D.ZicfilpRegs
 import LeanRV64D.SysControl
 import LeanRV64D.Platform
+import LeanRV64D.InterruptImplementation
 import LeanRV64D.Callbacks0
 import LeanRV64D.InstsBegin
 import LeanRV64D.ZicfilpInsts
@@ -24,6 +28,7 @@ import LeanRV64D.StepCommon
 import LeanRV64D.StepExt
 import LeanRV64D.DecodeExt
 import LeanRV64D.Fetch
+import LeanRV64D.TransformedInst
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -31,12 +36,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -80,6 +85,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -113,10 +120,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -162,6 +172,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -180,17 +191,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -205,12 +223,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -221,14 +242,17 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex673576_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
-def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32)) (exit_wait : Bool) : SailM Step := do
+/-- Type quantifiers: k_ex1173420_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
+def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instr_info : instr_info) (exit_wait : Bool) : SailM Step := do
   if ((← (shouldWakeForInterrupt ())) : Bool)
   then
     (do
@@ -240,7 +264,7 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                 (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
       else (pure ())
       writeReg hart_state (HART_ACTIVE ())
-      (pure (Step_Execute ((Retire_Success ()), instbits))))
+      (pure (Step_Execute ((Retire_Success ()), instr_info))))
   else
     (do
       match (wr, (valid_reservation ()), exit_wait) with
@@ -254,7 +278,7 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          (pure (Step_Execute ((Retire_Success ()), instbits))))
+          (pure (Step_Execute ((Retire_Success ()), instr_info))))
       | (.WAIT_WRS_NTO, false, _) =>
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -265,7 +289,7 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          (pure (Step_Execute ((Retire_Success ()), instbits))))
+          (pure (Step_Execute ((Retire_Success ()), instr_info))))
       | (.WAIT_WFI, _, true) =>
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -276,20 +300,26 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          let is_illegal ← do
-            if ((← do
-                 if ((bne (← readReg cur_privilege) Machine) : Bool)
-                 then (pure ((_get_Mstatus_TW (← readReg mstatus)) == 1#1))
-                 else (pure false)) : Bool)
-            then (pure true)
-            else
-              (do
-                if (((← readReg cur_privilege) == User) : Bool)
-                then (currentlyEnabled Ext_S)
-                else (pure false))
-          if (is_illegal : Bool)
-          then (pure (Step_Execute ((Illegal_Instruction ()), instbits)))
-          else (pure (Step_Execute ((Retire_Success ()), instbits))))
+          match (← readReg cur_privilege) with
+          | .Machine => (pure (Step_Execute ((Retire_Success ()), instr_info)))
+          | .User =>
+            (do
+              if ((← do
+                   if (((_get_Mstatus_TW (← readReg mstatus)) == 1#1) : Bool)
+                   then (pure true)
+                   else (currentlyEnabled Ext_S)) : Bool)
+              then (pure (Step_Execute ((Illegal_Instruction ()), instr_info)))
+              else (pure (Step_Execute ((Retire_Success ()), instr_info))))
+          | .VirtualSupervisor =>
+            (do
+              if (((_get_Hstatus_VTW (← readReg hstatus)) == 1#1) : Bool)
+              then (pure (Step_Execute ((Virtual_Instruction ()), instr_info)))
+              else (pure (Step_Execute ((Retire_Success ()), instr_info))))
+          | _ =>
+            (do
+              if (((_get_Mstatus_TW (← readReg mstatus)) == 1#1) : Bool)
+              then (pure (Step_Execute ((Illegal_Instruction ()), instr_info)))
+              else (pure (Step_Execute ((Retire_Success ()), instr_info)))))
       | (.WAIT_WRS_STO, _, true) =>
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -300,7 +330,7 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          (pure (Step_Execute ((Retire_Success ()), instbits))))
+          (pure (Step_Execute ((Retire_Success ()), instr_info))))
       | (.WAIT_WRS_NTO, _, true) =>
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -311,12 +341,20 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
           writeReg hart_state (HART_ACTIVE ())
-          if ((← do
-               if (((← readReg cur_privilege) == Machine) : Bool)
-               then (pure true)
-               else (pure ((_get_Mstatus_TW (← readReg mstatus)) == 0#1))) : Bool)
-          then (pure (Step_Execute ((Retire_Success ()), instbits)))
-          else (pure (Step_Execute ((Illegal_Instruction ()), instbits))))
+          if (((← readReg cur_privilege) == Machine) : Bool)
+          then (pure (Step_Execute ((Retire_Success ()), instr_info)))
+          else
+            (do
+              if (((_get_Mstatus_TW (← readReg mstatus)) == 1#1) : Bool)
+              then (pure (Step_Execute ((Illegal_Instruction ()), instr_info)))
+              else
+                (do
+                  if ((← do
+                       if ((← (inVirtualPrivilege ())) : Bool)
+                       then (pure ((_get_Hstatus_VTW (← readReg hstatus)) == 1#1))
+                       else (pure false)) : Bool)
+                  then (pure (Step_Execute ((Virtual_Instruction ()), instr_info)))
+                  else (pure (Step_Execute ((Retire_Success ()), instr_info))))))
       | (_, _, false) =>
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -330,18 +368,31 @@ def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instbits : (BitVec 32))
 
 /-- Type quantifiers: step_no : Nat, 0 ≤ step_no -/
 def run_hart_active (step_no : Nat) : SailM Step := SailME.run do
+  match (← (find_highest_priority_pending_trigger (← readReg cur_privilege))) with
+  | .some pti => SailME.throw ((Step_Pending_Trigger pti) : Step)
+  | none => (pure ())
   match (← (dispatchInterrupt (← readReg cur_privilege))) with
   | .some (intr, priv) => SailME.throw ((Step_Pending_Interrupt (intr, priv)) : Step)
   | none => (pure ())
+  match (← (match_memory_trigger_before (← readReg cur_privilege)
+      (TriggerFetchAddr (← readReg PC)))) with
+  | .some pti => SailME.throw ((Step_Fetch_Trigger pti) : Step)
+  | none => (pure ())
+  let fetch_privilege ← do readReg cur_privilege
+  let fetch_trigger_reentrance ← do (prevent_reentrance TA_Breakpoint fetch_privilege)
   match (ext_fetch_hook (← (fetch ()))) with
   | .F_Ext_Error e => (pure (Step_Ext_Fetch_Failure e))
-  | .F_Error (e, addr) => (pure (Step_Fetch_Failure ((Virtaddr addr), e)))
+  | .F_Error e => (pure (Step_Fetch_Failure e))
   | .F_RVC h =>
     (do
       let _ : Unit := (sail_instr_announce h)
       let _ : Unit := (fetch_callback h)
+      match (← (match_memory_trigger_before (← readReg cur_privilege)
+          (TriggerFetchInstr ((← readReg PC), (zero_extend (m := (8 *i 16)) h), 2)))) with
+      | .some pti => SailME.throw ((Step_Fetch_Trigger pti) : Step)
+      | none => (pure ())
       let instbits : instbits := (zero_extend (m := 32) h)
-      let instruction ← do (ext_decode_compressed h)
+      let fetched_instruction ← do (ext_decode_compressed h)
       if ((get_config_print_instr ()) : Bool)
       then
         (discard <| pure (print_log_instr
@@ -353,32 +404,61 @@ def run_hart_active (step_no : Nat) : SailM Step := SailME.run do
                       (HAppend.hAppend (BitVec.toFormatted (← readReg PC))
                         (HAppend.hAppend " ("
                           (HAppend.hAppend (BitVec.toFormatted h)
-                            (HAppend.hAppend ") " (← (instruction_to_str instruction)))))))))))
+                            (HAppend.hAppend ") " (← (instruction_to_str fetched_instruction)))))))))))
             (zero_extend (m := 64) (← readReg PC))))
       else (pure ())
       if ((← (is_landing_pad_expected ())) : Bool)
       then
         (do
           let r ← do (trap (make_landing_pad_exception ()))
-          (pure (Step_Execute (r, instbits))))
+          let executed_instruction : (Option instruction) := none
+          let instr_info :=
+            { fetch_privilege := fetch_privilege
+              fetch_trigger_reentrance := fetch_trigger_reentrance
+              instbits := instbits
+              fetched_instruction := fetched_instruction
+              executed_instruction := executed_instruction
+              compressed := true }
+          (pure (Step_Execute (r, instr_info))))
       else
         (do
           if ((← (currentlyEnabled Ext_Zca)) : Bool)
           then
             (do
               writeReg nextPC (BitVec.addInt (← readReg PC) 2)
-              let result ← (( do
-                match (← (execute instruction)) with
-                | .ExecuteAs other_inst => (execute other_inst)
-                | result => (pure result) ) : SailME Step ExecutionResult )
-              (pure (Step_Execute (result, instbits))))
-          else (pure (Step_Execute ((Illegal_Instruction ()), instbits)))))
+              let (executed_instruction, result) ← (( do
+                match (← (execute fetched_instruction)) with
+                | .ExecuteAs other_inst => (pure ((some other_inst), (← (execute other_inst))))
+                | result => (pure ((some fetched_instruction), result)) ) : SailME Step
+                ((Option instruction) × ExecutionResult) )
+              let instr_info :=
+                { fetch_privilege := fetch_privilege
+                  fetch_trigger_reentrance := fetch_trigger_reentrance
+                  fetched_instruction := fetched_instruction
+                  executed_instruction := executed_instruction
+                  instbits := instbits
+                  compressed := true }
+              (pure (Step_Execute (result, instr_info))))
+          else
+            (let executed_instruction : (Option instruction) := none
+            let instr_info :=
+              { fetch_privilege := fetch_privilege
+                fetch_trigger_reentrance := fetch_trigger_reentrance
+                fetched_instruction := fetched_instruction
+                executed_instruction := executed_instruction
+                instbits := instbits
+                compressed := true }
+            (pure (Step_Execute ((Illegal_Instruction ()), instr_info))))))
   | .F_Base w =>
     (do
       let _ : Unit := (sail_instr_announce w)
       let _ : Unit := (fetch_callback w)
+      match (← (match_memory_trigger_before (← readReg cur_privilege)
+          (TriggerFetchInstr ((← readReg PC), (zero_extend (m := (8 *i 16)) w), 4)))) with
+      | .some pti => SailME.throw ((Step_Fetch_Trigger pti) : Step)
+      | none => (pure ())
       let instbits : instbits := (zero_extend (m := 32) w)
-      let instruction ← do (ext_decode w)
+      let fetched_instruction ← do (ext_decode w)
       if ((get_config_print_instr ()) : Bool)
       then
         (discard <| pure (print_log_instr
@@ -390,22 +470,48 @@ def run_hart_active (step_no : Nat) : SailM Step := SailME.run do
                       (HAppend.hAppend (BitVec.toFormatted (← readReg PC))
                         (HAppend.hAppend " ("
                           (HAppend.hAppend (BitVec.toFormatted w)
-                            (HAppend.hAppend ") " (← (instruction_to_str instruction)))))))))))
+                            (HAppend.hAppend ") " (← (instruction_to_str fetched_instruction)))))))))))
             (zero_extend (m := 64) (← readReg PC))))
       else (pure ())
-      if (((← (is_landing_pad_expected ())) && (not (is_lpad_instruction instruction))) : Bool)
+      if (((← (is_landing_pad_expected ())) && (not (is_lpad_instruction fetched_instruction))) : Bool)
       then
         (do
           let r ← do (trap (make_landing_pad_exception ()))
-          (pure (Step_Execute (r, instbits))))
+          let executed_instruction : (Option instruction) := none
+          let instr_info :=
+            { fetch_privilege := fetch_privilege
+              fetch_trigger_reentrance := fetch_trigger_reentrance
+              fetched_instruction := fetched_instruction
+              executed_instruction := executed_instruction
+              instbits := instbits
+              compressed := false }
+          (pure (Step_Execute (r, instr_info))))
       else
         (do
           writeReg nextPC (BitVec.addInt (← readReg PC) 4)
-          let result ← (( do
-            match (← (execute instruction)) with
-            | .ExecuteAs other_inst => (execute other_inst)
-            | result => (pure result) ) : SailME Step ExecutionResult )
-          (pure (Step_Execute (result, instbits)))))
+          let (executed_instruction, result) ← (( do
+            match (← (execute fetched_instruction)) with
+            | .ExecuteAs other_inst => (pure ((some other_inst), (← (execute other_inst))))
+            | result => (pure ((some fetched_instruction), result)) ) : SailME Step
+            ((Option instruction) × ExecutionResult) )
+          let instr_info :=
+            { fetch_privilege := fetch_privilege
+              fetch_trigger_reentrance := fetch_trigger_reentrance
+              fetched_instruction := fetched_instruction
+              executed_instruction := executed_instruction
+              instbits := instbits
+              compressed := false }
+          (pure (Step_Execute (result, instr_info)))))
+
+def handle_pending_trigger (tuple_0 : (Trig_Action × Nat × (BitVec 64))) : SailM Unit := do
+  let (action, _, trigger_tval) := tuple_0
+  match action with
+  | .TA_Breakpoint =>
+    (handle_exception (← (exception_context (E_Breakpoint Brk_Hardware) trigger_tval)))
+  | _ =>
+    (internal_error "postlude/step.sail" 233
+      (HAppend.hAppend "Trigger action "
+        (HAppend.hAppend (trigger_action_name_forwards action) " not supported.")))
 
 def wait_is_nop (wr : WaitReason) : Bool :=
   match wr with
@@ -413,15 +519,25 @@ def wait_is_nop (wr : WaitReason) : Bool :=
   | .WAIT_WRS_STO => false
   | .WAIT_WRS_NTO => false
 
-/-- Type quantifiers: k_ex673579_ : Bool, step_no : Nat, 0 ≤ step_no -/
+/-- Type quantifiers: k_ex1173423_ : Bool, step_no : Nat, 0 ≤ step_no -/
 def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
   let _ : Unit := (ext_pre_step_hook ())
+  (update_mip ())
   writeReg minstret_increment (← (should_inc_minstret (← readReg cur_privilege)))
   let step_val ← (( do
     match (← readReg hart_state) with
-    | .HART_WAITING (wr, instbits) => (run_hart_waiting step_no wr instbits exit_wait)
+    | .HART_WAITING (wr, instr_info) => (run_hart_waiting step_no wr instr_info exit_wait)
     | .HART_ACTIVE () => (run_hart_active step_no) ) : SailM Step )
   match step_val with
+  | .Step_Pending_Trigger pti =>
+    (do
+      let _ : Unit :=
+        if ((get_config_print_trigger ()) : Bool)
+        then
+          (let (_, idx, _) := pti
+          (print_endline (HAppend.hAppend "Handling trigger at index #" (Int.repr idx))))
+        else ()
+      (handle_pending_trigger pti))
   | .Step_Pending_Interrupt (intr, priv) =>
     (do
       let _ : Unit :=
@@ -429,24 +545,44 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
         then (print_bits "Handling interrupt: " (interruptType_bits_forwards intr))
         else ()
       (handle_interrupt intr priv))
+  | .Step_Fetch_Trigger pti =>
+    (do
+      let _ : Unit :=
+        if ((get_config_print_trigger ()) : Bool)
+        then
+          (let (_, idx, _) := pti
+          (print_endline (HAppend.hAppend "Handling trigger at index #" (Int.repr idx))))
+        else ()
+      (fire_pending_before_triggers pti)
+      (handle_pending_trigger pti))
   | .Step_Ext_Fetch_Failure e => (pure (ext_handle_fetch_check_error e))
-  | .Step_Fetch_Failure (vaddr, e) => (handle_exception (bits_of_virtaddr vaddr) e)
+  | .Step_Fetch_Failure e => (handle_exception e)
   | .Step_Waiting _ =>
-    (assert (hart_is_waiting (← readReg hart_state)) "cannot be Waiting in a non-Wait state")
-  | .Step_Execute (.Retire_Success (), _) =>
-    (assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:219.74-219.75")
+    sail_assert (hart_is_waiting (← readReg hart_state)) "cannot be Waiting in a non-Wait state"
+  | .Step_Execute (.Retire_Success (), instr_info) =>
+    (do
+      sail_assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:314.39-314.40"
+      (match_icount_triggers instr_info.fetch_privilege instr_info.fetch_trigger_reentrance))
   | .Step_Execute (.ExecuteAs _, _) =>
-    (internal_error "postlude/step.sail" 223
+    (internal_error "postlude/step.sail" 320
       "Multiple chained ExecuteAs (only one redirection is supported).")
-  | .Step_Execute (.Trap (priv, exc, pc), _) => (set_next_pc (← (exception_handler priv exc pc)))
-  | .Step_Execute (.Illegal_Instruction (), instbits) =>
-    (handle_exception (zero_extend (m := 64) instbits) (E_Illegal_Instr ()))
-  | .Step_Execute (.Virtual_Instruction (), instbits) =>
-    (handle_exception (zero_extend (m := 64) instbits) (E_Virtual_Instr ()))
-  | .Step_Execute (.Enter_Wait wr, instbits) =>
+  | .Step_Execute (.Trap (priv, ctx, pc), instr_info) =>
+    (do
+      let ctx ← do (transform_exception_context ctx instr_info)
+      (set_next_pc (← (exception_handler priv ctx pc))))
+  | .Step_Execute (.Illegal_Instruction (), instr_info) =>
+    (handle_exception
+      (make_instr_exception_context (E_Illegal_Instr ()) (zero_extend (m := 64) instr_info.instbits)))
+  | .Step_Execute (.Virtual_Instruction (), instr_info) =>
+    (handle_exception
+      (make_instr_exception_context (E_Virtual_Instr ()) (zero_extend (m := 64) instr_info.instbits)))
+  | .Step_Execute (.Enter_Wait wr, instr_info) =>
     (do
       if ((wait_is_nop wr) : Bool)
-      then (assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:232.41-232.42")
+      then
+        (do
+          sail_assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:333.41-333.42"
+          (match_icount_triggers instr_info.fetch_privilege instr_info.fetch_trigger_reentrance))
       else
         (do
           if ((get_config_print_instr ()) : Bool)
@@ -456,7 +592,17 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
                   (HAppend.hAppend (wait_name_forwards wr)
                     (HAppend.hAppend " state at PC " (BitVec.toFormatted (← readReg PC)))))))
           else (pure ())
-          writeReg hart_state (HART_WAITING (wr, instbits))))
+          writeReg hart_state (HART_WAITING (wr, instr_info))))
+  | .Step_Execute (.PendingTrigger pti, _) =>
+    (do
+      let _ : Unit :=
+        if ((get_config_print_trigger ()) : Bool)
+        then
+          (let (_, idx, _) := pti
+          (print_endline (HAppend.hAppend "Handling trigger at index #" (Int.repr idx))))
+        else ()
+      (fire_pending_before_triggers pti)
+      (handle_pending_trigger pti))
   | .Step_Execute (.Ext_CSR_Check_Failure (), _) => (pure (ext_check_CSR_fail ()))
   | .Step_Execute (.Ext_ControlAddr_Check_Failure e, _) => (pure (ext_handle_control_check_error e))
   | .Step_Execute (.Ext_DataAddr_Check_Failure e, _) => (pure (ext_handle_data_check_error e))
@@ -480,6 +626,9 @@ def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
            else (pure false)) : Bool)
       then writeReg minstret (BitVec.addInt (← readReg minstret) 1)
       else (pure ())
+      (dispatch_events ())
+      (clear_written_event_index ())
+      (update_triggers ())
       if ((get_config_rvfi ()) : Bool)
       then
         writeReg rvfi_pc_data (Sail.BitVec.updateSubrange (← readReg rvfi_pc_data) 127 64

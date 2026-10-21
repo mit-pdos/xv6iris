@@ -176,11 +176,11 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF �
   iframe Hk Hpc Hte Hce Hsl Hdep Hoff Hdev Hinum Hval Hshot Hfrz Hsb Hsi Hpid Hbs Hop
   iframe #
   isplitl [Hload]
-  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, if_false]; iexact Hload
+  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, ite_false]; iexact Hload
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
   unfold icDepSide icDepSideTx txPinO
@@ -538,7 +538,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   · ipureintro; exact create_slots_2 false ns rfl hS.hns
   · ipureintro
     refine ⟨Xv6.namex_sub_trans _ _ _ hsb5 hsb6, by omega, fun h => absurd h (by decide)⟩
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iframe Htx Hcf
   ipureintro
   rw [ha0f]
@@ -630,7 +630,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   -- back from iupdate, at +0x150
   iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hcidev Hciinum Hcmeta Hcmap Hsbi
     Hcdiat Hb2 Hop
-  try simp only [if_true, ↓reduceIte]
+  try simp only [ite_true, ↓reduceIte]
   have hR1 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R1 :=
     createRegs3_cs k _ _ _ ty major minor _ R1 hcs1
       (createRegs3_set _ _ _ _ _ _ _ _ 1#5 _ (by decide)

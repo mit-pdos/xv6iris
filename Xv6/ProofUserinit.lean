@@ -224,7 +224,7 @@ theorem ui_slots_runnable [CurCtx] (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 
       procSlotsAt Γ ξl pa RUNNABLE := by
   iintro ⟨#Hu, Hc, Hh, Hz⟩
   iapply (procSlots_park_gen Γ ξl pa RUNNABLE (by decide))
-  rw [if_pos (show needsCtx RUNNABLE from by decide), if_pos (show zsHeld RUNNABLE from Or.inr (Or.inl rfl))]
+  rw [ite_eq_left (show needsCtx RUNNABLE from by decide), ite_eq_left (show zsHeld RUNNABLE from Or.inr (Or.inl rfl))]
   isplitl []
   · iexact Hu
   isplitl [Hc]
@@ -568,7 +568,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     have hcs5' : calleeSaved kf.regs R5 := by
       unfold calleeSaved at hcs5 ⊢
       simp only [KCtx.setReg_eq_withRegs, KCtx.withRegs_regs, KCtx.setReg_regs, RegMap.set_apply,
-        BitVec.reduceEq, if_false] at hcs5
+        BitVec.reduceEq, ite_false] at hcs5
       exact hcs5
     k_norm [KCtx.setReg_eq_withRegs, KCtx.popExit_false, ui_ret_c12]
     iapply Hcont $$ %R5 Hk Hpc %hcs5'
@@ -783,7 +783,7 @@ theorem ui_calleeSaved_epi (R0 R5 : RegMap) (ra : BitVec 64)
     calleeSaved R0 ((((R5.set 1#5 ra).set 8#5 (R0 8#5)).set 9#5 (R0 9#5)).set 2#5 (R0 2#5)) := by
   unfold calleeSaved
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · exact hhi 18#5 (Or.inl rfl)
   · exact hhi 19#5 (Or.inr (Or.inl rfl))
   · exact hhi 20#5 (Or.inr (Or.inr (Or.inl rfl)))
@@ -966,7 +966,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
     have h5 := hcs5
     unfold calleeSaved at h2 h5
     simp only [KCtx.withRegs_regs, KCtx.withLocks_regs, KCtx.pushOffAt_regs, KCtx.pushed_regs,
-      RegMap.set_apply, BitVec.reduceEq, if_false, if_true] at h2 h5
+      RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h2 h5
     have hR5_2 : R5 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64 := by rw [h5.1, h2.1]
     have hhi : ∀ r : BitVec 5, r = 18#5 ∨ r = 19#5 ∨ r = 20#5 ∨ r = 21#5 ∨ r = 22#5 ∨ r = 23#5 ∨
         r = 24#5 ∨ r = 25#5 ∨ r = 26#5 ∨ r = 27#5 → R5 r = k.regs r := by

@@ -48,11 +48,11 @@ def ushSet (f : Nat → BitVec 8) (j : Nat) (b : BitVec 8) : Nat → BitVec 8 :=
 
 /-- **Rocq `ush_set_lt`**. -/
 theorem ushSet_lt (f : Nat → BitVec 8) (i j : Nat) (b : BitVec 8) (h : j < i) : ushSet f i b j = f j := by
-  unfold ushSet; rw [if_neg (by omega)]
+  unfold ushSet; rw [ite_eq_right (by omega)]
 
 /-- **Rocq `ush_set_at`**. -/
 theorem ushSet_at (f : Nat → BitVec 8) (i : Nat) (b : BitVec 8) : ushSet f i b i = b := by
-  unfold ushSet; rw [if_pos rfl]
+  unfold ushSet; rw [ite_eq_left rfl]
 
 /-! ## §2 The rows the console preamble establishes -/
 

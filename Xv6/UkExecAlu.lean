@@ -14,7 +14,7 @@ import MachCSL.UExecAluGpr
 namespace Xv6
 
 open MachCSL
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 section

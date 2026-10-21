@@ -10,7 +10,7 @@ import MachCSL.Tactics
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## Facts -/
@@ -25,6 +25,27 @@ theorem setWidth_bool_to_bit (b : Bool) : BitVec.setWidth 64 (bool_to_bit b) = i
   cases b <;> rfl
 
 /-! ## The physical reads and writes, with accessors -/
+
+open Lean Elab Tactic in
+/-- `mem_iapply f a₁ … aₙ`: `iapply (f req a₁ … aₙ)`, with `req` the request of the memory
+event at the head of the `swp` goal (for a write `f req bytes tags a₁ … aₙ`).  The request is
+passed explicitly, as the executor does: its type is the model's `Mem_request n nt
+physaddrbits_len ..`, the rule's the interface's `Mem_request n nt Arch.addr_size ..`, equal by
+unfolding only, so the proof mode's unifier does not match it against a hole. -/
+elab "mem_iapply " f:term:max args:(ppSpace colGt term:max)* : tactic => withMainContext do
+  let tgt ← instantiateMVars (← getMainTarget)
+  let some m := findSwp tgt | throwError "mem_iapply: no `swp` goal"
+  let x := stripWrappers m
+  let xs := x.getAppArgs
+  let pre : Array Term ←
+    if x.isAppOf ``LeanRV64D.ArchSem.sail_mem_write && xs.size ≥ 3 then
+      pure #[← Term.exprToSyntax xs[xs.size - 3]!, ← Term.exprToSyntax xs[xs.size - 2]!,
+        ← Term.exprToSyntax xs[xs.size - 1]!]
+    else if (x.isAppOf ``LeanRV64D.ArchSem.sail_mem_read ||
+        x.isAppOf ``LeanRV64D.ArchSem.sail_mem_address_announce) && xs.size ≥ 1 then
+      pure #[← Term.exprToSyntax xs.back!]
+    else throwError "mem_iapply: the head is not a memory event{indentExpr x}"
+  evalTactic (← `(tactic| iapply ($f $pre* $args*)))
 
 set_option hygiene false in
 /-- The shared prefix of the supervisor-mode physical accesses: PMA, PMP,

@@ -23,7 +23,7 @@ import MachCSL.WpSmodeFenceFloor
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -92,7 +92,6 @@ theorem execSpecF_fence_iorw_iorw_floor (cpu : CPU) (dq : DFrac) (c : MConf) (si
   · iexact Hrv
   inext
   iintro #Hv
-  iapply swp_ret
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [HF Hv]

@@ -113,7 +113,7 @@ theorem ulm_ab_R (I : List (BitVec 8)) (a : Ralt) (hnp : ulineNopipe (ul I))
     (hok : raltOk (ul I) a) (hfr : fstateFree a = true) :
     lmAb ulmG ulmGHooks I (ualtCode (.UR a)) = cont ∅ (ul I) a := by
   unfold lmAb
-  rw [if_pos ⟨(ulm_ok_R (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
+  rw [ite_eq_left ⟨(ulm_ok_R (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
   exact ulm_cont_R ∅ (ul I) a
 
 /-- **Rocq `ulm_ok_R'`**: at any line that is no pipeline (the seccomp and
@@ -138,7 +138,7 @@ theorem ulm_ab_R' (I : List (BitVec 8)) (a : Ralt) (hnp : ∀ p n, ul I ≠ .LPi
     (hok : raltOk (ul I) a) (hfr : fstateFree a = true) :
     lmAb ulmG ulmGHooks I (ualtCode (.UR a)) = cont ∅ (ul I) a := by
   unfold lmAb
-  rw [if_pos ⟨(ulm_ok_R' (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
+  rw [ite_eq_left ⟨(ulm_ok_R' (∅ : Fstate) (ul I) a hnp).2 hok, by rw [ulm_free_R]; exact hfr⟩]
   exact ulm_cont_R ∅ (ul I) a
 
 /-- **Rocq `uline_of_u_eq`**: the union's parse agrees with the file's

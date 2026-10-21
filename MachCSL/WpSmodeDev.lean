@@ -30,7 +30,7 @@ import MachCSL.SmodeDevDefs
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 open Sail.ArchSem (FreeM)
 
@@ -87,23 +87,26 @@ theorem not_othersReserve_dev {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
 
 /-! ## The leaves: the memory events against the interpretation -/
 
-/-- An MMIO read: the device answers out of its mirror. -/
-theorem swp_sail_mem_read_dev (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (pa : PAddr) (hpa : req.pa = pa) (d : DevId) (off : Nat)
+/-- An MMIO read: the device answers out of its mirror (concurrency interface v2: the
+answer is the bits as a byte vector and an empty tag vector). -/
+theorem swp_sail_mem_read_dev (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (pa : PAddr) (hpa : req.address = pa) (d : DevId) (off : Nat)
     (hdec : devDecode pa = some (d, off)) (hdev : devBytes pa n)
     (hn : 0 < n) (hk : akPlain req.access_kind = true)
-    (Ψ : BitVec (8 * n) → IProp GF) (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    devReadAU d off n Ψ ∗ ▷ (∀ w, Ψ w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    (Ψ : BitVec (8 * n) → IProp GF)
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    devReadAU d off n Ψ ∗ ▷ (∀ w, Ψ w -∗ Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   subst hpa
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit devReadAU
+  unfold devReadAU
   iintro ⟨HAU, HΦ⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
     exact hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_mem_read req) (.memRead (memReq req))
+    (fun v => FreeM.pure (memReadAns v)) (sail_mem_read_def req) Φ
     (fun _ _ hb => by
       have h1 : akExcl req.access_kind = true := hb.1
       rw [hk'.2] at h1
@@ -115,13 +118,13 @@ theorem swp_sail_mem_read_dev (cpu : CPU) {n vasize : Nat}
   case' _ => iframe
   subst hs
   obtain ⟨⟨w, s'⟩, hrd⟩ := Option.isSome_iff_exists.1 hsome
-  have hdr : devRead σ.devs req.pa n = some (w, σ.devs.set d s') := devRead_some hdec hrd
+  have hdr : devRead σ.devs req.address n = some (w, σ.devs.set d s') := devRead_some hdec hrd
   imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
   · iframe
   imodintro
   isplit
   · ipureintro
-    exact ⟨.Ok (w, none), _, Or.inl ⟨hdev, w, _, hdr, rfl, rfl⟩⟩
+    exact ⟨.ok (w, 0#nt), _, Or.inl ⟨hdev, w, _, hdr, rfl, rfl⟩⟩
   inext
   iintro %v %σ' %Hev
   rcases Hev with ⟨_, w₀, ds₀, hdr', rfl, rfl⟩ | ⟨hr, _⟩ | ⟨hr, _⟩ | ⟨hr, _⟩
@@ -138,47 +141,50 @@ theorem swp_sail_mem_read_dev (cpu : CPU) {n vasize : Nat}
   all_goals exact absurd hr (not_ramBytes_of_devBytes hdev hn)
 
 /-- An MMIO write: the device takes the value into its mirror.  Never
-blocked (the reservations are RAM's). -/
-theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (pa : PAddr) (hpa : req.pa = pa) (d : DevId) (off : Nat)
+blocked (the reservations are RAM's).  Concurrency interface v2: the write
+carries the bytes (`hv`: their bits are `w'`) and answers `.Ok none`. -/
+theorem swp_sail_mem_write_dev (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (bytes : Vector (BitVec 8) n) (tags : Vector Bool nt)
+    (pa : PAddr) (hpa : req.address = pa) (d : DevId) (off : Nat)
     (hdec : devDecode pa = some (d, off)) (hdev : devBytes pa n)
-    (hn : 0 < n) (w' : BitVec (8 * n)) (hv : req.value = some w')
-    (Ψ : IProp GF) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
-    devWriteAU d off n w' Ψ ∗ ▷ (Ψ -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  subst hpa
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit devWriteAU
+    (hn : 0 < n) (w' : BitVec (8 * n)) (hv : vecbytes_to_bitvec bytes = w')
+    (Ψ : IProp GF) (Φ : Result (Option Bool) Unit → IProp GF) :
+    devWriteAU d off n w' Ψ ∗ ▷ (Ψ -∗ Φ (.Ok none))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags) Φ := by
+  subst hpa hv
+  unfold devWriteAU
   iintro ⟨HAU, HΦ⟩
-  iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_step_at cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags)
+    (.memWrite (memReq req) (vecbytes_to_bitvec bytes) (vecbool_to_bitvec tags))
+    (fun v => FreeM.pure (memWriteAns v)) (sail_mem_write_def req bytes tags) Φ
   iintro %σ Hσ
   -- the reservations are RAM's: the write is never blocked
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
   ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-  have hnb : ¬ othersReserve σ.resv cpu req.pa n := not_othersReserve_dev hmm hdev
+  have hnb : ¬ othersReserve σ.resv cpu req.address n := not_othersReserve_dev hmm hdev
   imod HAU with ⟨%s, Hfrag, %hsome, Hcont⟩
   icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hclose⟩
   ihave %hs := devAgreeAt _ d (σ.devs.st d) s $$ [Hauth Hfrag]
   case' _ => iframe
   subst hs
   obtain ⟨s', hwr⟩ := Option.isSome_iff_exists.1 hsome
-  have hdw : devWrite σ.devs req.pa n w' = some (σ.devs.set d s') := devWrite_some hdec hwr
+  have hdw : devWrite σ.devs req.address n (vecbytes_to_bitvec bytes) = some (σ.devs.set d s') :=
+    devWrite_some hdec hwr
   imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
   · iframe
   imodintro
   isplit
   · ipureintro
-    exact Or.inl ⟨.Ok (some true), _, Or.inl ⟨hdev, w', _, hv, hdw, rfl, rfl⟩⟩
+    exact Or.inl ⟨.ok (), _, Or.inl ⟨hdev, _, hdw, rfl, rfl⟩⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl⟩ | ⟨hr, _⟩
-    · rw [hv] at hv'
-      obtain rfl := Option.some.inj hv'
-      rw [hdw] at hdw'
+    rcases Hev with ⟨_, ds₀, hdw', rfl, rfl⟩ | ⟨hr, _⟩
+    · rw [hdw] at hdw'
       obtain rfl := Option.some.inj hdw'
       ihave HΨ := Hcont $$ %s' %hwr Hfrag
       imod HΨ
@@ -221,7 +227,7 @@ theorem swp_checked_mem_read_dev1_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_read_dev cpu _ pa rfl d off hdec (devByteOk_devBytes hio) (by decide) rfl Ψ)
+  mem_iapply (swp_sail_mem_read_dev cpu) pa rfl d off hdec (devByteOk_devBytes hio) (by decide) rfl Ψ
   iframe HAU
   inext
   iintro %w HΨ
@@ -258,7 +264,8 @@ theorem swp_checked_mem_write_dev1_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_write_dev cpu _ pa rfl d off hdec (devByteOk_devBytes hio) (by decide) data rfl Ψ)
+  mem_iapply (swp_sail_mem_write_dev cpu) pa rfl d off hdec (devByteOk_devBytes hio) (by decide) data
+    (vecbytes_to_bitvec_to_bytes_le_1 _) Ψ
   iframe HAU
   inext
   iintro HΨ
@@ -307,7 +314,7 @@ theorem execSpecF_lbu_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf
@@ -396,7 +403,7 @@ theorem execSpecF_sb_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf

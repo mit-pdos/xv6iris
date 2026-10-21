@@ -31,7 +31,8 @@ def stack0Slot : BitVec 64 := KA.«_GLOBAL_OFFSET_TABLE_» + 8#64
 /-- **WP of `_entry` up to and including the `jal` to `start`.**
 
 Hart `cpu` at `_entry` in machine mode, with the boot configuration `mBoot`,
-its hart id in `mhartid` (both at `dq`), the kernel text, the GOT slot holding
+its hart id in `mhartid` (at `dq` and `dqh`: since sail-riscv 0.16 `mhartid` is a
+frozen cell of the configuration's `hwConfig`, so a boot client holds it discarded), the kernel text, the GOT slot holding
 some value `s0` (the address of `stack0`) at its own fraction `dqg` (Rocq's
 `mb_ld_ea ↦ₚ₈{dq} v_stack0`: every hart reads the one slot, so the top level
 hands each a discarded copy), and ownership of `ra`, `sp`, `a0`, `a1` at
@@ -43,9 +44,9 @@ arbitrary values, is safe to run provided the continuation is safe from
 
 the configuration and GOT slot unchanged, and the clock cells at some value. -/
 def wp_entry_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
-    (cpu : CPU) (dq dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64) : Prop :=
+    (cpu : CPU) (dq dqh dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64) : Prop :=
   mBoot cpu dq ∗
-  Register.mhartid ↦ᵣ[cpu]{dq} hartid ∗
+  Register.mhartid ↦ᵣ[cpu]{dqh} hartid ∗
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
   kernelText ∗
@@ -54,7 +55,7 @@ def wp_entry_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗
   Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
   (mBoot cpu dq -∗
-   Register.mhartid ↦ᵣ[cpu]{dq} hartid -∗
+   Register.mhartid ↦ᵣ[cpu]{dqh} hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗
    pwordPointsTo stack0Slot 8 dqg s0 -∗
@@ -70,7 +71,7 @@ def wp_entry_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 the binder list is restated, the statement lives only in `wp_entry_body`. -/
 structure ENTRY : Prop where
   wp_entry : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
-    (cpu : CPU) (dq dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64),
-    wp_entry_body (GF := GF) cpu dq dqg hartid s0 v1 v2 v10 v11
+    (cpu : CPU) (dq dqh dqg : DFrac) (hartid s0 v1 v2 v10 v11 : BitVec 64),
+    wp_entry_body (GF := GF) cpu dq dqh dqg hartid s0 v1 v2 v10 v11
 
 end Xv6

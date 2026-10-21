@@ -27,7 +27,7 @@ open Iris.Std
 /-- `getElem?` of an `ExtTreeMap.insert` at another key. -/
 private theorem dst_insert_ne (s : Dst) (N M : Fname) (p : Nat × List (BitVec 8)) (h : M ≠ N) :
     (s.insert N p)[M]? = s[M]? := by
-  rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rw [Std.compare_eq_iff_eq]; exact Ne.symm h)]
+  rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rw [Std.compare_eq_iff_eq]; exact Ne.symm h)]
 
 private theorem dst_insert_eq (s : Dst) (N : Fname) (p : Nat × List (BitVec 8)) :
     (s.insert N p)[N]? = some p := by

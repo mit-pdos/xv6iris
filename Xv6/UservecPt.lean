@@ -277,7 +277,7 @@ theorem uservec_entry [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
             (RegMap.get (R0.set 10#5 (BitVec.signExtend 64 (0x2000#20 ++ 0#12))) 10#5 +
               BitVec.signExtend 64 0xfff#12)))) 10#5 <<< (13#6).toNat) = R0.set 10#5 TRAPFRAME := by
     intro R0
-    simp only [RegMap.set_set_same, RegMap.get, RegMap.set_same, BitVec.reduceEq, if_false]
+    simp only [RegMap.set_set_same, RegMap.get, RegMap.set_same, BitVec.reduceEq, ite_false]
     rfl
   rw [hR g]
   iapply HΦ $$ Hst Hss

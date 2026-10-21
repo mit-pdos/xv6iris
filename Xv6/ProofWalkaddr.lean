@@ -164,7 +164,7 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
         have hwalk : t.walk 2 (vpnOf (k.regs 11#5))
             = some (pteAddr (t.slot 2 (vpnOf (k.regs 11#5))).1 (t.slot 2 (vpnOf (k.regs 11#5))).2,
                 PTree.entAt 2 t (vpnOf (k.regs 11#5))) := by
-          rw [PTree.walk_eq, if_neg hV0]
+          rw [PTree.walk_eq, ite_eq_right hV0]
         obtain ⟨w, hgw, hadw⟩ := UPtWalkaddr.ptRep_get_some hrep _ _ _ hwalk
         k_step_gen (wp_s_branch c12 _ (KA.«walkaddr» + 0x26#64) false 12#13 13#5 14#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -220,11 +220,11 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
           by_cases hV0 : PTree.entAt 2 t (vpnOf (k.regs 11#5)) = 0#64
           · refine Or.inl ⟨rfl, Or.inr (Or.inl ?_)⟩
             refine UPtWalkaddr.ptRep_get_none hrep _ ?_
-            rw [PTree.walk_eq, if_pos hV0]
+            rw [PTree.walk_eq, ite_eq_left hV0]
           · have hwalk : t.walk 2 (vpnOf (k.regs 11#5))
                 = some (pteAddr (t.slot 2 (vpnOf (k.regs 11#5))).1
                     (t.slot 2 (vpnOf (k.regs 11#5))).2, PTree.entAt 2 t (vpnOf (k.regs 11#5))) := by
-              rw [PTree.walk_eq, if_neg hV0]
+              rw [PTree.walk_eq, ite_eq_right hV0]
             obtain ⟨w, hgw, hadw⟩ := UPtWalkaddr.ptRep_get_some hrep _ _ _ hwalk
             refine Or.inl ⟨rfl, Or.inr (Or.inr ⟨w, hgw, ?_⟩)⟩
             intro hc

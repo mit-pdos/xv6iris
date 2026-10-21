@@ -306,7 +306,7 @@ theorem syscall_idx (w : BitVec 64) (h1 : 1 ≤ (BitVec.extractLsb' 0 32 w).toIn
     split at h2 <;> split at h1 <;> omega
   have hle : x ≤ 24#32 := by rw [BitVec.le_def]; simpa using hsmall
   have hti : x.toInt.toNat = x.toNat := by
-    rw [BitVec.toInt_eq_toNat_cond, if_pos (by omega)]; simp
+    rw [BitVec.toInt_eq_toNat_cond, ite_eq_left (by omega)]; simp
   rw [hti]
   have e1 : BitVec.ofNat 64 (8 * x.toNat) = BitVec.setWidth 64 x <<< 3 := by
     apply BitVec.eq_of_toNat_eq

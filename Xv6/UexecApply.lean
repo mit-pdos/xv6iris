@@ -109,7 +109,7 @@ theorem uvisRun_arg (W : Uvis) (k : Nat) (hk : k < 8) :
   unfold tfResumeGpr0 tfResumeGpr
   have h0 : BitVec.ofNat 5 (10 + k) ≠ 0#5 := by
     intro h; have := congrArg BitVec.toNat h; simp at this; omega
-  rw [if_neg h0]
+  rw [ite_eq_right h0]
   congr 1; simp [tfArgIdx]; omega
 
 /-- Rocq `uvis_run_num`. -/
@@ -173,18 +173,18 @@ theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
   unfold uexecArmF
   rw [hne]
   by_cases h1 : sc = uecallScause
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     by_cases h2 : uvisNum W' = USYS_exit
-    · simp only [if_pos h2]; exact .rfl
-    simp only [if_neg h2]
+    · simp only [ite_eq_left h2]; exact .rfl
+    simp only [ite_eq_right h2]
     by_cases h3 : uvisNum W' = USYS_fork
-    · simp only [if_pos h3]
+    · simp only [ite_eq_left h3]
       unfold uexecForkParentF
       rw [hM, hpi, hsz, hfd, hcw, hgn, hch, hlz, hsc]
       iintro H %r %fdv' %cw' %cs' %hr %hf %hc Hans
       iapply (HS _ _ (hb r W'.M W'.perm W'.sz fdv' cw' W'.gen cs' W'.lazy W'.secc)).mp
       iapply H $$ %r %fdv' %cw' %cs' %hr %hf %hc Hans
-    simp only [if_neg h3]
+    simp only [ite_eq_right h3]
     have hcont : ∀ CH : BitVec 64 → ExtTreeSet GName compare → IProp GF,
         uexecRetContGen S (uvisNum W') f W CH ⊢ uexecRetContGen S (uvisNum W') f W' CH := by
       intro CH
@@ -199,17 +199,17 @@ theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
       iapply (spostAt_cong S (uvisNum W') f W W' r M' fdv' cw' cs' hsk).mpr
       iexact Hsp
     by_cases h4 : uvisNum W' = USYS_wait
-    · simp only [if_pos h4]
+    · simp only [ite_eq_left h4]
       unfold uexecWaitF
       have e : (fun r cs' => uwaitAnsPid (GF := GF) r W.ch cs' W.pid) =
           (fun r cs' => uwaitAnsPid r W'.ch cs' W'.pid) := by rw [hch, hpid]
       rw [e]; exact hcont _
-    · simp only [if_neg h4]
+    · simp only [ite_eq_right h4]
       unfold uexecRetContF
       have e : (fun r cs' => iprop(⌜usysChOk (uvisNum W') r W.ch cs'⌝ : IProp GF)) =
           (fun r cs' => iprop(⌜usysChOk (uvisNum W') r W'.ch cs'⌝)) := by rw [hch]
       rw [e]; exact hcont _
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     unfold uexecKillArmF ukillCredAt
     rw [hgn]
     refine BI.and_mono ?_ (HS W W' hk).mp
@@ -319,7 +319,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
       uslot W' := by
   iintro Hxo Hfo Hwo Hsp Hret
   by_cases hec : sc = uecallScause
-  · rw [if_pos hec]
+  · rw [ite_eq_left hec]
     ihave Hret := (uexecArm_run sc W f hl).mp $$ Hret
     subst hec
     rw [uexecArm_ecall]
@@ -329,7 +329,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
       have hx1 : uvisNum (uvisRun W) ≠ USYS_exit := by rw [hexec]; decide
       have hx2 : uvisNum (uvisRun W) ≠ USYS_fork := by rw [hexec]; decide
       have hx3 : uvisNum (uvisRun W) ≠ USYS_wait := by rw [hexec]; decide
-      rw [if_neg hx1, if_neg hx2, if_neg hx3]
+      rw [ite_eq_right hx1, ite_eq_right hx2, ite_eq_right hx3]
       ihave H := Hxo $$ %⟨rfl, hexec⟩
       icases H with (%hfail | Hslot)
       · obtain ⟨r, hb, hm, hfd'⟩ := hfail
@@ -355,10 +355,10 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
       change usysMemOk (uvisNum (uvisRun W)) _ _ _ _ _ _ _ _ _ _ at hm
       change usysCwdOk (uvisNum (uvisRun W)) _ _ _ at hc
       change usysSeccOk (uvisNum (uvisRun W)) _ _ _ _ at hsc
-      rw [if_neg hnex]
+      rw [ite_eq_right hnex]
       by_cases hfk : uvisNum (uvisRun W) = USYS_fork
       · -- THE FORK ROW: the PARENT's arm, instantiated at the pid the round returned
-        rw [if_pos hfk]
+        rw [ite_eq_left hfk]
         rw [hfk] at hm hc hsc
         have hsc' : W'.secc = W.secc := usysSeccOk_quiet (by decide) hsc
         have hrne : r ≠ 0#64 := usysMemOk_forkNz hm
@@ -389,11 +389,11 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
             rw [tfResumePc_bump _ _ (by rw [uvisRun_length]; decide), hb2]
         iapply (uslot_keyCong _ _ hkey).mp
         iexact Hs
-      · rw [if_neg hfk]
+      · rw [ite_eq_right hfk]
         ispecialize Hsp $$ %⟨rfl, hnex, hfk⟩
         by_cases hwt : uvisNum (uvisRun W) = USYS_wait
         · -- WAIT'S ROW: the kernel's answer pays the children row
-          rw [if_pos hwt]
+          rw [ite_eq_left hwt]
           ihave Hans := Hwo $$ %⟨rfl, hwt⟩
           unfold uexecWaitF
           rw [show (uvisRun W).ch = W.ch from rfl, show (uvisRun W).pid = W.pid from rfl]
@@ -405,7 +405,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
           isplitl [Hsp]
           · iexact Hsp
           · iexact Hret
-        · rw [if_neg hwt]
+        · rw [ite_eq_right hwt]
           have hchq : W'.ch = W.ch := hch (fun h => h.2.elim hfk hwt)
           unfold uexecRetContF
           rw [show (uvisRun W).ch = W.ch from rfl]
@@ -418,7 +418,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
           · iexact Hsp
           · iexact Hret
   · -- TRANSPARENT: the slot arrives directly, and the key congruence is all
-    rw [if_neg hec]
+    rw [ite_eq_right hec]
     obtain ⟨⟨hi1, hi2⟩, hM, hpi, hsz, hcw, hlz, hscq⟩ := uroundOk_transparent hec hr
     have hchq : W'.ch = W.ch := hch (fun h => hec h.1)
     have hkey : ukeyEq (uvisRun W) W' :=

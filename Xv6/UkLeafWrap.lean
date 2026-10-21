@@ -52,7 +52,7 @@ def UkFetchDec (π : Nat → Option UPerm) (sz : Nat) (M : ElfMem) (pc : BitVec 
       (∀ kv ∈ toList pt.um, (V kv.1).length = 4096) → UkFetchFact C pt T pc V fr
 
 theorem ukExecOut_mono {C : UCfg} {P : UPtd} {T : BMap} {i : instruction} {len : Int} {m : RegMap}
-    {pc : BitVec 64} {V : Nat → List (BitVec 8)} {Rt Rt' : UWSt → Prop} {Ex Ex' : sync_exception → Prop}
+    {pc : BitVec 64} {V : Nat → List (BitVec 8)} {Rt Rt' : UWSt → Prop} {Ex Ex' : ExceptionContext → Prop}
     (hR : ∀ s, Rt s → Rt' s) (hE : ∀ e, Ex e → Ex' e) (h : UkExecOut C P T i len m pc V Rt Ex) :
     UkExecOut C P T i len m pc V Rt' Ex' := by
   intro s hl hr hp hv orc
@@ -62,8 +62,8 @@ theorem ukExecOut_mono {C : UCfg} {P : UPtd} {T : BMap} {i : instruction} {len :
   · exact Or.inl ⟨h1, hR _ h2⟩
   · exact Or.inr ⟨exc, h1, hE _ h2, h3⟩
 
-theorem uk_ecall_scause : utrapScause (.Exception (.E_U_EnvCall ())) 0#64 = uecallScause := by
-  rw [utrapScause_eq]; rfl
+theorem uk_ecall_scause : ukExcScause (.E_U_EnvCall ()) = uecallScause := by
+  unfold ukExcScause; rw [utrapScause_eq]; rfl
 
 section wrap
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [CurCtx]
@@ -88,7 +88,7 @@ theorem uk_leaf_retire (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc 
       obtain ⟨V', hM', hR⟩ := hX C pt T V h1 h2 h3 h4 h5 h6
       exact ⟨hF C pt T V h1 h2 h3 h4 h5 h6, ukExecOut_mono (fun s hs => ⟨rfl, V', hs, hM'⟩)
         (fun _ h => h) (ukExecOut_retire (ukEx true (.E_U_EnvCall ())) hR)⟩)
-    (fun _ => rfl) (fun h => by cases h) (by rw [if_pos rfl]; exact hU)
+    (fun _ => rfl) (fun h => by cases h) (by rw [ite_eq_left rfl]; exact hU)
   unfold ukStep ukUvb ukcq
   iintro Hb HKc
   unfold ukLeafGoal at hG
@@ -116,7 +116,7 @@ theorem uk_leaf_ecall (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc :
       icases H with ⟨H, -⟩
       imodintro
       iexact H)
-    (by rw [if_neg (by decide), uk_ecall_scause]; exact hU)
+    (by rw [ite_eq_right (by decide), uk_ecall_scause]; exact hU)
   unfold ukUvb
   iintro Hb #Hmy HR
   unfold ukLeafGoal at hG
@@ -139,8 +139,8 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
       sbundleAt uslot USYS_exit fx (ukRunKey S K M m pc) -∗ wpLoop S.cpu := by
   obtain ⟨fr, hdec, hF⟩ := hFD
   obtain ⟨hlo, hpm, hacc, hlf⟩ := hS
-  have hne : utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64 ≠ uecallScause := by
-    rw [utrapScause_eq]; decide
+  have hne : ukExcScause (.E_SAMO_Page_Fault ()) ≠ uecallScause := by
+    unfold ukExcScause; rw [utrapScause_eq]; decide
   have hG := uk_engine (GF := GF) S.π S.sz S.Qp K M m pc hal
     iprop(S.Qp (-1) ∗ sbundleAt uslot USYS_exit fx (ukRunKey S K M m pc))
     fr (ukLen isRvc) i hdec false m pc M (.E_SAMO_Page_Fault ())
@@ -149,11 +149,11 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
         (ukExecOut_trap rfl (hX C pt T V h1 h2 h3 h4 h5 h6))⟩)
     (fun h => by cases h)
     (fun _ => by
-      rw [show uexecRetF (GF := GF) uslot (utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64)
+      rw [show uexecRetF (GF := GF) uslot (ukExcScause (.E_SAMO_Page_Fault ()))
           (uvisOfRun m pc M S.π S.sz K.fdv K.cw K.gn K.cs K.pid false seccAll) =
-          iprop(∃ f : sfam GF, uexecPayDep (utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64)
+          iprop(∃ f : sfam GF, uexecPayDep (ukExcScause (.E_SAMO_Page_Fault ()))
             (uvisOfRun m pc M S.π S.sz K.fdv K.cw K.gn K.cs K.pid false seccAll) f ∗
-            uexecKillArm (utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64)
+            uexecKillArm (ukExcScause (.E_SAMO_Page_Fault ()))
               (uvisOfRun m pc M S.π S.sz K.fdv K.cw K.gn K.cs K.pid false seccAll) f)
         from uexecRet_transparent _ _ hne]
       iintro ⟨#Hmy, H⟩
@@ -175,7 +175,7 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
         · iexact Hrow
       · icases H with ⟨-, H⟩
         iexact H)
-    (by rw [if_neg (by decide)]; exact hU)
+    (by rw [ite_eq_right (by decide)]; exact hU)
   unfold ukUvb
   iintro Hb #Hmy Hp Hrow
   unfold ukLeafGoal at hG
@@ -199,9 +199,9 @@ theorem uk_leaf_trap (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp 
       (∀ kv ∈ toList pt.um, (V kv.1).length = 4096) →
       UkExecTrap C pt T i (ukLen isRvc) m pc V e)
     (hU : Ustep.ustep (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) =
-      .trap (utrapScause (.Exception e) 0#64))
+      .trap (ukExcScause e))
     (hTrap : myPay K.gn Qp ∗ (Kc ∧ uslot (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) ⊢
-      |==> uexecRetF uslot (utrapScause (.Exception e) 0#64)
+      |==> uexecRetF uslot (ukExcScause e)
         (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) :
     ⊢ ukLeafGoal (GF := GF) π sz Qp K M m pc Kc := by
   obtain ⟨fr, hdec, hF⟩ := hFD
@@ -209,7 +209,7 @@ theorem uk_leaf_trap (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp 
     (fun C pt T V h1 h2 h3 h4 h5 h6 =>
       ⟨hF C pt T V h1 h2 h3 h4 h5 h6, ukExecOut_mono (fun _ h => h.elim) (fun _ h => ⟨rfl, h⟩)
         (ukExecOut_trap hue (hX C pt T V h1 h2 h3 h4 h5 h6))⟩)
-    (fun h => by cases h) (fun _ => hTrap) (by rw [if_neg (by decide)]; exact hU)
+    (fun h => by cases h) (fun _ => hTrap) (by rw [ite_eq_right (by decide)]; exact hU)
 
 end trapGen
 

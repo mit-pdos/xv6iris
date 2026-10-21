@@ -324,7 +324,7 @@ theorem kw_pstate_whole_zombie (Γ : SchedNames) (pa : BitVec 64) :
     pstateLock (GF := GF) Γ pa ZOMBIE ⊢ pstateWhole Γ pa ZOMBIE := by
   iintro H
   iapply (pstateWhole_split Γ pa ZOMBIE).2
-  rw [if_pos kw_zombie_unclaimed]
+  rw [ite_eq_left kw_zombie_unclaimed]
   isplitl [H]
   · iexact H
   · iempintro
@@ -334,8 +334,8 @@ theorem kw_slots_zombie_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa ZOMBIE ⊢
       slotUsed Γ pa ∗ @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗ hartAtAny Γ pa := by
   unfold procSlotsAt
-  rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
-    if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
+  rw [ite_eq_right kw_zombie_not_needsCtx, ite_eq_right kw_zombie_not_isRunning,
+    ite_eq_left kw_zombie_invDormant, ite_eq_left kw_zombie_notRunning, ite_eq_left rfl]
   iintro ⟨_, _, Hd, Hh, Hm, -⟩
   ihave #Hu := pavSlot_used Γ pa ZOMBIE (by decide) $$ Hm
   iframe Hu Hd Hh
@@ -347,8 +347,8 @@ theorem kw_slots_zombie_split (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
       @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE ∗
       (@procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE -∗ procSlotsAt Γ ξl pa ZOMBIE) := by
   unfold procSlotsAt
-  rw [if_neg kw_zombie_not_needsCtx, if_neg kw_zombie_not_isRunning,
-    if_pos kw_zombie_invDormant, if_pos kw_zombie_notRunning, if_pos rfl]
+  rw [ite_eq_right kw_zombie_not_needsCtx, ite_eq_right kw_zombie_not_isRunning,
+    ite_eq_left kw_zombie_invDormant, ite_eq_left kw_zombie_notRunning, ite_eq_left rfl]
   iintro ⟨H1, H2, Hd, Hh, Hm, H6⟩
   iframe Hd
   iintro Hd
@@ -362,9 +362,9 @@ theorem kw_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
       zsElem pa none ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
-  rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
-    if_pos (by decide : invDormant UNUSED), if_pos (by decide : notRunning UNUSED),
-    if_neg (by decide : ¬ UNUSED = ZOMBIE)]
+  rw [ite_eq_right (by decide : ¬ needsCtx UNUSED), ite_eq_right (by decide : ¬ isRunning UNUSED),
+    ite_eq_left (by decide : invDormant UNUSED), ite_eq_left (by decide : notRunning UNUSED),
+    ite_eq_right (by decide : ¬ UNUSED = ZOMBIE)]
   iintro ⟨Hu, Hd, Hh, Hz⟩
   isplitl []
   · iempintro
@@ -402,9 +402,9 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   · iframe Hq Hpid
   subst hpe
   unfold dormantSpace genHalvesDorm
-  rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED)), if_pos rfl]
+  rw [ite_eq_right (by decide : ¬ (ZOMBIE = UNUSED)), ite_eq_left rfl]
   icases Hxs with ⟨%xsv, Hxs, Hesc⟩
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   icases Hesc with ⟨Hesc, Hzs⟩
   icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack⟩
   icases procPtAt_cases V.upt M $$ Hpt with ⟨%hwf, HptO, Hum⟩
@@ -420,7 +420,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   iexists V, M
   isplitl [Hpid Hfields Hal Hch Hev Hstack Htf Hpt]
   · unfold freeprocIn
-    rw [if_neg htfne, if_neg hptne]
+    rw [ite_eq_right htfne, ite_eq_right hptne]
     isplitl []
     · ipureintro; exact ⟨hof, hcwd, hroot⟩
     iframe Hpid Hfields Hal Hch Hev Hstack
@@ -504,7 +504,7 @@ theorem kw_slot_first (Γ : SchedNames) (ξl ξ : CtxId) (n : Nat) (hn : n < NPR
     procSlotsAt (GF := GF) Γ ξl (procAddr n) st ∗ kwWRest ξ ps h ⊢
       ⌜(famOf h n).zomb = none⌝ ∗ procSlotsAt Γ ξl (procAddr n) st ∗ kwWRest ξ ps h := by
   unfold procSlotsAt kwWRest
-  rw [if_neg hst]
+  rw [ite_eq_right hst]
   iintro ⟨⟨H1, H2, H3, H4, H5, He⟩, %gs, %m, %O, Hch, Ho, Hci, Hfam⟩
   icases famLedAt_lookup ps gs h n hn none $$ [Hfam He] with ⟨%hz, Hfam, He⟩
   · iframe Hfam He
@@ -749,7 +749,7 @@ theorem kw_peek_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   unfold kwWRest procDormant
   iintro ⟨⟨%gs, %m, %O, Hch, Ho, Hci, Hfam⟩, Hxs, %hst, %V, %pid, %hV, Hpid, Hf, Hal, Hchf, Hev, Hgh,
     ⟨%xsv, Hxb, Hz⟩, Hsp⟩
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   icases Hz with ⟨Hesc, Hzs⟩
   icases famLedAt_tie parents gs zh $$ Hfam with ⟨%hT, Hfam⟩
   icases famLedAt_lb parents gs zh $$ Hfam with ⟨#Hlb, Hfam⟩
@@ -784,7 +784,7 @@ theorem kw_peek_ghost (j n : Nat) (hj : j < NPROC) (hn : n < NPROC)
   isplitl []
   · ipureintro; exact hV
   iexists xs
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   iframe Hxb Hesc Hzs
 
 /-- The reading `kwait` lends `killed()` (Rocq `kw_round_tail`'s `Hkacc`):
@@ -1590,7 +1590,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
   by_cases haddr : k.regs 10#5 = 0#64
   · -- addr == 0: skip copyout, funnel to Hcommon with P' = V.upt, d = 0.
     ihave Hpc := (show pcIs (GF := GF) cur (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64))
-      ⊢ pcIs cur (KA.«kwait» + 0x60#64) from by rw [if_pos haddr]) $$ Hpc
+      ⊢ pcIs cur (KA.«kwait» + 0x60#64) from by rw [ite_eq_left haddr]) $$ Hpc
     ihave HprivE := (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
         procPrivNoctxAt curCtx (procAddr j) pid { V.updEv V.ev with upt := V.upt } M from .rfl) $$ Hpriv
     iapply Hcommon $$ %(R2.set 19#5 (BitVec.signExtend 64 pid0)) %V.upt %M %0 %V.ev []
@@ -1613,7 +1613,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
   · -- addr != 0: copyout, then blt on the result.
     ihave Hpc := (show pcIs (GF := GF) cur
         (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64)) ⊢ pcIs cur (KA.«kwait» + 0x48#64)
-        from by rw [if_neg haddr]) $$ Hpc
+        from by rw [ite_eq_right haddr]) $$ Hpc
     icases kw_priv_copy_ev (procAddr j) pid V M $$ Hpriv with ⟨%hpf, Hsz, Hpg, HptP, Hcnt, Hback⟩
     -- the lend (permit sweep L1b): the block's counter, borrowed for copyout
     icases actLend_borrow (procAddr j) V.ev $$ Hcnt with ⟨Hlend, Hlback⟩
@@ -2138,7 +2138,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
   by_cases hmatch : parents n = procAddr j
   · -- MATCH: acquire pp->lock, read state
     ihave Hpc := (show pcIs (GF := GF) cur (if parents n ≠ procAddr j then (KA.«kwait» + 0xaa#64) else (KA.«kwait» + 0xb8#64))
-      ⊢ pcIs cur (KA.«kwait» + 0xb8#64) from by rw [if_neg (by simp [hmatch])]) $$ Hpc
+      ⊢ pcIs cur (KA.«kwait» + 0xb8#64) from by rw [ite_eq_right (by simp [hmatch])]) $$ Hpc
     ihave #HlkN := procsInv_lookup Γ n hn $$ Hpinv
     iapply (kw_scan_acq AC Γ cur kh n hn (by rw [hkhnoff]; decide) (by omega)
         (by rw [hkhlocks]; decide) hkhtier hsie (R.set 15#5 (parents n)) ?h9a ?h20a)
@@ -2164,7 +2164,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       · -- ZOMBIE: reap
         subst hzombie
         ihave Hpc := (show pcIs (GF := GF) cur (if (ZOMBIE : BitVec 32) = ZOMBIE then (KA.«kwait» + 0x40#64) else (KA.«kwait» + 0xc4#64))
-          ⊢ pcIs cur (KA.«kwait» + 0x40#64) from by rw [if_pos rfl]) $$ Hpc
+          ⊢ pcIs cur (KA.«kwait» + 0x40#64) from by rw [ite_eq_left rfl]) $$ Hpc
         iapply (kw_reap CO FP RE Γ cpu cur k kh γw γp γl γk j n pid V M hj hn hkhsie hkhnoff
             hkhlocks hkhproc hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0
             kb spieW sppW s0 s1b Rb hkbwf hkbsie hkbstruct hkhstruct spie2 spp2 R2
@@ -2174,7 +2174,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
               $Hstate $Hpl $Hchan $Hpub $Hslots $Hpriv $Hframe $HΦ]
       · -- non-ZOMBIE: release pp->lock, havekids := 1, advance
         ihave Hpc := (show pcIs (GF := GF) cur (if st = ZOMBIE then (KA.«kwait» + 0x40#64) else (KA.«kwait» + 0xc4#64))
-          ⊢ pcIs cur (KA.«kwait» + 0xc4#64) from by rw [if_neg hzombie]) $$ Hpc
+          ⊢ pcIs cur (KA.«kwait» + 0xc4#64) from by rw [ite_eq_right hzombie]) $$ Hpc
         -- c.mv a0,s1 ; jal release
         k_step (wp_s_add cur _ (KA.«kwait» + 0xc4#64) true 10#5 0#5 9#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9R2]
@@ -2256,7 +2256,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     case h20a => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix.2.2.2.1
   · -- NO MATCH: advance
     ihave Hpc := (show pcIs (GF := GF) cur (if parents n ≠ procAddr j then (KA.«kwait» + 0xaa#64) else (KA.«kwait» + 0xb8#64))
-      ⊢ pcIs cur (KA.«kwait» + 0xaa#64) from by rw [if_pos hmatch]) $$ Hpc
+      ⊢ pcIs cur (KA.«kwait» + 0xaa#64) from by rw [ite_eq_left hmatch]) $$ Hpc
     iapply Hadv $$ %(R.set 15#5 (parents n)) []
       Hk Hpc Htc Hcl Hir Hav Hlockw Hwait Hwrest Hg Hpriv Hframe HΦ
     ipureintro
@@ -2349,7 +2349,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       iintro Hk Hpc
       ihave Hpc := (show pcIs (GF := GF) cur
           (if procAddr (n + 1) = KA.«tickslock» then (KA.«kwait» + 0xce#64) else (KA.«kwait» + 0xb2#64))
-          ⊢ pcIs cur (KA.«kwait» + 0xce#64) from by rw [if_pos ((kw_cursor_eq n hn).mpr hlast)]) $$ Hpc
+          ⊢ pcIs cur (KA.«kwait» + 0xce#64) from by rw [ite_eq_left ((kw_cursor_eq n hn).mpr hlast)]) $$ Hpc
       iapply Hexit $$ %(Radv.set 9#5 (procAddr (n + 1))) []
         Hk Hpc Htc Hcl Hir Hav Hlockw Hwait Hwrest Hg Hpriv Hframe HΦ
       ipureintro
@@ -2389,7 +2389,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       ihave Hpc := (show pcIs (GF := GF) cur
           (if procAddr (n + 1) = KA.«tickslock» then (KA.«kwait» + 0xce#64) else (KA.«kwait» + 0xb2#64))
           ⊢ pcIs cur (KA.«kwait» + 0xb2#64) from by
-          rw [if_neg (fun h => absurd ((kw_cursor_eq n hn).mp h) (by omega))]) $$ Hpc
+          rw [ite_eq_right (fun h => absurd ((kw_cursor_eq n hn).mp h) (by omega))]) $$ Hpc
       have hfixv' : kwFix k (Radv.set 9#5 (procAddr (n + 1))) := by
         unfold kwFix at hfixv ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixv
       have h9next : (Radv.set 9#5 (procAddr (n + 1))) 9#5 = procAddr (n + 1) := by
@@ -2634,7 +2634,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         subst hkilled
         ihave Hpc := (show pcIs (GF := GF) cur
             (if BitVec.signExtend 64 (0#32) ≠ 0#64 then (KA.«kwait» + 0xfa#64) else (KA.«kwait» + 0xd8#64))
-            ⊢ pcIs cur (KA.«kwait» + 0xd8#64) from by rw [if_neg (by decide)]) $$ Hpc
+            ⊢ pcIs cur (KA.«kwait» + 0xd8#64) from by rw [ite_eq_right (by decide)]) $$ Hpc
         -- c.mv a0,s2 ; jal sleep_prepare(p)
         k_step (wp_s_add cur _ (KA.«kwait» + 0xd8#64) true 10#5 0#5 18#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRK18]
@@ -2777,7 +2777,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         ihave Hpc := (show pcIs (GF := GF) cur
             (if BitVec.signExtend 64 klk ≠ 0#64 then (KA.«kwait» + 0xfa#64) else (KA.«kwait» + 0xd8#64))
             ⊢ pcIs cur (KA.«kwait» + 0xfa#64) from by
-            rw [if_pos (fun h => hkilled (by revert h; bv_decide))]) $$ Hpc
+            rw [ite_eq_left (fun h => hkilled (by revert h; bv_decide))]) $$ Hpc
         icases Hkr with (%hk0 | #Hshot)
         · exact absurd hk0 hkilled
         ihave #Hwhy : waitWhyLed (GF := GF) cs V.gen (decide (k.regs 10#5 = 0#64)) (procAddr j) (xstateVal 0#32)
@@ -2888,7 +2888,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
   have hfix0 : kwFix k (((Rl.set 14#5 0#64).set 9#5 (KA.«kwait» + 0x100F0#64)).set 9#5 (procAddr 0)) := by
     unfold kwFix at hfixL ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixL
   have h90 : (((Rl.set 14#5 0#64).set 9#5 (KA.«kwait» + 0x100F0#64)).set 9#5 (procAddr 0)) 9#5 = procAddr 0 := by
-    simp only [RegMap.set_apply, if_pos]
+    simp only [RegMap.set_apply, ite_eq_left]
   iapply (kw_scan CO FP RE AC Γ cpu k _ γw γp γl γk j pid V M cs hj hkhsie hkhnoff hkhlocks hkhproc
     hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0 kb spieL sppL s0 s1b Rb hkbwf
     hkbsie hkbstruct rfl w9 parents zh (NPROC - 1) 0 (by unfold NPROC; decide) (by unfold NPROC; decide)

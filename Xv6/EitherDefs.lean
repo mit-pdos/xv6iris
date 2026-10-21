@@ -195,7 +195,7 @@ theorem ProcPriv.updEv_self_upt (V : ProcPriv) : { V.updEv V.ev with upt := V.up
 
 theorem ec_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact fun hc => h hc)]
 
 /-- `sext.w` on a length below `2 ^ 31` is the identity. -/
 theorem ec_addiw_id (n : Nat) (h : n < 2 ^ 31) :
@@ -302,8 +302,8 @@ theorem ec_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     first
       | (intro i h1 h2 h3 h4 h5 h6 h7
-         simp only [RegMap.set_apply, if_neg h1, if_neg h2, if_neg h3, if_neg h4, if_neg h5,
-           if_neg h6, if_neg h7])
+         simp only [RegMap.set_apply, ite_eq_right h1, ite_eq_right h2, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5,
+           ite_eq_right h6, ite_eq_right h7])
       | simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
 set_option maxHeartbeats 4000000 in
@@ -363,8 +363,8 @@ theorem ei_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     first
       | (intro i h1 h2 h3 h4 h5 h6 h7
-         simp only [RegMap.set_apply, if_neg h1, if_neg h2, if_neg h3, if_neg h4, if_neg h5,
-           if_neg h6, if_neg h7])
+         simp only [RegMap.set_apply, ite_eq_right h1, ite_eq_right h2, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5,
+           ite_eq_right h6, ite_eq_right h7])
       | simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
 /-! ## The callees, at their entry addresses -/

@@ -26,12 +26,12 @@ open Xv6.PtRun Xv6.UPt
 /-- `bltz` on a result known to be `0`: not taken. -/
 theorem bltz_zero {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = q := by
-  subst h; rw [if_neg (by decide)]
+  subst h; rw [ite_eq_right (by decide)]
 
 /-- `bltz` on a result known to be `-1`: taken. -/
 theorem bltz_neg_one {α : Type _} (x : BitVec 64) (h : x = -1#64) (p q : α) :
     (if bcond bop.BLT x 0#64 then p else q) = p := by
-  subst h; rw [if_pos (by decide)]
+  subst h; rw [ite_eq_left (by decide)]
 
 /-! ## Immediates -/
 
@@ -110,7 +110,7 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
       rw [get?_insert_eq rfl] at hw
       obtain rfl : v = w := Option.some.inj hw
       refine ⟨pteAddr (t.slot 2 v').1 (vpnIdx v' 0), v, ?_, pteAD_refl v⟩
-      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, if_neg hvz,
+      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, ite_eq_right hvz,
         slot_snd_of_complete 2 t v' hc]
     · rw [get?_insert_ne (m := L) (k := vpn.toNat) (k' := v'.toNat) (v := v)
         (fun hh => he (hkey v' hh.symm))] at hw

@@ -320,12 +320,12 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
   icases Hcm with ⟨He, Ht, Hx, Hm⟩
   cases found
   · -- ===== ARM D: the name is GONE -- the miss observation fires =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨hfn, h10⟩, Hir, Hoff⟩
     ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
       from .rfl) $$ HP
     have hnm : (dirEntries (eraNode dnd bmd datd))[bname 14 nf]? = none := by
-      rw [dirEntries_eraNode dnd bmd datd hholes hszcap, if_pos htyz]
+      rw [dirEntries_eraNode dnd bmd datd hholes hszcap, ite_eq_left htyz]
       exact (dirView_lookup_None _ _ _).mpr hfn
     unfold sysfileEnv
     icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
@@ -371,7 +371,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
       $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hpid $Hhole $HΦ $Hlk $Hload $Hbs $Hir $Hop $Harms]
     unfold sysfileEnv; iframe #
   · -- ===== FOUND: the W3 seam =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%⟨hfn, hks, h10⟩, Href, Hrui, Hoff⟩
     have hnz : ientry ks ≠ 0#64 := ientry_ne_zero ks (by omega)
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x6e#64) false 234#13 10#5 0#5 (by decide)

@@ -104,7 +104,7 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
   by_cases hw4 : width = 4
   · -- a full word
     subst hw4
-    rw [if_pos rfl] at hM hS
+    rw [ite_eq_left rfl] at hM hS
     simp only [Nat.reduceMul]
     split at hM
     · rename_i i₁ heqM
@@ -138,11 +138,11 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
         · exact absurd hM (by simp)
       · exact absurd hS (by simp)
     · exact absurd hM (by simp)
-  · rw [if_neg hw4] at hM hS
+  · rw [ite_eq_right hw4] at hM hS
     by_cases hw2 : width = 2
     · -- a compressed half
       subst hw2
-      rw [if_pos rfl] at hM hS
+      rw [ite_eq_left rfl] at hM hS
       simp only [Nat.reduceMul]
       split at hM
       · rename_i i₁ heqM
@@ -157,7 +157,7 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
                 split at hS
                 case isFalse => exact absurd hS (by simp)
                 by_cases h2 : pc.toNat % 4 = 2
-                · rw [if_pos h2] at hM hS
+                · rw [ite_eq_left h2] at hM hS
                   simp only [Option.some.injEq, Prod.mk.injEq] at hM hS
                   obtain ⟨rfl, rfl, rfl⟩ := hM
                   obtain ⟨-, -, h21⟩ := hS
@@ -180,15 +180,15 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
                       · iexact H1
                   · ipureintro
                     exact ⟨_, MachCSL.decodesAll16_bridge _ _ heqM heqS, hex⟩
-                · rw [if_neg h2] at hM hS
+                · rw [ite_eq_right h2] at hM hS
                   by_cases h0 : pc.toNat % 4 = 0
-                  · rw [if_pos h0] at hM hS
+                  · rw [ite_eq_left h0] at hM hS
                     split at hM
                     · rename_i k2 hfind2
                       simp only [hfind2] at hS
                       split at hM
                       · rename_i hw2'
-                        rw [if_pos hw2'] at hS
+                        rw [ite_eq_left hw2'] at hS
                         simp only [Option.some.injEq, Prod.mk.injEq] at hM hS
                         obtain ⟨rfl, rfl, rfl⟩ := hM
                         obtain ⟨-, -, h21⟩ := hS
@@ -234,13 +234,13 @@ theorem text_instr (pc : BitVec 64) (rvc : Bool) (i i₀ : instruction)
                           exact ⟨_, MachCSL.decodesAll16_bridge _ _ heqM heqS, hex⟩
                       · exact absurd hM (by simp)
                     · exact absurd hM (by simp)
-                  · rw [if_neg h0] at hM; exact absurd hM (by simp)
+                  · rw [ite_eq_right h0] at hM; exact absurd hM (by simp)
               · exact absurd hM (by simp)
             · exact absurd hS (by simp)
           · exact absurd hM (by simp)
         · exact absurd hS (by simp)
       · exact absurd hM (by simp)
-    · rw [if_neg hw2] at hM; exact absurd hM (by simp)
+    · rw [ite_eq_right hw2] at hM; exact absurd hM (by simp)
 
 /-! ## The decode, checked by the kernel alone
 

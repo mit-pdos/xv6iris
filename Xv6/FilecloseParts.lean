@@ -212,18 +212,18 @@ def fcRest [Icfg] [CurCtx] (pn : FPNames) (C : FContent) : IProp GF :=
 
 theorem fcRest_pipe [Icfg] [CurCtx] (pn : FPNames) (C : FContent) (h : C.type = FD_PIPE) :
     fcRest (GF := GF) pn C ⊢ isPipe pn.lock pn.pipe C.pipe ∗ pipeRef pn.pipe (fcWbool C) 1 ∗ irefSlot := by
-  unfold fcRest; rw [if_pos h]
+  unfold fcRest; rw [ite_eq_left h]
 
 theorem fcRest_fs [Icfg] [CurCtx] (pn : FPNames) (C : FContent) (h : C.type = FD_INODE ∨ C.type = FD_DEVICE) :
     fcRest (GF := GF) pn C ⊢ inodeHeld C.ip := by
   have hp : C.type ≠ FD_PIPE := by rcases h with h | h <;> rw [h] <;> decide
-  unfold fcRest; rw [if_neg hp, if_pos h]
+  unfold fcRest; rw [ite_eq_right hp, ite_eq_left h]
 
 theorem fcRest_none [Icfg] [CurCtx] (pn : FPNames) (C : FContent) (h : C.type = FD_NONE) :
     fcRest (GF := GF) pn C ⊢ irefSlot := by
   unfold fcRest
-  rw [if_neg (by rw [h]; exact fdNone_ne_pipe),
-    if_neg (by rw [h]; exact fun h' => h'.elim fdNone_ne_inode fdNone_ne_device)]
+  rw [ite_eq_right (by rw [h]; exact fdNone_ne_pipe),
+    ite_eq_right (by rw [h]; exact fun h' => h'.elim fdNone_ne_inode fdNone_ne_device)]
 
 /-- **THE LAST CLOSE'S PAYLOAD STEP** (Rocq `file_off_reclaim` + the
 free-slot construction `Hpy0` + `inode_pay_cancel`): the borrowed unit goes
@@ -242,21 +242,21 @@ theorem fclose_core_take [Icfg] [CurCtx] (E : CoPset) (kk : Nat) (pn : FPNames) 
     ihave Hu := irefSlot_frac.2 $$ Hu
     imodintro
     unfold fcRest
-    rw [if_pos hp]
+    rw [ite_eq_left hp]
     iframe Hi Hf Hp Hr Hu
   · by_cases hi : C.type = FD_INODE ∨ C.type = FD_DEVICE
     · ihave Hn := (fileCoreNoff_inode 1 pn C hi).1 $$ Hn
       imod inodePay_cancel E pn.icv pn.iq pn.ig pn.inum C.ip C.type (fcWbool C) hE1 $$ Hn with Hh
       imodintro
       unfold fcRest
-      rw [if_neg hp, if_pos hi]
+      rw [ite_eq_right hp, ite_eq_left hi]
       iframe Hi Hf Hh
     · ihave Hn := (show fileCoreNoff (GF := GF) 1 pn C ⊢ irefFrac 1 from by
-        unfold fileCoreNoff; rw [if_neg hp, if_neg hi]) $$ Hn
+        unfold fileCoreNoff; rw [ite_eq_right hp, ite_eq_right hi]) $$ Hn
       ihave Hu := irefSlot_frac.2 $$ Hn
       imodintro
       unfold fcRest
-      rw [if_neg hp, if_neg hi]
+      rw [ite_eq_right hp, ite_eq_right hi]
       iframe Hi Hf Hu
 
 /-! ## The callees -/

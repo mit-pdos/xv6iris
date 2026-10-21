@@ -98,7 +98,7 @@ theorem bc_kmapClass_rw (a : PAddr) (h1 : 0x80007000 ≤ a.toNat) (h2 : a.toNat 
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv]
   unfold kmapClass
-  rw [if_neg (by omega), if_pos (Or.inl ⟨by omega, by omega⟩)]
+  rw [ite_eq_right (by omega), ite_eq_left (Or.inl ⟨by omega, by omega⟩)]
 /-! ## The kernel's read-only image -/
 
 /-- A text instruction lies in `[_text, etext)`. -/
@@ -257,7 +257,7 @@ theorem bootRan_run (m : MemF Hist) (A : Nat) (Hs : Nat → Hist) :
 /-- A fresh era's history at an image byte in RAM. -/
 theorem bc_imgFlat_get (image : Mem) (a : PAddr) (v : BitVec 8) (hram : inRam a 1)
     (hv : image[a]? = some v) : (imgFlat image)[a]? = some [⟨0, 0, v⟩] := by
-  rw [imgFlat_get?, if_pos hram, hv]; rfl
+  rw [imgFlat_get?, ite_eq_left hram, hv]; rfl
 
 /-- `[A, A + n)` in RAM, as plain numbers. -/
 def bcInRam (A n : Nat) : Prop := ramBase ≤ A ∧ A + n ≤ ramEnd
@@ -391,7 +391,7 @@ theorem bootImage_has (a w e : Nat) (h : bcImgOk a w e = true) :
   unfold ramBase at h1; unfold ramEnd at h2
   intro j hj
   have ha := bc_addr_toNat a j (by omega)
-  rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; rw [ha]; omega), ha]
+  rw [bootImage_get?, ite_eq_left (by unfold inRam ramBase ramEnd; rw [ha]; omega), ha]
   exact congrArg some (beq_iff_eq.1 (hc j hj))
 
 /-- Byte `j` of a `w`-byte word, read off its `Nat`. -/
@@ -487,7 +487,7 @@ theorem bcImgOkS_sound (a w e : Nat) (h : bcImgOkS a w e = true) : bcImgOk a w e
     unfold bcByteS at hcj
     rw [← bc_row_eq _ (by unfold KernelElf.elfEnd KernelElf.elfBase at *; omega)] at hcj
     unfold bootByte KernelElf.elfByte
-    rw [if_pos (by omega), show a + j - KernelElf.elfBase = a - KernelElf.elfBase + j by omega, hcj]
+    rw [ite_eq_left (by omega), show a + j - KernelElf.elfBase = a - KernelElf.elfBase + j by omega, hcj]
   · exact h
 
 theorem bc_img_row (l : List Kernel.KInstr) (h : l.all (fun k => bcImgOkS k.addr k.width k.enc) = true) :
@@ -567,7 +567,7 @@ theorem bc_img_got : bcImgOk 0x8000a3e8 8 MachCSL.KernelSyms.«stack0» = true :
 /-- **THE BOOT IMAGE IS THE KERNEL'S ELF**, as far as the carve reads it (was
 the carve's premise; now a theorem about the language constant). -/
 theorem bootImage_wf : BootImage bootImage where
-  ram a h := ⟨bootByte a.toNat, by rw [bootImage_get?, if_pos h]⟩
+  ram a h := ⟨bootByte a.toNat, by rw [bootImage_get?, ite_eq_left h]⟩
   text k hk := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_text_all k hk)
   rodata p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_ro_all p hp)
   got := by
@@ -576,7 +576,7 @@ theorem bootImage_wf : BootImage bootImage where
   data p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_data p hp)
   bss a h1 h2 := by
     simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end»] at h1 h2
-    rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; omega),
+    rw [bootImage_get?, ite_eq_left (by unfold inRam ramBase ramEnd; omega),
       bootByte_zero _ (by unfold KernelElf.elfEnd; omega)]
 
 /-- **The kernel text** out of the persisted window (Rocq `kernel_text_intro`). -/

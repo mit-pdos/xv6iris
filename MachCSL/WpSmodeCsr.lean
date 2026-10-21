@@ -19,16 +19,16 @@ import MachCSL.ModelFacts
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The `SIE` bit of the supervisor view is `mstatus`'s. -/
 theorem lower_mstatus_sie (m : BitVec 64) :
-    BitVec.extractLsb' 1 1 (lower_mstatus m) = BitVec.extractLsb' 1 1 m := by
-  unfold lower_mstatus
-  simp only [Mk_Sstatus, Functions.zeros,
+    BitVec.extractLsb' 1 1 (mstatusLower m) = BitVec.extractLsb' 1 1 m := by
+  unfold mstatusLower
+  simp only [Mk_Sstatus, Functions.zeros, _update_Sstatus_SDT,
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
     _update_Sstatus_XS, _update_Sstatus_SUM, _update_Sstatus_MXR, _update_Sstatus_SPELP, _update_Sstatus_UXL,
     _update_Sstatus_SD, _get_Mstatus_SIE, _get_Mstatus_SPIE, _get_Mstatus_SPP, _get_Mstatus_VS, _get_Mstatus_FS,
@@ -44,12 +44,12 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
     execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
       (instruction.CSRReg (0x100#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu (RegMap.set R rd (lower_mstatus c.mstatus))) := by
+      (gprFile cpu R) (gprFile cpu (RegMap.set R rd (mstatusLower c.mstatus))) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
   unfold execute
   swp_run 300
   iapply swp_bind
@@ -69,13 +69,13 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
       { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 }
       (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu (RegMap.set R rd (lower_mstatus c.mstatus))) := by
+      (gprFile cpu R) (gprFile cpu (RegMap.set R rd (mstatusLower c.mstatus))) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
+  have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
   try unfold execute_CSRImm
@@ -86,10 +86,10 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_sstatus (hmpp := hMPP)
+  iapply (swp_write_CSR_sstatus (p := Privilege.Supervisor) (hp := rfl) (hmpp := hMPP))
   iframe; iframe Hhw
   inext
-  iintro Hmstatus
+  iintro Hcur_privilege Hmstatus
   simp only [hcl]
   swp_run 30
   iapply swp_bind
@@ -117,8 +117,8 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
+  have hcl := sstatus_clear_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
   try unfold execute_CSRImm
@@ -129,10 +129,10 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_sstatus (hmpp := hMPP)
+  iapply (swp_write_CSR_sstatus (p := Privilege.Supervisor) (hp := rfl) (hmpp := hMPP))
   iframe; iframe Hhw
   inext
-  iintro Hmstatus
+  iintro Hcur_privilege Hmstatus
   simp only [hcl]
   swp_run 30
   unfold wX_bits wX
@@ -157,8 +157,8 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
-  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hst := sstatus_set_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP, hSDT, hGVA, hMPV, hMDT, -⟩ := hms
+  have hst := sstatus_set_sie' c.mstatus hSXL hFS hXS hVS hSD hMPP hSDT hGVA hMPV hMDT
   unfold execute
   dsimp only
   try unfold execute_CSRImm
@@ -169,10 +169,10 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_sstatus (hmpp := hMPP)
+  iapply (swp_write_CSR_sstatus (p := Privilege.Supervisor) (hp := rfl) (hmpp := hMPP))
   iframe; iframe Hhw
   inext
-  iintro Hmstatus
+  iintro Hcur_privilege Hmstatus
   simp only [hst]
   swp_run 30
   unfold wX_bits wX

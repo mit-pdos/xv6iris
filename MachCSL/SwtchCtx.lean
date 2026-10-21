@@ -212,7 +212,7 @@ instance validCtxF_contractive [KernelGeom] [KernelImage GF] (P : VcPay GF) :
     refine BI.sep_ne.ne ?_ .rfl
     cases back
     · exact .rfl
-    · simp only [if_true]
+    · simp only [ite_true]
       refine BI.exists_ne (fun ξo => ?_)
       refine BI.sep_ne.ne .rfl ?_
       exact OFE.Contractive.distLater_dist (f := BIBase.later) (fun m hm => Hrec m hm _)

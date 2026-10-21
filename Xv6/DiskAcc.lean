@@ -76,7 +76,7 @@ theorem virtio_readN4 (v : VirtioState) (off : Nat) (w : BitVec 32)
     (devSig .virtio).read v off 4 = some (w, v) := by
   show Virtio.readN v off 4 = _
   unfold Virtio.readN
-  rw [dif_pos rfl, h]
+  rw [dite_eq_left rfl, h]
   rfl
 
 theorem virtio_writeN4 (v v' : VirtioState) (off : Nat) (w : BitVec 32)
@@ -84,7 +84,7 @@ theorem virtio_writeN4 (v v' : VirtioState) (off : Nat) (w : BitVec 32)
     (devSig .virtio).write v off 4 w = some v' := by
   show Virtio.writeN v off 4 w = _
   unfold Virtio.writeN
-  rw [dif_pos rfl]
+  rw [dite_eq_left rfl]
   exact h
 
 /-! ## The registers `virtio_disk_init` reads
@@ -119,13 +119,13 @@ theorem vwrite_status_reset (v : VirtioState) :
 theorem vwrite_status_set (v : VirtioState) (w : BitVec 32) (hw : w ≠ 0#32) :
     Virtio.write v Virtio.offStatus w = some { v with cfg := { v.cfg with status := w } } := by
   show (if w = 0#32 then _ else _) = _
-  rw [if_neg hw]
+  rw [ite_eq_right hw]
 
 theorem vwrite_drvFeat0 (v : VirtioState) (w : BitVec 32) (h : v.cfg.dfsel = 0#32) :
     Virtio.write v Virtio.offDriverFeatures w =
       some { v with cfg := { v.cfg with dfeat := w } } := by
   show (if v.cfg.dfsel = 0#32 then _ else _) = _
-  rw [if_pos h]
+  rw [ite_eq_left h]
 
 theorem vwrite_queueSel (v : VirtioState) (w : BitVec 32) :
     Virtio.write v Virtio.offQueueSel w = some { v with cfg := { v.cfg with qsel := w } } := rfl
@@ -1206,7 +1206,7 @@ theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
     simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
       Iris.Algebra.BigOpL.bigOpL_nil]
     isplitl [Hp0 Hp1]
-    · simp only [if_true, show (1 : Nat) = 0 ↔ False from by decide, if_false]
+    · simp only [ite_true, show (1 : Nat) = 0 ↔ False from by decide, ite_false]
       iframe Hp0 Hp1
     · ipureintro
       intro j hj

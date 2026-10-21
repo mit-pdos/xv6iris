@@ -68,13 +68,13 @@ theorem utD0_umemLazy_fill (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (
     have h1 : n % 4096 < 4096 := Nat.mod_lt _ (by decide)
     have h2 : n < pgRoundUpN sz := by unfold pgRoundUpN; omega
     rw [hk]
-    simp only [e1, e2, ite_true, Bool.false_eq_true, ite_false, if_pos h2]
-    rw [viewZero, if_pos rfl, List.getElem?_replicate, if_pos h1]
+    simp only [e1, e2, ite_true, Bool.false_eq_true, ite_false, ite_eq_left h2]
+    rw [viewZero, ite_eq_left rfl, List.getElem?_replicate, ite_eq_left h1]
   · have e1 : Iris.Std.PartialMap.get? (P.insertLeaf vpn r perm).um (n / 4096) =
         Iris.Std.PartialMap.get? P.um (n / 4096) := by
       simp only [UPtd.insertLeaf]; exact LawfulPartialMap.get?_insert_ne (fun h => hk h.symm)
     simp only [e1]
-    rw [viewZero, if_neg hk]
+    rw [viewZero, ite_eq_right hk]
 
 /-! ## §2 The call site -/
 
@@ -144,7 +144,7 @@ theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.s
     utFdEcall_quiet _ _ _ _ _ _ hne,
     utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP]; rfl, rfl⟩
   unfold utRound uroundOk
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   refine ⟨⟨rfl, rfl⟩, ?_, permOf_extSz hext, rfl, rfl, rfl, rfl⟩
   exact utD0_umemLazy_fill _ _ _ _ _ _ hn hlt
 
@@ -173,7 +173,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   icases Hte with ⟨Hcsrs, Hir⟩
   icases trapCsrs_cases cpu $$ Hcsrs with ⟨%e, %s, %t, Hcsrs⟩
   unfold trapCsrsAt
-  icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
+  icases Hcsrs with ⟨Hsepc, Hscause, Hstval, Hhcsrs⟩
   -- +0xd0  csrr a2,stval ; +0xd4  csrr a3,scause
   k_step (wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0xd0#64) false 12#5 (by decide) t)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hstval]
@@ -235,8 +235,8 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   ihave Hpg := (show wordPointsTo (GF := GF) (procAddr A.j + 80#64) 8 (DFrac.own 1)
       (pageAddr (utV1 A).upt.root) ⊢
     wordPointsTo (pPagetable (procAddr A.j)) 8 (DFrac.own 1) (pageAddr (utV1 A).upt.root) from .rfl) $$ Hpg
-  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval]
-  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval
+  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval Hhcsrs]
+  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval Hhcsrs
   ihave Hte : trapCsrsExt (GF := GF) cpu false $$ [Hcsrs Hir]
   · rw [trapCsrsExt_false]; iframe Hcsrs Hir
   icases Hres with (⟨%h0, Hpt⟩ | ⟨%r, %⟨hr, hval, hlt, hnone⟩, Hpt⟩)

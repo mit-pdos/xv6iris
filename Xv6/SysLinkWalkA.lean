@@ -504,7 +504,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   have hbz := Xv6.namex_beqz_half (0#16)
   cases ok
   · -- ===== ARM E: nameiparent missed =====
-    simp only [Bool.false_eq_true, ite_false, if_false]
+    simp only [Bool.false_eq_true, ite_false, ite_false]
     icases Harm with ⟨%ha0z, Hir⟩
     have hd : bcond bop.BEQ (R4 10#5) 0#64 = true := by rw [ha0z]; decide
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x7e#64) true 118#13 10#5 0#5 (by decide) bop.BEQ)
@@ -524,7 +524,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
         (by unfold iputUnits; omega))
       $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hslk' $Hfl' $Hkeep $Hru $Hshr $Hshot
         $Htok $Hcmu $Hltgt $Hlent $Hbs $Hir $Hop $Htx]
-  · simp only [ite_true, if_true]
+  · simp only [ite_true, ite_true]
     icases Harm with ⟨%⟨ha0d, -⟩, Hheld, Hir⟩
     unfold inodeHeldTy
     icases Hheld with ⟨%kd, %qd, %dinum, %gd, %lod, %tld, %hdpe, %hkd, %hdnib, %hdpos, %hled, #Hfld,
@@ -650,7 +650,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
   have hp3 := sysLinkPins_s1 k R2 (k.regs 9#5) (k.regs 18#5) (R2 10#5) hp2
   cases ok
   · -- ===== ARM B: namei(old) missed =====
-    simp only [Bool.false_eq_true, ite_false, if_false]
+    simp only [Bool.false_eq_true, ite_false, ite_false]
     icases Harm with ⟨%ha0z, Hir2⟩
     have hd : bcond bop.BEQ (R2 10#5) 0#64 = true := by rw [ha0z]; decide
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x40#64) true 124#13 10#5 0#5 (by decide) bop.BEQ)
@@ -663,7 +663,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     · unfold sysLinkBufs; iframe
     iapply (sys_link_tail_b EO Γ cpu k A P2 spie2 spp2 _ (R2 10#5) w₄ n1 hj hproc hK hnoff htier hp3 hal)
       $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hbs $Hir $Hop $Hcm]
-  · simp only [ite_true, if_true]
+  · simp only [ite_true, ite_true]
     icases Harm with ⟨%ha0, Hheld, Hir2⟩
     unfold inodeHeld
     icases Hheld with ⟨%kk, %q, %inum, %hie, %hkk, %hnib, %hpos, Hrefp⟩

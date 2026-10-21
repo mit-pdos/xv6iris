@@ -185,7 +185,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   by_cases hshort : dni.diSize.toNat < 16 * jj + 16
   · -- THE SHORT READ: panic("isdirempty: readi"), LIVE
     have hne : tot ≠ 16 := by
-      rw [htot]; unfold rdClamp; rw [if_pos (by omega)]; omega
+      rw [htot]; unfold rdClamp; rw [ite_eq_left (by omega)]; omega
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x118#64) false 22#13 10#5 15#5 (by decide)
         bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -195,7 +195,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
     icases Henv with ⟨-, #Hpe, -⟩
     iapply (sys_unlink_panic_readi PA cpu k A ok spie1 spp1 _) $$ [$Hk $Hpc $Hpe]
   have htot' : tot = 16 := by
-    rw [htot]; unfold rdClamp; rw [if_neg (by omega)]
+    rw [htot]; unfold rdClamp; rw [ite_eq_right (by omega)]
   subst htot'
   have hrec := dirlookup_full_lt _ jj hshort
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x118#64) false 22#13 10#5 15#5 (by decide)
@@ -459,7 +459,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     dirlookup_lic_live dnd datd _ kk htyz hdoc (Or.inr ⟨hnd, hndd⟩) hfn
   have hnm : (dirEntries (eraNode dnd bmd datd))[bname 14 nf]? =
       some (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
-    rw [dirEntries_eraNode dnd bmd datd hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz]
+    rw [dirEntries_eraNode dnd bmd datd hok.2.2.2.2.2.1 hok.2.2.2.2.1, ite_eq_left htyz]
     exact (dirView_lookup_Some _ _ _ _).2 ⟨kk, hfn, (MachCSL.zext32_toNat _).symm⟩
   have hne := ufNot_dots_only _ dni bmi dati jj hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hnli hddixi
     (hduqi htyi) h2 hjj hlive

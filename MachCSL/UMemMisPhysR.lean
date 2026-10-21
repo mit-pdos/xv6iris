@@ -4,7 +4,7 @@ MachCSL: **the physical side of a misaligned READ** (lane U2-M2; Rocq
 
 `checked_mem_read` at a plain data load: the PMA-first check, the chunk plan
 (`umm_split_misaligned_plan`: `N` chunks of `b` bytes), then the chunk loop
-(`umm_loop_bind`): per chunk the PMP check, the (false) MMIO test and a plain
+(`umm_loopME_bind`, in the early-return block `SailME.run`): per chunk the PMP check, the (false) MMIO test and a plain
 `read_ram` of the chunk's sub-window.  Every chunk lies inside the access's
 window `[pa, pa + W)`, so the per-chunk facts are asked for EVERY sub-window
 (`∀ j c, 0 < c → j + c ≤ W → …`), which is how they are stated here; the RAM
@@ -23,7 +23,7 @@ import MachCSL.UMemPhys
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- **The chunked read, at a given plan** (Rocq `GmCheckedMemReadSplit`). -/
@@ -47,9 +47,8 @@ theorem umm_checked_mem_read_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitV
   sail_norm
   simp only [runRW_bind, runRW_pure, Option.bind_some, hsp]
   sail_norm
-  simp only [Option.bind_assoc]
-  refine umm_loop_bind (α := BitVec ((8 * (N : Int) * (b : Int)).toNat) × Bool × Nat) D orc N hN (fun x => x.2.1) _
-    (fun k x s' => s' = s ∧ (k < N → x.2.1 = false ∧ x.2.2 = k)) _ s ?h0 ?hf _
+  refine umm_loopME_bind (α := BitVec ((8 * (N : Int) * (b : Int)).toNat) × Bool × Nat) D orc N hN
+    (fun x => x.2.1) _ (fun k x s' => s' = s ∧ (k < N → x.2.1 = false ∧ x.2.2 = k)) _ s ?h0 ?hf _
     (fun o => ∃ v : BitVec (8 * W), o = some (Result.Ok (v, ()), s, orc)) ?hG
   case h0 => exact ⟨rfl, fun _ => ⟨rfl, rfl⟩⟩
   case hG =>
@@ -65,21 +64,22 @@ theorem umm_checked_mem_read_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitV
     clear hk
     have hw := umm_chunk_le N b i W hNb hk'
     obtain ⟨v, hv⟩ := umm_bmRead_of_owned s'.mm _ b (ummOwned_sub s'.mm pa W (i * b) b hown hw)
-    have hv' := uma_read_ram_plain D orc s' _ b (by omega) v hv
-    simp only [utr_assert_true, umm_ofInt_mul, ExceptT.run_bind, run_liftM, runRW_bind, hpmp (i * b) b hb hw,
-      hmmio (i * b) b hb hw, runRW_pure, Option.bind_some]
-    sail_norm
-    simp only [runRW_bind, hv', runRW_pure, Option.bind_some]
+    have hv' := uma_read_ram_plain D orc s' (.Load .Data) rfl _ b (by omega) v hv
     obtain ⟨e1, e2⟩ := umm_idx N i
-    refine ⟨_, s', rfl, ⟨rfl, ?_⟩, ?_⟩ <;>
+    refine ⟨?x', s', fun g => ?_, ⟨rfl, ?_⟩, ?_⟩
+    case' refine_1 =>
+      simp only [bind_assoc, umm_ofInt_mul, liftM, run_lift_bind, runRW_bind, Option.bind_some,
+        hpmp (i * b) b hb hw, hmmio (i * b) b hb hw, pure_bind, Bool.false_eq_true, ite_false, hv']
+      rfl
+    all_goals
     · simp only [e1, e2]
       by_cases hi : i + 1 = N
       · have h1 : (i == N - 1) = true := by simp; omega
-        simp only [h1, if_true, hi, beq_self_eq_true]
+        simp only [h1, ite_true, hi, beq_self_eq_true]
         try omega
       · have h1 : (i == N - 1) = false := by simp; omega
         have h2 : (i + 1 == N) = false := by simpa using hi
-        simp only [h1, h2, Bool.false_eq_true, if_false]
+        simp only [h1, h2, Bool.false_eq_true, ite_false]
         try simp
 
 /-- **The misaligned physical read** (Rocq `exec_mem_read_mis_U`): whatever

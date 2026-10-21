@@ -107,7 +107,7 @@ theorem usyncAt_new (ps cs cs' : List Nat) (s : Fstate) (I w : List (BitVec 8))
     (hlen : cs.length = nlines I) (hcc : cs <+: cs') (hw : w <+: lmSess ulmG ps cs s I) :
     usyncAt ps cs' s (I ++ [wlNl]) w (nlines I) = none := by
   unfold usyncAt
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨_, _, hp⟩
   rw [lmSeq_S, bodiesOf_snoc_nl,
     lmSeq_cs_ext ulmG ps cs' cs s _ (nlines I)

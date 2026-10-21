@@ -519,7 +519,7 @@ theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
             · exfalso
               have hone : (t.mapRun (vpnOf (k.regs 12#5))
                   (BitVec.extractLsb' 12 44 (R3 10#5)) 22#64 1 fresh).2.2 = 1 := by
-                simp only [PTree.mapRun, if_pos hc]
+                simp only [PTree.mapRun, ite_eq_left hc]
               omega
             · rw [PtRun.mapRun_fail t (vpnOf (k.regs 12#5))
                 (BitVec.extractLsb' 12 44 (R3 10#5)) 22#64 0 fresh hc]

@@ -137,10 +137,10 @@ theorem ushSlot_persist (N : UkNames GF) (s0 base : Nat) (toks : List (Nat × Na
   | none =>
     by_cases hi : i = toks.length
     · simp only [ushSlot, ushSlotQ, h]
-      rw [if_pos hi, if_pos hi]
+      rw [ite_eq_left hi, ite_eq_left hi]
       exact ushUword_persist (GF := GF) N.d _ _
     · simp only [ushSlot, ushSlotQ, h]
-      rw [if_neg hi, if_neg hi]
+      rw [ite_eq_right hi, ite_eq_right hi]
       iintro _; imodintro; ipureintro; trivial
 
 omit [MachGS GF] in
@@ -169,7 +169,7 @@ theorem ushSlotsQ_cap (γd : GName) (s0 base : Nat) (toks : List (Nat × Nat)) (
       uwordq γd DFrac.discard (base + 8 * toks.length) 0#64 := by
   refine (BigSepL.bigSepL_lookup (Φ := fun _ j => ushSlotQ (GF := GF) γd s0 base toks j)
     (List.getElem?_range h10)).trans ?_
-  unfold ushSlotQ; rw [List.getElem?_eq_none (by omega), if_pos rfl]
+  unfold ushSlotQ; rw [List.getElem?_eq_none (by omega), ite_eq_left rfl]
 
 /-- An element of `ushArgs` is a token's image. -/
 theorem ushArgs_get (s0 : Nat) (g : Nat → BitVec 8) (toks : List (Nat × Nat)) (k : Nat) (x : UArg)

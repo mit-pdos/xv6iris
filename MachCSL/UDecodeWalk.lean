@@ -50,34 +50,39 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
 /-! ## The leaf-predicate walk -/
 
 /-- `runRead` refined by a leaf predicate `P`, checked at the `pure` leaf
-(Rocq `goodbP`). -/
+(Rocq `goodbP`).  Concurrency interface v2, in the shapes of `runRead`: a
+failure `.impure (.inl (.error _)) _` and a finite choice `.impure (.inr n) k`
+give `false`; a register read's access type is ignored; the silent events
+(the write announce among them) are skipped. -/
 def runReadP {X : Type} (dref : (r : Register) → Option (RegisterType r)) (P : X → Bool) :
     SailM X → Bool
   | .pure x => P x
-  | .impure (.error _) _ => false
-  | .impure (.ok o) k =>
+  | .impure (.inl (.error _)) _ => false
+  | .impure (.inr _) _ => false
+  | .impure (.inl (.ok o)) k =>
     match o, k with
-    | .regRead r, k =>
+    | .regRead r _, k =>
       match dref r with
       | some v => runReadP dref P (k v)
       | none => false
+    | .memWriteAnnounce _, k => runReadP dref P (k ())
     | .barrier _, k => runReadP dref P (k ())
     | .cacheOp _, k => runReadP dref P (k ())
-    | .tlbi _, k => runReadP dref P (k ())
+    | .tlbOp _, k => runReadP dref P (k ())
     | .translationStart _, k => runReadP dref P (k ())
     | .translationEnd _, k => runReadP dref P (k ())
-    | .takeException _, k => runReadP dref P (k ())
-    | .returnException _, k => runReadP dref P (k ())
-    | .cycleCount, k => runReadP dref P (k ())
+    | .archException _, k => runReadP dref P (k ())
+    | .returnException, k => runReadP dref P (k ())
+    | .clockCycle, k => runReadP dref P (k ())
     | .getCycleCount, k => runReadP dref P (k (0 : Nat))
-    | .message _, k => runReadP dref P (k ())
+    | .printMessage _, k => runReadP dref P (k ())
     | _, _ => false
 
 section
@@ -88,11 +93,10 @@ theorem runReadP_sound (P : X → Bool) (m : SailM X) (h : runReadP d P m = true
   induction m with
   | pure y => exact ⟨y, false, rfl, h⟩
   | impure call k ih =>
-    cases call with
-    | error e => simp [runReadP] at h
-    | ok o =>
-      cases o <;> simp only [runReadP, Bool.false_eq_true] at h
-      case regRead r =>
+    rcases call with (e | o) | n
+    · simp [runReadP] at h
+    · cases o <;> simp only [runReadP, Bool.false_eq_true] at h
+      case regRead r a =>
         cases hd : d r with
         | none => rw [hd] at h; simp at h
         | some v =>
@@ -102,33 +106,33 @@ theorem runReadP_sound (P : X → Bool) (m : SailM X) (h : runReadP d P m = true
       all_goals
         obtain ⟨x, b, hx, hp⟩ := ih _ h
         exact ⟨x, true, by simp [runRead, hx], hp⟩
+    · simp [runReadP] at h
 
 theorem runReadP_bind (P : Y → Bool) (m : SailM X) (f : X → SailM Y) :
     runReadP d P (FreeM.bind m f) = runReadP d (fun x => runReadP d P (f x)) m := by
   induction m with
   | pure y => rfl
   | impure call k ih =>
-    cases call with
-    | error e => rfl
-    | ok o =>
-      cases o
-      case regRead r =>
+    rcases call with (e | o) | n
+    · rfl
+    · cases o
+      case regRead r a =>
         simp only [FreeM.bind, runReadP]
         cases d r with
         | none => rfl
         | some v => exact ih v
       all_goals first | rfl | exact ih _
+    · rfl
 
 theorem runReadP_of_runRead (Q : X → Bool) (m : SailM X) (v : X) (b : Bool)
     (h : runRead d m = some (v, b)) : runReadP d Q m = Q v := by
   induction m generalizing b with
   | pure y => simp only [runRead, Option.some.injEq, Prod.mk.injEq] at h; rw [← h.1]; rfl
   | impure call k ih =>
-    cases call with
-    | error e => simp [runRead] at h
-    | ok o =>
-      cases o <;> simp only [runRead, reduceCtorEq] at h
-      case regRead r =>
+    rcases call with (e | o) | n
+    · simp [runRead] at h
+    · cases o <;> simp only [runRead, reduceCtorEq] at h
+      case regRead r a =>
         simp only [runReadP]
         cases hd : d r with
         | none => rw [hd] at h; simp at h
@@ -143,6 +147,7 @@ theorem runReadP_of_runRead (Q : X → Bool) (m : SailM X) (v : X) (b : Bool)
         obtain ⟨⟨x', b'⟩, h', hx, -⟩ := h
         simp only at hx; subst hx
         exact ih _ b' h'
+    · simp [runRead] at h
 
 theorem runReadP_bind_intro (P : Y → Bool) (m : SailM X) (f : X → SailM Y)
     (h : runReadP d (fun x => runReadP d P (f x)) m = true) :
@@ -161,15 +166,15 @@ theorem runReadP_bind_Q (Q : X → Bool) (P : Y → Bool) (m : SailM X) (f : X �
   induction m with
   | pure y => exact hk y hm
   | impure call k ih =>
-    cases call with
-    | error e => simp [runReadP] at hm
-    | ok o =>
-      cases o <;> simp only [runReadP, Bool.false_eq_true] at hm ⊢
-      case regRead r =>
+    rcases call with (e | o) | n
+    · simp [runReadP] at hm
+    · cases o <;> simp only [runReadP, Bool.false_eq_true] at hm ⊢
+      case regRead r a =>
         cases hd : d r with
         | none => simp only [hd] at hm; simp at hm
         | some v => simp only [hd] at hm ⊢; exact ih v hm
       all_goals exact ih _ hm
+    · simp [runReadP] at hm
 
 /-- The clause-spine leaf predicate. -/
 def optP (P : X → Bool) : Option X → Bool
@@ -201,15 +206,15 @@ theorem runReadP_ite (P : X → Bool) (c : Prop) [Decidable c] (a b : SailM X)
     (ha : c → runReadP d P a = true) (hb : ¬ c → runReadP d P b = true) :
     runReadP d P (ite c a b) = true := by
   by_cases hc : c
-  · rw [if_pos hc]; exact ha hc
-  · rw [if_neg hc]; exact hb hc
+  · rw [ite_eq_left hc]; exact ha hc
+  · rw [ite_eq_right hc]; exact hb hc
 
 theorem runReadP_dite (P : X → Bool) (c : Prop) [Decidable c] (a : c → SailM X) (b : ¬ c → SailM X)
     (ha : ∀ h, runReadP d P (a h) = true) (hb : ∀ h, runReadP d P (b h) = true) :
     runReadP d P (dite c a b) = true := by
   by_cases hc : c
-  · rw [dif_pos hc]; exact ha hc
-  · rw [dif_neg hc]; exact hb hc
+  · rw [dite_eq_left hc]; exact ha hc
+  · rw [dite_eq_right hc]; exact hb hc
 
 theorem udecode_and_left {a b : Bool} (h : (a && b) = true) : a = true := by
   cases a <;> simp_all
@@ -490,23 +495,29 @@ def step (cx : Ctx) (g : MVarId) : MetaM (List MVarId) := g.withContext do
     return [g'.mvarId!]
   if fn.isConstOf ``FreeM.impure then
     let margs := m.getAppArgs
-    let e ← whnf margs[margs.size - 2]!
+    let c ← whnf margs[margs.size - 2]!
     let k := margs[margs.size - 1]!
-    unless e.isAppOfArity ``Except.ok 3 do
+    -- v2: an event node is `.inl (.ok o)`; a failure `.inl (.error _)` and a
+    -- finite choice `.inr n` are refused (as by `runReadP`)
+    let e ← if c.isAppOfArity ``Sum.inl 3 then whnf c.appArg! else pure c
+    unless c.isAppOfArity ``Sum.inl 3 && e.isAppOfArity ``Except.ok 3 do
       if ← closeByFalseHyp g then return []
-      throwError "udecode: error branch reached{indentExpr m}"
+      throwError "udecode: error or choice branch reached{indentExpr m}"
     let o ← whnf e.appArg!
     let ofn := o.getAppFn
-    if ofn.isConstOf ``Outcome.regRead then
-      let r := o.appArg!
+    if ofn.isConstOf ``InstructionEffect.regRead then
+      -- `regRead r acc`: the register is the next-to-last argument
+      let r := o.appFn!.appArg!
       let dv ← whnf (mkApp d r)
       unless dv.isAppOfArity ``Option.some 2 do throwError "udecode: register {r} outside the reference map"
       return ← replaceM (k.beta #[dv.appArg!])
-    if ofn.isConstOf ``Outcome.getCycleCount then
+    if ofn.isConstOf ``InstructionEffect.getCycleCount then
       return ← replaceM (k.beta #[mkNatLit 0])
-    for n in [``Outcome.barrier, ``Outcome.cacheOp, ``Outcome.tlbi, ``Outcome.translationStart,
-        ``Outcome.translationEnd, ``Outcome.takeException, ``Outcome.returnException,
-        ``Outcome.cycleCount, ``Outcome.message] do
+    for n in [``InstructionEffect.memWriteAnnounce, ``InstructionEffect.barrier,
+        ``InstructionEffect.cacheOp, ``InstructionEffect.tlbOp,
+        ``InstructionEffect.translationStart, ``InstructionEffect.translationEnd,
+        ``InstructionEffect.archException, ``InstructionEffect.returnException,
+        ``InstructionEffect.clockCycle, ``InstructionEffect.printMessage] do
       if ofn.isConstOf n then return ← replaceM (k.beta #[mkConst ``Unit.unit])
     throwError "udecode: unsupported event{indentExpr o}"
   if fn.isConstOf ``ite then

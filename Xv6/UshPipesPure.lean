@@ -101,7 +101,7 @@ theorem ushqCutOk_of_good (len : Nat) (f : Nat → BitVec 8) (T toks : List (Nat
     obtain ⟨⟨h1, h2⟩, hbody, -⟩ := hT q tk hq
     have hx := hbody (tk.1 + j) (by omega) (by omega)
     rw [ushpNulfold_zeroAt, ushZeroAt_miss]
-    · unfold ushpExt; rw [if_pos (by omega)]; exact hnn _ (by omega)
+    · unfold ushpExt; rw [ite_eq_left (by omega)]; exact hnn _ (by omega)
     · intro hin
       simp only [List.mem_map] at hin
       obtain ⟨t', ht', he⟩ := hin

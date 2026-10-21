@@ -364,7 +364,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
       rw [ok.hproc]) $$ Hhole
   cases okw
   · -- THE WALK DIED: ARM B (+0xe2)
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%h10, Hir, Hdead⟩
     ihave Hir := (show irefSlots (GF := GF) 2 ⊢ irefSlots sysUnlinkSlots from .rfl) $$ Hir
     k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x2e#64) true 180#13 10#5 0#5 (by decide)
@@ -385,7 +385,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     iapply (sys_unlink_tail_b EO Γ cpu k A ok P2 spie2 spp2 _ 0#64 w₄ w₅ n' hp3)
       $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Henv $Hpid $Hhole $HΦ $Hbs $Hir $Hop $Harms]
   · -- THE PARENT: the W2 seam
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%iL, %es, %e, %⟨h10, hnp, hbn⟩, Hheld, HP, Hir⟩
     icases (show inodeHeldTyAt (GF := GF) ipv T_DIR iL ⊢ ⌜ipv ≠ 0#64⌝ ∗ inodeHeldTyAt ipv T_DIR iL by
         unfold inodeHeldTyAt

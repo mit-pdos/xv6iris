@@ -39,7 +39,7 @@ import MachCSL.WpSmodeAtomic
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -65,7 +65,7 @@ theorem swp_checked_mem_read_load1_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (si
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 1 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_au cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_au cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAU_wand cpu pa 1 K ts Ψ $$ HAU
@@ -93,7 +93,7 @@ theorem swp_checked_mem_write_store2_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 2 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_au cpu) data (vecbytes_to_bitvec_to_bytes_le_2 _) rfl r
   iframe Hfrag
   iapply writeAU_wand cpu pa 2 data Ψ $$ HAU
   inext

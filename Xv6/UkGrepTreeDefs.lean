@@ -87,7 +87,7 @@ theorem kgrep_nl_word : BitVec.ofNat 64 10 = BitVec.setWidth 64 wlNl := by decid
 theorem grepRdAnsOf_pos (ret : BitVec 64) (g : Nat → BitVec 8) (nb : Nat) (h : ret.toInt = nb) :
     rdAnsOf ret g = .RdBytes ((List.range nb).map g) := by
   unfold rdAnsOf
-  rw [if_neg (by omega), h]
+  rw [ite_eq_right (by omega), h]
   rfl
 
 /-- **Rocq `grep_rk_nonpos`**. -/

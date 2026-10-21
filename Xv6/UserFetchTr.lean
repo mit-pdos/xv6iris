@@ -51,9 +51,9 @@ theorem uft_land {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s s2 : UWSt} (
 
 /-- The fetch's write-back is an `A`/`D` variant of the leaf. -/
 theorem uft_update_AD {lw w x : BitVec 64} (had : pteAD lw w)
-    (hu : update_PTE_Bits w (.InstructionFetch ()) = some x) : pteAD lw x := by
+    (hu : uwkUpd w (.InstructionFetch ()) = some x) : pteAD lw x := by
   obtain ⟨a, d, rfl⟩ := had
-  rw [update_PTE_Bits_pteSetAD lw a d (.InstructionFetch ()) rfl] at hu
+  rw [uwkUpd_pteSetAD lw a d (.InstructionFetch ()) rfl rfl] at hu
   split at hu
   · cases hu; exact ⟨_, _, rfl⟩
   · cases hu
@@ -84,7 +84,7 @@ set_option maxHeartbeats 1000000 in
 theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (t : PTree)
     (hstep : UbMemStep P t0 t mm0 s.mm) (htlb : utlbOk t (s.file .tlb)) (vpn : BitVec 27) (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_miss 39 0#16 P.root vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
+        (translate_TLB_miss 39 0#16 0#14 P.root vpn (.InstructionFetch ()) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
@@ -102,7 +102,7 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
   have herr : ∀ e, (∀ x, e ≠ PTW_Error.PTW_Ext_Error x) →
       uwkWalkRes (.InstructionFetch ()) false (t.walk 2 vpn) = .Err (e, ()) →
       ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_miss 39 0#16 t.base vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
+        (translate_TLB_miss 39 0#16 0#14 t.base vpn (.InstructionFetch ()) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
     intro e he hres
     have hout : UftTrOut C P t0 mm0 s (.Err (e, ())) s := by
@@ -123,9 +123,9 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
     cases hperm : uwkPermOk (.InstructionFetch ()) false w with
     | false =>
       exact herr (.PTW_No_Permission ()) (fun x h => by cases h)
-        (by rw [hw]; simp only [uwkWalkRes, hok.inv, hperm, Bool.false_eq_true, if_false])
+        (by rw [hw]; simp only [uwkWalkRes, hok.inv, hperm, Bool.false_eq_true, ite_false])
     | true =>
-      have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn (.InstructionFetch ()) .User false sum t.base 2 false ()) =
+      have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn (.InstructionFetch ()) .User false sum t.base 2 false .S_Stage ()) =
           some (.Ok (uwkOut w addr false, ()), s, orc) := fun orc => by
         rw [hwalk orc, hw]
         simp only [uwkWalkRes, hok.inv, hperm, hok.g0]
@@ -139,10 +139,10 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
       have hum := hlok.2 hU
       have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hum, had, rfl⟩
       have hmem := uft_treeMem hwf addr w (PTree.walk_mem_entries 2 t vpn addr w hw)
-      cases hu : update_PTE_Bits w (.InstructionFetch ()) with
+      cases hu : uwkUpd w (.InstructionFetch ()) with
       | none =>
         refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
-          _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ false sum hu), ?_⟩
+          _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ rfl false sum hu), ?_⟩
         refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]

@@ -455,7 +455,7 @@ free. -/
 theorem itExcAt_false (γfs : FsNames) (Xexc l l' : List Nat) :
     itExcAt (GF := GF) γfs false Xexc l ⊢ itExcAt γfs false Xexc l' := by
   unfold itExcAt
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iintro H; iexact H
 
 set_option maxRecDepth 100000 in
@@ -855,7 +855,7 @@ theorem itFix_set (k : KCtx) (recovering : Bool) (t : Nat) (R : RegMap)
   simp only [List.mem_cons, List.mem_nil_iff, or_false, not_or] at hr
   obtain ⟨n2, n8, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hr
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [RegMap.set_apply] <;> rw [if_neg (Ne.symm ‹_›)] <;> assumption
+    simp only [RegMap.set_apply] <;> rw [ite_eq_right (Ne.symm ‹_›)] <;> assumption
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 40000000 in
@@ -905,7 +905,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     ▷ itLoopInv c0 k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt
     ⊢ wpLoop (GF := GF) cpu := by
   subst hrec
-  simp only [itLat, itDat, if_true, Nat.add_zero]
+  simp only [itLat, itDat, ite_true, Nat.add_zero]
   iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, #Hbinv, #Hgen, Hte, Hce, Hpid, HlhN, Hlhb,
     Hexc, Hauth, Hdirty, Hdone, Htodo, Hslots, HRt, Hframe, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -935,7 +935,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
   icases itRow_uncons γfs true logstart Lw W t wt htlen hwteq $$ Htodo with ⟨Hrow, Htodo⟩
   ihave Hslot := (show itRowPre (GF := GF) γfs true logstart Lw t wt ⊢
       fsChalf γfs (logSlotBno logstart t) (Lw t) from by
-    unfold itRowPre; simp only [if_true]; iintro ⟨H, -⟩; iexact H) $$ Hrow
+    unfold itRowPre; simp only [ite_true]; iintro ⟨H, -⟩; iexact H) $$ Hrow
   -- the header word of this entry
   icases BigSepL.bigSepL_insert_acc (Φ := fun (i : Nat) (w : BitVec 32) =>
     wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) hwt $$ Hlhb with ⟨Hcell, Hclose⟩
@@ -1116,14 +1116,14 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hv
     rw [List.getElem?_take] at hi
     by_cases hit : i < t
-    · rw [if_pos hit] at hi
+    · rw [ite_eq_left hit] at hi
       exact absurd (hnodup t i wt v hwt hi hveq.symm) (by omega)
-    · rw [if_neg hit] at hi; cases hi
+    · rw [ite_eq_right hit] at hi; cases hi
   have hmemX : wt.toNat ∈ excDelMany Xexc ((W.take t).map (fun w => w.toNat)) :=
     (mem_excDelMany _ _ _).2 ⟨hwtX, hwtnot⟩
   ihave Hexc := (show itExcAt (GF := GF) γfs true Xexc ((W.take t).map (fun w => w.toNat)) ⊢
       excOwn γfs.exc (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) from by
-    unfold itExcAt; simp only [if_true]; iintro H; iexact H) $$ Hexc
+    unfold itExcAt; simp only [ite_true]; iintro H; iexact H) $$ Hexc
   iapply wpLoop_fupd
   imod (fsblock_install_exc_at ⊤ γfs homeL Xv (itRecLUpto W Lw L t)
       (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) wt.toNat bsD logN_top hmemX
@@ -1141,14 +1141,14 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
       (excDel (excDelMany Xexc ((W.take t).map (fun w => w.toNat))) wt.toNat) ⊢
       itExcAt γfs true Xexc ((W.take (t + 1)).map (fun w => w.toNat)) from by
     unfold itExcAt
-    simp only [if_true]
+    simp only [ite_true]
     rw [excDel_excDelMany, show (W.take t).map (fun w => w.toNat) ++ [wt.toNat]
       = (W.take (t + 1)).map (fun w => w.toNat) from by
       rw [List.take_succ_eq_append_getElem htlen, hwteq, List.map_append]; rfl]) $$ Hexc
   ihave Hrow2 := (show fsChalf (GF := GF) γfs (logSlotBno logstart t) (Lw t) ⊢
       itRowPost γfs true logstart Lw t wt from by
     unfold itRowPost
-    simp only [if_true]
+    simp only [ite_true]
     iintro H
     isplitl [H]
     · iexact H
@@ -1342,16 +1342,16 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     have htn1 : t + 1 = n := by omega
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs (itRecLUpto W Lw L (t + 1)) ⊢
         fsCacheAuth γfs (if true then itRecL W Lw L else L) from by
-      simp only [if_true]
+      simp only [ite_true]
       unfold itRecL
       rw [htn1, hnW]) $$ Hauth
     ihave Hdirty := (show fsDirtyAuth (GF := GF) γfs D ⊢
         fsDirtyAuth γfs (if true then D else dirtyClear D (W.map (fun w => w.toNat))) from by
-      simp only [if_true]
+      simp only [ite_true]
       iintro H; iexact H) $$ Hdirty
     ihave Hslots3 := (show bslots (GF := GF) 2 ⊢
         bslots (2 + (if true then 0 else W.length)) from by
-      simp only [if_true, Nat.add_zero]
+      simp only [ite_true, Nat.add_zero]
       iintro H; iexact H) $$ Hslots3
     ihave Hdone3 := (show ([∗list] i ↦ w ∈ W.take (t + 1), itRowPost (GF := GF) γfs true logstart Lw i w) ⊢
         [∗list] i ↦ w ∈ W, itRowPost γfs true logstart Lw i w from by
@@ -1372,15 +1372,15 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     ihave IH' := itLoopInv_elim c0 k γb γfs true logstart n W Lw L D pidv dqp Xexc Rt $$ IH
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs (itRecLUpto W Lw L (t + 1)) ⊢
         fsCacheAuth γfs (itLat true W Lw L (t + 1)) from by
-      simp only [itLat, if_true]
+      simp only [itLat, ite_true]
       iintro H; iexact H) $$ Hauth
     ihave Hdirty := (show fsDirtyAuth (GF := GF) γfs D ⊢
         fsDirtyAuth γfs (itDat true D W (t + 1)) from by
-      simp only [itDat, if_true]
+      simp only [itDat, ite_true]
       iintro H; iexact H) $$ Hdirty
     ihave Hslots3 := (show bslots (GF := GF) 2 ⊢
         bslots (2 + (if true then 0 else t + 1)) from by
-      simp only [if_true, Nat.add_zero]
+      simp only [ite_true, Nat.add_zero]
       iintro H; iexact H) $$ Hslots3
     iapply IH' $$ %cpu %spie5 %spp5 %_ %(t + 1) [] Hk Hpc Hte Hce Hpid HlhN Hlhb
       Hexc Hauth Hdirty Hdone2 Htodo Hslots3 HRt Hframe HΦ
@@ -1434,7 +1434,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     ▷ itLoopInv c0 k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt
     ⊢ wpLoop (GF := GF) cpu := by
   subst hrec
-  simp only [itLat, itDat, Bool.false_eq_true, if_false]
+  simp only [itLat, itDat, Bool.false_eq_true, ite_false]
   iintro ⟨Hk, Hpc, #Hpinv, #Hbc, #Hdc, #Hpe, #Hfroz, #Hbinv, #Hgen, Hte, Hce, Hpid, HlhN, Hlhb,
     Hexc, Hauth, Hdirty, Hdone, Htodo, Hslots, HRt, Hframe, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1465,7 +1465,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   icases (show itRowPre (GF := GF) γfs false logstart Lw t wt ⊢
       fsChalf γfs (logSlotBno logstart t) (Lw t) ∗ fsDirtyHalf γfs wt.toNat true from by
     unfold itRowPre
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro H; iexact H) $$ Hrow with ⟨Hslot, Hhome⟩
   -- the header word of this entry
   icases BigSepL.bigSepL_insert_acc (Φ := fun (i : Nat) (w : BitVec 32) =>
@@ -1622,7 +1622,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
   ihave Hrow2 := (show fsChalf (GF := GF) γfs (logSlotBno logstart t) (Lw t) ∗
       fsDirtyHalf γfs wt.toNat false ⊢ itRowPost γfs false logstart Lw t wt from by
     unfold itRowPost
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro H; iexact H) $$ [Hslot Hhome]
   case' _ => iframe
   ihave Hdone2 := itRow_snoc γfs false logstart Lw W t wt htlen hwteq $$ [Hdone Hrow2]
@@ -1851,17 +1851,17 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     have htn1 : t + 1 = n := by omega
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (if false then itRecL W Lw L else L) from by
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       iintro H; iexact H) $$ Hauth
     ihave Hdirty := (show fsDirtyAuth (GF := GF) γfs
         (dirtyClear D ((W.take (t + 1)).map (fun w => w.toNat))) ⊢
         fsDirtyAuth γfs (if false then D else dirtyClear D (W.map (fun w => w.toNat))) from by
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       rw [show W.take (t + 1) = W from by
         rw [show t + 1 = W.length from by omega]; exact List.take_length]) $$ Hdirty
     ihave Hslots3 := (show bslots (GF := GF) (2 + (t + 1)) ⊢
         bslots (2 + (if false then 0 else W.length)) from by
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       rw [show W.length = t + 1 from by omega]) $$ Hslots3
     ihave Hdone3 := (show ([∗list] i ↦ w ∈ W.take (t + 1), itRowPost (GF := GF) γfs false logstart Lw i w) ⊢
         [∗list] i ↦ w ∈ W, itRowPost γfs false logstart Lw i w from by
@@ -1883,16 +1883,16 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
       ((W.take (t + 1)).map (fun w => w.toNat)) $$ Hexc
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (itLat false W Lw L (t + 1)) from by
-      simp only [itLat, Bool.false_eq_true, if_false]
+      simp only [itLat, Bool.false_eq_true, ite_false]
       iintro H; iexact H) $$ Hauth
     ihave Hdirty := (show fsDirtyAuth (GF := GF) γfs
         (dirtyClear D ((W.take (t + 1)).map (fun w => w.toNat))) ⊢
         fsDirtyAuth γfs (itDat false D W (t + 1)) from by
-      simp only [itDat, Bool.false_eq_true, if_false]
+      simp only [itDat, Bool.false_eq_true, ite_false]
       iintro H; iexact H) $$ Hdirty
     ihave Hslots3 := (show bslots (GF := GF) (2 + (t + 1)) ⊢
         bslots (2 + (if false then 0 else t + 1)) from by
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       iintro H; iexact H) $$ Hslots3
     iapply IH' $$ %cpu %spie5 %spp5 %_ %(t + 1) [] Hk Hpc Hte Hce Hpid HlhN Hlhb
       Hexc Hauth Hdirty Hdone2 Htodo Hslots3 HRt Hframe HΦ
@@ -2056,22 +2056,22 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
     ihave Hauth := (show fsCacheAuth (GF := GF) γfs L ⊢
         fsCacheAuth γfs (if recovering then itRecL ([] : List (BitVec 32)) Lw L else L) from by
       cases recovering with
-      | true => simp only [if_true]; rw [itRecL_nil]
-      | false => simp only [Bool.false_eq_true, if_false]; iintro H; iexact H) $$ Hauth
+      | true => simp only [ite_true]; rw [itRecL_nil]
+      | false => simp only [Bool.false_eq_true, ite_false]; iintro H; iexact H) $$ Hauth
     ihave Hdirty := (show fsDirtyAuth (GF := GF) γfs D ⊢
         fsDirtyAuth γfs (if recovering then D
           else dirtyClear D (([] : List (BitVec 32)).map (fun w => w.toNat))) from by
       cases recovering with
-      | true => simp only [if_true]; iintro H; iexact H
+      | true => simp only [ite_true]; iintro H; iexact H
       | false =>
-        simp only [Bool.false_eq_true, if_false]
+        simp only [Bool.false_eq_true, ite_false]
         rw [show dirtyClear D (([] : List (BitVec 32)).map (fun w => w.toNat)) = D from rfl]) $$ Hdirty
     ihave Hslots := (show bslots (GF := GF) 2 ⊢
         bslots (2 + (if recovering then 0 else ([] : List (BitVec 32)).length)) from by
       cases recovering with
-      | true => simp only [if_true]; iintro H; iexact H
+      | true => simp only [ite_true]; iintro H; iexact H
       | false =>
-        simp only [Bool.false_eq_true, if_false, List.length_nil, Nat.add_zero]
+        simp only [Bool.false_eq_true, ite_false, List.length_nil, Nat.add_zero]
         iintro H; iexact H) $$ Hslots
     ihave Hrows := (show ([∗list] i ↦ w ∈ ([] : List (BitVec 32)),
           fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗

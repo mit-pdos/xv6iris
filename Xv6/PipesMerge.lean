@@ -471,13 +471,13 @@ theorem sel_wfN_cons_inv (src : W → List α) (w : W) (s : List W) (hwf : sel_w
     simp only [cntN, supd] at this ⊢
     by_cases hw' : w' = w
     · subst hw'; simp [h] at this ⊢; omega
-    · simp only [if_neg hw', Ne.symm hw'] at this ⊢; omega
+    · simp only [ite_eq_right hw', Ne.symm hw'] at this ⊢; omega
 
 theorem restN_cons (src : W → List α) (w : W) (b : α) (r : List α) (s : List W)
     (hs : src w = b :: r) (w' : W) : restN (supd src w r) s w' = restN src (w :: s) w' := by
   simp only [restN, supd, cntN]
   by_cases hw' : w' = w
-  · subst hw'; simp only [if_true, hs]; rw [Nat.add_comm]; rfl
+  · subst hw'; simp only [ite_true, hs]; rw [Nat.add_comm]; rfl
   · simp [hw', Ne.symm hw']
 
 /-- Rocq `mergeN_app`: the merge splits at a well-formed first part. -/
@@ -535,15 +535,15 @@ theorem map_supd_insert (src : W → List α) (ws : List W) (i : Nat) (w : W) (r
   · subst hj
     obtain ⟨hlt, he⟩ := List.getElem?_eq_some_iff.1 hi
     simp [hlt, supd, he]
-  · simp only [if_neg hj, List.getElem?_map]
+  · simp only [ite_eq_right hj, List.getElem?_map]
     cases hwj : ws[j]? with
     | none => rfl
     | some w' =>
       simp only [Option.map_some, supd]
-      rw [if_neg]
+      rw [ite_eq_right]
       rintro rfl
       have hlt := (List.getElem?_eq_some_iff.1 hi).1
-      exact hj ((List.getElem?_inj hlt hnd).1 (hi.trans hwj.symm))
+      exact hj ((List.Nodup.getElem?_inj hlt hnd).1 (hi.trans hwj.symm))
 
 
 /-- Rocq `mergeN_merge_all`: every writer of `ws` exhausted, no other named. -/
@@ -600,7 +600,7 @@ theorem cntN_concat_rep (ws : List W) (f : W → Nat) (w : W) (hnd : ws.Nodup) :
 
 theorem padN_cnt (ws : List W) (src : W → List α) (sel : List W) (w : W) (hnd : ws.Nodup)
     (hwf : sel_wfN src sel) (hw : w ∈ ws) : cntN (padN ws src sel) w = (src w).length := by
-  simp only [padN, cntN_app, cntN_concat_rep ws _ w hnd, if_pos hw]
+  simp only [padN, cntN_app, cntN_concat_rep ws _ w hnd, ite_eq_left hw]
   have := hwf w; omega
 
 theorem padN_in (ws : List W) (src : W → List α) (sel : List W) (w : W)
@@ -782,7 +782,7 @@ theorem fmap_supd_notin (src : W → List α) (Wd : List W) (w : W) (r : List α
   apply List.map_congr_left
   intro x hx
   simp only [supd]
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro rfl; exact hw hx
 
 theorem insert_last {A : Type} (l : List A) (y x : A) : (l ++ [y]).set l.length x = l ++ [x] := by

@@ -20,7 +20,7 @@ import MachCSL.CtxKeyMint
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -47,7 +47,7 @@ theorem swp_checked_mem_write_store1_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 1 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_au cpu) data (vecbytes_to_bitvec_to_bytes_le_1 _) rfl r
   iframe Hfrag
   iapply writeAU_wand cpu pa 1 data Ψ $$ HAU
   inext
@@ -106,7 +106,7 @@ theorem execSpecF_sb_au_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf

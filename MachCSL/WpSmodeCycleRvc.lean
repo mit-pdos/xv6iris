@@ -10,7 +10,7 @@ import MachCSL.WpTick
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -35,17 +35,19 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
     ⊢ wpLoop cpu := by
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
+  ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart_lc
-  iintro %tick
+  iintro %tick %ew
   inext
   iintro Hlc
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf
   unfold try_step
+  cycle_prologue
   swp_run 40
   -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
   iapply swp_bind
@@ -64,14 +66,16 @@ theorem wpLoop_s_rvc [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root : 
   iintro %ipw HmConf Hmip
   rcases hd : dispatchS c ipw with _ | ⟨i, p⟩
   · icases HΦ with ⟨HΦ, -⟩
-    try simp only [hd]
-    swp_run 40
+    cycle_prefetch_s
     iapply swp_bind
     iapply (hfetch _)
     iframe
     inext
     iintro HmConf HPC HT HR
+    -- 0.16: the fetched-instruction trigger check reads the privilege and `PC`
+    conf_cases HmConf
     swp_run 40
+    conf_intro_s
     iapply swp_bind
     iapply (hdec _)
     iframe

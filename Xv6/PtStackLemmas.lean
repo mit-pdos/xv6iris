@@ -38,7 +38,7 @@ theorem complete_of_mapRun_one (T : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (
     (T.fill 2 vpn fresh).1.complete 2 vpn := by
   by_cases hc : (T.fill 2 vpn fresh).1.complete 2 vpn
   · exact hc
-  · simp only [PTree.mapRun, if_neg hc] at h
+  · simp only [PTree.mapRun, ite_eq_right hc] at h
     exact absurd h (by decide)
 
 /-! ## The dummy tree `missingStacks` counts over -/
@@ -138,10 +138,10 @@ def pasUpd (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) : Nat → BitVec 
 
 theorem pasUpd_lt (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) (j : Nat) (h : j < i) :
     pasUpd pas i p j = pas j := by
-  simp only [pasUpd, if_neg (by omega : ¬ j = i)]
+  simp only [pasUpd, ite_eq_right (by omega : ¬ j = i)]
 
 theorem pasUpd_self (pas : Nat → BitVec 44) (i : Nat) (p : BitVec 44) : pasUpd pas i p i = p := by
-  simp only [pasUpd, if_pos]
+  simp only [pasUpd, ite_eq_left]
 
 /-- What `proc_mapstacks` keeps across an iteration: the tree built so far
 is the `mapStacks` of the supply consumed so far, of the shape the count
@@ -386,7 +386,7 @@ theorem byteBuf_pageWord [CurCtx] (b : BitVec 44) (c : BitVec 8) :
   have hsplit : (4096 : Nat) = 8 + 4088 := by omega
   have hal : (pageAddr b).toNat % 8 = 0 := by
     have h8 : BitVec.extractLsb' 0 3 (pageAddr b) = 0#3 := by
-      simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+      simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
       bv_decide
     have h8' := congrArg BitVec.toNat h8
     simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat,

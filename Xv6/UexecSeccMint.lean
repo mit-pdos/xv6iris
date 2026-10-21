@@ -141,7 +141,7 @@ theorem seccSbundleExec (W : Uvis) :
     seccKey (GF := GF) W ⊢ myPay W.gen (fun _ => iprop(True)) -∗ seccSlots -∗
       xv6Sbundle (uslot) USYS_exec seccFam W := by
   unfold xv6Sbundle
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   unfold xrowExec seccSlots
   dsimp only [seccFam, xfamAt, xfamPt]
   iintro #Hk #Hpay #IH
@@ -183,47 +183,47 @@ theorem seccSbundleRows (n : Int) (W : Uvis) (hnb : n ∉ seccB.map Int.ofNat) :
     imodintro
     iapply seccSbundleExec W $$ Hk Hpay IH
   unfold xv6Sbundle
-  rw [if_neg hx]
+  rw [ite_eq_right hx]
   imodintro
   unfold xv6SbundleRest
   by_cases h5 : n = 5
-  · rw [if_pos h5]
+  · rw [ite_eq_left h5]
     unfold xrowRead
     dsimp only [seccFam, xfamAt, xfamPt]
     ihave #Hrow := seccKeyAtArg W (xkA W 0) $$ Hk
     iapply seccFilereadIn _ _ _ $$ Hc Hrow
-  rw [if_neg h5]
+  rw [ite_eq_right h5]
   by_cases h9 : n = 9
-  · rw [if_pos h9]
+  · rw [ite_eq_left h9]
     unfold xrowChdir
     dsimp only [seccFam, xfamAt, xfamPt]
     iintro %rt
     iapply fsabsChdirPre
-  rw [if_neg h9, if_neg h15]
+  rw [ite_eq_right h9, ite_eq_right h15]
   by_cases h16 : n = 16
-  · rw [if_pos h16]
+  · rw [ite_eq_left h16]
     unfold xrowWrite
     dsimp only [seccFam, xfamAt, xfamPt]
     iintro %Mv %_
     ihave #Hrow := seccKeyAtArg W (xkA W 0) $$ Hk
     iapply seccFilewriteIn _ _ _ _ _ _ _ $$ Hc Hrow
-  rw [if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6]
+  rw [ite_eq_right h16, ite_eq_right h17, ite_eq_right h18, ite_eq_right h19, ite_eq_right h20, ite_eq_right h6]
   by_cases h21 : n = 21
-  · rw [if_pos h21]
+  · rw [ite_eq_left h21]
     dsimp only [seccFam, xfamAt, xfamPt]
     iapply seccKeyCloseCpay W _ $$ Hk
-  rw [if_neg h21]
+  rw [ite_eq_right h21]
   by_cases h2 : n = USYS_exit
-  · rw [if_pos h2]
+  · rw [ite_eq_left h2]
     ihave #Hr := seccKey_rows W $$ Hk
     iapply seccFilecloseCpays W.fd $$ Hr
-  rw [if_neg h2]
+  rw [ite_eq_right h2]
   by_cases h22 : n = 22
   · -- row 22: the point deposits no sync hook
-    rw [if_pos h22]
+    rw [ite_eq_left h22]
     dsimp only [seccFam, xfamAt, xfamPt, hookOpt]
     iempintro
-  rw [if_neg h22]
+  rw [ite_eq_right h22]
   iempintro
 
 /-- Rocq `secc_sbundle`, at the class's bundle (so its readers need no
@@ -249,7 +249,7 @@ theorem spostAt_pipe_elim_xv6 (X : Uvis → IProp GF) (n : Int) (hn : n = USYS_p
   subst hn
   show xv6Spost X USYS_pipe f W r M' fdv' cw' cs' ⊢ _
   unfold xv6Spost USYS_exec USYS_pipe
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- the resume slot at a bumped key in the universe (Rocq's `"Hgo"`) -/
@@ -370,26 +370,26 @@ theorem seccRet (sc : BitVec 64) (W : Uvis) :
   ihave Hpd := uexecPayDep_triv (SG := uexecSGXv6) sc W seccFam rfl $$ Hpay
   by_cases hsc : sc = uecallScause
   · unfold uexecRet uexecRetF
-    simp only [if_pos hsc]
+    simp only [ite_eq_left hsc]
     by_cases hx : uvisNum W = USYS_exit
-    · simp only [if_pos hx]
+    · simp only [ite_eq_left hx]
       imod seccSbundle (uvisNum W) W hnb $$ Hc Hk Hpay IH with Hb
       imodintro
       iexists seccFam
       isplitl [Hpd]
       · iexact Hpd
       · iexact Hb
-    simp only [if_neg hx]
+    simp only [ite_eq_right hx]
     by_cases hf : uvisNum W = USYS_fork
-    · simp only [if_pos hf]
+    · simp only [ite_eq_left hf]
       imodintro
       iexists seccFam
       isplitl [Hpd]
       · iexact Hpd
       · iapply seccFork W $$ Hk Hpay IH
-    simp only [if_neg hf]
+    simp only [ite_eq_right hf]
     by_cases hw : uvisNum W = USYS_wait
-    · simp only [if_pos hw]
+    · simp only [ite_eq_left hw]
       imod seccSbundle (uvisNum W) W hnb $$ Hc Hk Hpay IH with Hb
       imodintro
       iexists seccFam
@@ -398,7 +398,7 @@ theorem seccRet (sc : BitVec 64) (W : Uvis) :
       isplitl [Hb]
       · iexact Hb
       · iapply seccWait (uvisNum W) W hw $$ Hk Hpay IH
-    simp only [if_neg hw]
+    simp only [ite_eq_right hw]
     imod seccSbundle (uvisNum W) W hnb $$ Hc Hk Hpay IH with Hb
     imodintro
     iexists seccFam
@@ -410,7 +410,7 @@ theorem seccRet (sc : BitVec 64) (W : Uvis) :
   · obtain ⟨nx, hnx⟩ : ∃ nx : Int, nx = USYS_exit := ⟨_, rfl⟩
     have hxb' : nx ∉ seccB.map Int.ofNat := hnx ▸ hxb
     unfold uexecRet uexecRetF
-    simp only [if_neg hsc]
+    simp only [ite_eq_right hsc]
     imod seccSbundle nx W hxb' $$ Hc Hk Hpay IH with Hb
     imodintro
     iapply uexecKillArm_exists (uslot) sc W seccFam

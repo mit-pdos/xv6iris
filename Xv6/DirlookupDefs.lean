@@ -221,12 +221,12 @@ theorem dirlookup_post_of_spec (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32)
     Hshr Hru Hnm Hpid Hrc Hrr Hsl Hlk Hdi
   unfold dirlookupArm
   cases found
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨hnone, ha0⟩, Hs, Hpf⟩
     iframe Hs Hpf
     ipureintro
     exact ⟨hns, hnone, ha0⟩
-  · simp only [if_true, Bool.false_eq_true, if_false]
+  · simp only [ite_true, Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨hsome, hks, ha0⟩, Href, Hru2, Hpf⟩
     iexists BitVec.setWidth 32 (dirInum data kk)
     iframe Href Hru2 Hpf
@@ -413,10 +413,10 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip
     bm data dn false off 16 olds pidv dirlookupVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
     hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
-    (by simp only [Bool.false_eq_true, if_false]; exact ha1)
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha1)
     (by rw [ha3, MachCSL.signExtend_ofNat32 _ (by omega)]) (by rw [ha4]; rfl) (fun _ => holds)
   unfold wp_readi_eb_body at h
-  simp only [readiAddr, Bool.false_eq_true, if_false, and_false, false_and, false_or, fsView_gd] at h
+  simp only [readiAddr, Bool.false_eq_true, ite_false, and_false, false_and, false_or, fsView_gd] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, #Hkl, #Hav, Hdev, Hmeta, Hmap,
     Hblk, Hbuf, Hpid, Hsl, Hnext⟩
   ihave Hmap := inodeMapQ_1_to fscFs (DFrac.own 1) ip bm rfl $$ Hmap

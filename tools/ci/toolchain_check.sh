@@ -8,9 +8,14 @@
 # and the packages actually fetched are the pinned ones.
 #
 # Always (text only, runs anywhere):
-#   * lean-toolchain, model/Lean_RV64D/lean-toolchain and
-#     vendor/lean-sail/lean-toolchain name the same Lean (three lake packages
-#     compiled into one build: a mismatch makes .olean files incompatible);
+#   * lean-toolchain and model/Lean_RV64D/lean-toolchain name the same Lean
+#     (two lake packages compiled into one build: a mismatch makes .olean
+#     files incompatible; lean-sail is a git dependency whose own
+#     lean-toolchain lake ignores: it is compiled with the root toolchain on
+#     purpose, and an incompatibility fails the build);
+#   * model/Lean_RV64D/lakefile.toml requires lean-sail (`Sail`) by git at the
+#     SAME revision as lakefile.toml (tools/regen_sail_model.sh writes the
+#     former; two revisions would mean two incompatible `Sail` packages);
 #   * every git dependency of lakefile.toml is in lake-manifest.json at the
 #     same revision (a manifest left behind after a lakefile bump makes lake
 #     silently build the OLD dependency).
@@ -26,7 +31,7 @@ with_lake=0
 [ "${1:-}" = "--with-lake" ] && with_lake=1
 bad=0
 want=$(tr -d '[:space:]' < lean-toolchain)
-for f in model/Lean_RV64D/lean-toolchain vendor/lean-sail/lean-toolchain; do
+for f in model/Lean_RV64D/lean-toolchain; do
   have=$(tr -d '[:space:]' < "$f" 2>/dev/null || echo missing)
   if [ "$have" != "$want" ]; then
     echo "toolchain-check: $f is '$have', lean-toolchain is '$want'"; bad=1
@@ -37,6 +42,17 @@ import json, re, sys
 lake = open("lakefile.toml", encoding="utf-8").read()
 man = {p["name"]: p for p in json.load(open("lake-manifest.json"))["packages"]}
 bad = 0
+# lean-sail: the generated model's lakefile must pin the revision the root pins
+def sail_rev(txt):
+    for blk in txt.split("[[require]]")[1:]:
+        if re.search(r'^name\s*=\s*"Sail"', blk, re.M):
+            m = re.search(r'^rev\s*=\s*"([^"]*)"', blk, re.M)
+            return m.group(1) if m else None
+    return None
+model_lake = open("model/Lean_RV64D/lakefile.toml", encoding="utf-8").read()
+if sail_rev(lake) is None or sail_rev(lake) != sail_rev(model_lake):
+    print(f"toolchain-check: lean-sail (`Sail`) is pinned at {sail_rev(lake)} in lakefile.toml, "
+          f"at {sail_rev(model_lake)} in model/Lean_RV64D/lakefile.toml"); bad = 1
 for blk in lake.split("[[require]]")[1:]:
     blk = blk.split("[[")[0]
     get = lambda k: (re.search(r'^%s\s*=\s*"([^"]*)"' % k, blk, re.M) or [None, None])[1]

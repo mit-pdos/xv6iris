@@ -60,7 +60,7 @@ theorem xv6Sbundle_close_of_reg (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
     (hst : fdStOfKey (xkA W 0) W.fd = .open rb wb (.pipe γp)) (hcl : f.clP = iprop(True)) :
     pipeReg γp ⊢ xv6Sbundle X 21 f W := by
   unfold xv6Sbundle xv6SbundleRest USYS_exec
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   rw [hst, hcl]
   exact fileclose_cpay_of_reg_true (.open rb wb (.pipe γp))
 

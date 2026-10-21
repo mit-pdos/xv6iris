@@ -173,7 +173,7 @@ theorem last_law_holds (H : NodeOk D fs Qfin Rtop) (S : StgEnv D) (K : StgOk D S
   rw [hka] at hk
   cases hk
   unfold RcRf
-  rw [if_pos hnc.symm]
+  rw [ite_eq_left hnc.symm]
   have H0 : (ld0.set 0 (ushRd γp))[0]? = some (ushRd γp) := by
     rw [List.getElem?_set_self (by omega)]
   have H1 : (ld0.set 0 (ushRd γp))[1]? = some (.open rb1 true (.device CONSOLE)) := by
@@ -200,7 +200,7 @@ theorem entry_law_holds (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (HS : UK_SY
   iintro %k %st0 %N' %γ' %γp %av %hlt %hav %hpeq - HRc Hpid #Hck #Hjt
   haveI : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
   have hk1 : k + 1 < D.nc := by rw [L.hlen] at hlt; omega
-  ihave HRc := (show RcRf D k st0 γp ⊢ nraw D k γp by unfold RcRf; rw [if_neg (by omega)]) $$ HRc
+  ihave HRc := (show RcRf D k st0 γp ⊢ nraw D k γp by unfold RcRf; rw [ite_eq_right (by omega)]) $$ HRc
   unfold nraw nknow nodeown
   icases HRc with ⟨#Hinv, ⟨#Hsk, #Hinvs⟩, HF, Hr, HsR, ⟨HSh, HL, HF', HG', Hpb⟩, Hbel⟩
   imod os_shoot (D.gF k) $$ HF with #HFs

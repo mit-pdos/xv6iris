@@ -71,8 +71,10 @@ open Sail LeanRV64D LeanRV64D.Functions
 def ufTrapRw : List Register := [.cur_privilege, .mstatus, .scause, .stval, .sepc, .PC, .nextPC]
 
 /-- The other written cells, by name: the hart state, the clock riders
-(`clockCells`), the TLB. -/
-def ufRwNamed : List Register := [.hart_state, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .tlb]
+(`clockCells`), the TLB; and (sail-riscv 0.16, the cycle epilogue's trigger bookkeeping, `UcFoot`)
+`written_event_index`. -/
+def ufRwNamed : List Register :=
+  [.hart_state, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .tlb, .written_event_index]
 
 /-- **Rocq `u_rw_list`**: every cell a user cycle writes. -/
 def ufRwList : List Register := ufTrapRw ++ (ufRwNamed ++ uxaGprs)
@@ -80,8 +82,11 @@ def ufRwList : List Register := ufTrapRw ++ (ufRwNamed ++ uxaGprs)
 /-- The loop-constant configuration, at the kernel's fraction `C.dqc`. -/
 def ufCfgRo : List Register := [.stvec, .medeleg, .mie, .mideleg, .menvcfg]
 
-/-- Read-only cells the hart owns outright (`userHwCells`, `userPtInv`). -/
-def ufOwnRo : List Register := [.mcounteren, .mtimecmp, .stimecmp, .satp, .pmpcfg_n, .pmpaddr_n]
+/-- Read-only cells the hart owns outright (`userHwCells`, `userPtInv`; and, sail-riscv 0.16's
+per-cycle cells `cycleAux` a user cycle only reads, `UcFoot`: the CLINT's `msip`, which the `mip`
+refresh reads, and `written_trigger_index`, which the epilogue checks is `none`). -/
+def ufOwnRo : List Register :=
+  [.mcounteren, .mtimecmp, .stimecmp, .satp, .pmpcfg_n, .pmpaddr_n, .msip, .written_trigger_index]
 
 /-- **Rocq `u_ro_list`**: every cell a user cycle only reads. -/
 def ufRoList : List Register := ufCfgRo ++ (ufOwnRo ++ hwRegs)
@@ -94,7 +99,8 @@ theorem ufLists_nodup : (ufRwList ++ ufRoList).Nodup := by decide
 /-- **Rocq `u_Df`**: the read-only half's fractions. -/
 def ufDf (dqc : DFrac) : Register → DFrac
   | .stvec | .medeleg | .mie | .mideleg | .menvcfg => dqc
-  | .mcounteren | .mtimecmp | .stimecmp | .satp | .pmpcfg_n | .pmpaddr_n => DFrac.own 1
+  | .mcounteren | .mtimecmp | .stimecmp | .satp | .pmpcfg_n | .pmpaddr_n | .msip | .written_trigger_index =>
+    DFrac.own 1
   | _ => DFrac.discard
 
 /-- **The user footprint** (Rocq `Du_r`/`Du_w`, and the wires). -/
@@ -148,6 +154,17 @@ structure UfVals where
   stc : BitVec 64
   ctr : HwCounters
   lf : SLeft
+  /-- `hwConfig`'s other existential cells (since sail-riscv 0.16): H's `hgeie`, `hcounteren`,
+  `henvcfg`, at the values the bundle holds -/
+  hge : BitVec 64
+  hcen : BitVec 32
+  henv : BitVec 64
+  /-- the hart's id (`mhartid`, pinned by the bundle at `bootHid cpu`) -/
+  hid : BitVec 64
+  /-- the per-cycle cells `cycleAux` holds at some value (sail-riscv 0.16): `msip`,
+  `written_event_index` (`written_trigger_index` is `none`) -/
+  msip : BitVec 32
+  wei : Option (Nat × event_csr)
 
 /-- Some register file (the reference file's value off the footprint). -/
 noncomputable def ufBaseFile : RegFile := fun r => by cases r <;> exact default
@@ -174,6 +191,8 @@ noncomputable def ufFile (C : UCfg) (P : UPtd) (v : UfVals) : RegFile := fun r =
   | .htif_tohost_base => none | .elp => 0#1 | .senvcfg => 0#64 | .scounteren => v.ctr.scen
   | .mcountinhibit => v.ctr.mci | .minstretcfg => v.ctr.mic | .mcyclecfg => v.ctr.mcc | .mstateen0 => 0#64
   | .sstateen0 => 0#32 | .mhpmcounter => v.ctr.hpm
+  | .hgeie => v.hge | .mhartid => v.hid | .hcounteren => v.hcen | .henvcfg => v.henv
+  | .msip => v.msip | .written_event_index => v.wei | .written_trigger_index => none
   | r => ufBaseFile r
 
 /-- The leftover cells of a file (`MachCSL.SLeft`: `mcounteren`, `mtimecmp`,
@@ -194,9 +213,11 @@ structure UfCfg (C : UCfg) (P : UPtd) (f : RegFile) : Prop where
   satp : f .satp = satpOf .kpt P.root
   lok : (ufLeft f).ok
   hw : ∀ r v, hwVal r = some v → f r = v
+  /-- the epilogue's trigger check passes (sail-riscv 0.16; Sdtrig off, nothing sets it) -/
+  wti : f .written_trigger_index = none
 
 theorem ufCfg_file (C : UCfg) (P : UPtd) (v : UfVals) (hv : v.lf.ok) : UfCfg C P (ufFile C P v) := by
-  refine ⟨rfl, rfl, rfl, rfl, rfl, rfl, hv, ?_⟩
+  refine ⟨rfl, rfl, rfl, rfl, rfl, rfl, hv, ?_, rfl⟩
   intro r x h
   unfold hwVal at h
   split at h <;> simp only [reduceCtorEq, Option.some.injEq] at h <;> (subst h; rfl)
@@ -217,7 +238,7 @@ theorem ufCfg_of_ro (C : UCfg) (P : UPtd) (f f' : RegFile) (hc : UfCfg C P f)
     rw [e .mcounteren (by decide), e .mtimecmp (by decide), e .pmpcfg_n (by decide), e .pmpaddr_n (by decide)]
   refine ⟨(e _ (by decide)).trans hc.stvec, (e _ (by decide)).trans hc.medeleg, (e _ (by decide)).trans hc.mie,
     (e _ (by decide)).trans hc.mideleg, (e _ (by decide)).trans hc.menvcfg,
-    (e _ (by decide)).trans hc.satp, hl ▸ hc.lok, ?_⟩
+    (e _ (by decide)).trans hc.satp, hl ▸ hc.lok, ?_, (e _ (by decide)).trans hc.wti⟩
   intro r x hx
   have hm : r ∈ ufRoList := by
     have : r ∈ hwRegs := uf_hwVal_mem r x hx
@@ -265,7 +286,8 @@ theorem uf_rwNamed_cells (cpu : CPU) (f : RegFile) :
     ufCells (GF := GF) cpu ufRwNamed f ⊣⊢ iprop(Register.hart_state ↦ᵣ[cpu] f .hart_state ∗
       Register.minstret_increment ↦ᵣ[cpu] f .minstret_increment ∗ Register.minstret ↦ᵣ[cpu] f .minstret ∗
       Register.mcycle ↦ᵣ[cpu] f .mcycle ∗ Register.mtime ↦ᵣ[cpu] f .mtime ∗
-      Register.mip ↦ᵣ[cpu] f .mip ∗ Register.tlb ↦ᵣ[cpu] f .tlb ∗ emp) := by
+      Register.mip ↦ᵣ[cpu] f .mip ∗ Register.tlb ↦ᵣ[cpu] f .tlb ∗
+      Register.written_event_index ↦ᵣ[cpu] f .written_event_index ∗ emp) := by
   unfold ufCells ufRwNamed
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   exact .rfl
@@ -282,26 +304,32 @@ theorem uf_ownRo_cells (cpu : CPU) (dqc : DFrac) (f : RegFile) :
     ufCellsD (GF := GF) cpu (ufDf dqc) ufOwnRo f ⊣⊢ iprop(Register.mcounteren ↦ᵣ[cpu] f .mcounteren ∗
       Register.mtimecmp ↦ᵣ[cpu] f .mtimecmp ∗ Register.stimecmp ↦ᵣ[cpu] f .stimecmp ∗
       Register.satp ↦ᵣ[cpu] f .satp ∗ Register.pmpcfg_n ↦ᵣ[cpu] f .pmpcfg_n ∗
-      Register.pmpaddr_n ↦ᵣ[cpu] f .pmpaddr_n ∗ emp) := by
+      Register.pmpaddr_n ↦ᵣ[cpu] f .pmpaddr_n ∗ Register.msip ↦ᵣ[cpu] f .msip ∗
+      Register.written_trigger_index ↦ᵣ[cpu] f .written_trigger_index ∗ emp) := by
   unfold ufCellsD ufOwnRo
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   exact .rfl
 
 /-- The frozen cells, off `hwConfig` (Rocq `u_pins_hw`); the existential
-counter cells at the file's values. -/
-theorem uf_hw_cells (cpu : CPU) (dqc : DFrac) (f : RegFile) (hw : ∀ r v, hwVal r = some v → f r = v) :
+cells -- the counters and, since sail-riscv 0.16, H's `hgeie`/`hcounteren`/`henvcfg` -- at the
+file's values, and `mhartid` at the hart's id. -/
+theorem uf_hw_cells (cpu : CPU) (dqc : DFrac) (f : RegFile) (hw : ∀ r v, hwVal r = some v → f r = v)
+    (hid : f .mhartid = bootHid cpu) :
     hwConfig (GF := GF) cpu ∗ Register.mcountinhibit ↦ᵣ[cpu]□ (f .mcountinhibit) ∗
       Register.minstretcfg ↦ᵣ[cpu]□ (f .minstretcfg) ∗ Register.mcyclecfg ↦ᵣ[cpu]□ (f .mcyclecfg) ∗
-      Register.mhpmcounter ↦ᵣ[cpu]□ (f .mhpmcounter) ∗ Register.scounteren ↦ᵣ[cpu]□ (f .scounteren) ⊢
+      Register.mhpmcounter ↦ᵣ[cpu]□ (f .mhpmcounter) ∗ Register.scounteren ↦ᵣ[cpu]□ (f .scounteren) ∗
+      Register.hgeie ↦ᵣ[cpu]□ (f .hgeie) ∗ Register.hcounteren ↦ᵣ[cpu]□ (f .hcounteren) ∗
+      Register.henvcfg ↦ᵣ[cpu]□ (f .henvcfg) ⊢
       ufCellsD cpu (ufDf dqc) hwRegs f := by
   unfold ufCellsD hwRegs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   rw [hw .misa _ rfl, hw .mseccfg _ rfl, hw .pma_regions _ rfl, hw .htif_tohost_base _ rfl, hw .elp _ rfl,
-    hw .senvcfg _ rfl, hw .mstateen0 _ rfl, hw .sstateen0 _ rfl]
+    hw .senvcfg _ rfl, hw .mstateen0 _ rfl, hw .sstateen0 _ rfl, hid]
   unfold hwConfig
-  iintro ⟨⟨#H1, #H2, #H3, #H4, #H5, #H6, #H8, #H9, -⟩, #H10, #H11, #H12, #H13, #H7⟩
+  iintro ⟨⟨#H1, #H2, #H3, #H4, #H5, #H6, #H8, #H9, -, #H15, -, -, -⟩, #H10, #H11, #H12, #H13, #H7, #H14,
+    #H16, #H17⟩
   dsimp only [ufDf]
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
 
 /-- The frame, piece by piece. -/
 theorem uf_F_split (cpu : CPU) (C : UCfg) (f : RegFile) :
@@ -335,8 +363,12 @@ end bundles
 section openclose
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-/-- What rides aside the frames: `mepc` (not read at User). -/
-def ufAside (cpu : CPU) : IProp GF := iprop(∃ mepc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc)
+/-- What rides aside the frames: `mepc` (not read at User) and, since sail-riscv 0.16, H's
+trap CSRs (`hTrapCsrs`: every trap writes them, H enabled or not; the user tier owns them at
+some value, `UserExec` deviation 10; the trap tower takes them as cells, not through the
+register frame). -/
+def ufAside (cpu : CPU) : IProp GF :=
+  iprop((∃ mepc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc) ∗ hTrapCsrs cpu)
 
 /-! ### The exit's receipt, as the user tier carries it (NI M2-W2b) -/
 
@@ -403,14 +435,19 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
   unfold userPtAny
   icases Hpt with ⟨%M, Hpt⟩
   icases ub_userPtInv_open cpu pt M $$ HS Hpt with ⟨%t, %tlb, %mm, %hwf, %htlb, Hr, HB⟩
-  unfold uRegs clockCells
-  icases Hregs with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip⟩, Hg⟩
+  unfold uRegs clockCells cycleAux
+  icases Hregs with ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, ⟨%mi, %mst, %cy, %ti, %ip, Hmi, Hmst, Hcy, Hti, Hip,
+    ⟨%msv, Hmsip⟩, ⟨%wei, Hwei⟩, Hwti⟩, Hht, Hg⟩
   unfold userCfg userHwCells
   icases Hcfg with ⟨Hstvec, Hmie, Hmdl, Hmedl, Hmenv, %mc, %mtc, %htm, Hmcen, Hmtc, %mepc, %stc, Hmepc, Hstc⟩
   unfold ubPtRegs userPmp
   icases Hr with ⟨Hsatp, ⟨%cfg, %paddr, %h0, Hpcfg, Hpaddr⟩, Htlb⟩
   icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm, #Hscen⟩
-  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, ctr, ⟨mc, mtc, cfg, paddr⟩⟩ : UfVals),
+  icases hwConfig_hgeie cpu $$ Hhw with ⟨%hge, #Hhge⟩
+  icases hwConfig_hcounteren cpu $$ Hhw with ⟨%hcen, #Hhcen⟩
+  icases hwConfig_henvcfg cpu $$ Hhw with ⟨%henv, #Hhenv⟩
+  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, ctr, ⟨mc, mtc, cfg, paddr⟩,
+      hge, hcen, henv, bootHid cpu, msv, wei⟩ : UfVals),
     t, mm
   isplitr
   · ipureintro; exact ⟨hok, hms, hact, htm, h0⟩
@@ -419,13 +456,13 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
   isplitr
   · ipureintro; exact htlb
   iframe HB Hrut
-  isplitr [Hmepc]
+  isplitr [Hmepc Hht]
   · iapply (uf_F_split cpu C (ufFile C pt _)).2
     isplitl [Hpr Hms Hsc Hstv Hsep Hpc Hnpc]
     · iapply (uf_trapRw_cells cpu (ufFile C pt _)).2
       dsimp only [ufFile]
       iframe
-    isplitl [Hhs Hmi Hmst Hcy Hti Hip Htlb]
+    isplitl [Hhs Hmi Hmst Hcy Hti Hip Htlb Hwei]
     · iapply (uf_rwNamed_cells cpu (ufFile C pt _)).2
       dsimp only [ufFile]
       iframe
@@ -436,16 +473,16 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
     · iapply (uf_cfgRo_cells cpu C.dqc (ufFile C pt _)).2
       dsimp only [ufFile]
       iframe
-    isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr]
+    isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr Hmsip Hwti]
     · iapply (uf_ownRo_cells cpu C.dqc (ufFile C pt _)).2
       dsimp only [ufFile]
       iframe
-    · iapply uf_hw_cells cpu C.dqc (ufFile C pt _) (ufCfg_file C pt _ ⟨htm, h0⟩).hw
+    · iapply uf_hw_cells cpu C.dqc (ufFile C pt _) (ufCfg_file C pt _ ⟨htm, h0⟩).hw rfl
       iframe Hhw
       dsimp only [ufFile]
-      iframe Hmci Hmic Hmcc Hhpm
-      iexact Hscen
+      iframe Hmci Hmic Hmcc Hhpm Hscen Hhge Hhcen Hhenv
   · unfold ufAside
+    iframe Hht
     iexists mepc
     iexact Hmepc
 
@@ -464,11 +501,11 @@ theorem uf_close_inv [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
   iintro #HS HF HB Ha Hrut
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, Hwei, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
-  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv]
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, Hmsip, Hwti, -⟩
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hc.wti]
   ihave Hpt := ub_userPtInv_close cpu pt t t' mm mm' (f .tlb) hwf hs htlb $$ HS [Hsatp Hpcfg Hpaddr Htlb] HB
   · unfold ubPtRegs userPmp
     iframe Hsatp Htlb
@@ -476,7 +513,7 @@ theorem uf_close_inv [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
     iframe Hpcfg Hpaddr
     ipureintro; exact hc.lok.2
   unfold ufAside
-  icases Ha with ⟨%mepc, Hmepc⟩
+  icases Ha with ⟨⟨%mepc, Hmepc⟩, Hht⟩
   ihave Hhwc : userHwCells (GF := GF) cpu $$ [Hmcen Hmtc Hmepc Hstc]
   · unfold userHwCells
     iexists f .mcounteren, f .mtimecmp
@@ -485,7 +522,7 @@ theorem uf_close_inv [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
     iframe Hmcen Hmtc
     iexists mepc, f .stimecmp
     iframe Hmepc Hstc
-  unfold userInv uRegs clockCells userCfg
+  unfold userInv uRegs clockCells cycleAux userCfg
   iexists f .hart_state, f .mstatus, f .scause, f .stval, f .sepc, f .PC, f .nextPC, uxaXget f
   isplitr
   · ipureintro; exact hok
@@ -514,11 +551,11 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     unfold ufExitEv; rw [hc.satp]) $$ Hrc
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
-  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, -⟩
+  icases (uf_rwNamed_cells cpu f).1 $$ H2 with ⟨Hhs, Hmi, Hmst, Hcy, Hti, Hip, Htlb, Hwei, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
-  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
-  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc]
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, Hmsip, Hwti, -⟩
+  rw [hc.stvec, hc.medeleg, hc.mie, hc.mideleg, hc.menvcfg, hc.satp, hpriv, hhs, hpc, hnpc, hc.wti]
   ihave Hpt := ub_userPtInv_close cpu pt t t' mm mm' (f .tlb) hwf hs htlb $$ HS [Hsatp Hpcfg Hpaddr Htlb] HB
   · unfold ubPtRegs userPmp
     iframe Hsatp Htlb
@@ -526,7 +563,7 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     iframe Hpcfg Hpaddr
     ipureintro; exact hc.lok.2
   unfold ufAside
-  icases Ha with ⟨%mepc, Hmepc⟩
+  icases Ha with ⟨⟨%mepc, Hmepc⟩, Hht⟩
   ihave Hhwc : userHwCells (GF := GF) cpu $$ [Hmcen Hmtc Hmepc Hstc]
   · unfold userHwCells
     iexists f .mcounteren, f .mtimecmp
@@ -535,7 +572,7 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     iframe Hmcen Hmtc
     iexists mepc, f .stimecmp
     iframe Hmepc Hstc
-  unfold userTrapFrame pcIs clockCells userCfg
+  unfold userTrapFrame pcIs clockCells cycleAux userCfg
   iexists f .mstatus, f .scause, f .stval, f .sepc, uxaXget f
   isplitr
   · ipureintro; exact hms
@@ -611,7 +648,7 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, H6⟩
   icases (uf_trapRw_cells cpu f).1 $$ H1 with ⟨Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, -⟩
   icases (uf_cfgRo_cells cpu C.dqc f).1 $$ H4 with ⟨Hstvec, Hmedl, Hmie, Hmdl, Hmenv, -⟩
-  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, -⟩
+  icases (uf_ownRo_cells cpu C.dqc f).1 $$ H5 with ⟨Hmcen, Hmtc, Hstc, Hsatp, Hpcfg, Hpaddr, Hmsip, Hwti, -⟩
   ihave Hg := (uf_gprFile_cells cpu f).2 $$ H3
   rw [hc.stvec, hc.medeleg]
   iframe Hpr Hms Hsc Hstv Hsep Hstvec Hmedl Hpc Hnpc Hsatp Hg
@@ -645,7 +682,7 @@ theorem uf_trapCells (cpu : CPU) (C : UCfg) (P : UPtd) (f : RegFile) (hc : UfCfg
     iapply (uf_cfgRo_cells cpu C.dqc f).2
     rw [hc.stvec, hc.medeleg]
     iframe
-  isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr]
+  isplitl [Hmcen Hmtc Hstc Hsatp Hpcfg Hpaddr Hmsip Hwti]
   · iapply ufCellsD_congr cpu _ ufOwnRo f _ hown
     iapply (uf_ownRo_cells cpu C.dqc f).2
     iframe
@@ -656,12 +693,15 @@ end seams
 /-- **U1-P2's translation pins** (`UtrPins`) at any walker state whose file
 is a user file: the footprint reads `mstatus`/`cur_privilege`/`satp`; User
 privilege; `userMstatusOk` gives SXL = 2 and MPRV = 0; `satp` is
-`satpOf .kpt P.root` (Sv39, ASID 0). -/
+`satpOf .kpt P.root` (Sv39, ASID 0); and (sail-riscv 0.16) the footprint reads
+`misa`/`senvcfg`/`menvcfg`, `misa.S = 1` (the derived constant) and `senvcfg.UKTE = 0`
+(`senvcfg` is frozen at 0). -/
 theorem uf_utrPins (C : UCfg) (P : UPtd) (s : UWSt) (hc : UfCfg C P s.file)
     (hpriv : s.file .cur_privilege = Privilege.User) (hms : userMstatusOk (s.file .mstatus)) :
     UtrPins ufFoot s :=
   ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), hpriv, ⟨hms.1, hms.2.1⟩,
-   by rw [hc.satp]; exact utrSatpOk_satpOf P.root⟩
+   by rw [hc.satp]; exact utrSatpOk_satpOf P.root, ufFoot_rd _ (by decide), ufFoot_rd _ (by decide),
+   ufFoot_rd _ (by decide), by rw [hc.hw .misa _ rfl]; decide, by rw [hc.hw .senvcfg _ rfl]; decide⟩
 
 /-- **The file agrees with `drefU`** (U1-X2's `UxcCfg`; the decoder's
 reference map is the frozen configuration: User privilege, `misa`,

@@ -15,7 +15,7 @@ open LeanRV64D
 /-- A branch on a value known to be nonzero: not taken. -/
 theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]

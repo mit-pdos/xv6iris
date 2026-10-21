@@ -51,7 +51,7 @@ theorem pdep_left_fail (k : Nat) (s : List (BitVec 8)) (hs : s ≠ [])
     pdep D (WLeft k) s ⊢ D.shotsF k ∗ osS (D.gG k) ∗ wcur (D.P k) 0 := by
   rw [pdep_unfold D (WLeft k) s hs (Or.inl hf)]
   simp only [PdRound.pdepNe]
-  rw [if_pos hf]
+  rw [ite_eq_left hf]
 
 /-- the content's deposit: the shots, and a byte of every pipe with every
 filter passing (or the last stage's diagnostic IS the content). -/
@@ -184,7 +184,7 @@ theorem pexcl_sh (k : Nat) (s : List (BitVec 8)) (hk : k < D.nc) (hs : panicSrc 
       iapply os_excl $$ HF HS
   · ihave ⟨#Hsj, #HGj⟩ := pdep_left_shots D j s' hne $$ Hd'
     by_cases hp : s = dgPipeB
-    · rw [if_pos hp] at hc
+    · rw [ite_eq_left hp] at hc
       by_cases hjk : j = k
       · subst hjk
         ihave HG := HG $$ %hp
@@ -193,7 +193,7 @@ theorem pexcl_sh (k : Nat) (s : List (BitVec 8)) (hk : k < D.nc) (hs : panicSrc 
       · ihave HS := shotsF_at D j k (by omega) $$ Hsj
         iexfalso
         iapply os_excl $$ HF HS
-    · rw [if_neg hp] at hc
+    · rw [ite_eq_right hp] at hc
       ihave HS := shotsF_at D j k hc $$ Hsj
       iexfalso
       iapply os_excl $$ HF HS

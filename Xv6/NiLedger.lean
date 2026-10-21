@@ -631,7 +631,7 @@ def niSpend (γ : GName) (ox : Option (Nat × Obs)) : IProp GF :=
 theorem niExitMint_fork (γ : GName) (i : Nat) (x : Obs) (h : niForkExit x = true) :
     niExitMint (GF := GF) γ i x ⊢ niOriginTicket γ := by
   unfold niExitMint originClaim niOriginTicket
-  rw [if_pos h]
+  rw [ite_eq_left h]
   iintro H
   iexists i
   iexact H
@@ -772,14 +772,14 @@ theorem niHistStep_below {k : Nat} {B H : UIota} {f : NiEntry} (hH : niBelow H B
     by_cases hk : k' = k
     · subst hk
       dsimp only
-      rw [if_pos rfl]
+      rw [ite_eq_left rfl]
       obtain ⟨h1, h2, h3⟩ := niJoin_below hH (hf ι' hc)
       refine ⟨h1, h2, fun ι h => ?_⟩
       simp only [Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨-, rfl⟩ := h
       exact h3
     · dsimp only
-      rw [if_neg hk]
+      rw [ite_eq_right hk]
       refine ⟨hH, niBelow_refl H, fun ι h => ?_⟩
       simp only [Option.some.injEq, Prod.mk.injEq] at h
       exact absurd h.1 hk
@@ -913,7 +913,7 @@ theorem niUhInv_file {F : List NiEntry} {U : GName → Option (Uvis × List Urou
       · rcases List.mem_append.mp hf with hf | hf
         · exact niUhFits_mono hp1 (hfo f hf hfu)
         · rw [List.mem_singleton.mp hf]; exact niUhFits_mono hp2 hfit
-  · simp only [if_neg hγ]
+  · simp only [ite_eq_right hγ]
     refine ⟨fun h f hf => ?_, fun W0' H h => ?_⟩
     · rcases List.mem_append.mp hf with hf | hf
       · exact (hinv γ').1 h f hf
@@ -1129,19 +1129,19 @@ theorem niChainSt_powerOn (γe : GName) (h : List Obs) (F : List NiEntry) (hF : 
           constructor
           · rintro ⟨k, γs', rfl, hT⟩
             have hk : k ≠ obsBoots h + 1 := by have := hb k γs' hT; omega
-            exact ⟨k, γs', rfl, by simp only [if_neg hk]; exact hT⟩
+            exact ⟨k, γs', rfl, by simp only [ite_eq_right hk]; exact hT⟩
           · rintro ⟨k, γs', rfl, hT⟩
             by_cases hk : k = obsBoots h + 1
             · subst hk
               dsimp only at hT
-              rw [if_pos rfl] at hT
+              rw [ite_eq_left rfl] at hT
               cases hT
               exact absurd rfl hn
-            · exact ⟨k, γs', rfl, by simpa only [if_neg hk] using hT⟩
+            · exact ⟨k, γs', rfl, by simpa only [ite_eq_right hk] using hT⟩
       · rw [obsBoots_snoc_powerOn]
         by_cases hk : k = obsBoots h + 1
         · omega
-        · simp only [if_neg hk] at hT
+        · simp only [ite_eq_right hk] at hT
           have := hb k γs' hT
           omega
     isplitr
@@ -1150,15 +1150,15 @@ theorem niChainSt_powerOn (γe : GName) (h : List Obs) (F : List NiEntry) (hF : 
       by_cases hk : k = obsBoots h + 1
       · ileft
         ipureintro
-        simp only [if_pos hk]
-      · simp only [if_neg hk] at hT ⊢
+        simp only [ite_eq_left hk]
+      · simp only [ite_eq_right hk] at hT ⊢
         iapply Hera
         ipureintro
         exact hT
     · ipureintro
       intro f hf k ι hc
       have hk : k ≠ obsBoots h + 1 := by have := niOk_cite_le hF f hf k ι hc; omega
-      simp only [if_neg hk]
+      simp only [ite_eq_right hk]
       exact hch f hf k ι hc
   · unfold niEraTok niEraKey
     iexists γs
@@ -1265,7 +1265,7 @@ theorem niChainSt_file (γe : GName) (h : List Obs) (e : Obs) (F : List NiEntry)
         isplitl []
         · iexact Hv
         · iexact Hj
-      · simp only [if_neg hk]
+      · simp only [ite_eq_right hk]
         iapply Hera
         ipureintro
         exact hT₂
@@ -1280,7 +1280,7 @@ theorem niChainSt_file (γe : GName) (h : List Obs) (e : Obs) (F : List NiEntry)
           simp only [Option.some.injEq, Prod.mk.injEq] at hc
           obtain ⟨-, rfl⟩ := hc
           exact hjb.1
-      · simp only [if_neg hk]
+      · simp only [ite_eq_right hk]
         rcases List.mem_append.mp hf with hf | hf
         · exact hch f hf k₂ ι₂ hc
         · rw [List.mem_singleton.mp hf, hfn] at hc
@@ -1359,7 +1359,7 @@ theorem niUhSt_file (F : List NiEntry) (fn : NiEntry) (γ : GName) (W0 : Uvis) (
           iapply Hlbs
           ipureintro; exact hU
         · iexact Hn
-    · simp only [if_neg hγ] at hU'
+    · simp only [ite_eq_right hγ] at hU'
       iapply Hlbs
       ipureintro; exact hU'
   · ipureintro

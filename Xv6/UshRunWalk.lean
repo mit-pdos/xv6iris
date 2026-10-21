@@ -51,7 +51,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem ushR_cs_wr (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSavedIdx r = false) :
     ucalleeSaved m (ukWr m r v) := by
   by_cases h0 : r = 0#5
-  · subst h0; unfold ukWr; rw [if_pos rfl]; exact ucalleeSaved_refl m
+  · subst h0; unfold ukWr; rw [ite_eq_left rfl]; exact ucalleeSaved_refl m
   · rw [ukWr_ne0 _ _ _ h0]; exact ucs_caller m r v hr
 
 /-- The number a stub's `c.li a7` leaves, as the trap reads it. -/
@@ -205,7 +205,7 @@ theorem ushRun_exec (UL : UK_LEAVES) (HS : UK_SYS_P) (SX : SH_SYS_EXEC)
     rw [show 2 + (Dg + n) = Dg + (2 + n) by omega]
     iapply hleaf N h6 m5 0xda (2 + n) (Or.inr (Or.inl ⟨rfl, by rw [hs1']; exact ht8⟩)) $$ Hdp Hc [] [] Hrun
     · unfold ushDiagRes
-      rw [if_pos rfl, hs1']
+      rw [ite_eq_left rfl, hs1']
       iexists x
       iframe Hw0 Hx
     · iapply hpx

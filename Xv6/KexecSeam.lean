@@ -130,12 +130,12 @@ theorem kxc_elf_align (sp0 : BitVec 64) (h : (kxcElfBuf sp0).toNat % 8 = 0) :
 /-- Rocq `kxc_page_base_inj`, at proc_pagetable's Lean post: the trapframe
 page the new table maps IS the block's own `tfp` (deviation 6). -/
 theorem kxc_tfp_extract (t : BitVec 44) : BitVec.extractLsb' 12 44 (pageAddr t) = t := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-- Rocq `kxc_tf_align`: proc_pagetable's `htf` premise. -/
 theorem kxc_tf_align (t : BitVec 44) : pageAddr t &&& 0xfff#64 = 0#64 := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-! ## THE COVERAGE HALF OF THE PHDR LOOP INVARIANT, ACROSS uvmalloc -/
@@ -170,10 +170,10 @@ theorem kxc_umBelow_grow (oldsz newsz xperm : BitVec 64) (P P' : UPtd) (M M' : N
     have hne : ¬ (newsz.toNat < pgRoundUpN oldsz.toNat) := by
       intro hc
       unfold uvmaNp at hnp
-      rw [if_pos hc] at hnp
+      rw [ite_eq_left hc] at hnp
       omega
     have hnpe : uvmaNp oldsz newsz = (newsz.toNat - pgRoundUpN oldsz.toNat + 4095) / 4096 := by
-      unfold uvmaNp; rw [if_neg hne]
+      unfold uvmaNp; rw [ite_eq_right hne]
     have hup := Xv6.pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
     rw [hnpe, hq] at h2
     rw [hq] at hup
@@ -194,12 +194,12 @@ theorem kxc_grow_inv {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {oldsz newsz
     umBelow (if newsz.toNat < oldsz.toNat then oldsz else newsz) P' ∧
     lazyFree P'.um (if newsz.toNat < oldsz.toNat then oldsz else newsz) := by
   by_cases hlt : newsz.toNat < oldsz.toNat
-  · rw [if_pos hlt]
+  · rw [ite_eq_left hlt]
     -- NOTHING WAS MAPPED: the run is empty, so the domain did not move
     have hnp : uvmaNp oldsz newsz = 0 := by
       unfold uvmaNp
       have := UPtAlloc.pgRoundUpN_ge oldsz.toNat
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
     have hkeep := kxc_umBelow_grow oldsz oldsz xperm P P' M M' hb (Nat.le_refl _) (by
       obtain ⟨hext, hout, hrun⟩ := hok
       refine ⟨hext, fun k hk => hout k (by
@@ -218,7 +218,7 @@ theorem kxc_grow_inv {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {oldsz newsz
         · have := UPtAlloc.pgRoundUpN_ge oldsz.toNat; omega
       omega)
     exact ⟨hkeep, LazyFree.lazyFree_ext hok.1 hc⟩
-  · rw [if_neg hlt]
+  · rw [ite_eq_right hlt]
     exact ⟨kxc_umBelow_grow oldsz newsz xperm P P' M M' hb (by omega) hok,
       LazyFree.lazyFree_uvmalloc hok hc⟩
 

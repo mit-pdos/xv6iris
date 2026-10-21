@@ -54,7 +54,7 @@ theorem scanPin_set (R R' : RegMap) (h : scanPin R R') (i : BitVec 5)
   intro r a b c
   rw [RegMap.set_apply]
   have : ¬ (r = i) := by rcases hi with rfl|rfl|rfl <;> assumption
-  rw [if_neg this]
+  rw [ite_eq_right this]
   exact h r a b c
 
 theorem vdrw2_bne_num' (j : Nat) (h : j + 1 < NUM) :
@@ -238,7 +238,7 @@ theorem vdrw_scan_body (cpu : CPU) (K : KCtx) (γ : DiskNames) (pd pav pu : BitV
     iframe Hpc Hv Ho Hback
     ipureintro
     refine ⟨?_, hv.2 rfl⟩
-    rw [RegMap.set_apply, if_neg (by decide), h15]
+    rw [RegMap.set_apply, ite_eq_right (by decide), h15]
 
 /-! ## The scan: a bounded induction over the indices left -/
 
@@ -427,7 +427,7 @@ theorem vdrw_iter (cpu : CPU) (K : KCtx) (γ : DiskNames) (pd pav pu : BitVec 64
       unfold iterExit
       ileft
       iexists n
-      rw [if_pos h3]
+      rw [ite_eq_left h3]
       iframe Hpc Hpay Hout Hidx
       ipureintro
       refine ⟨hn, htk, ?_, ?_⟩ <;>
@@ -444,7 +444,7 @@ theorem vdrw_iter (cpu : CPU) (K : KCtx) (γ : DiskNames) (pd pav pu : BitVec 64
       unfold iterExit
       ileft
       iexists n
-      rw [if_neg h3]
+      rw [ite_eq_right h3]
       iframe Hpc Hpay Hout Hidx
       ipureintro
       refine ⟨hn, htk, ?_, ?_⟩ <;>
@@ -924,7 +924,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
 
 theorem iterPcNext (i : Nat) (hne : ¬ (i + 1 = 3)) :
     (if i + 1 = 3 then KA.«virtio_disk_rw» + 0xc4#64 else KA.«virtio_disk_rw» + 0x5c#64) =
-      KA.«virtio_disk_rw» + 0x5c#64 := if_neg hne
+      KA.«virtio_disk_rw» + 0x5c#64 := ite_eq_right hne
 
 theorem iterPcTrue :
     (if True then KA.«virtio_disk_rw» + 0xc4#64 else KA.«virtio_disk_rw» + 0x5c#64) =
@@ -932,7 +932,7 @@ theorem iterPcTrue :
 
 theorem iterPcDone (i : Nat) (he : i + 1 = 3) :
     (if i + 1 = 3 then KA.«virtio_disk_rw» + 0xc4#64 else KA.«virtio_disk_rw» + 0x5c#64) =
-      KA.«virtio_disk_rw» + 0xc4#64 := if_pos he
+      KA.«virtio_disk_rw» + 0xc4#64 := ite_eq_left he
 
 set_option maxHeartbeats 40000000 in
 /-- **The outer retry loop of `alloc3_desc`.**  From its head at `+0xbc`,

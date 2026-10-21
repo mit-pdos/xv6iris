@@ -94,8 +94,8 @@ theorem syscRows_wait (V : ProcPriv) (M M2 : Nat → List (BitVec 8)) (P' : UPtd
     syscRetPid_ne _ _ _ 3 hnum (by decide), rfl,
     usysSeccOk_refl _ _ _ _ (hn 23 (by decide)), Or.inl (hn 14 (by decide)), Or.inr hw⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
-      if_pos (show syscNum V = USYS_wait from hnum)]
+    rw [ite_eq_right (hn USYS_exec (by decide)), ite_eq_right (hn USYS_sbrk (by decide)),
+      ite_eq_left (show syscNum V = USYS_wait from hnum)]
     subst ha
     exact ⟨bs, hbs, hz, himg⟩
   · exact syscFdOk_refl_at V _ sts 3 hnum (by decide) (by decide) (by decide) (by decide)
@@ -104,7 +104,7 @@ theorem syscRows_wait (V : ProcPriv) (M M2 : Nat → List (BitVec 8)) (P' : UPtd
 theorem syscArmWait_xbytes (xw : BitVec 32) (v : BitVec 64) (h0 : v ≠ 0#64) :
     usysWaitBytes v (xstateVal xw) = xstateBytes xw := by
   unfold usysWaitBytes xstateVal
-  rw [if_neg h0, BitVec.ofInt_toInt]; rfl
+  rw [ite_eq_right h0, BitVec.ofInt_toInt]; rfl
 
 /-- **THE WINDOW AT A LAZY-FREE KEY** (NI M2-G1e): kwait's copyout window --
 `d` status bytes writable in the returned table `P'`, and (below four) the
@@ -126,8 +126,8 @@ theorem syscArmWait_bytes (rv xw : BitVec 32) (v : BitVec 64) (d : Nat) (hans : 
     (hrv : rv ≠ -1#32) : (xstateBytes xw).take d = usysWaitBytes v (xstateVal xw) := by
   unfold usysWaitBytes xstateVal
   by_cases h0 : v = 0#64
-  · rw [if_pos h0, hans.1 h0]; rfl
-  · rw [if_neg h0, hans.2 h0 hrv, BitVec.ofInt_toInt]; rfl
+  · rw [ite_eq_left h0, hans.1 h0]; rfl
+  · rw [ite_eq_right h0, hans.2 h0 hrv, BitVec.ofInt_toInt]; rfl
 
 section
 variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
@@ -245,7 +245,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     dsimp only
     rw [hz]
     dsimp only
-    rw [hwin, if_neg (Nat.ne_of_lt hcf.1)]
+    rw [hwin, ite_eq_right (Nat.ne_of_lt hcf.1)]
     refine ⟨?_, hf.2, ?_⟩
     · show syscA0 V' = _
       rw [ha, hf.1]; decide
@@ -285,7 +285,7 @@ theorem syscArmWait_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     dsimp only
     rw [hzl]
     dsimp only
-    rw [hwin, if_pos rfl]
+    rw [hwin, ite_eq_left rfl]
     refine ⟨ha, hcs, ?_⟩
     rw [himg]
     by_cases h0 : tfW V.tf (tfArgIdx 0) = 0#64

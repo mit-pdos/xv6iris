@@ -161,10 +161,10 @@ theorem initUexecSlot (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc :
           (fun k _ => decide (k < (ukeySp W).toNat - 8 * (2 + (4 + (12 + (12 + (4 + n0)))))))
           (udataLo W.M W.perm W.sz)) (0x1000 + j) = some (initArgvByte j) := by
     intro j hj
-    rw [LawfulPartialMap.get?_filter, udataLo_get, if_pos (by omega), udataPart_get,
-      if_pos ⟨by unfold uCap; omega, hwd _ (by omega) (by omega)⟩, hdat _ _ (initArgvMap_byte j hj)]
+    rw [LawfulPartialMap.get?_filter, udataLo_get, ite_eq_left (by omega), udataPart_get,
+      ite_eq_left ⟨by unfold uCap; omega, hwd _ (by omega) (by omega)⟩, hdat _ _ (initArgvMap_byte j hj)]
     simp only [Option.bind_some, decide_eq_true_eq]
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
   iintro Hdp #Hdep Hxs Hdn Hrd Hrd0 Hbn #Hblaw Hdlaw Hmp
   ihave #Hnp : urunNopipe W.fd $$ []
   · iapply (urunNopipe_intro (GF := GF) W.fd hnpk)

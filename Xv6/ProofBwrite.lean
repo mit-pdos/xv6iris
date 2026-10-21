@@ -94,7 +94,7 @@ theorem bw_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs GF Γ]
     Q hj hproc hK hnoff htier hbno hbsd hpd hkm
   unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
-    decide_true, if_true] at h
+    decide_true, ite_true] at h
   exact h
 
 end

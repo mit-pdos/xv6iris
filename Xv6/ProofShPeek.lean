@@ -103,7 +103,7 @@ theorem wp_shPeek (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h : CPU) (
       m6.get r = m.get r := by
     intro r r2 r8 r20 r18 r21 r9 r19
     have r2' : r ≠ spIdx := r2
-    simp only [m6, m5, m4, m3, m2, m1, ukWr_get, r2', r8, r20, r18, r21, r9, r19, _root_.false_and, if_false]
+    simp only [m6, m5, m4, m3, m2, m1, ukWr_get, r2', r8, r20, r18, r21, r9, r19, _root_.false_and, ite_false]
   have h6sp : m6.get spIdx = sp0 + BitVec.ofInt 64 (-((8 * 8 : Nat) : Int)) := by
     show (ukWr (ukWr (ukWr (ukWr (ukWr (ukWr (ukWr (ukWr m _ _) _ _) _ _) _ _) _ _) _ _) _ _) _ _).get 2#5 = _
     ureg
@@ -222,9 +222,9 @@ theorem wp_shPeek (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h : CPU) (
       | none => simp only [Option.isSome_none]; decide
       | some j0 =>
         have hj0 := (ushpFind_ge tlen 0 tf (f s) j0 e).2
-        simp only [Option.isSome_some, if_true]
+        simp only [Option.isSome_some, ite_true]
         rw [show ((toks : Int) + (j0 : Int)) = ((toks + j0 : Nat) : Int) by omega, umoi_natCast,
-          ushPk_snez_nat _ (by omega), if_neg (by omega)]
+          ushPk_snez_nat _ (by omega), ite_eq_right (by omega)]
     iapply ushS_rtype UL N (ushI_482 N.t) 0x486 h14 m11 (2 + n) _ hsnez $$ Hc Hrun
     iintro %h15 Hrun
     -- 0x486  j 0x46a

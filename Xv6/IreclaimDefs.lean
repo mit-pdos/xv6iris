@@ -93,15 +93,15 @@ theorem ireclaimBody_set [Icfg] (k : KCtx) (R : RegMap) (r : BitVec 5)
   obtain ⟨a2, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption)
-      | (rw [if_neg (Ne.symm n20)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- `ireclaimBody` survives the writes of the scratch registers. -/
 macro "ireclaim_body_tac" : tactic =>
@@ -491,7 +491,7 @@ theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     hj hproc hK hnoff htier hkk (fun h => absurd h (by simp))
     (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hbel hn hpd ha0
   unfold wp_iput_gen_eb_body at h
-  simp only [iputAddr, iregRegime, Bool.false_eq_true, if_false] at h
+  simp only [iputAddr, iregRegime, Bool.false_eq_true, ite_false] at h
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Hbc, Hlc, Hdc, Hit, Hiti, Hesc, Hinv, Hboot, Hslk,
     Href, Hsb, Hsi, Hbmi, Hpid, Hsl, Hop, Htx, HΦ⟩
   iapply h

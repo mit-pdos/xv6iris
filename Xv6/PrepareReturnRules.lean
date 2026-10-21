@@ -21,7 +21,7 @@ import Xv6.SpecPrepareReturn
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 set_option linter.unusedSimpArgs false
@@ -32,8 +32,10 @@ variable {lent : Bool}
 
 /-! ## `csrr rd, satp` -/
 
--- the `read_CSR` arm, so `swp_run` does not walk the whole CSR match
-@[sail_facts] theorem read_CSR_satp : read_CSR 0x180#12 = readReg Register.satp := rfl
+-- the `read_CSR` arm, so `swp_run` does not walk the whole CSR match (since sail-riscv 0.16 it
+-- asks whether the hart is virtualised: `vsatp` then, `satp` otherwise)
+@[sail_facts] theorem read_CSR_satp : read_CSR 0x180#12 =
+    (do if (← inVirtualPrivilege ()) then readReg Register.vsatp else readReg Register.satp) := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- `csrr rd, satp`: the configuration's `satp` into `rd`. -/

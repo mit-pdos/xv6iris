@@ -70,7 +70,7 @@ theorem wp_uk_ecall_open (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
   subst M' pm' sz' lz' cw' secc' g' cs'
   have hfd2 : usysFdOk USYS_open (tfOf m pc) r fdv fdv' := hfd
   unfold usysFdOk at hfd2
-  rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at hfd2
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at hfd2
   iapply uslot_bupd
   rcases hfd2 with ⟨fd, rd, wr, t, hr, hcl, rfl, hnp⟩ | ⟨hr, rfl⟩
   · imod ufd_alloc_least N.fd fdv l fd (.open rd wr t) hcl (by simp) $$ Hufd Hstd with ⟨Hufd, Hh⟩
@@ -135,7 +135,7 @@ theorem wp_uk_ecall_dup_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
   subst M' pm' sz' lz' cw' secc' g' cs'
   have hfd2 : usysFdOk USYS_dup (tfOf m pc) r fdv fdv' := hfd
   unfold usysFdOk at hfd2
-  rw [if_neg (by decide), if_pos rfl] at hfd2
+  rw [ite_eq_right (by decide), ite_eq_left rfl] at hfd2
   have haiz : usysArgfd (tfOf m pc) = (fd0 : Int) := by rw [ukSys_argfd]; exact harg
   have hai : (usysArgfd (tfOf m pc)).toNat = fd0 := by rw [haiz]; simp
   iapply uslot_bupd
@@ -233,7 +233,7 @@ theorem wp_uk_ecall_dup_untracked (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
   subst M' pm' sz' lz' cw' secc' g' cs'
   have hfd2 : usysFdOk USYS_dup (tfOf m pc) r fdv fdv' := hfd
   unfold usysFdOk at hfd2
-  rw [if_neg (by decide), if_pos rfl] at hfd2
+  rw [ite_eq_right (by decide), ite_eq_left rfl] at hfd2
   iapply uslot_bupd
   rcases hfd2 with ⟨fd1, -, hcl, -, rfl⟩ | ⟨-, rfl, -⟩
   · by_cases hc0 : fdv.getD (usysArgfd (tfOf m pc)).toNat .closed = .closed
@@ -290,12 +290,12 @@ theorem wp_uk_ecall_dup_closed_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
   subst M' pm' sz' lz' cw' secc' g' cs'
   have hfd2 : usysFdOk USYS_dup (tfOf m pc) r fdv fdv' := hfd
   unfold usysFdOk at hfd2
-  rw [if_neg (by decide), if_pos rfl] at hfd2
+  rw [ite_eq_right (by decide), ite_eq_left rfl] at hfd2
   have haiz : usysArgfd (tfOf m pc) = (fd0 : Int) := by rw [ukSys_argfd]; exact harg
   have hai : (usysArgfd (tfOf m pc)).toNat = fd0 := by rw [haiz]; simp
   have hsrc : fdv[fd0]? = some .closed := by
     have : (fdv.take NSTD)[fd0]? = some .closed := by rw [htake]; exact hcl0
-    rw [List.getElem?_take, if_pos hstd] at this; exact this
+    rw [List.getElem?_take, ite_eq_left hstd] at this; exact this
   rcases hfd2 with ⟨_, -, -, hne, -⟩ | ⟨hr, rfl, -⟩
   · rw [hai] at hne; exact absurd hsrc hne
   iapply uslot_bump_close N m pc M pm sz _ _ cw cw gn cs pidv r avail hx0 hal4

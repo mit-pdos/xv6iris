@@ -86,7 +86,7 @@ abbrev grepMhLit (c : BitVec 8) (r text : Bytes) : Bool := matchLit (matchhere r
 /-- **Rocq `mh_cons_lit`**. -/
 theorem grepMh_cons_lit (c s : BitVec 8) (r text : Bytes) (hs : bdec s cStar = false) :
     matchhere (c :: s :: r) text = grepMhLit c (s :: r) text := by
-  rw [matchhere, if_neg (by simp [hs])]
+  rw [matchhere, ite_eq_right (by simp [hs])]
 
 /-- **Rocq `mh_one`**. -/
 theorem grepMh_one (c : BitVec 8) (text : Bytes) :
@@ -124,7 +124,7 @@ theorem grepMh_lit_case (c : BitVec 8) (r text : Bytes)
     (hr : match r with | s :: _ => bdec s cStar = false | [] => bdec c cDollar = false) :
     matchhere (c :: r) text = grepMhLit c r text := by
   cases r with
-  | nil => simp only at hr; rw [grepMh_one, if_neg (by simp [hr])]
+  | nil => simp only at hr; rw [grepMh_one, ite_eq_right (by simp [hr])]
   | cons s r' => exact grepMh_cons_lit c s r' text hr
 
 /-! ## §3 The byte literals the matcher tests (deviation 3) -/

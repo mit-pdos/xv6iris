@@ -64,35 +64,35 @@ theorem pgRoundUpN_uvmMaxsz : pgRoundUpN uvmMaxsz = uvmMaxsz := by
 
 theorem bgeu_pos {α : Type _} (x y : BitVec 64) (h : ¬ (x.toNat < y.toNat)) (p q : α) :
     (if bcond bop.BGEU x y then p else q) = p := by
-  rw [if_pos (by simp [bcond, BitVec.ult]; omega)]
+  rw [ite_eq_left (by simp [bcond, BitVec.ult]; omega)]
 
 theorem bgeu_neg {α : Type _} (x y : BitVec 64) (h : x.toNat < y.toNat) (p q : α) :
     (if bcond bop.BGEU x y then p else q) = q := by
-  rw [if_neg (by simp [bcond, BitVec.ult]; omega)]
+  rw [ite_eq_right (by simp [bcond, BitVec.ult]; omega)]
 
 theorem bltu_pos {α : Type _} (x y : BitVec 64) (h : x.toNat < y.toNat) (p q : α) :
     (if bcond bop.BLTU x y then p else q) = p := by
-  rw [if_pos (by simp [bcond, BitVec.ult]; omega)]
+  rw [ite_eq_left (by simp [bcond, BitVec.ult]; omega)]
 
 theorem bltu_neg {α : Type _} (x y : BitVec 64) (h : ¬ (x.toNat < y.toNat)) (p q : α) :
     (if bcond bop.BLTU x y then p else q) = q := by
-  rw [if_neg (by simp [bcond, BitVec.ult]; omega)]
+  rw [ite_eq_right (by simp [bcond, BitVec.ult]; omega)]
 
 theorem beq_pos {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, beq_iff_eq]; exact h)]
 
 theorem beq_neg {α : Type _} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 theorem bne_pos {α : Type _} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact h)]
 
 theorem bne_neg {α : Type _} (x : BitVec 64) (h : x = 0#64) (p q : α) :
     (if bcond bop.BNE x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
+  rw [ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
 /-! ## Immediates -/
 
@@ -245,7 +245,7 @@ theorem ptRep_setLeaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (v
       rw [get?_insert_eq rfl] at hw
       obtain rfl : c = w := Option.some.inj hw
       refine ⟨pteAddr (t.slot 2 v').1 (vpnIdx v' 0), v, ?_, had⟩
-      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, if_neg hvz,
+      rw [PTree.walk_eq, PTree.slot_setLeaf_self, PTree.entAt_setLeaf_self, ite_eq_right hvz,
         PtRun.slot_snd_of_complete 2 t v' hc]
     · rw [get?_insert_ne (m := L) (k := vpn.toNat) (k' := v'.toNat) (v := c)
         (fun hh => he (hkey v' hh.symm))] at hw
@@ -358,10 +358,10 @@ theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
   bv_decide
 
 theorem viewZero_self (M : Nat → List (BitVec 8)) (k : Nat) :
-    viewZero M k k = List.replicate 4096 0#8 := if_pos rfl
+    viewZero M k k = List.replicate 4096 0#8 := ite_eq_left rfl
 
 theorem viewZero_ne (M : Nat → List (BitVec 8)) (k k' : Nat) (h : k' ≠ k) :
-    viewZero M k k' = M k' := if_neg h
+    viewZero M k k' = M k' := ite_eq_right h
 
 /-! ## `umPages` -/
 
@@ -553,8 +553,8 @@ theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
   unfold uvmdNp
   rw [hx, hy]
   by_cases h0 : i = 0
-  · subst h0; rw [if_neg (by omega)]
-  · rw [if_pos (by omega),
+  · subst h0; rw [ite_eq_right (by omega)]
+  · rw [ite_eq_left (by omega),
       show 4096 * q + 4096 * i = 4096 * (q + i) from by omega,
       pgRoundUpN_mul, pgRoundUpN_mul]
     omega

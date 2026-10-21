@@ -242,7 +242,7 @@ theorem pages_fill_perm (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
         (vpnIdx vpn (lvl+1)) allIdx_nodup (mem_allIdx _) _ ?_ ?_
       · simp only [ite_true, hk]
         exact ih c fr
-      · intro j hj; simp only [if_neg hj]
+      · intro j hj; simp only [ite_eq_right hj]
     | none =>
       cases fr with
       | nil =>
@@ -261,7 +261,7 @@ theorem pages_fill_perm (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
         · simp only [ite_true, hk, List.nil_append, List.take_succ_cons]
           refine (ih (PTree.zeroNode b) fr').trans ?_
           rw [MachCSL.PTree.zeroNode_pages, MachCSL.PTree.zeroNode_missingOn, List.singleton_append]
-        · intro j hj; simp only [if_neg hj]
+        · intro j hj; simp only [ite_eq_right hj]
 
 theorem mem_pages_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (BitVec 44))
     (b : BitVec 44) :
@@ -280,8 +280,8 @@ theorem wf_setLeaf_complete (lvl : Nat) (t : PTree) (vpn : BitVec 27) (ppn : Bit
     refine ⟨(hwf j).1, ?_⟩
     simp only [PTree.setLeaf, PTree.setEnt, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn 0
-    · rw [if_pos hj]; exact Or.inr ⟨ppn, perm, a, d, rfl⟩
-    · rw [if_neg hj]; exact (hwf j).2
+    · rw [ite_eq_left hj]; exact Or.inr ⟨ppn, perm, a, d, rfl⟩
+    · rw [ite_eq_right hj]; exact (hwf j).2
   | succ lvl ih =>
     obtain ⟨c, hk, hcc⟩ := (complete_succ_iff lvl t vpn).mp hc
     have hwc := hwf (vpnIdx vpn (lvl+1))
@@ -290,9 +290,9 @@ theorem wf_setLeaf_complete (lvl : Nat) (t : PTree) (vpn : BitVec 27) (ppn : Bit
     intro j
     simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn (lvl+1)
-    · rw [if_pos hj, hj, hwc.1]
+    · rw [ite_eq_left hj, hj, hwc.1]
       exact ⟨by rw [PTree.base_setLeaf], ih c hwc.2 hcc⟩
-    · rw [if_neg hj]; exact hwf j
+    · rw [ite_eq_right hj]; exact hwf j
 
 /-- The same for a user table: any valid leaf (`V` and some of `R`/`W`/`X`)
 keeps `wfU`. -/
@@ -305,8 +305,8 @@ theorem wfU_setLeaf_complete (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitV
     refine ⟨(hwf j).1, ?_⟩
     simp only [PTree.setLeaf, PTree.setEnt, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn 0
-    · rw [if_pos hj]; exact Or.inr hv
-    · rw [if_neg hj]; exact (hwf j).2
+    · rw [ite_eq_left hj]; exact Or.inr hv
+    · rw [ite_eq_right hj]; exact (hwf j).2
   | succ lvl ih =>
     obtain ⟨c, hk, hcc⟩ := (complete_succ_iff lvl t vpn).mp hc
     have hwc := hwf (vpnIdx vpn (lvl+1))
@@ -315,9 +315,9 @@ theorem wfU_setLeaf_complete (lvl : Nat) (t : PTree) (vpn : BitVec 27) (v : BitV
     intro j
     simp only [PTree.setKid, PTree.kids_node, PTree.ents_node]
     by_cases hj : j = vpnIdx vpn (lvl+1)
-    · rw [if_pos hj, hj, hwc.1]
+    · rw [ite_eq_left hj, hj, hwc.1]
       exact ⟨by rw [PTree.base_setLeaf], ih c hwc.2 hcc⟩
-    · rw [if_neg hj]; exact hwf j
+    · rw [ite_eq_right hj]; exact hwf j
 
 /-- Writing a leaf does not disturb another page's (blocked) walk. -/
 theorem walk_setLeaf_ne (t : PTree) (vpn vpn' : BitVec 27) (v : BitVec 64)
@@ -331,7 +331,7 @@ theorem entAt_eq_zero (lvl : Nat) (t : PTree) (vpn : BitVec 27) (h : t.walk lvl 
   rw [PTree.walk_eq] at h
   by_cases he : t.entAt lvl vpn = 0#64
   · exact he
-  · rw [if_neg he] at h; exact absurd h (by simp)
+  · rw [ite_eq_right he] at h; exact absurd h (by simp)
 
 /-! ## A walk's slot is one of the tree's pages -/
 
@@ -358,10 +358,10 @@ theorem pteAddr_ne_zero (b : BitVec 44) (i : BitVec 9) (h : pageAddr b ≠ 0#64)
   intro hc
   refine h ?_
   have hb : b = 0#44 := by
-    unfold pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend at hc
+    unfold pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend at hc
     revert hc; bv_decide
   rw [hb]
-  unfold pageAddr pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend
+  unfold pageAddr pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend
   bv_decide
 
 /-- The address a completed walk returns is never `0`, since every node page
@@ -434,8 +434,8 @@ theorem sameShape_fill (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : List
         intro j
         simp only [PTree.setKid, PTree.kids_node]
         by_cases hj : j = vpnIdx vpn (lvl+1)
-        · rw [if_pos hj, if_pos hj]; exact ih c d fr gr hi hl
-        · rw [if_neg hj, if_neg hj]; exact h j
+        · rw [ite_eq_left hj, ite_eq_left hj]; exact ih c d fr gr hi hl
+        · rw [ite_eq_right hj, ite_eq_right hj]; exact h j
     | none =>
       rw [hk] at hi
       cases hk' : u.kids (vpnIdx vpn (lvl+1)) with
@@ -453,10 +453,10 @@ theorem sameShape_fill (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (fr gr : List
             intro j
             simp only [PTree.setKid, PTree.setEnt, PTree.kids_node]
             by_cases hj : j = vpnIdx vpn (lvl+1)
-            · rw [if_pos hj, if_pos hj]
+            · rw [ite_eq_left hj, ite_eq_left hj]
               exact ih (PTree.zeroNode b) (PTree.zeroNode e) fr' gr'
                 (sameShape_zeroNode lvl b e) (by simpa using hl)
-            · rw [if_neg hj, if_neg hj]; exact h j
+            · rw [ite_eq_right hj, ite_eq_right hj]; exact h j
 
 theorem sameShape_setLeaf (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (v w : BitVec 64)
     (h : sameShape lvl t u) : sameShape lvl (t.setLeaf lvl vpn v) (u.setLeaf lvl vpn w) := by
@@ -475,8 +475,8 @@ theorem sameShape_setLeaf (lvl : Nat) (t u : PTree) (vpn : BitVec 27) (v w : Bit
         intro j
         simp only [PTree.setKid, PTree.kids_node]
         by_cases hj : j = vpnIdx vpn (lvl+1)
-        · rw [if_pos hj, if_pos hj]; exact ih c d hi
-        · rw [if_neg hj, if_neg hj]; exact h j
+        · rw [ite_eq_left hj, ite_eq_left hj]; exact ih c d hi
+        · rw [ite_eq_right hj, ite_eq_right hj]; exact h j
     | none =>
       rw [hk] at hi
       cases hk' : u.kids (vpnIdx vpn (lvl+1)) with
@@ -518,7 +518,7 @@ theorem mapRun_succ (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : BitV
     fill_append 2 t vpn fr gr (by omega)
   have h2 : (t.fill 2 vpn (fr ++ gr)).2 = gr := by
     rw [supply_fill, ← hlen, List.drop_left]
-  simp only [PTree.mapRun, h1, h2, if_pos hc]
+  simp only [PTree.mapRun, h1, h2, ite_eq_left hc]
 
 /-- The last page of a run. -/
 theorem mapRun_one (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : BitVec 64)
@@ -536,7 +536,7 @@ fill left it and maps nothing. -/
 theorem mapRun_fail (t : PTree) (vpn : BitVec 27) (ppn : BitVec 44) (perm : BitVec 64) (m : Nat)
     (fr : List (BitVec 44)) (hc : ¬ (t.fill 2 vpn fr).1.complete 2 vpn) :
     t.mapRun vpn ppn perm (m+1) fr = ((t.fill 2 vpn fr).1, (t.fill 2 vpn fr).2, 0) := by
-  simp only [PTree.mapRun, if_neg hc]
+  simp only [PTree.mapRun, ite_eq_right hc]
 
 /-- The node count of a run, split at the first page: the pages the fill
 consumed, then the count of the rest (which depends only on the shape). -/
@@ -718,7 +718,7 @@ theorem ptreeOwn_leaf_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (vpn : B
       (vpnIdx vpn (lvl+1)) ?hupd) $$ Hkids
     case hupd =>
       intro v j hj
-      simp only [PTree.setKid, PTree.kids_node, if_neg hj]
+      simp only [PTree.setKid, PTree.kids_node, ite_eq_right hj]
     icases Hkids with ⟨Hi, Hclose⟩
     simp only [hk]
     icases ih c hcc $$ Hi with ⟨Hcell, Hback⟩

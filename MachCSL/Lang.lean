@@ -55,6 +55,57 @@ DMA reads see the top of the store order and its DMA writes append there as
 the disk agent (`MState.storeDma`), blocked while a hart reserves a byte of
 the footprint; the PLIC drives the harts' external-interrupt pins
 (`sig_seip`/`sig_meip`) through the wire primitive.
+
+The sail-riscv 0.16 bump (October 2026: concurrency interface v2, lean-sail
+v7).  The model's monad is lean-sail's free monad
+`FreeM ((Except (Sail.Error ue) InstructionEffect) ⊕ FinChoice)`, where it
+was the vendored V1 `Outcome` monad.  This semantics changed only where the
+interface or the 0.16 model forced it (`notes/design-rulings.md`, "The
+sail-riscv 0.16 bump"):
+
+1. Events are lean-sail's `InstructionEffect`s.  Register events carry a
+   system-register id the model never sets (`none`); it is ignored.
+2. A memory read answers its bits with an empty tag vector; a write carries
+   its bits in the event and answers `.ok ()`: the memory cannot report a
+   failed conditional write (MachCSL never did).
+3. Every store and AMO first announces its footprint (`memWriteAnnounce`):
+   a silent event.
+4. A nondeterministic choice is its own node, `.inr n`, answered by any
+   `Fin n`; V1's `choose` event was answered by any value of a Sail type.
+   lean-sail v7 makes `undefined_int`/`undefined_nat`/`undefined_string`
+   failures (the hart is stuck) and gives `undefined_range lo lo` no answer;
+   the generated model calls none of them on any path (its one
+   `undefined_range 0 12` sits in an unused `undefined_*` helper).
+5. The other silent events are renamed (`tlbOp`, `archException`,
+   `returnException`, `clockCycle`, `printMessage`); `getCycleCount` still
+   answers 0.
+6. Access kinds carry the access type (`Load`, `Store`, `LoadReserved`,
+   `Atomic`, `InstructionFetch`, ...).  Exclusivity is still keyed on the
+   reserved and conditional kinds, so the blocking semantics is unchanged
+   (`MachCSL.TsoMem`).
+7. Power-on: the board also sets the model's Sdtrig bookkeeping
+   `written_trigger_index := none` (0.16 asserts it at every cycle's end;
+   `MachCSL.ArchReset`).
+
+The driver (`riscvStep`) is `try_step 0 ew` plus a nondeterministic tick,
+with `ew` (the model's `exit_wait`) chosen nondeterministically too (owner,
+2026-10-19; before that it was fixed at `false`): a hart waiting in WFI may be
+left waiting or forced out in any cycle, which covers both of upstream's own
+schedules (the Sail `loop` passes `true` at every step, the C++ harness a
+bounded wait and then `true`); `notes/model-diffs.md` §5 records this.
+
+Model-side changes this semantics merely runs (a selection; the per-cycle hooks
+are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
+interrupt; `MSIP`/`STIP`/`MTIP` are recomputed from `msip` and the timer at
+each cycle start (the tick no longer writes `mip`); every cycle runs the Sdtrig
+reentrancy check and ends by asserting `written_trigger_index = none`; every
+physical access reads `mhartid` (`within_clint`); H's registers are read with H
+disabled (`hgeie` by `read_mip`, `hedeleg` by `exception_delegatee`) and a
+supervisor or user trap writes H's `hstatus`/`htval`/`htinst` (all invisible
+without H).  The fork keeps the atomic
+PTE A/D update, leaves the F/D instructions out of the generated model (as
+before the bump), and ignores `hideleg` without H (a bug fix).  Every
+deviation from upstream is listed in `notes/model-diffs.md`.
 -/
 import MachCSL.Platform
 import MachCSL.BootImage
@@ -68,8 +119,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## Machine state -/
@@ -206,9 +256,13 @@ abbrev MState.setRt (σ : MState) (d : DevId) (rt : DevRt) : MState :=
 a clock tick.  The model's own `loop` ticks the clock every
 `plat_insns_per_tick` instructions; the language has no instruction counter,
 so the tick is chosen nondeterministically at each cycle boundary (a sound
-weakening, exactly as in the Rocq prototype). -/
-noncomputable def riscvStep (tick : Bool) : SailM Unit := do
-  let _ ← Functions.try_step 0 false
+weakening, exactly as in the Rocq prototype).  `exit_wait` is the harness's
+other input to `try_step` -- whether a hart waiting in WFI is forced out of
+its wait this cycle (the spec allows WFI to wait or to retire; upstream's own
+drivers run two schedules) -- and is chosen the same way, so every schedule
+is covered (`notes/model-policy.md`, section 5). -/
+noncomputable def riscvStep (tick ew : Bool) : SailM Unit := do
+  let _ ← Functions.try_step 0 ew
   if tick then Functions.tick_clock () else pure ()
 
 /-! ## Expressions -/
@@ -322,9 +376,20 @@ def powerFork (gen : Nat) : List Expr := cpus.map (Loop gen) ++ DevId.all.map (D
 
 /-! ## The per-event step relation -/
 
+/-- A memory request's physical address, at this tree's address type (`PAddr = BitVec 64`; the
+interface's `BitVec Arch.addr_size` is the same type, `Arch.addr_size = 64` by `rfl`, but only at
+default transparency). -/
+abbrev _root_.Sail.ArchSem.MemRequest.pa (req : MemRequest) : PAddr := req.address
+
 /-- `evStep cpu o σ v σ'`: in state `σ`, hart `cpu`'s event `o` can be
-answered with `v`, moving the state to `σ'`.  Failure events and the legacy
-direct-RAM events have no answer (the hart is stuck).
+answered with `v`, moving the state to `σ'`.  Failures (`Sail.Error`, a separate node of the
+monad) have no answer (the hart is stuck).
+
+Concurrency interface v2 (sail-riscv 0.16, lean-sail v7): a memory read answers the bits and an
+empty tag vector (`.ok (w, 0#numTag)`; the model asks for no tags), a memory write carries its
+bits in the event and answers `.ok ()` (the memory cannot report a failed conditional write,
+which MachCSL never did), and every store or AMO first ANNOUNCES its footprint
+(`memWriteAnnounce`), a silent event.
 
 A memory event is routed by its address (the BUS DECODE): an access that
 reaches a device window (`devAddr`) is an MMIO transaction, serviced by that
@@ -336,7 +401,7 @@ device and no DRAM byte answers -- has no answer at all.
 
 The memory transactions:
 
-* a **fetch** (`AK_ifetch`) reads every byte of the footprint as the hart's
+* a **fetch** (`akIfetch`) reads every byte of the footprint as the hart's
   instruction-cache agent at one view between the hart's instruction view
   and the top, and moves nothing;
 * a **plain read** (explicit non-exclusive, or a page-table walk) reads as
@@ -350,57 +415,55 @@ The memory transactions:
 * a **write** appends at the top (`MState.store`) unless another hart
   reserves a byte of the footprint (blocked);
 * a **fence** moves the hart's views (`MState.fence`). -/
-abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
-    o.ret → MState → Prop :=
+abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
+    InstructionEffect.ret o → MState → Prop :=
   match o with
-  | .regRead r => fun v σ' => v = σ.regs cpu r ∧ σ' = σ
-  | .regWrite r v => fun _ σ' => σ' = σ.setReg cpu r v
-  | .memRead n _ req => fun v σ' =>
-      (devBytes req.pa n ∧
-        ∃ w ds', devRead σ.devs req.pa n = some (w, ds') ∧ v = .Ok (w, none) ∧
+  | .regRead r _ => fun v σ' => v = σ.regs cpu r ∧ σ' = σ
+  | .regWrite r _ v => fun _ σ' => σ' = σ.setReg cpu r v
+  | .memRead req => fun v σ' =>
+      (devBytes req.pa req.size ∧
+        ∃ w ds', devRead σ.devs req.pa req.size = some (w, ds') ∧ v = .ok (w, 0#req.numTag) ∧
           σ' = { σ with devs := ds' }) ∨
-      (ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧
-        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
-          σ.mem.readBytes (ifetchAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧ σ' = σ) ∨
-      (ramBytes req.pa n ∧ akPlain req.access_kind = true ∧
-        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
-          (σ.hr cpu).cohOk req.pa n tvn ∧
-          σ.mem.readBytes (hartAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧
-          σ' = σ.afterLoad cpu req.pa n tvn) ∨
-      (ramBytes req.pa n ∧ akExcl req.access_kind = true ∧
-        ¬ othersReserve σ.resv cpu req.pa n ∧
-        ∃ w : BitVec (8 * n), σ.mem.topBytes req.pa n w ∧ v = .Ok (w, none) ∧
-          σ' = σ.afterExcl cpu req.pa n w (akAcq req.access_kind))
-  | .memWrite n _ req => fun v σ' =>
-      (devBytes req.pa n ∧
-        ∃ w ds', req.value = some w ∧ devWrite σ.devs req.pa n w = some ds' ∧
-          v = .Ok (some true) ∧ σ' = { σ with devs := ds' }) ∨
-      (ramBytes req.pa n ∧
-        ∃ w : BitVec (8 * n), req.value = some w ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
-          v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind))
-  | .readRam .. => fun _ _ => False
-  | .writeRam .. => fun _ _ => False
+      (ramBytes req.pa req.size ∧ akIfetch req.accessKind = true ∧
+        ∃ (tvn : Nat) (w : BitVec (8 * req.size)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
+          σ.mem.readBytes (ifetchAgent cpu) tvn req.pa req.size w ∧ v = .ok (w, 0#req.numTag) ∧
+          σ' = σ) ∨
+      (ramBytes req.pa req.size ∧ akPlain req.accessKind = true ∧
+        ∃ (tvn : Nat) (w : BitVec (8 * req.size)), σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
+          (σ.hr cpu).cohOk req.pa req.size tvn ∧
+          σ.mem.readBytes (hartAgent cpu) tvn req.pa req.size w ∧ v = .ok (w, 0#req.numTag) ∧
+          σ' = σ.afterLoad cpu req.pa req.size tvn) ∨
+      (ramBytes req.pa req.size ∧ akExcl req.accessKind = true ∧
+        ¬ othersReserve σ.resv cpu req.pa req.size ∧
+        ∃ w : BitVec (8 * req.size), σ.mem.topBytes req.pa req.size w ∧ v = .ok (w, 0#req.numTag) ∧
+          σ' = σ.afterExcl cpu req.pa req.size w (akAcq req.accessKind))
+  | .memWrite req w _ => fun v σ' =>
+      (devBytes req.pa req.size ∧
+        ∃ ds', devWrite σ.devs req.pa req.size w = some ds' ∧
+          v = .ok () ∧ σ' = { σ with devs := ds' }) ∨
+      (ramBytes req.pa req.size ∧ ¬ othersReserve σ.resv cpu req.pa req.size ∧
+          v = .ok () ∧ σ' = σ.store cpu req.pa req.size w (akExcl req.accessKind))
+  | .memWriteAnnounce _ => fun _ σ' => σ' = σ
   | .barrier b => fun _ σ' => σ' = σ.fence cpu b
   | .cacheOp _ => fun _ σ' => σ' = σ
-  | .tlbi _ => fun _ σ' => σ' = σ
+  | .tlbOp _ => fun _ σ' => σ' = σ
   | .translationStart _ => fun _ σ' => σ' = σ
   | .translationEnd _ => fun _ σ' => σ' = σ
-  | .takeException _ => fun _ σ' => σ' = σ
-  | .returnException _ => fun _ σ' => σ' = σ
-  | .cycleCount => fun _ σ' => σ' = σ
+  | .archException _ => fun _ σ' => σ' = σ
+  | .returnException => fun _ σ' => σ' = σ
+  | .clockCycle => fun _ σ' => σ' = σ
   | .getCycleCount => fun v σ' => v = (0 : Nat) ∧ σ' = σ
-  | .message _ => fun _ σ' => σ' = σ
-  | .choose _ => fun _ σ' => σ' = σ
+  | .printMessage _ => fun _ σ' => σ' = σ
 
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
 reservation; the hart self-loops (the event is retried), a blocked exclusive
 read dropping the hart's own reservation. -/
-abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState) : Prop :=
+abbrev blockedStep (cpu : CPU) (o : InstructionEffect) (σ σ' : MState) : Prop :=
   match o with
-  | .memRead n _ req =>
-      akExcl req.access_kind = true ∧ othersReserve σ.resv cpu req.pa n ∧
+  | .memRead req =>
+      akExcl req.accessKind = true ∧ othersReserve σ.resv cpu req.pa req.size ∧
         σ' = σ.dropResv cpu
-  | .memWrite n _ req => othersReserve σ.resv cpu req.pa n ∧ σ' = σ
+  | .memWrite req _ _ => othersReserve σ.resv cpu req.pa req.size ∧ σ' = σ
   | _ => False
 
 /-! ## The user boundary (NI M2-W1)
@@ -456,17 +519,17 @@ def hartObsW (cpu : CPU) (f : RegFile) : (r : Register) → RegisterType r → L
 /-- **THE HART'S OBSERVATIONS** at event `o` in state `σ`: the boundary
 event at a privilege-crossing write of `cur_privilege`, nothing at every
 other event. -/
-def hartObs (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) : List Obs :=
+def hartObs (cpu : CPU) (o : InstructionEffect) (σ : MState) : List Obs :=
   match o with
-  | .regWrite r v => hartObsW cpu (σ.regs cpu) r v
+  | .regWrite r _ v => hartObsW cpu (σ.regs cpu) r v
   | _ => []
 
 /-- The observations of hart `cpu`'s next step with `m` left to run: its
 head event's (a blocked step's event is a memory access, which is silent;
-the cycle boundary is silent). -/
+the cycle boundary and a finite choice are silent). -/
 def hartObsM (cpu : CPU) (m : SailM Unit) (σ : MState) : List Obs :=
   match m with
-  | .impure (.ok o) _ => hartObs cpu o σ
+  | .impure (.inl (.ok o)) _ => hartObs cpu o σ
   | _ => []
 
 /-- A privilege write that stays on one side of the boundary is silent. -/
@@ -484,8 +547,9 @@ theorem hartObsW_ne (cpu : CPU) (f : RegFile) (r : Register) (v : RegisterType r
 
 /-- A register write is silent unless it is a crossing write of
 `cur_privilege`: any other register, or the value already there. -/
-theorem hartObs_regWrite_quiet (cpu : CPU) (σ : MState) (r : Register) (w : RegisterType r)
-    (h : r ≠ .cur_privilege ∨ σ.regs cpu r = w) : hartObs cpu (.regWrite r w) σ = [] := by
+theorem hartObs_regWrite_quiet (cpu : CPU) (σ : MState) (r : Register) (a : Option Arch.sys_reg_id)
+    (w : RegisterType r)
+    (h : r ≠ .cur_privilege ∨ σ.regs cpu r = w) : hartObs cpu (.regWrite r a w) σ = [] := by
   show hartObsW cpu (σ.regs cpu) r w = []
   rcases h with h | h
   · exact hartObsW_ne cpu _ r w h
@@ -499,10 +563,11 @@ consumes one event (or restarts the cycle at the boundary, or is blocked and
 retries the event) and continues with `m'` in state `σ'`. -/
 def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState) : Prop :=
   match m with
-  | .pure _ => ∃ tick : Bool, m' = riscvStep tick ∧ σ' = σ
-  | .impure (.error _) _ => False
-  | .impure (.ok o) k =>
-      (∃ v : o.ret, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)
+  | .pure _ => ∃ tick ew : Bool, m' = riscvStep tick ew ∧ σ' = σ
+  | .impure (.inl (.error _)) _ => False
+  | .impure (.inl (.ok o)) k =>
+      (∃ v : InstructionEffect.ret o, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)
+  | .impure (.inr n) k => ∃ v : Fin n, m' = k v ∧ σ' = σ
 
 /-! ## The device steps -/
 

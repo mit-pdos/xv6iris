@@ -382,7 +382,7 @@ theorem freerange_loop [WchG GF] (KF : KFREE) [CurCtx]
     iframe #
     iapply wpNext_intro_pin
     iintro %c6 %hp6 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hav %hsaved
-    rw [if_pos hn, ← hn]
+    rw [ite_eq_left hn, ← hn]
     unfold frSaved at hsaved
     obtain ⟨⟨s2, s8, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27⟩, s9⟩ := hsaved
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -429,7 +429,7 @@ theorem freerange_loop [WchG GF] (KF : KFREE) [CurCtx]
     iframe #
     iapply wpNext_intro_pin
     iintro %c6 %hp6 %spie3 %spp3 %R3 %hsp3 Hk Hpc Hav %hsaved
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     unfold frSaved at hsaved
     obtain ⟨⟨s2, s8, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27⟩, s9⟩ := hsaved
     rw [show base + BitVec.ofNat 64 (4096 * i) + 4096#64 = base + BitVec.ofNat 64 (4096 * (i + 1))
@@ -507,7 +507,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))
   by_cases hn0 : n = 0
   · -- no whole page: straight to the epilogue
-    rw [if_pos hn0]
+    rw [ite_eq_left hn0]
     simp only [hn0, availAdd_zero]
     ihave Hframe := frFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w3 w4 w5
       $$ [F0 F1 F2 F3 F4 F5]
@@ -528,7 +528,7 @@ theorem freerange_proof (KF : KFREE) : FREERANGE :=
     case e26 => simp [RegMap.set_apply]
     case e27 => simp [RegMap.set_apply]
   · -- save s2, s3, s4 and enter the loop
-    rw [if_neg hn0]
+    rw [ite_eq_right hn0]
     k_step_gen (wp_s_sd c12 _ (KA.«freerange» + 0x1e#64) true 16#12 2#5 18#5 (by decide) w3)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
     iintro Hk Hpc F3

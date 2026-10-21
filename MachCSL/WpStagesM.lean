@@ -15,7 +15,7 @@ import MachCSL.Tactics
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -113,9 +113,9 @@ theorem swp_checked_mem_read_load8_conf [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c
 
 /-- The translation mode in machine mode: Bare, at once. -/
 theorem swp_translationMode_M (cpu : CPU) (Φ : SATPMode → IProp GF) :
-    Φ SATPMode.Bare ⊢ swp cpu (translationMode Privilege.Machine) Φ := by
+    Φ SATPMode.Bare ⊢ swp cpu (Functions.satp_mode Privilege.Machine) Φ := by
   iintro HΦ
-  unfold translationMode
+  unfold Functions.satp_mode
   swp_run 20
   iexact HΦ
 
@@ -126,47 +126,70 @@ theorem signExtend_extract64' (va : BitVec 64) : BitVec.signExtend 64 (BitVec.ex
   bv_decide
 
 set_option maxHeartbeats 4000000 in
-/-- The effective-address transform of a kernel access in machine mode:
-pointer masking is off (`mseccfg.PMM = 0`), the address is untouched. -/
-theorem swp_transform_effective_address_M (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
-    (va : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
-    (Φ : virtaddr → IProp GF) :
-    mConf cpu dq c ∗ (mConf cpu dq c -∗ Φ (virtaddr.Virtaddr va))
-    ⊢ swp cpu (transform_effective_address (virtaddr.Virtaddr va) acc) Φ := by
+/-- The access information of a kernel access in machine mode (`MPRV = 0`):
+effective privilege `Machine`, no pointer masking (`mseccfg.PMM = 0`), not a
+guest access.  (Since sail-riscv 0.16 the effective privilege and the
+pointer-masking length are computed once, by `default_access_info`, and handed
+to `transform_effective_address` and `translateAddr`.) -/
+theorem swp_default_access_info_M (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
+    (Φ : AccessInfo → IProp GF) :
+    mConf cpu dq c ∗
+    (mConf cpu dq c -∗ Φ { eff_privilege := Privilege.Machine, pmlen := 0, as_guest := false })
+    ⊢ swp cpu (default_access_info acc) Φ := by
   iintro ⟨HmConf, HΦ⟩
   mconf_cases HmConf
   obtain ⟨hMIE, hMPRV⟩ := hok.1
-  unfold transform_effective_address
+  unfold default_access_info
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
     swp_run 120
-    iapply swp_bind
-    iapply swp_translationMode_M
-    swp_run 60
-    reduce_closed_widths
-    simp only [pm_transform_PA, zero_extend, Sail.BitVec.zeroExtend,
-      Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
-      Int.reduceToNat, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
-    reduce_closed_widths
-    try simp only [BitVec.zeroExtend, setWidth_extract64']
     mconf_intro HmConf
     iapply HΦ $$ HmConf
 
+set_option maxHeartbeats 4000000 in
+/-- The effective-address transform of a kernel access in machine mode
+(the access information `default_access_info` computes there,
+`swp_default_access_info_M`): pointer masking is off, the address is
+untouched. -/
+theorem swp_transform_effective_address_M (cpu : CPU) (dq : DFrac) (c : MConf) (_hok : MConf.ok (GF := GF) c)
+    (va : BitVec 64) (Φ : virtaddr → IProp GF) :
+    mConf cpu dq c ∗ (mConf cpu dq c -∗ Φ (virtaddr.Virtaddr va))
+    ⊢ swp cpu (transform_effective_address (virtaddr.Virtaddr va)
+        { eff_privilege := Privilege.Machine, pmlen := 0, as_guest := false }) Φ := by
+  iintro ⟨HmConf, HΦ⟩
+  unfold transform_effective_address
+  swp_run 20
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 20
+  reduce_closed_widths
+  simp only [pm_transform_PA, zero_extend, Sail.BitVec.zeroExtend,
+    Sail.BitVec.extractLsb, BitVec.extractLsb, Functions.xlen, Int.reduceSub,
+    Int.reduceToNat, Nat.reduceAdd, Nat.sub_zero, Int.cast_ofNat_Int]
+  reduce_closed_widths
+  try simp only [BitVec.zeroExtend, setWidth_extract64']
+  iapply HΦ $$ HmConf
+
 
 set_option maxHeartbeats 4000000 in
-/-- `translateAddr` in machine mode (`MPRV = 0`): the address itself. -/
-theorem swp_translateAddr_M (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+/-- `translateAddr` of a kernel access at effective privilege `Machine`: the
+address itself. -/
+theorem swp_translateAddr_M (cpu : CPU) (dq : DFrac) (c : MConf) (_hok : MConf.ok (GF := GF) c)
     (va : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
-    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
+    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit) → IProp GF) :
     mConf cpu dq c ∗
     (mConf cpu dq c -∗ Φ (.Ok (physaddr.Physaddr va, page_based_mem_type.PBMT_PMA, ())))
-    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ := by
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc Privilege.Machine) Φ := by
   iintro ⟨HmConf, HΦ⟩
   mconf_cases HmConf
-  obtain ⟨hMIE, hMPRV⟩ := hok.1
   unfold translateAddr
   rw [is_shadow_stack_access_kernel acc hacc]
   swp_run 60
+  iapply swp_bind
+  iapply swp_translationMode_M
+  swp_run 60
+  -- `translate_vs_stage` asks for the mode a second time
   iapply swp_bind
   iapply swp_translationMode_M
   swp_run 60

@@ -110,7 +110,7 @@ theorem wp_uk_ecall_pipe (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
         wpLoop h') -∗
       wpLoop h := by
   have hwin : usyswin m USYS_pipe = some (m.get 10#5, 8) := by
-    unfold usyswin; rw [if_neg (by decide), if_pos rfl]
+    unfold usyswin; rw [ite_eq_right (by decide), ite_eq_left rfl]
   have hw : usysWin USYS_pipe (tfOf m pc) = some (m.get 10#5, 8) := by rw [usyswin_tf_of]; exact hwin
   iintro #Hi Hrun Hsb Hreg Hstd Hbuf Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -165,13 +165,13 @@ theorem wp_uk_ecall_pipe (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     apply usysWr_uMWrite M (m.get 10#5) bs g hnw
     intro j hj
     show bs[j]? = some (if j < d then bs[j]?.getD 0#8 else f j)
-    rw [if_pos hj, List.getElem?_eq_getElem hj]; rfl
+    rw [ite_eq_left hj, List.getElem?_eq_getElem hj]; rfl
   subst hMw
   iapply uslot_fupd
   icases (ubytes_split N.d (m.get 10#5).toNat d 8 f hbl).1 $$ Hbuf with ⟨Hlo, Hhi⟩
   imod uheap_store_run N.t N.d N.s M pm sz (m.get 10#5).toNat d f g $$ Hheap Hlo with ⟨Hheap, Hlo⟩
   ihave Hhi := ubytes_ext N.d ((m.get 10#5).toNat + d) (8 - d) (fun j => f (d + j)) (fun j => g (d + j))
-    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [if_neg (by omega)]) $$ Hhi
+    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [ite_eq_right (by omega)]) $$ Hhi
   ihave Hbuf := (ubytes_split N.d (m.get 10#5).toNat d 8 g hbl).2 $$ [Hlo Hhi]
   · iframe Hlo Hhi
   -- THE AUTHORITY MOVES TO `fdv'`, and on success it pays out the two handles
@@ -188,7 +188,7 @@ theorem wp_uk_ecall_pipe (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
       intro i hi
       show (if i < d then bs[i]?.getD 0#8 else f i) = _
       have hd : d = 8 := h8
-      rw [if_pos (by omega), hbs]
+      rw [ite_eq_left (by omega), hbs]
       exact pipeBytes_get a b i hi
     imod ufd_alloc_least N.fd fdv l a (.open true false (.pipe γp)) hca (by simp) $$ Hufd Hstd
       with ⟨Hufd, Hal⟩

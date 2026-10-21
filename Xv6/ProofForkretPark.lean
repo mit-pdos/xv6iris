@@ -291,7 +291,7 @@ theorem forkret_park_paid (FR : FORKRET) {GF : BundledGFunctors.{0}} [MachGS GF]
   icases procHeldAt_live_cases Γ ξc h N.j RUNNING ch (Or.inl rfl) $$ Hheld with
     ⟨⟨Hlocked, Hwhole, %kl, %xs, %pidx, Hstate, Hchan, Hrest⟩, Hzs⟩
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr N.j) RUNNING
-  rw [if_neg (by decide : ¬ unclaimed RUNNING)] at hsplit
+  rw [ite_eq_right (by decide : ¬ unclaimed RUNNING)] at hsplit
   icases hsplit.mp $$ Hwhole with ⟨Hpsl, Hpst⟩
   icases hart_split Γ N.j h $$ Htag with ⟨Htag1, Htag2⟩
   -- the lock resource: the raw context cells the wand handed back, and THAT

@@ -70,7 +70,7 @@ theorem shStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (s
   have hsp2 : m2.get spIdx + BitVec.ofNat 64 (8 * 2) = sp0 := by
     show (ukWr (ukWr m 1#5 vra) 8#5 vs0).get 2#5 + _ = _
     simp only [ukWr_get]
-    simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
+    simp (config := {decide := true}) only [ite_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
@@ -97,19 +97,19 @@ theorem shStrlen_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (s
   iintro %h4 Hrun
   have hra : (ukWr m2 spIdx sp0).get 1#5 = vra := by
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 1#5 = vra
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   rw [hra]
   iapply Hcont $$ %h4 %_ [] [] [] Hrun
   · ipureintro
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 2#5 = sp0
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   · ipureintro
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 8#5 = vs0
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   · ipureintro
     intro r h2 h8 h1
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get r = m.get r
-    simp only [ukWr_get, h2, h8, h1, _root_.false_and, if_false]
+    simp only [ukWr_get, h2, h8, h1, _root_.false_and, ite_false]
 
 /-- One turn of the scan (one turn of Rocq `wp_kshp_strlen_loop`). -/
 theorem shStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (dq : DFrac) (p : Nat)
@@ -171,7 +171,7 @@ theorem shStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) 
         simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat] at this
         rw [Nat.mod_eq_of_lt (Nat.lt_trans b.isLt (by decide))] at this
         simpa using this
-      simp only [ukBtaken, hne, hb, bne_iff_ne, ne_eq, not_false_eq_true, decide_true, if_true, if_false]
+      simp only [ukBtaken, hne, hb, bne_iff_ne, ne_eq, not_false_eq_true, decide_true, ite_true, ite_false]
       decide
   rw [htgt]
   iapply Hcont $$ Hb %h4 %m3 [] [] [] Hrun
@@ -180,7 +180,7 @@ theorem shStrlen_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) 
   · ipureintro; show (ukWr m2 14#5 _).get 15#5 = _; ureg; exact h15
   · ipureintro; intro r h13 h14' h15'
     show (ukWr (ukWr (ukWr mc 13#5 _) 15#5 _) 14#5 _).get r = _
-    simp only [ukWr_get, h13, h14', h15', _root_.false_and, if_false]
+    simp only [ukWr_get, h13, h14', h15', _root_.false_and, ite_false]
 
 /-- The scan (Rocq `wp_kshp_strlen_loop`): `k` body bytes still to walk. -/
 theorem shStrlen_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (a len : Nat) (f : Nat → BitVec 8) :
@@ -219,7 +219,7 @@ theorem shStrlen_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (a len : Na
     iapply shStrlen_step UL N h mc dq (a + 1 + j) (f (1 + j)) n (by omega) ha5 $$ Hc Hb Hrun
     iintro Hb %h1 %mc1 %h13 %h15 %hr Hrun
     have hnz : f (1 + j) ≠ 0#8 := hne (1 + j) hj
-    rw [if_neg hnz]
+    rw [ite_eq_right hnz]
     rw [← ep]
     ispecialize Hcl $$ Hb
     iapply ih (j + 1) h1 mc1 n (by omega) hbnd (by rw [h15]; congr 1) $$ Hc Hcl Hrun
@@ -349,7 +349,7 @@ theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq
     rw [show BitVec.ofNat 64 0xa36 + BitVec.signExtend 64 0x1ffff6#21 = BitVec.ofNat 64 0xa2c from by decide]
     let m7 := ukWr (ukWr m5 10#5 (ukItypeVal .ADDI (m5.get 0#5) 0#12)) 0#5 (BitVec.ofNat 64 0xa36 + instrLen true)
     have e7 : m7 = ukWr m5 10#5 (ukItypeVal .ADDI (m5.get 0#5) 0#12) := by
-      show ukWr _ 0#5 _ = _; unfold ukWr; rw [if_pos rfl]
+      show ukWr _ 0#5 _ = _; unfold ukWr; rw [ite_eq_left rfl]
     have f2 : m7.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) := by
       rw [e7]; ureg <;> exact hsp4
     have f10 : m7.get 10#5 = BitVec.ofNat 64 0 := by rw [e7]; ureg; rfl
@@ -359,7 +359,7 @@ theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq
       have r15 : r ≠ 15#5 := ucs_ne r 15#5 hr (by decide)
       have r2' : r ≠ spIdx := r2
       rw [e7]
-      simp only [m5, m4, m1, ukWr_get, r10, r15, r8, r2', _root_.false_and, if_false]
+      simp only [m5, m4, m1, ukWr_get, r10, r15, r8, r2', _root_.false_and, ite_false]
     iapply hEpi h8 m7 f2 f10 fr $$ Hc Hw8 Hw0 Hrun
     iapply Hcont $$ Hcl
   · -- a nonempty string: 0xa14 reads a body byte, 0xa18 falls through
@@ -391,7 +391,7 @@ theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq
         else BitVec.ofNat 64 0xa18 + instrLen true) = BitVec.ofNat 64 0xa1a := by
       have : m5.get 15#5 = BitVec.setWidth 64 (f 0) := by ureg
       rw [this]
-      simp only [ukBtaken, beq_iff_eq, hnz, decide_false, Bool.false_eq_true, if_false]
+      simp only [ukBtaken, beq_iff_eq, hnz, decide_false, Bool.false_eq_true, ite_false]
       decide
     rw [htk]
     -- 0xa1a  addi a5,a0,1
@@ -431,7 +431,7 @@ theorem wp_shStrlen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (dq
       have r15 : r ≠ 15#5 := ucs_ne r 15#5 hr' (by decide)
       have r2' : r ≠ spIdx := r2
       rw [ukWr_get_other _ _ _ _ r10, hr r r13 r14 r15]
-      simp only [m6, m5, m4, m1, ukWr_get, r10, r15, r8, r2', _root_.false_and, if_false]
+      simp only [m6, m5, m4, m1, ukWr_get, r10, r15, r8, r2', _root_.false_and, ite_false]
     iapply hEpi h9 _ f2 f10 fr $$ Hc Hw8 Hw0 Hrun
     iapply Hcont $$ Hs
 

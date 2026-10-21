@@ -147,7 +147,7 @@ theorem syKept_trans {R R' R'' : RegMap} (h : syKept R R') (h' : syKept R' R'') 
 /-- Setting `a4` keeps everything the function keeps. -/
 theorem syKept_set14 (R : RegMap) (v : BitVec 64) : syKept R (R.set 14#5 v) := by
   intro r _ _ _ h14' _ _
-  simp only [RegMap.set_apply, h14', if_false]
+  simp only [RegMap.set_apply, h14', ite_false]
 
 /-- What the pad loop keeps: everything but `a3` and `a4`. -/
 def syPadKept (R R' : RegMap) : Prop :=
@@ -219,7 +219,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c4
         (if n - (j + 1) = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x30#64)) ⊢
-        pcIs c4 (KA.«strncpy» + 0x3e#64) from by rw [if_pos hz]) $$ Hpc
+        pcIs c4 (KA.«strncpy» + 0x3e#64) from by rw [ite_eq_left hz]) $$ Hpc
     ihave HΦ' := wpNext_at _ _ _ c4 _
       (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
     iapply HΦ' $$ %_ %(cur.set j 0#8) Hk Hpc Hdst
@@ -232,7 +232,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
       subst this
       exact List.getElem?_set_self (by rw [hcur]; omega)
     · intro r h13 h14'
-      simp only [RegMap.set_apply, h13, h14', if_false]
+      simp only [RegMap.set_apply, h13, h14', ite_false]
   | succ f ih =>
     intro j hf hjn cur hcur R h14 hw15 cpu
     have hmore : j + 1 < n := by omega
@@ -264,7 +264,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c4
         (if n - (j + 1) = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x30#64)) ⊢
-        pcIs c4 (KA.«strncpy» + 0x30#64) from by rw [if_neg hnz]) $$ Hpc
+        pcIs c4 (KA.«strncpy» + 0x30#64) from by rw [ite_eq_right hnz]) $$ Hpc
     ihave HΦ := wpNext_shift _ _ _ _ _
       (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
     iapply (ih (j + 1) (by omega) (by omega) (cur.set j 0#8)
@@ -292,7 +292,7 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
       · exact hpad' q (by omega) hq2
     · refine syPadKept_trans ?_ hkept'
       intro r h13 h14'
-      simp only [RegMap.set_apply, h13, h14', if_false]
+      simp only [RegMap.set_apply, h13, h14', ite_false]
 
 /-! ## The copy loop -/
 
@@ -337,7 +337,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c1
         (if n - i = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x12#64)) ⊢
-        pcIs c1 (KA.«strncpy» + 0x3e#64) from by rw [if_pos hz]) $$ Hpc
+        pcIs c1 (KA.«strncpy» + 0x3e#64) from by rw [ite_eq_left hz]) $$ Hpc
     ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %R %cur Hk Hdst Hsrc
     · ipureintro; exact ⟨hcur, syKept_refl R⟩
@@ -360,7 +360,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c1
         (if n - i = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x12#64)) ⊢
-        pcIs c1 (KA.«strncpy» + 0x12#64) from by rw [if_neg hnz]) $$ Hpc
+        pcIs c1 (KA.«strncpy» + 0x12#64) from by rw [ite_eq_right hnz]) $$ Hpc
     -- addiw a3,a2,-1
     k_step_gen (wp_s_addiw c1 _ (KA.«strncpy» + 0x12#64) false 4095#12 13#5 12#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -411,13 +411,13 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     · -- the source NUL: leave the copy loop
       ihave Hpc := (show pcIs (GF := GF) c8
           (if bss[i] = 0#8 then (KA.«strncpy» + 0x26#64) else (KA.«strncpy» + 0xc#64)) ⊢
-          pcIs c8 (KA.«strncpy» + 0x26#64) from by rw [if_pos hb0]) $$ Hpc
+          pcIs c8 (KA.«strncpy» + 0x26#64) from by rw [ite_eq_left hb0]) $$ Hpc
       ihave HΦ' := wpNext_at _ _ _ c8 _ hpin8 $$ HΦ Hlc
       iapply HΦ' $$ %_ %(cur.set i bss[i]) Hk Hdst Hsrc
       · ipureintro
         refine ⟨by rw [List.length_set]; exact hcur, ?_⟩
         intro r h11' h12' h13' h14' h15' h16'
-        simp only [RegMap.set_apply, h11', h13', h14', h15', h16', if_false]
+        simp only [RegMap.set_apply, h11', h13', h14', h15', h16', ite_false]
       · unfold sncpyCopyPost
         iright
         iframe
@@ -437,7 +437,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     · -- a non-NUL byte: go round
       ihave Hpc := (show pcIs (GF := GF) c8
           (if bss[i] = 0#8 then (KA.«strncpy» + 0x26#64) else (KA.«strncpy» + 0xc#64)) ⊢
-          pcIs c8 (KA.«strncpy» + 0xc#64) from by rw [if_neg hb0]) $$ Hpc
+          pcIs c8 (KA.«strncpy» + 0xc#64) from by rw [ite_eq_right hb0]) $$ Hpc
       -- mv a2,a3
       k_step_gen (wp_s_add c8 _ (KA.«strncpy» + 0xc#64) true 12#5 0#5 13#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -471,7 +471,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
       · ipureintro
         refine ⟨hl', syKept_trans ?_ hkept'⟩
         intro r h11' h12' h13' h14' h15' h16'
-        simp only [RegMap.set_apply, h11', h12', h13', h14', h15', h16', if_false]
+        simp only [RegMap.set_apply, h11', h12', h13', h14', h15', h16', ite_false]
       · iexact Hpost
 
 end
@@ -606,7 +606,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {GF} _ _ cpu k bsd bss n dq hK hn hn31
       iintro Hk Hpc
       ihave Hpc := (show pcIs (GF := GF) c6
           (if n - i - 1 = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x2c#64)) ⊢
-          pcIs c6 (KA.«strncpy» + 0x3e#64) from by rw [if_pos hlast]) $$ Hpc
+          pcIs c6 (KA.«strncpy» + 0x3e#64) from by rw [ite_eq_left hlast]) $$ Hpc
       iapply (hexit c6 (fun h => (hp6 h).trans ((hp5 h).trans (hpin4 h))) _
         (hbase2 _ (syKept_set14 R4 _)) (hbase _ (syKept_set14 R4 _)) cur4 hl4 ?hpostB)
         $$ [- $Hk $Hpc]
@@ -626,7 +626,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {GF} _ _ cpu k bsd bss n dq hK hn hn31
       iintro Hk Hpc
       ihave Hpc := (show pcIs (GF := GF) c6
           (if n - i - 1 = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x2c#64)) ⊢
-          pcIs c6 (KA.«strncpy» + 0x2c#64) from by rw [if_neg hlast]) $$ Hpc
+          pcIs c6 (KA.«strncpy» + 0x2c#64) from by rw [ite_eq_right hlast]) $$ Hpc
       -- addw a5,a5,a2
       k_step_gen (wp_s_addw c6 _ (KA.«strncpy» + 0x2c#64) true 15#5 15#5 12#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
@@ -654,7 +654,7 @@ theorem strncpy_proof : STRNCPY := ⟨fun {GF} _ _ cpu k bsd bss n dq hK hn hn31
       have hkeptAll : syKept R4 R9 := by
         refine syKept_trans ?_ (syKept_of_pad hkept9)
         intro r _ _ _ h14' h15' _
-        simp only [RegMap.set_apply, h14', h15', if_false]
+        simp only [RegMap.set_apply, h14', h15', ite_false]
       iapply (hexit c9 (fun h => (hp9 h).trans (hpin8 h)) _
         (hbase2 _ hkeptAll) (hbase _ hkeptAll) cur9 hl9 ?hpostC) $$ [- $Hk $Hpc]
       rotate_right 1

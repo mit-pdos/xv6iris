@@ -77,10 +77,10 @@ theorem uc_bgeu_test {α : Type} (sz : BitVec 64) (n i : Nat) (hn : n = uvmNp sz
     refine Xv6.bcOfNatToNat _ ?_
     omega
   by_cases he : i = n
-  · rw [if_pos he, if_pos (show bcond bop.BGEU (BitVec.ofNat 64 (4096 * i)) sz = true by
+  · rw [ite_eq_left he, ite_eq_left (show bcond bop.BGEU (BitVec.ofNat 64 (4096 * i)) sz = true by
       simp only [bcond, BitVec.ult, hival, Bool.not_eq_true', decide_eq_false_iff_not, Nat.not_lt]
       omega)]
-  · refine (if_neg ?_).trans (if_neg he).symm
+  · refine (ite_eq_right ?_).trans (ite_eq_right he).symm
     intro hc
     simp only [bcond, BitVec.ult, hival, Bool.not_eq_true', decide_eq_false_iff_not,
       Nat.not_lt] at hc
@@ -167,14 +167,14 @@ theorem uc_inv_ok {Pold Pnew P : UPtd} {Mold Mnew : Nat → List (BitVec 8)} {n 
     · rw [hfree k hk] at hw; exact absurd hw (by simp)
     · rw [hout k hk]; exact hw
   · intro k hk
-    exact ⟨hout k hk, by unfold UPtCopy.ucView; rw [if_neg hk]⟩
+    exact ⟨hout k hk, by unfold UPtCopy.ucView; rw [ite_eq_right hk]⟩
   · intro i hi
     have hb := hin i hi
     cases hw : get? Pold.um i with
     | none => rw [hw] at hb; exact hb
     | some w =>
       rw [hw] at hb
-      exact ⟨hb, by unfold UPtCopy.ucView; rw [if_pos hi]⟩
+      exact ⟨hb, by unfold UPtCopy.ucView; rw [ite_eq_left hi]⟩
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
@@ -414,7 +414,7 @@ theorem uc_procPtAt_view [CurCtx] (Pnew : UPtd) (Mold Mnew : Nat → List (BitVe
       rw [hfree k hc] at hw
       exact absurd hw (by simp)
     unfold UPtCopy.ucView
-    rw [if_neg hk]
+    rw [ite_eq_right hk]
   unfold procPtAt
   iintro ⟨%hwf, Ht, Hp⟩
   isplitl []
@@ -435,7 +435,7 @@ theorem uc_procPtAt_view' [CurCtx] (Pnew : UPtd) (Mold Mnew : Nat → List (BitV
       rw [hfree k hc] at hw
       exact absurd hw (by simp)
     unfold UPtCopy.ucView
-    rw [if_neg hk]
+    rw [ite_eq_right hk]
   unfold procPtAt
   iintro ⟨%hwf, Ht, Hp⟩
   isplitl []
@@ -813,7 +813,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       have hent0 : told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) = 0#64 :=
         UPtCopy.entAt_eq_zero_of_invalid 2 told _ hrepo.1 hcomp hv1
       have hwalkn : told.walk 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) = none := by
-        rw [PTree.walk_eq, if_pos hent0]
+        rw [PTree.walk_eq, ite_eq_left hent0]
       have holdum : get? Pold.um i = none := by
         have h := UPtCopy.ptRep_none_of_walk hrepo (vpnOf (BitVec.ofNat 64 (4096 * i))) hwalkn
         rw [hvpni] at h
@@ -847,7 +847,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           = some (pteAddr (told.slot 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))).1
               (told.slot 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))).2,
             told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))) := by
-        rw [PTree.walk_eq, if_neg hentne]
+        rw [PTree.walk_eq, ite_eq_right hentne]
       obtain ⟨w, hw⟩ : ∃ w, get? Pold.um i = some w := by
         cases hg : get? Pold.leaves i with
         | none =>
@@ -1082,7 +1082,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           rw [e1, e2]
           exact hsp2 h
         have hviewi : UPtCopy.ucView Mold Mnew n i = Mold i := by
-          unfold UPtCopy.ucView; rw [if_pos hi]
+          unfold UPtCopy.ucView; rw [ite_eq_left hi]
         have hleafpa : pte2pa (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = R3 10#5 :=
           UPtCopy.pte2pa_leafOf _ _ hmemal hmemlt (UPtCopy.pteFlags_mask w)
         have hleafppn : ptePpn (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) = BitVec.extractLsb' 12 44 (R3 10#5) :=
@@ -1093,9 +1093,9 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
             by_cases hc : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2
                 (vpnOf (BitVec.ofNat 64 (4096 * i)))
             · exact hc
-            · rw [uc_mapRun_one, if_neg hc] at hcount
+            · rw [uc_mapRun_one, ite_eq_right hc] at hcount
               simp at hcount
-          rw [uc_mapRun_one, if_pos hcomp2]
+          rw [uc_mapRun_one, ite_eq_left hcomp2]
           have hrep2 : ptRep ((tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.setLeaf 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))
               (leafOf (BitVec.extractLsb' 12 44 (R3 10#5))
                 (pteFlags (told.entAt 2 (vpnOf (BitVec.ofNat 64 (4096 * i)))))))
@@ -1162,9 +1162,9 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           icases Hn with #Hn
           have hnc : ¬ (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.complete 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) := by
             intro hc
-            rw [uc_mapRun_one, if_pos hc] at hlt1
+            rw [uc_mapRun_one, ite_eq_left hc] at hlt1
             simp at hlt1
-          rw [uc_mapRun_one, if_neg hnc]
+          rw [uc_mapRun_one, ite_eq_right hnc]
           have hbf : (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1.base = P.root := by
             rw [MachCSL.PTree.base_fill]; exact hbasec
           have hrf : ptRep (tchild.fill 2 (vpnOf (BitVec.ofNat 64 (4096 * i))) fresh).1 P.leaves :=
@@ -1294,7 +1294,7 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3 £ Hlc
       iintro Hk Hpc
-      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_pos hlast]
+      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), ite_eq_left hlast]
       have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = c1 := fun h =>
         (hp3 h).trans (hp2 h)
       have hpin3' : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
@@ -1347,7 +1347,7 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
       iintro Hk Hpc
-      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_neg hlast]
+      k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), ite_eq_right hlast]
       have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
         (hp3 h).trans ((hp2 h).trans (hp1 h))
       ihave HΦ := wpNext_shift _ _ _ _ _ hpin3 $$ HΦ

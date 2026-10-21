@@ -4,9 +4,9 @@ import LeanRV64D.Defs
 import LeanRV64D.Xv6Extras
 
 namespace MachCSL
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
-open ConcurrencyInterfaceV1
+open ArchSem
 open zicondop
 open xRET_type
 open wxfunct6
@@ -47,6 +47,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -80,10 +82,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -129,6 +134,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -147,17 +153,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -172,12 +185,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -188,7 +204,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -209,7 +228,8 @@ def bootPMA : List PMA_Region :=
                                           write_idempotent := true
                                           misaligned_exceptions := { load_store := none
                                                                      vector := none
-                                                                     amo := AccessFault }
+                                                                     amo := AccessFault
+                                                                     lrsc := AccessFault }
                                           atomic_support := AMONone
                                           reservability := RsrvNone
                                           supports_cbo_zero := false
@@ -229,7 +249,8 @@ def bootPMA : List PMA_Region :=
                                                                                write_idempotent := false
                                                                                misaligned_exceptions := { load_store := none
                                                                                                           vector := none
-                                                                                                          amo := AccessFault }
+                                                                                                          amo := AccessFault
+                                                                                                          lrsc := AccessFault }
                                                                                atomic_support := AMONone
                                                                                reservability := RsrvNone
                                                                                supports_cbo_zero := false
@@ -249,7 +270,8 @@ def bootPMA : List PMA_Region :=
                                                                                                                     write_idempotent := true
                                                                                                                     misaligned_exceptions := { load_store := none
                                                                                                                                                vector := none
-                                                                                                                                               amo := AccessFault }
+                                                                                                                                               amo := AccessFault
+                                                                                                                                               lrsc := AccessFault }
                                                                                                                     atomic_support := AMOCASQ
                                                                                                                     reservability := RsrvEventual
                                                                                                                     supports_cbo_zero := true

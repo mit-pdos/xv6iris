@@ -24,21 +24,21 @@ variable {C : UCfg} {P : UPtd}
 theorem uft_translate (hv : UftLeavesValid P) {t0 : PTree} {mm0 : BMap} (s : UWSt) (hl : UstLand C P t0 mm0 s)
     (vpn : BitVec 27) (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate 39 0#16 P.root vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
+        (translate 39 0#16 0#14 P.root vpn (.InstructionFetch ()) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   obtain ⟨t, hstep, htlb⟩ := hl.mem
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
-  have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc)) →
+  have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (none, s, orc)) →
       ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate 39 0#16 P.root vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
+        (translate 39 0#16 0#14 P.root vpn (.InstructionFetch ()) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
     intro hl0
     obtain ⟨r, s', hw, hout⟩ := uft_miss hv s hl t hstep htlb vpn sum
-    exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum _ (hl0 orc) (hw orc), hout⟩
+    exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum (ufFoot_rd _ (by decide)) _ (hl0 orc) (hw orc), hout⟩
   cases hslot : (s.file .tlb)[tlbHash vpn]! with
   | none => exact hmiss (fun orc => utlb_lookup_empty ufFoot orc s hdr _ rfl vpn hslot)
   | some ent =>
-    cases hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) with
+    cases hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage with
     | false => exact hmiss (fun orc => utlb_lookup_other ufFoot orc s hdr _ rfl vpn ent hslot hm)
     | true =>
       have hslot' : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent := by
@@ -54,7 +54,8 @@ theorem uftXlate_of_valid (hv : UftLeavesValid P) : UftXlate C P := by
   by_cases hc : utrCanon va
   · obtain ⟨r0, s', hw, hout⟩ := uft_translate hv s hl (vpnOf va) (utrSum (s.file .mstatus))
     have e : utrTranslate s va (.InstructionFetch ()) =
-        translate 39 0#16 P.root (vpnOf va) (.InstructionFetch ()) .User false (utrSum (s.file .mstatus)) () := by
+        translate 39 0#16 0#14 P.root (vpnOf va) (.InstructionFetch ()) .User false (utrSum (s.file .mstatus))
+          .S_Stage () := by
       unfold utrTranslate
       rw [hl.cfg.satp, utrRoot_satpOf, utrMxr_false _ hl.ms.2.2.1]
     have hw' : ∀ orc, runRW ufFoot orc s (utrTranslate s va (.InstructionFetch ())) = some (r0, s', orc) := by
@@ -87,7 +88,7 @@ theorem uftXlate_of_valid (hv : UftLeavesValid P) : UftXlate C P := by
     · intro pa pbmt h; cases h
     · intro e' h
       cases h
-      exact uftExc_utrTexc _ (fun x h => by cases h)
+      exact uftExc_utrTexc (.PTW_Invalid_Addr ()) (fun x h => by cases h)
 
 end xlate
 

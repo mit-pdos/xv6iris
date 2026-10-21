@@ -96,10 +96,10 @@ theorem rdDst_post (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : P
          wordPointsTo (pPid k.proc) 4 dqp pidv) := by
   cases user
   · rw [rdDst_false, hproc]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro H; iexact H
   · rw [rdDst_true]
-    simp only [if_true]
+    simp only [ite_true]
     iintro ⟨%kv, %hkv, H⟩
     iexists P, Mi, kv
     ihave H := procPrivExt_close _ _ _ _ _ $$ H

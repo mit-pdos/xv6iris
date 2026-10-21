@@ -81,7 +81,7 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   iintro %r %M' %pm' %sz' %fdv' %cw' %g' %cs' %lz' %secc' %hok %hfd %_ %hcw %hgn %_ %hlive %hsc %hch Hpost
   have hw : usysWin USYS_read (tfOf m pc) = some (m.get 11#5, cnt.toNat) := by
     unfold usysWin usysRdcount
-    rw [if_neg (by decide), if_neg (by decide), if_pos rfl, tfOf_a1, tfOf_a2, ukSys_lo32, hcnt]
+    rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl, tfOf_a1, tfOf_a2, ukSys_lo32, hcnt]
   have hok2 : usysMemOk USYS_read (tfOf m pc) r M pm sz false M' pm' sz' lz' := hok
   obtain ⟨⟨bs, hbl, hM'⟩, hp, hs⟩ := usysMemOk_window hw hok2
   have hl : lz' = false := usysMemOk_lazy (by decide) hok2
@@ -112,17 +112,17 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     apply usysWr_uMWrite M (m.get 11#5) bs g hnw
     intro j hj
     show bs[j]? = some (if j < d then bs[j]?.getD 0#8 else f j)
-    rw [if_pos hj, List.getElem?_eq_getElem hj]; rfl
+    rw [ite_eq_left hj, List.getElem?_eq_getElem hj]; rfl
   subst hMw
   have hgf : ∀ j, d ≤ j → j < k → g j = f j := fun j h1 _ => by
-    show (if j < d then _ else f j) = f j; rw [if_neg (by omega)]
+    show (if j < d then _ else f j) = f j; rw [ite_eq_right (by omega)]
   have hMg : ∀ j, j < k → uMWrite M (m.get 11#5).toNat d g ((m.get 11#5) + BitVec.ofNat 64 j).toNat = some (g j) := by
     intro j hj
     rw [hlin j hj]
     unfold uMWrite
     by_cases hjd : j < d
-    · rw [if_pos ⟨by omega, by omega⟩]; congr 2; omega
-    · rw [if_neg (by omega), hgf j (by omega) hj]; exact (hbnd j hj).1
+    · rw [ite_eq_left ⟨by omega, by omega⟩]; congr 2; omega
+    · rw [ite_eq_right (by omega), hgf j (by omega) hj]; exact (hbnd j hj).1
   have hwm : ∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um sz = pm → lazyFree P.um (BitVec.ofNat 64 sz) →
       j < k → uvaWmapped P ((m.get 11#5) + BitVec.ofNat 64 j).toNat := by
     intro P j hwf hpm hlf hj
@@ -132,7 +132,7 @@ theorem wp_uk_ecall_read_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   icases (ubytes_split N.d (m.get 11#5).toNat d k f hdk).1 $$ Hbuf with ⟨Hlo, Hhi⟩
   imod uheap_store_run N.t N.d N.s M pm sz (m.get 11#5).toNat d f g $$ Hheap Hlo with ⟨Hheap, Hlo⟩
   ihave Hhi := ubytes_ext N.d ((m.get 11#5).toNat + d) (k - d) (fun j => f (d + j)) (fun j => g (d + j))
-    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [if_neg (by omega)]) $$ Hhi
+    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [ite_eq_right (by omega)]) $$ Hhi
   ihave Hbuf := (ubytes_split N.d (m.get 11#5).toNat d k g hdk).2 $$ [Hlo Hhi]
   · iframe Hlo Hhi
   imodintro

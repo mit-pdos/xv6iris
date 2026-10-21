@@ -316,16 +316,16 @@ theorem cafMade_row_node (n : FsNode) (ty major minor : BitVec 16)
   have hsz : fnSize n = 0 := by unfold fnSize; rw [hr]; rfl
   unfold creC0
   by_cases hd : ty.toNat = T_DIR_z
-  · rw [if_pos hd]
+  · rw [ite_eq_left hd]
     have hdir : fnIsDir n = true := by unfold fnIsDir; rw [hnty]; exact decide_eq_true hd
     rw [absOf_dir n hdir (by rw [hnl]; decide), dirEntries_size_0 n hsz, hnl]
-  · rw [if_neg hd]
+  · rw [ite_eq_right hd]
     have hnd : fnIsDir n = false := by unfold fnIsDir; rw [hnty]; exact decide_eq_false hd
     by_cases hf : ty.toNat = T_FILE
-    · rw [if_pos hf, absOf_file n hnd (by rw [hnty]; exact hf) (by rw [hnl]; decide), hnl]
+    · rw [ite_eq_left hf, absOf_file n hnd (by rw [hnty]; exact hf) (by rw [hnl]; decide), hnl]
       have hb : fnFileBytes n = [] := by unfold fnFileBytes; rw [hsz]; rfl
       rw [hb]
-    · rw [if_neg hf, absOf_dev n hnd (by rw [hnty]; exact hf) (by rw [hnty]; exact hty)
+    · rw [ite_eq_right hf, absOf_dev n hnd (by rw [hnty]; exact hf) (by rw [hnty]; exact hty)
         (by rw [hnl]; decide), hnl]
       have hma : fnMajor n = major.toNat := by unfold fnMajor; rw [hr]; rfl
       have hmi : fnMinor n = minor.toNat := by unfold fnMinor; rw [hr]; rfl

@@ -103,7 +103,7 @@ theorem ukDataBytes_view (um : RegMapF (BitVec 64)) (mm T : BMap)
     obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hp
     rw [ukView_length um mm T (k, w) hkv, List.mem_range] at hj
     have hd : pte2pa w + BitVec.ofNat 64 j ∈ ukDataAddrs um :=
-      List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [ht', Bool.false_eq_true, if_false]; exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩⟩
+      List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [ht', Bool.false_eq_true, ite_false]; exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩⟩
     obtain ⟨b, hb⟩ := Option.isSome_iff_exists.1 (hdom _ hd)
     dsimp only
     rw [ukView_data um mm T k w hk ht' j hj, hb]
@@ -123,7 +123,7 @@ theorem ukTextBytes_view (um : RegMapF (BitVec 64)) (mm T : BMap)
     obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hp
     rw [ukView_length um mm T (k, w) hkv, List.mem_range] at hj
     have hd : pte2pa w + BitVec.ofNat 64 j ∈ ukTextAddrs um :=
-      List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [ht, if_true]; exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩⟩
+      List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [ht, ite_true]; exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩⟩
     obtain ⟨b, hb⟩ := Option.isSome_iff_exists.1 (hdom _ hd)
     dsimp only
     rw [ukView_text um mm T k w hk ht j hj, hb]
@@ -149,12 +149,12 @@ theorem ukView_lookup (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) (
     cases htl : ukTextLeaf w with
     | false =>
       rw [ukView_data um mm T k w hk htl j hj]
-      have hm := hd _ (List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [htl, Bool.false_eq_true, if_false]; exact hpb⟩)
+      have hm := hd _ (List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [htl, Bool.false_eq_true, ite_false]; exact hpb⟩)
       dsimp only at hm
       rw [hm, hMj]; rfl
     | true =>
       rw [ukView_text um mm T k w hk htl j hj]
-      have hm := ht _ (List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [htl, if_true]; exact hpb⟩)
+      have hm := ht _ (List.mem_flatMap.2 ⟨(k, w), hkv, by simp only [htl, ite_true]; exact hpb⟩)
       dsimp only at hm
       rw [hm, hMj]; rfl
   · have h1 : (ukView um mm T k).length = 4096 := ukView_length um mm T (k, w) hkv
@@ -227,8 +227,8 @@ omit [MachGS GF] in
 theorem ukPage_split (c : Bool) (X D : IProp GF) :
     (if c then X else D) ⊣⊢ iprop((if c then iprop(emp) else D) ∗ (if c then X else iprop(emp))) := by
   cases c
-  · simp only [Bool.false_eq_true, if_false]; exact ⟨sep_emp.2, sep_emp.1⟩
-  · simp only [if_true]; exact ⟨emp_sep.2, emp_sep.1⟩
+  · simp only [Bool.false_eq_true, ite_false]; exact ⟨sep_emp.2, sep_emp.1⟩
+  · simp only [ite_true]; exact ⟨emp_sep.2, emp_sep.1⟩
 
 /-- **The pages, split** (Rocq `umem_x_bytes`, forward): the data pages as
 physical bytes, the text pages as stamped bytes. -/
@@ -260,10 +260,10 @@ theorem ukPagesX_fwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_l
-    · simp only [if_true]
+    · simp only [ite_true]
       iintro _ _
       unfold ubOwnA
       simp only [Iris.Algebra.BigOpL.bigOpL_nil]
@@ -271,12 +271,12 @@ theorem ukPagesX_fwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
   · iapply BigSepL.bigSepL_mono _ $$ HT
     intro k kv hk
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       iintro _
       unfold ukOwnX
       simp only [Iris.Algebra.BigOpL.bigOpL_nil]
       iempintro
-    · simp only [if_true]
+    · simp only [ite_true]
       exact (ukTextPage_eq K (pte2pa kv.2) (M kv.1)).1
 
 /-- **The pages, joined** (Rocq `umem_x_bytes`, backward). -/
@@ -303,19 +303,19 @@ theorem ukPagesX_bwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
-    · simp only [if_true]
+    · simp only [ite_true]
       iintro _ _
       iempintro
   · iapply BigSepL.bigSepL_mono _ $$ HT
     intro k kv hk
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       iintro _
       iempintro
-    · simp only [if_true]
+    · simp only [ite_true]
       exact (ukTextPage_eq K (pte2pa kv.2) (M kv.1)).2
 
 /-- **The plain pages, split** (for the mint at userret's `fence.i`): the
@@ -334,13 +334,13 @@ theorem umPages_split [CurCtx] (P : UPtd) (hwf : uptWf P) (M : Nat → List (Bit
   iapply BigSepL.bigSepL_mono _ $$ H
   intro k kv _
   cases ukTextLeaf kv.2
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iintro H
     iframe H
     unfold ubOwnA
     simp only [Iris.Algebra.BigOpL.bigOpL_nil]
     iempintro
-  · simp only [if_true]
+  · simp only [ite_true]
     iintro H
     iframe H
     unfold ubOwnA

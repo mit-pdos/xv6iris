@@ -15,7 +15,7 @@ import MachCSL.UTranslate
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- **The PMA check of a (possibly misaligned) data load or store**: a
@@ -33,11 +33,10 @@ theorem umm_pmaCheck_mis (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (W
   sail_norm
   simp only [runRW_bind, utr_readReg D _ _ _ hD, Option.bind_some, hreg]
   sail_norm
-  simp only [runRW_pure, Option.bind_some]
   generalize override_PMA region.attributes pbmt = a at hok hme ⊢
   rcases hacc with rfl | rfl <;> simp only [utrPmaOk, Bool.not_false, Bool.true_and] at hok <;> simp only [hok] <;>
   sail_norm <;>
-  simp only [runRW_bind, runRW_pure, Option.bind_some, utr_assert_true, mag_pma_check, is_mag_applicable_access,
+  simp only [runRW_bind, runRW_pure, Option.bind_some, mag_pma_check, is_mag_applicable_access,
     pma_misaligned_exception, hme] <;>
   sail_norm <;> split <;> (try split) <;> simp only [runRW_pure, Option.bind_some] <;> sail_norm <;> exact ⟨_, rfl⟩
 

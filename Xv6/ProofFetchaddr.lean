@@ -59,10 +59,10 @@ theorem fetchaddr_ret_2e : jumpPc (KA.«fetchaddr» + 0x2e#64) = (KA.«fetchaddr
   decide
 
 theorem fetchaddr_if_pos {α : Type} (c : Bool) (h : c = true) (p q : α) :
-    (if c then p else q) = p := by rw [if_pos h]
+    (if c then p else q) = p := by rw [ite_eq_left h]
 
 theorem fetchaddr_if_neg {α : Type} (c : Bool) (h : c = false) (p q : α) :
-    (if c then p else q) = q := by rw [if_neg (by rw [h]; decide)]
+    (if c then p else q) = q := by rw [ite_eq_right (by rw [h]; decide)]
 
 /-- `addr >= sz`: the doubleword does not fit. -/
 theorem fetchaddr_ge_bad (addr sz : BitVec 64) (h : bcond bop.BGEU addr sz = true) :
@@ -183,7 +183,7 @@ theorem fetchaddr_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (R : Re
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     first
       | (intro i h1 h2 h3 h4 h5
-         simp only [RegMap.set_apply, if_neg h1, if_neg h2, if_neg h3, if_neg h4, if_neg h5])
+         simp only [RegMap.set_apply, ite_eq_right h1, ite_eq_right h2, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5])
       | simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
 set_option maxHeartbeats 1000000 in

@@ -131,15 +131,15 @@ theorem imgAgrees_umemLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
   unfold umemLazy at hab
   unfold umemByte
   by_cases hm : (Iris.Std.PartialMap.get? P.um (a / 4096)).isSome
-  · rw [if_pos hm] at hab; rw [hab]; rfl
-  · rw [if_neg hm] at hab
+  · rw [ite_eq_left hm] at hab; rw [hab]; rfl
+  · rw [ite_eq_right hm] at hab
     by_cases hlt : a < pgRoundUpN sz.toNat
     · exfalso
       apply hm
       apply h (a / 4096)
       unfold pgRoundUpN at hlt ⊢
       omega
-    · rw [if_neg hlt] at hab; cases hab
+    · rw [ite_eq_right hlt] at hab; cases hab
 
 /-- The dispatcher's view for open/mknod/exec agrees with its own key. -/
 theorem imgAgrees_viewLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) :
@@ -148,13 +148,13 @@ theorem imgAgrees_viewLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
   unfold umemLazy at h
   unfold umemByte viewLazy
   by_cases hm : (Iris.Std.PartialMap.get? P.um (a / 4096)).isSome
-  · rw [if_pos hm] at h
+  · rw [ite_eq_left hm] at h
     have hn : ¬ ((Iris.Std.PartialMap.get? P.um (a / 4096)).isNone ∧ a / 4096 * 4096 < sz.toNat) := by
       intro hc; rw [Option.isNone_iff_eq_none] at hc; rw [hc.1] at hm; simp at hm
-    rw [if_neg hn, h]; rfl
-  · rw [if_neg hm] at h
+    rw [ite_eq_right hn, h]; rfl
+  · rw [ite_eq_right hm] at h
     by_cases hb : a < pgRoundUpN sz.toNat
-    · rw [if_pos hb] at h
+    · rw [ite_eq_left hb] at h
       cases h
       have hn : (Iris.Std.PartialMap.get? P.um (a / 4096)).isNone ∧ a / 4096 * 4096 < sz.toNat := by
         refine ⟨?_, ?_⟩
@@ -162,9 +162,9 @@ theorem imgAgrees_viewLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec
           | none => rfl
           | some _ => rw [hq] at hm; simp at hm
         · unfold pgRoundUpN at hb; omega
-      rw [if_pos hn]
-      rw [List.getElem?_replicate, if_pos (Nat.mod_lt a (by decide : 4096 > 0))]; rfl
-    · rw [if_neg hb] at h; cases h
+      rw [ite_eq_left hn]
+      rw [List.getElem?_replicate, ite_eq_left (Nat.mod_lt a (by decide : 4096 > 0))]; rfl
+    · rw [ite_eq_right hb] at h; cases h
 
 /-- ...and write's (`UMemImg.writerImg`). -/
 theorem imgAgrees_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) :
@@ -173,15 +173,15 @@ theorem imgAgrees_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) 
   unfold umemLazy at h
   unfold umemByte writerImg
   by_cases hm : (Iris.Std.PartialMap.get? P.um (a / 4096)).isSome
-  · rw [if_pos hm] at h
-    rw [if_pos hm, h]; rfl
-  · rw [if_neg hm] at h
-    rw [if_neg hm]
+  · rw [ite_eq_left hm] at h
+    rw [ite_eq_left hm, h]; rfl
+  · rw [ite_eq_right hm] at h
+    rw [ite_eq_right hm]
     by_cases hb : a < pgRoundUpN sz
-    · rw [if_pos hb] at h
+    · rw [ite_eq_left hb] at h
       cases h
-      rw [List.getElem?_replicate, if_pos (Nat.mod_lt a (by decide : 4096 > 0))]; rfl
-    · rw [if_neg hb] at h; cases h
+      rw [List.getElem?_replicate, ite_eq_left (Nat.mod_lt a (by decide : 4096 > 0))]; rfl
+    · rw [ite_eq_right hb] at h; cases h
 
 /-! ## §1 THE DEPOSIT'S FAMILIES, as one record -/
 
@@ -643,7 +643,7 @@ theorem xfamAt_sbundle (X : Uvis → IProp GF) (n : Int) (Q : Int → IProp GF) 
     (hne : n ≠ USYS_read) (hnx : n ≠ USYS_exec) :
     xv6Sbundle X n (xfamAt Q f) W = xv6Sbundle X n f W := by
   unfold xv6Sbundle
-  rw [if_neg hnx, if_neg hnx]
+  rw [ite_eq_right hnx, ite_eq_right hnx]
   rfl
 
 /-- **Rocq `xfam_at_spost`**. -/
@@ -655,7 +655,7 @@ theorem xv6Spost_exec (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitV
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
     xv6Spost X USYS_exec f W r M' fdv' cw' cs' = iprop(⌜r = BitVec.ofInt 64 (-1)⌝ -∗ f.xRs) := by
   unfold xv6Spost
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
 
 /-! ### The supply and its two laws -/
 
@@ -728,54 +728,54 @@ theorem xv6SbundleRest_supply (n : Int) (W : Uvis) :
     □ xv6Ssupply (GF := GF) ⊢ xv6SbundleRest n (xfamPt (GF := GF)) W := by
   unfold xv6SbundleRest
   by_cases h5 : n = 5
-  · rw [if_pos h5]; exact xrowRead_supply W
-  rw [if_neg h5]
+  · rw [ite_eq_left h5]; exact xrowRead_supply W
+  rw [ite_eq_right h5]
   by_cases h9 : n = 9
-  · rw [if_pos h9]; exact xrowChdir_supply W
-  rw [if_neg h9]
+  · rw [ite_eq_left h9]; exact xrowChdir_supply W
+  rw [ite_eq_right h9]
   by_cases h15 : n = 15
-  · rw [if_pos h15]; exact xrowOpen_supply W
-  rw [if_neg h15]
+  · rw [ite_eq_left h15]; exact xrowOpen_supply W
+  rw [ite_eq_right h15]
   by_cases h16 : n = 16
-  · rw [if_pos h16]; exact xrowWrite_supply W
-  rw [if_neg h16]
+  · rw [ite_eq_left h16]; exact xrowWrite_supply W
+  rw [ite_eq_right h16]
   by_cases h17 : n = 17
-  · rw [if_pos h17]; exact xrowMknod_supply W
-  rw [if_neg h17]
+  · rw [ite_eq_left h17]; exact xrowMknod_supply W
+  rw [ite_eq_right h17]
   by_cases h18 : n = 18
-  · rw [if_pos h18]; exact xrowUnlink_supply W
-  rw [if_neg h18]
+  · rw [ite_eq_left h18]; exact xrowUnlink_supply W
+  rw [ite_eq_right h18]
   by_cases h19 : n = 19
-  · rw [if_pos h19]; exact xrowLink_supply
-  rw [if_neg h19]
+  · rw [ite_eq_left h19]; exact xrowLink_supply
+  rw [ite_eq_right h19]
   by_cases h20 : n = 20
-  · rw [if_pos h20]; exact xrowMkdir_supply W
-  rw [if_neg h20]
+  · rw [ite_eq_left h20]; exact xrowMkdir_supply W
+  rw [ite_eq_right h20]
   by_cases h6 : n = 6
-  · rw [if_pos h6]
+  · rw [ite_eq_left h6]
     unfold xv6Ssupply
     iintro #⟨-, Hkc, -⟩
     iexact Hkc
-  rw [if_neg h6]
+  rw [ite_eq_right h6]
   by_cases h21 : n = 21
-  · rw [if_pos h21]
+  · rw [ite_eq_left h21]
     unfold xv6Ssupply
     iintro #⟨-, Hkc, -⟩
     iapply filecloseCpay_taint _ _ $$ Hkc
-  rw [if_neg h21]
+  rw [ite_eq_right h21]
   by_cases h2 : n = USYS_exit
-  · rw [if_pos h2]
+  · rw [ite_eq_left h2]
     unfold xv6Ssupply
     iintro #⟨-, Hkc, -⟩
     iapply filecloseCpays_taint _ $$ Hkc
-  rw [if_neg h2]
+  rw [ite_eq_right h2]
   by_cases h22 : n = 22
   · -- the point deposits no sync hook
-    rw [if_pos h22]
+    rw [ite_eq_left h22]
     dsimp only [xfamPt, hookOpt]
     iintro _
     iempintro
-  rw [if_neg h22]
+  rw [ite_eq_right h22]
   iintro _
   iempintro
 
@@ -796,7 +796,7 @@ theorem xv6SbundleOfSupplyNe (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : I
   isplitr
   · ipureintro; rfl
   unfold xv6Sbundle
-  rw [if_neg hne, xv6SbundleRest_at]
+  rw [ite_eq_right hne, xv6SbundleRest_at]
   iapply (xv6SbundleRest_supply n W) $$ Hs
 
 /-- **Rocq `xv6_sbundle_of_supply`**: the half the generic inhabitants use,
@@ -814,7 +814,7 @@ theorem xv6SbundleOfSupply (X : Uvis → IProp GF) (n : Int) (W : Uvis) (R : IPr
     isplitr
     · ipureintro; rfl
     unfold xv6Sbundle
-    rw [if_pos hx]
+    rw [ite_eq_left hx]
     unfold xrowExec
     dsimp only [xfamAt, xfamPt]
     isplitr
@@ -891,17 +891,17 @@ theorem xv6Sbundle_free (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : Int �
   · ipureintro; rfl
   unfold xv6Sbundle xv6SbundleRest
   dsimp only [xfamAt, xfamPt]
-  rw [if_neg hx, if_neg h5]
+  rw [ite_eq_right hx, ite_eq_right h5]
   by_cases h9 : n = 9
-  · rw [if_pos h9]; unfold xrowChdir; iintro %rt; iapply fsabsChdirPre
-  rw [if_neg h9, if_neg h15, if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6,
-    if_neg h21, if_neg h2]
+  · rw [ite_eq_left h9]; unfold xrowChdir; iintro %rt; iapply fsabsChdirPre
+  rw [ite_eq_right h9, ite_eq_right h15, ite_eq_right h16, ite_eq_right h17, ite_eq_right h18, ite_eq_right h19, ite_eq_right h20, ite_eq_right h6,
+    ite_eq_right h21, ite_eq_right h2]
   by_cases h22 : n = 22
   · -- row 22 at the point: no hook
-    rw [if_pos h22]
+    rw [ite_eq_left h22]
     dsimp only [hookOpt]
     iempintro
-  rw [if_neg h22]
+  rw [ite_eq_right h22]
   iempintro
 
 /-! ## §5 THE PER-NUMBER READERS, and the laws the arms take
@@ -920,10 +920,10 @@ theorem syscSpostEmp_xv6 : SyscSpostEmp (GF := GF) := by
   show ⊢ xv6Spost X n f W r M' fdv' cw' cs'
   unfold xv6Spost
   have h7 : n ≠ USYS_exec := fun h => hno (by simp [h, USYS_exec])
-  rw [if_neg h7, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega), if_neg (by omega),
-    if_neg (show ¬ n = USYS_pause by unfold USYS_pause; omega)]
+  rw [ite_eq_right h7, ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+    ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega), ite_eq_right (by omega),
+    ite_eq_right (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), ite_eq_right (by omega), ite_eq_right (by omega),
+    ite_eq_right (show ¬ n = USYS_pause by unfold USYS_pause; omega)]
   exact .rfl
 
 /-- pipe's out row (Rocq `spost_at_pipe_intro`): the receipt -- on
@@ -933,7 +933,7 @@ theorem spostAt_pipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : B
     xpostPipe (GF := GF) W r fdv' ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 4 f W r M' fdv' cw' cs' := by
   show _ ⊢ xv6Spost X 4 f W r M' fdv' cw' cs'
   unfold xv6Spost USYS_exec USYS_pipe
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- close's out row (Rocq `spost_at_close_intro`): the close payment's
@@ -944,7 +944,7 @@ theorem spostAt_close_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : 
       @UexecSG.spostAt GF _ uexecSGXv6 X 21 f W r M' fdv' cw' cs' := by
   show _ ⊢ xv6Spost X 21 f W r M' fdv' cw' cs'
   unfold xv6Spost USYS_exec USYS_pipe
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `sbundle_at_close_elim`**: row 21 is the close payment at the
@@ -954,7 +954,7 @@ theorem sbundleAt_close_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis
       filecloseCpay (fdStOfKey (xkA W 0) W.fd) f.clP := by
   show xv6Sbundle X 21 f W ⊢ _
   unfold xv6Sbundle xv6SbundleRest USYS_exec
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `sbundle_at_exit_elim`**: row 2 is the close payments of the key's
@@ -963,7 +963,7 @@ theorem sbundleAt_exit_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
     @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exit f W ⊢ filecloseCpays W.fd := by
   show xv6Sbundle X USYS_exit f W ⊢ _
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `sbundle_at_sync_elim`** (sync K4): row 22 is the process's
@@ -973,7 +973,7 @@ theorem sbundleAt_sync_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
       hookOpt (genId (GF := GF)) f.syOQ := by
   show xv6Sbundle X 22 f W ⊢ _
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `sbundle_at_sync_intro`**. -/
@@ -982,7 +982,7 @@ theorem sbundleAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis
       @UexecSG.sbundleAt GF _ uexecSGXv6 X 22 f W := by
   show _ ⊢ xv6Sbundle X 22 f W
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `spost_at_sync_intro`**: the hook's `Q` pays post 22. -/
@@ -991,7 +991,7 @@ theorem spostAt_sync_intro_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) 
     qOpt f.syOQ ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 22 f W r M' fdv' cw' cs' := by
   show _ ⊢ xv6Spost X 22 f W r M' fdv' cw' cs'
   unfold xv6Spost USYS_exec USYS_pipe
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **pause's post IS its answer's reason** (NI M3 no-kill K1): post 13 is
@@ -1004,7 +1004,7 @@ theorem spostAt_pause_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : 
       iprop(⌜r = 0#64⌝ ∨ killShot (GF := GF) W.gen) := by
   show xv6Spost X USYS_pause f W r M' fdv' cw' cs' ⊣⊢ _
   unfold xv6Spost USYS_exec USYS_pipe USYS_pause
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact .rfl
 
 /-- **Rocq `sbundle_at_kill_elim`** / `sysc_dep_kill`: row 6 is the kill
@@ -1013,7 +1013,7 @@ theorem syscDepKill_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X 6 f W ⊢ □ uKillCred := by
   show xv6Sbundle X 6 f W ⊢ _
   unfold xv6Sbundle xv6SbundleRest USYS_exec
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   iintro #H
   iexact H
 
@@ -1028,7 +1028,7 @@ theorem syscDepExec_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
           (@UexecSG.sexitPay GF _ uexecSGXv6 f) f.xP f.xPmiss f.xFo Mv (xkA W 0) (xkA W 1) W.fd W.ch W.pid := by
   show xv6Sbundle X USYS_exec f W ⊢ _
   unfold xv6Sbundle
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   exact .rfl
 
 /-- **Rocq `sbundle_at_exec_intro`/`sbundle_pay_exec_intro`**: a process
@@ -1039,7 +1039,7 @@ theorem sbundleAt_exec_intro_xv6 (X : Uvis → IProp GF) (W : Uvis) (Q : Int →
       @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exec (xfamExecAt P Pmiss Fo Rs (fun _ => iprop(True)) iprop(emp) Q) W := by
   show _ ⊢ xv6Sbundle X USYS_exec _ W
   unfold xv6Sbundle
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   exact .rfl
 
 /-! ### The per-number readers (Rocq `sbundle_at_<n>_elim` / `spost_at_<n>_intro`):

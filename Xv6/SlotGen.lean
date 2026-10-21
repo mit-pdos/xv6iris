@@ -318,7 +318,7 @@ theorem sgBootMap_get (g0 : GName) (l : List (BitVec 64)) (hl : l.Nodup) (a : Bi
   induction l with
   | nil =>
     unfold sgBootMap
-    rw [if_neg (by simp)]
+    rw [ite_eq_right (by simp)]
     exact get?_empty a
   | cons b l ih =>
     have hb : b ∉ l := (List.nodup_cons.mp hl).1
@@ -328,13 +328,13 @@ theorem sgBootMap_get (g0 : GName) (l : List (BitVec 64)) (hl : l.Nodup) (a : Bi
     unfold sgOne
     by_cases hab : b = a
     · subst hab
-      rw [LawfulPartialMap.get?_singleton_eq rfl, if_neg hb, if_pos (List.mem_cons_self)]
+      rw [LawfulPartialMap.get?_singleton_eq rfl, ite_eq_right hb, ite_eq_left (List.mem_cons_self)]
       rfl
     · rw [show get? (PartialMap.singleton b (DFracAgree.mk (.own 1) (⟨g0⟩ : DiscreteO GName)) :
             SgenUR) a = none from LawfulPartialMap.get?_singleton_ne hab]
       by_cases ha : a ∈ l
-      · rw [if_pos ha, if_pos (List.mem_cons_of_mem _ ha)]; rfl
-      · rw [if_neg ha, if_neg (by simp only [List.mem_cons, not_or]; exact ⟨Ne.symm hab, ha⟩)]
+      · rw [ite_eq_left ha, ite_eq_left (List.mem_cons_of_mem _ ha)]; rfl
+      · rw [ite_eq_right ha, ite_eq_right (by simp only [List.mem_cons, not_or]; exact ⟨Ne.symm hab, ha⟩)]
         rfl
 
 theorem sgBootMap_valid (g0 : GName) (l : List (BitVec 64)) (hl : l.Nodup) :
@@ -1064,7 +1064,7 @@ theorem pidRegDom_insert (R : IntMapF GName) (pids : Nat → BitVec 32) (k : Nat
     refine ⟨hnz, j, hj, ?_⟩
     by_cases hjk : j = k
     · subst hjk; rw [hz] at hv; exact absurd hv.symm (by simpa using hnz)
-    · simp only [hjk, if_false]; exact hv
+    · simp only [hjk, ite_false]; exact hv
 
 /-- ...and freeproc's: the slot's pid is deregistered and its cell zeroed. -/
 theorem pidRegDom_delete (R : IntMapF GName) (pids : Nat → BitVec 32) (k : Nat) (z : BitVec 32)
@@ -1080,7 +1080,7 @@ theorem pidRegDom_delete (R : IntMapF GName) (pids : Nat → BitVec 32) (k : Nat
     refine ⟨hnz, j, hj, ?_⟩
     by_cases hjk : j = k
     · subst hjk; exact absurd hv hq'
-    · simp only [hjk, if_false]; exact hv
+    · simp only [hjk, ite_false]; exact hv
 
 /-! ## Boot: the NPROC wholes, minted in the boot fupd beside the children
 map (over the CAMERA class only -- the names are what this creates) -/

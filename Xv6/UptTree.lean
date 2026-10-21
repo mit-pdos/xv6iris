@@ -77,7 +77,7 @@ theorem uptWalk_path (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf : t
   | none =>
     have h := hwf (vpnIdx vpn 2)
     rw [hk2] at h
-    simp only [hk2, h, if_true] at hw
+    simp only [hk2, h, ite_true] at hw
     exact absurd hw (by simp)
   | some c1 =>
     have h2 := hwf (vpnIdx vpn 2)
@@ -87,7 +87,7 @@ theorem uptWalk_path (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf : t
     | none =>
       have h := h2.2 (vpnIdx vpn 1)
       rw [hk1] at h
-      simp only [hk1, h, if_true] at hw
+      simp only [hk1, h, ite_true] at hw
       exact absurd hw (by simp)
     | some c0 =>
       have h1 := h2.2 (vpnIdx vpn 1)
@@ -163,8 +163,8 @@ theorem uptTlbVpnOk (t : PTree) (tlb : Tlb) (h : utlbOk t tlb) (vpn : BitVec 27)
     tlbVpnOk tlb vpn ppn perm addr := by
   intro ent hget hm
   obtain ⟨vpn', addr', w, w', -, hw', hww, rfl⟩ := h (tlbHash vpn) (tlbHash_lt vpn) ent hget
-  have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn' (ptePpn w) w' addr') 0#16 (BitVec.signExtend 45 vpn) =
-      decide (vpn = vpn') := match_tlbEntryOf vpn' vpn (ptePpn w) w' addr'
+  have hm' : match_TLB_Entry (tlbEntryOf 0#16 vpn' (ptePpn w) w' addr') 0#16 0#14 (BitVec.signExtend 47 vpn)
+      TranslationStage.S_Stage = decide (vpn = vpn') := match_tlbEntryOf vpn' vpn (ptePpn w) w' addr'
   rw [hm'] at hm
   have hv : vpn = vpn' := of_decide_eq_true hm
   subst hv

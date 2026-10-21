@@ -108,7 +108,7 @@ theorem imgBlkmap_get (P : Nat → List (BitVec 8)) (dn : Dinode) (k : Nat) (_hw
   simp only
   split
   · rename_i hd
-    rw [List.getElem!_eq_getElem?_getD, List.getElem?_take, if_pos hd,
+    rw [List.getElem!_eq_getElem?_getD, List.getElem?_take, ite_eq_left hd,
       ← List.getElem!_eq_getElem?_getD]
   · have hlen := fsIndEnts_length P dn
     have hj : k - NDIRECT < NINDIRECT := by unfold MAXFILE NDIRECT NINDIRECT at *; omega
@@ -121,8 +121,8 @@ theorem imgBlkmap_slot (P : Nat → List (BitVec 8)) (dn : Dinode) (i : Nat) (hw
     (hi : i ≤ MAXFILE) : (bmSlot (imgBlkmap P dn) i).toNat = fsSlot P dn i := by
   unfold bmSlot fsSlot
   by_cases hm : i = MAXFILE
-  · rw [if_pos hm, if_pos hm]; rfl
-  · rw [if_neg hm, if_neg hm]
+  · rw [ite_eq_left hm, ite_eq_left hm]; rfl
+  · rw [ite_eq_right hm, ite_eq_right hm]
     exact imgBlkmap_get P dn i hwf (by omega)
 
 /-- A5: no indirect block => no entries (Rocq's `img_blkmap_noind`). -/
@@ -130,7 +130,7 @@ theorem imgBlkmap_noind (P : Nat → List (BitVec 8)) (dn : Dinode)
     (h0 : (imgBlkmap P dn).bmInd.toNat = 0) :
     (imgBlkmap P dn).bmEnt = List.replicate NINDIRECT 0 := by
   rw [imgBlkmap_ind] at h0
-  simp only [imgBlkmap, fsIndEnts, h0, if_true, List.map_replicate]
+  simp only [imgBlkmap, fsIndEnts, h0, ite_true, List.map_replicate]
   rfl
 
 /-! ## B.  THE GEOMETRY FACTS, from `FsSbOk` alone -/

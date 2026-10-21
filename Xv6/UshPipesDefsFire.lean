@@ -44,7 +44,7 @@ theorem vsrc_fire (md : Wid → Option (List (BitVec 8))) (sel : List Wid) (w : 
   · subst hxw
     simp [vupd, rmd, cmtNFireSelf, mdupd]
   · rw [vupd_other _ _ _ _ hxw, hs x]
-    simp only [rmd, cmtN_fire_wid md sel w s x hxw, mdupd, if_neg hxw]
+    simp only [rmd, cmtN_fire_wid md sel w s x hxw, mdupd, ite_eq_right hxw]
 
 /-- **Rocq `ex_of_src`**: a nonempty committed entry of the vector is a
 committed writer. -/
@@ -61,7 +61,7 @@ theorem ex_of_src (md : Wid → Option (List (BitVec 8))) (sel : List Wid)
   · cases hm : md w' with
     | none => simp [hc, hm] at hnz
     | some s' =>
-      simp only [hc, hm, if_true, Option.getD_some] at hx
+      simp only [hc, hm, ite_true, Option.getD_some] at hx
       exact ⟨w', s', hc, hm, hx⟩
 
 /-- the vector's entry at an unfired writer is empty. -/

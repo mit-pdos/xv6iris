@@ -143,7 +143,7 @@ theorem entTyOk_dot_iff (self : Nat) (dd : Option Nat) (isd : Bool) (ty : Ity) :
     entTyOk self dd isd DOT ty ↔
       ∀ (p : Int) (q : Nat), ty = .tDir p → dd = some q → (q : Int) = p := by
   unfold entTyOk
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
 
 /-- THE ENTRY MAP READS THE RECORD ONLY THROUGH ITS TYPE AND SIZE, so a
 flush that moves neither (a count move) leaves it alone. -/
@@ -192,12 +192,12 @@ theorem dirView_dirlink (dn dn' : Dinode) (data data' : Nat → List (BitVec 8))
   have hwin : ∀ j, j < 16 →
       fileByte data' (16 * k0 + j) = (direntBytes (deOfName inum s))[j]! := by
     intro j hj
-    rw [hrng, if_pos (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
+    rw [hrng, ite_eq_left (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
   obtain ⟨hrin, hrnm⟩ := dirRecord_ofName data' k0 inum s hlen hs hwin
   have hwrit : dirWrittenAt data data' k0 s inum := by
     refine ⟨hrin, hrnm, ?_⟩
     intro q hq j hj
-    rw [hrng, if_neg]
+    rw [hrng, ite_eq_right]
     rintro ⟨hlo, hhi⟩
     exact hq (by omega)
   have hfree : k0 < nrec → ¬ dirLive data k0 := by
@@ -277,12 +277,12 @@ theorem dirView_dirlinkDead (dn dn' : Dinode) (data data' : Nat → List (BitVec
   have hwin : ∀ j, j < 16 →
       fileByte data' (16 * k0 + j) = (direntBytes (deOfName inum s))[j]! := by
     intro j hj
-    rw [hrng, if_pos (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
+    rw [hrng, ite_eq_left (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
   obtain ⟨hrin, _⟩ := dirRecord_ofName data' k0 inum s hlen hs hwin
   have hk0dead : ¬ dirLive data' k0 := fun hc => hc (hrin.trans hz)
   have hagr : ∀ q, q ≠ k0 → dirWinAgree data data' q := by
     intro q hq j hj
-    rw [hrng, if_neg]
+    rw [hrng, ite_eq_right]
     rintro ⟨hlo, hhi⟩
     exact hq (by omega)
   have hfree : k0 < nrec → ¬ dirLive data k0 := by
@@ -322,7 +322,7 @@ theorem dirEntries_dirlinkNopEq (dn dn' : Dinode) (bm bm' : Blkmap)
   have hszeq : dn'.diSize.toNat = dn.diSize.toNat := by rw [hsz]; omega
   have hbytes : ∀ x, fileByte data' x = fileByte data x := by
     intro x
-    rw [hrng, if_neg (by omega)]
+    rw [hrng, ite_eq_right (by omega)]
   rw [dirEntries_eraNode dn bm data hh hb, dirEntries_eraNode dn' bm' data' hh' hb', hty, hszeq]
   split
   · exact dirView_dataExt data' data _ (fun x _ => hbytes x)
@@ -353,7 +353,7 @@ theorem entToks_dirlink (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm bm
       entTok Γ i (fnDd (eraNode dn bm data)) (fnOrphan (eraNode dn bm data)) isd s inum.toNat -∗
         entToks Γ i (eraNode dn' bm' data') (if isd then D.insert s else D) := by
   have hents : dirEntries (eraNode dn bm data) = dirView data nrec := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty, hnrec]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, hnrec]
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
   have horph : fnOrphan (eraNode dn' bm' data') = fnOrphan (eraNode dn bm data) := by
     unfold fnOrphan fnNlink
@@ -362,7 +362,7 @@ theorem entToks_dirlink (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm bm
   by_cases hz : inum = 0#16
   · -- the written record is DEAD: nothing is inserted and the unit is dropped
     have hents' : dirEntries (eraNode dn' bm' data') = dirView data nrec := by
-      rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2]
+      rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2]
       exact dirView_dirlinkDead dn dn' data data' inum s nrec k0 hnrec hk0 hlen hs hz hsz hrng
     have hext : ∀ s', (∃ t, (dirEntries (eraNode dn' bm' data'))[s']? = some t) →
         (s' ∈ D ↔ s' ∈ (if isd then D.insert s else D)) := by
@@ -378,7 +378,7 @@ theorem entToks_dirlink (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm bm
     iapply e1.1
     iexact H
   · have hents' : dirEntries (eraNode dn' bm' data') = (dirView data nrec).insert s inum.toNat := by
-      rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2]
+      rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2]
       exact dirView_dirlink dn dn' data data' inum s nrec k0 hnrec hk0 hlen hs hz hsz hrng hnone
     have hdd : fnDd (eraNode dn' bm' data') = fnDd (eraNode dn bm data) := by
       unfold fnDd
@@ -417,8 +417,8 @@ theorem dirEntries_dirlinkIns (dn dn' : Dinode) (bm bm' : Blkmap)
     dirEntries (eraNode dn' bm' data')
       = (dirEntries (eraNode dn bm data)).insert s inum.toNat := by
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
-  rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2,
-    dirEntries_eraNode dn bm data hh hb, if_pos hty, ← hnrec]
+  rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2,
+    dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, ← hnrec]
   exact dirView_dirlink dn dn' data data' inum s nrec k0 hnrec hk0 hlen hs hnz hsz hrng hnone
 
 /-- CREATE'S `dirlink(ip, "..", dp)` (durable-disk G5).  The one write in
@@ -458,10 +458,10 @@ theorem entToks_dirlinkDotdot (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) 
         entToks Γ i (eraNode dn' bm' data') D := by
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
   have hents : dirEntries (eraNode dn bm data) = dirView data nrec := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty, hnrec]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, hnrec]
   have hents' : dirEntries (eraNode dn' bm' data')
       = (dirView data nrec).insert DOTDOT inum.toNat := by
-    rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2]
+    rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2]
     exact dirView_dirlink dn dn' data data' inum DOTDOT nrec k0 hnrec hk0 (by decide)
       (by unfold nonul DOTDOT; decide) hnz hsz hrng hnone
   have hfresh : (dirView data nrec)[DOTDOT]? = none := (dirView_lookup_None _ _ _).mpr hnone
@@ -634,10 +634,10 @@ theorem entToks_eraOrphan (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm 
         ⌜entTyOk i (fnDd (eraNode dn bm data)) (decide (DOT ∈ D)) DOT ty⌝) ∗
       entToks Γ i (eraNode dn' bm data) D := by
   have hlk : (dirEntries (eraNode dn bm data))[DOTDOT]? = some t := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos htyd, ← hnm, ← hin]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left htyd, ← hnm, ← hin]
     exact dirView_live data _ 1 hu hnr hlv
   have hlk0 : (dirEntries (eraNode dn bm data))[DOT]? = some i := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos htyd, ← hnm0, ← hin0]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left htyd, ← hnm0, ← hin0]
     exact dirView_live data _ 0 hu (by omega) hlv0
   exact entToks_orphan Γ i (eraNode dn bm data) (eraNode dn' bm data) D t
     (dirEntries_eraNode_cong dn dn' bm data hty hsz) (fnOrphan_eraNz dn bm data hnz)
@@ -678,10 +678,10 @@ theorem entToks_unlink (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm bm'
   have hb' : dn'.diSize.toNat ≤ MAXFILE * BSIZE := by rw [hsz]; exact hb
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
   have hents : dirEntries (eraNode dn bm data) = dirView data (dirNrec dn.diSize.toNat) := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty]
   have hents' : dirEntries (eraNode dn' bm' data')
       = (dirView data (dirNrec dn.diSize.toNat)).erase (dirBname data k0) := by
-    rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2, hsz]
+    rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2, hsz]
     exact dirView_zero data data' _ k0 hu hk0 hlive hzer
   have horph : fnOrphan (eraNode dn' bm' data') = fnOrphan (eraNode dn bm data) := by
     rw [fnOrphan_eraNz dn bm data hnz, fnOrphan_eraNz dn' bm' data' hnz']
@@ -713,8 +713,8 @@ theorem dirEntries_unlinkEq (dn dn' : Dinode) (bm bm' : Blkmap)
       = (dirEntries (eraNode dn bm data)).erase (dirBname data k0) := by
   have hb' : dn'.diSize.toNat ≤ MAXFILE * BSIZE := by rw [hsz]; exact hb
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
-  rw [dirEntries_eraNode dn bm data hh hb, if_pos hty, dirEntries_eraNode dn' bm' data' hh' hb',
-    if_pos hty2, hsz]
+  rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, dirEntries_eraNode dn' bm' data' hh' hb',
+    ite_eq_left hty2, hsz]
   exact dirView_zero data data' _ k0 hu hk0 hlive hzer
 
 /-- THE ENTRY MAP ONLY GROWS AT A `dirlink`, on either arm: the no-write arm
@@ -739,7 +739,7 @@ theorem dirEntries_dirlinkGrow (dn dn' : Dinode) (bm bm' : Blkmap)
       ∃ t, (dirEntries (eraNode dn' bm' data'))[s']? = some t := by
   have hty2 : dn'.diType.toNat = T_DIR_z := by rw [hty']; exact hty
   have hents : dirEntries (eraNode dn bm data) = dirView data nrec := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty, hnrec]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, hnrec]
   have hk0le : k0 ≤ nrec := by rw [hk0]; exact dirSlot_le data nrec
   rcases htot with rfl | rfl
   · rw [dirEntries_dirlinkNopEq dn dn' bm bm' data data'
@@ -749,7 +749,7 @@ theorem dirEntries_dirlinkGrow (dn dn' : Dinode) (bm bm' : Blkmap)
   · by_cases hz : inum = 0#16
     · -- the written record is DEAD: nothing is inserted
       have heq : dirEntries (eraNode dn' bm' data') = dirView data nrec := by
-        rw [dirEntries_eraNode dn' bm' data' hh' hb', if_pos hty2]
+        rw [dirEntries_eraNode dn' bm' data' hh' hb', ite_eq_left hty2]
         exact dirView_dirlinkDead dn dn' data data' inum s nrec k0 hnrec hk0 hlen hs hz hsz hrng
       rw [heq, ← hents]
       exact fun _ h => h
@@ -795,7 +795,7 @@ theorem entToks_dirlinkArm (Γ : FsViewNames GF) (i : Nat) (dn dn' : Dinode) (bm
     have hext : ∀ s', (∃ t, (dirEntries (eraNode dn' bm' data'))[s']? = some t) →
         (s' ∈ D ↔ s' ∈ (if isd then D.insert s else D)) := by
       rintro s' ⟨t, ht⟩
-      rw [hents, dirEntries_eraNode dn bm data hh hb, if_pos hty, ← hnrec] at ht
+      rw [hents, dirEntries_eraNode dn bm data hh hb, ite_eq_left hty, ← hnrec] at ht
       have hne : s' ≠ s := by
         rintro rfl
         rw [(dirView_lookup_None _ _ _).mpr hnone] at ht
@@ -900,7 +900,7 @@ theorem entToks_eraBorrowAt (Γ : FsViewNames GF) (i : Nat) (dn : Dinode) (bm : 
         entToks Γ i (eraNode dn bm data) D) := by
   have hlk : (dirEntries (eraNode dn bm data))[dirBname data k]?
       = some (dirInum data k).toNat := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty]
     exact dirView_live data _ k hu hnr hlv
   have hne' := entTok_ne Γ i (fnDd (eraNode dn bm data)) (fnOrphan (eraNode dn bm data))
     (decide (dirBname data k ∈ D)) (dirBname data k) (dirInum data k).toNat hnd hndd hne
@@ -920,7 +920,7 @@ theorem entToks_borrow (Γ : FsViewNames GF) (self : Nat) (dn : Dinode) (bm : Bl
         (linkTok Γ ((dirInum data k).toNat : Int) ty -∗ entToks Γ self (eraNode dn bm data) D) := by
   have hlk : (dirEntries (eraNode dn bm data))[dirBname data k]?
       = some (dirInum data k).toNat := by
-    rw [dirEntries_eraNode dn bm data hh hsz, if_pos hty, dirView_lookup, hfirst]
+    rw [dirEntries_eraNode dn bm data hh hsz, ite_eq_left hty, dirView_lookup, hfirst]
     rfl
   have htl : entTokenless self (fnOrphan (eraNode dn bm data)) (dirBname data k)
       (dirInum data k).toNat = false :=

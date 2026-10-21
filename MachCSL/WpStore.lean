@@ -14,7 +14,7 @@ import MachCSL.WordPointsTo
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -86,7 +86,7 @@ theorem execSpec_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   swp_run 150
   iapply swp_bind
   mconf_intro HmConf
-  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_M cpu dq c hok _)
   iframe HmConf
   iintro HmConf
   mconf_cases HmConf
@@ -149,7 +149,7 @@ theorem execSpec_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MCo
   swp_run 150
   iapply swp_bind
   mconf_intro HmConf
-  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_M cpu dq c hok _)
   iframe HmConf
   iintro HmConf
   mconf_cases HmConf

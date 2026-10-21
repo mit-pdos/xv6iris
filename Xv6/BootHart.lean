@@ -98,16 +98,19 @@ theorem bootStack_rw (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
   have h3 : ¬ (0x80000 ≤ (0x8000a420 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 ∧
       (0x8000a420 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x80007) := by
     omega
-  rw [if_neg h3, if_pos (Or.inl ⟨h1, h2⟩)]
+  rw [ite_eq_right h3, ite_eq_left (Or.inl ⟨h1, h2⟩)]
 
 /-! ## §2 The M-mode precondition, out of one hart's reset residue -/
 
 /-- The registers `Xv6.bootEntryPre` takes out of the reset file: the
-configuration cells, `mhartid`, the clock cells, the program counter, and the
+configuration cells (with, since sail-riscv 0.16, `mhartid`: a frozen cell of
+`hwConfig`), the clock cells (with 0.16's per-cycle `cycleAux`: `msip`,
+`written_event_index`, `written_trigger_index`), the program counter, and the
 eight GPRs `_entry`/`start` touch. -/
 def bootEntryRegs : List Register :=
   bootConfRegs ++
-  [.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .PC, .nextPC,
+  [.minstret_increment, .minstret, .mcycle, .mtime, .mip, .msip, .written_event_index,
+   .written_trigger_index, .PC, .nextPC,
    .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15]
 
 /-- What is taken after `Xv6.bootEntryPre`: its registers and the two wire
@@ -119,24 +122,28 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The part of `Xv6.bootEntryPre` past the configuration cells. -/
 theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
-    ([∗list] r ∈ [Register.mhartid, .minstret_increment, .minstret, .mcycle, .mtime, .mip, .PC,
+    ([∗list] r ∈ [Register.minstret_increment, .minstret, .mcycle, .mtime, .mip, .msip,
+        .written_event_index, .written_trigger_index, .PC,
         .nextPC, .x1, .x2, .x4, .x8, .x10, .x11, .x14, .x15],
         regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
-      Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
+      clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] f .x1 ∗ Register.x2 ↦ᵣ[cpu] f .x2 ∗ Register.x4 ↦ᵣ[cpu] f .x4 ∗
       Register.x8 ↦ᵣ[cpu] f .x8 ∗ Register.x10 ↦ᵣ[cpu] f .x10 ∗
       Register.x11 ↦ᵣ[cpu] f .x11 ∗ Register.x14 ↦ᵣ[cpu] f .x14 ∗
       Register.x15 ↦ᵣ[cpu] f .x15 := by
-  have eh := hres.1 .mhartid _ rfl
+  have ew := hres.1 .written_trigger_index _ rfl
   have ep := hres.1 .PC _ rfl
   have en := hres.1 .nextPC _ rfl
-  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, eh, ep, en]
-  unfold clockCells pcIs hartId
+  simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, ew, ep, en]
+  unfold clockCells cycleAux pcIs
   rw [entry_sym_addr]
-  iintro ⟨Hh, Hmi, Hms, Hmc, Hmt, Hmp, Hpc, Hnpc, H1, H2, H4, H8, H10, H11, H14, H15, -⟩
-  iframe Hh Hpc Hnpc H1 H2 H4 H8 H10 H11 H14 H15
+  iintro ⟨Hmi, Hms, Hmc, Hmt, Hmp, Hsip, Hwe, Hwt, Hpc, Hnpc, H1, H2, H4, H8, H10, H11, H14, H15, -⟩
+  iframe Hpc Hnpc H1 H2 H4 H8 H10 H11 H14 H15
   iexists (f .minstret_increment), (f .minstret), (f .mcycle), (f .mtime), (f .mip)
-  iframe
+  iframe Hmi Hms Hmc Hmt Hmp Hwt
+  isplitl [Hsip]
+  · iexists (f .msip); iexact Hsip
+  · iexists (f .written_event_index); iexact Hwe
 
 /-- **THE REGISTER SIDE OF THE BOOT PATH, out of the reset file** (Rocq
 `boot_entry_pre`): the cells `MachCSL.wp_power` hands hart `cpu`'s boot client
@@ -146,7 +153,7 @@ counter and GPR inputs, plus the rest of the file. -/
 theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     regCellsNoPins (GF := GF) (regName (GF := GF) cpu) f ⊢ |==>
       (mBoot cpu (DFrac.own 1) ∗
-      Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
+      Register.mhartid ↦ᵣ[cpu]□ hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] f .x1 ∗ Register.x2 ↦ᵣ[cpu] f .x2 ∗ Register.x4 ↦ᵣ[cpu] f .x4 ∗
       Register.x8 ↦ᵣ[cpu] f .x8 ∗ Register.x10 ↦ᵣ[cpu] f .x10 ∗
       Register.x11 ↦ᵣ[cpu] f .x11 ∗ Register.x14 ↦ᵣ[cpu] f .x14 ∗
@@ -159,10 +166,15 @@ theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
   unfold bootEntryRegs
   icases BigSepL.bigSepL_append.1 $$ Hl with ⟨Hc, Hl⟩
   imod mBoot_of_cells cpu f hres $$ Hc with Hm
-  icases bootEntry_rest_cells cpu f hres $$ Hl with ⟨Hh, Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15⟩
+  icases Hm with ⟨%z, Hm⟩
+  icases confCells_hw cpu _ _ _ $$ Hm with ⟨Hm, #Hhw⟩
+  ihave #Hh := hwConfig_mhartid cpu $$ Hhw
+  icases bootEntry_rest_cells cpu f hres $$ Hl with ⟨Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15⟩
   imodintro
-  unfold bootEntryTaken bootEntryRegs
-  iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 H
+  isplitl [Hm]
+  · iexists z; iexact Hm
+  unfold bootEntryTaken bootEntryRegs hartId
+  iframe Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 H
 
 /-- The GPRs `Xv6.bootEntryPre` does not take (all but `x1 x2 x4 x8 x10 x11
 x14 x15`), for the M->S bridge's whole-file `gprFile`. -/

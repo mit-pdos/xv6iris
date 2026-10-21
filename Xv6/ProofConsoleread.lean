@@ -498,11 +498,11 @@ theorem cr_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γ
     ⊢ wpLoop (GF := GF) c := by
   have h := EC.wp_either_copyout (GF := GF) c k' γl γk j pid V P Mi true
     (DFrac.own 1) [b] [b] hj (fun _ => hproc) hnoff hK hlk
-    (by simp only [if_true]; exact huser)
+    (by simp only [ite_true]; exact huser)
     (by simp only [List.length_singleton]; rw [hlen])
-    (by simp only [if_true, List.length_singleton]; omega) rfl
+    (by simp only [ite_true, List.length_singleton]; omega) rfl
   unfold wp_either_copyout_body at h
-  simp only [eitherCopyoutAddr, if_true] at h
+  simp only [eitherCopyoutAddr, ite_true] at h
   exact h
 
 end

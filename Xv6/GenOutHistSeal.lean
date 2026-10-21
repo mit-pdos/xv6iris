@@ -181,17 +181,17 @@ theorem lmDlOk_echo (so : GStage M) (x : List Obs × BitVec 8) (dl : List (List 
     have hidx : (if restOf ([] ++ [x.2]) = [] ∧ ([] : List (BitVec 8)) = []
         then nlines ([] ++ [x.2]) - 1 else nlines ([] ++ [x.2])) = 0 := by
       by_cases hx : x.2 = wlNl
-      · rw [hx, if_pos ⟨restOf_snoc_nl [], rfl⟩, nlines_snoc_nl, nlines_nil]
-      · rw [if_neg (fun h => by have h1 := h.1; rw [restOf_snoc_other [] _ hx] at h1; simp at h1),
+      · rw [hx, ite_eq_left ⟨restOf_snoc_nl [], rfl⟩, nlines_snoc_nl, nlines_nil]
+      · rw [ite_eq_right (fun h => by have h1 := h.1; rw [restOf_snoc_other [] _ hx] at h1; simp at h1),
           nlines_snoc_other [] _ hx, nlines_nil]
     rw [hidx, linesBytes_0]
     exact Nat.zero_le _
-  · rw [if_neg hc] at hdl
+  · rw [ite_eq_right hc] at hdl
     by_cases hx : x.2 = wlNl
-    · rw [hx, if_pos ⟨restOf_snoc_nl _, rfl⟩, nlines_snoc_nl, Nat.add_sub_cancel,
+    · rw [hx, ite_eq_left ⟨restOf_snoc_nl _, rfl⟩, nlines_snoc_nl, Nat.add_sub_cancel,
         linesBytes_snoc_nl _ _ (Nat.le_refl _)]
       exact hdl
-    · rw [if_neg (fun h => by have h1 := h.1; rw [restOf_snoc_other _ _ hx] at h1; simp at h1),
+    · rw [ite_eq_right (fun h => by have h1 := h.1; rw [restOf_snoc_other _ _ hx] at h1; simp at h1),
         nlines_snoc_other _ _ hx, linesBytes_snoc_other _ _ _ hx]
       exact hdl
 

@@ -306,7 +306,7 @@ def logCredit (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) : IProp G
 omit [MachGS GF] in
 instance logCredit_persistent (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat) :
     Persistent (logCredit (GF := GF) γ cr Sb e0 b) := by
-  unfold logCredit; cases cr <;> simp only [Bool.false_eq_true, if_false, if_true] <;> infer_instance
+  unfold logCredit; cases cr <;> simp only [Bool.false_eq_true, ite_false, ite_true] <;> infer_instance
 
 omit [MachGS GF] in
 /-- The OWN-SET claimant's conversion. -/
@@ -314,8 +314,8 @@ theorem logCredit_own (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 b : Nat)
     (h : cr = true → b ∈ Sb) : ⊢ logCredit (GF := GF) γ cr Sb e0 b := by
   unfold logCredit
   cases cr
-  · simp only [Bool.false_eq_true, if_false]; iempintro
-  · simp only [if_true]
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
+  · simp only [ite_true]
     iintro
     ileft
     ipureintro
@@ -327,8 +327,8 @@ theorem logCredit_group (γ : LogNames) (cr : Bool) (Sb : List Nat) (e0 e b : Na
     loggedAt (GF := GF) γ e b ⊢ logCredit γ cr Sb e0 b := by
   unfold logCredit
   cases cr
-  · simp only [Bool.false_eq_true, if_false]; iintro -; iempintro
-  · simp only [if_true]
+  · simp only [Bool.false_eq_true, ite_false]; iintro -; iempintro
+  · simp only [ite_true]
     iintro #Hw
     iright
     iexists e
@@ -343,8 +343,8 @@ theorem logCredit_mono (γ : LogNames) (cr : Bool) (Sb Sb' : List Nat) (e0 b : N
     logCredit (GF := GF) γ cr Sb e0 b ⊢ logCredit γ cr Sb' e0 b := by
   unfold logCredit
   cases cr
-  · simp only [Bool.false_eq_true, if_false]; iintro H; iexact H
-  · simp only [if_true]
+  · simp only [Bool.false_eq_true, ite_false]; iintro H; iexact H
+  · simp only [ite_true]
     iintro H
     icases H with ⟨H | H⟩
     · ileft; icases H with %h; ipureintro; exact hsub b h
@@ -550,13 +550,13 @@ instance instCtxMorphLogResAt (γ : LogNames) (γb : BcacheNames) (γfs : FsName
           eraSyncTok (GF := GF) ∗
           logStateAt γb γfs cov logstart n LB (opPending om) ξ)) := by
     cases cmt
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       refine @instCtxMorphExists _ _ _ _ (fun n => ?_)
       refine @instCtxMorphExists _ _ _ _ (fun LB => ?_)
       have := instCtxMorphLogStateAt (GF := GF) γb γfs cov logstart n LB (opPending om)
       have := instCtxMorphConst (GF := GF) (eraSyncTok (GF := GF))
       infer_instance
-    · simp only [if_true]
+    · simp only [ite_true]
       exact instCtxMorphConst _
   infer_instance
 
@@ -849,7 +849,7 @@ theorem logCreditUse (γ : LogNames) (om : RegMapF OpEntry) (E : Nat)
   cases cr
   · ipureintro; intro h; exact absurd h (by simp)
   · unfold logCredit
-    simp only [if_true]
+    simp only [ite_true]
     icases Hc with ⟨Hc | Hc⟩
     · icases Hc with %hin
       ihave ⟨⟨%i, Hel⟩, -, -⟩ := (show logOpSe (GF := GF) γ u Sb e0 ⊢
@@ -904,13 +904,13 @@ theorem fsPay_bs (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     iintro Hc ⟨Hm, -⟩
     iapply fsChalf_mdirty_agree γfs bno.toNat bs0 bsl
     iframe Hc Hm
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro Hc ⟨Hm, -⟩
     iapply fsChalf_mclean_agree γfs bno.toNat bs0 bsl
     iframe Hc Hm
@@ -927,14 +927,14 @@ theorem fsPay_bs_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     unfold fsMdirty
     iintro Ha ⟨⟨Hm, -⟩, -⟩
     ihave %h := ghost_map_lookup $$ Ha Hm
     ipureintro; exact h
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     unfold fsMclean
     iintro Ha ⟨⟨Hm, -⟩, -⟩
     ihave %h := ghost_map_lookup $$ Ha Hm
@@ -950,7 +950,7 @@ theorem fsPay_d (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     unfold fsMdirty
     iintro Hc ⟨⟨-, Hm⟩, -⟩
     iapply ghost_map_elem_agree γfs.dirty bno.toNat (.own (1 : Qp).half) (.own (1 : Qp).half)
@@ -958,7 +958,7 @@ theorem fsPay_d (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     iframe Hm Hc
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     unfold fsMclean
     iintro Hc ⟨⟨-, Hm⟩, -⟩
     iapply ghost_map_elem_agree γfs.dirty bno.toNat (.own (1 : Qp).half) (.own (1 : Qp).half)
@@ -976,14 +976,14 @@ theorem fsPay_d_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     unfold fsMdirty
     iintro Ha ⟨⟨-, Hm⟩, -⟩
     ihave %h := ghost_map_lookup $$ Ha Hm
     ipureintro; exact h
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     unfold fsMclean
     iintro Ha ⟨⟨-, Hm⟩, -⟩
     ihave %h := ghost_map_lookup $$ Ha Hm
@@ -999,7 +999,7 @@ theorem fsPay_open (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
       (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb k dv bno := by
   unfold bioPay
   rw [hdt]
-  simp only [if_true]
+  simp only [ite_true]
   unfold fsMdirty
   iintro ⟨⟨H1, H2⟩, H3⟩
   iframe H1 H2 H3
@@ -1013,7 +1013,7 @@ theorem fsPay_open_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
       (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} false) := by
   unfold bioPay
   rw [hcl]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   unfold fsMclean
   iintro ⟨⟨H1, H2⟩, %he⟩
   isplitr [H1 H2]
@@ -1034,13 +1034,13 @@ theorem fsPay_split (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     unfold fsMdirty
     iintro ⟨⟨H1, H2⟩, H3⟩
     iframe H1 H2 H3
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     unfold fsMclean
     iintro ⟨⟨H1, H2⟩, -⟩
     iframe H1 H2
@@ -1058,13 +1058,13 @@ theorem fsPay_mk (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
   cases d with
   | true =>
     rw [hdt]
-    simp only [if_true]
+    simp only [ite_true]
     unfold fsMdirty
     iintro ⟨H1, H2, H3⟩
     iframe H1 H2 H3
   | false =>
     rw [hcl]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     unfold fsMclean
     iintro ⟨H1, H2, -⟩
     isplitl [H1 H2]
@@ -1081,7 +1081,7 @@ theorem fsPay_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
       bioPay (GF := GF) γb V k dv bno bsl bsl false := by
   unfold bioPay
   rw [hcl]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   unfold fsMclean
   iintro ⟨H1, H2⟩
   isplitl [H1 H2]

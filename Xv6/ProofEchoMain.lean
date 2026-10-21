@@ -215,15 +215,15 @@ theorem echoMain_body (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
     rw [h9s1, h9s5, hs1, hs5]
     have hlt : av + 8 * args.length < 2 ^ 64 := by omega
     by_cases he : i + 1 = args.length
-    · rw [if_pos he]
+    · rw [ite_eq_left he]
       have : av + 8 * i = av + 8 * args.length - 8 := by omega
-      rw [this]; simp only [ukBtaken, bne_self_eq_false, Bool.false_eq_true, if_false]; decide
-    · rw [if_neg he]
+      rw [this]; simp only [ukBtaken, bne_self_eq_false, Bool.false_eq_true, ite_false]; decide
+    · rw [ite_eq_right he]
       have hne : BitVec.ofNat 64 (av + 8 * i) ≠ BitVec.ofNat 64 (av + 8 * args.length - 8) := by
         intro e; have := congrArg BitVec.toNat e
         rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
         omega
-      simp only [ukBtaken, bne_iff_ne, ne_eq, hne, not_false_eq_true, if_true]
+      simp only [ukBtaken, bne_iff_ne, ne_eq, hne, not_false_eq_true, ite_true]
       decide
   rw [htk]
   iapply Hcont $$ %h10 %m9 [] HCo Hrun
@@ -323,7 +323,7 @@ theorem echoMain_sep (UL : UK_LEAVES) (N : UkNames GF) (av : Nat) (args : List U
       intro e; have := congrArg BitVec.toNat e
       rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
       omega
-    simp only [ukBtaken, beq_iff_eq, hne, Bool.false_eq_true, if_false, decide_false]
+    simp only [ukBtaken, beq_iff_eq, hne, Bool.false_eq_true, ite_false, decide_false]
     decide
   rw [htk]
   iapply Hcont $$ %h7 %m6 [] [] HCo Hrun
@@ -352,7 +352,7 @@ theorem echoMain_loop (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
     icases Hpay $$ %g %hg with ⟨%Cm, Hw, Hnl⟩
     iapply echoMain_body UL HS N av args i g h mc n Ci Cm hg hav hs1 hs3 hs5 $$ Hw Hc Hargv HCi Hrun
     iintro %h1 %mc1 %hp1 HCm Hrun
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
     -- 0x66  li a2,1
     ihave Hi := echo_uis N.t 0x66 true (.ITYPE (1#12, .Regidx 0#5, .Regidx 12#5, .ADDI)) udec%
       (by decide) $$ Hc
@@ -419,7 +419,7 @@ theorem echoMain_loop (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
     icases Hpay $$ %g %hg with ⟨%Cm, %Cn, Hw, Hsep, Hpay⟩
     iapply echoMain_body UL HS N av args i g h mc n Ci Cm hg hav hs1 hs3 hs5 $$ Hw Hc Hargv HCi Hrun
     iintro %h1 %mc1 %hp1 HCm Hrun
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     iapply echoMain_sep UL N av args i h1 mc1 n Cm Cn hav (by omega)
       (by rw [hp1 9#5 (by decide) (by decide)]; exact hs1) (by rw [hp1 19#5 (by decide) (by decide)]; exact hs3)
       (by rw [hp1 20#5 (by decide) (by decide)]; exact hs4) (by rw [hp1 22#5 (by decide) (by decide)]; exact hs6)
@@ -560,7 +560,7 @@ theorem wp_echoMain (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (h : CP
   rw [h315, h3a0, echoMain_bge _ (by omega)]
   by_cases hL : args.length ≤ 1
   · -- argc ≤ 1: nothing to print
-    rw [decide_eq_true hL, if_pos rfl,
+    rw [decide_eq_true hL, ite_eq_left rfl,
       show BitVec.ofNat 64 0x16 + BitVec.signExtend 64 0x60#13 = BitVec.ofNat 64 0x76 from by decide]
     unfold kechoPayAll
     icases Hpay with ⟨Hp, -⟩

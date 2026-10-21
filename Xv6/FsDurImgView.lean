@@ -70,7 +70,7 @@ theorem imgRoot_entries (P : Nat → List (BitVec 8)) (sb : FsSb) (hwf : fsimgWf
   have hdir : fnIsDir (imgNode P sb ROOTINO) = true := by
     unfold fnIsDir fnType; rw [imgNode_rec, hty]; rfl
   unfold dirEntries
-  rw [if_pos hdir]
+  rw [ite_eq_left hdir]
   exact dirView_dataExt _ _ _ (eraNode_fbAgree_nrec _ _ _
     (imgBlkmap_holes P _ (fsDinode_wf P sb ROOTINO)) hok.fioSize)
 
@@ -182,7 +182,7 @@ theorem viewOps_incl (data : Nat → List (BitVec 8)) (self : Nat) (orph : Bool)
         cases htl : entTokenless self orph (dirBname data n) (dirInum data n).toNat with
         | true =>
           unfold entElem
-          rw [if_pos htl]
+          rw [ite_eq_left htl]
           exact ORA.inc_unit
         | false =>
           obtain ⟨ht, hpv⟩ := hself n (by omega) hw hex htl
@@ -212,7 +212,7 @@ theorem viewOps_inclTickets (P : Nat → List (BitVec 8)) (self : Nat) (dn : Din
     rw [entTokenless_selfNe self orph _ _ e hex] at htl
     cases htl
   unfold fsRecTicket
-  simp only [hlv, hne, decide_false, Bool.not_false, Bool.and_self, if_true]
+  simp only [hlv, hne, decide_false, Bool.not_false, Bool.and_self, ite_true]
 
 /-! ## 9f.  The image's own instance -/
 

@@ -535,20 +535,20 @@ theorem authMapAux_get? : ∀ (l : List Agent) (b t : Nat),
     get? (authMapAux l b) t = if b < t ∧ t ≤ b + l.length then l[t - b - 1]? else none
   | [], b, t => by
     simp only [authMapAux, List.length_nil, Nat.add_zero]
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     rfl
   | a :: l, b, t => by
     simp only [authMapAux, List.length_cons]
     by_cases h : t = b + 1
     · subst h
-      rw [LawfulPartialMap.get?_insert_eq rfl, if_pos (by omega)]
+      rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left (by omega)]
       simp
     · rw [LawfulPartialMap.get?_insert_ne (Ne.symm h), authMapAux_get? l (b + 1) t]
       by_cases h1 : b + 1 < t ∧ t ≤ b + 1 + l.length
-      · rw [if_pos h1, if_pos (by omega)]
+      · rw [ite_eq_left h1, ite_eq_left (by omega)]
         have : t - b - 1 = (t - (b + 1) - 1) + 1 := by omega
         rw [this, List.getElem?_cons_succ]
-      · rw [if_neg h1, if_neg (by omega)]
+      · rw [ite_eq_right h1, ite_eq_right (by omega)]
 
 theorem authMap_get? (log : List Agent) (t : Nat) :
     get? (authMap log) t = if 1 ≤ t ∧ t ≤ log.length then log[t - 1]? else none := by
@@ -556,8 +556,8 @@ theorem authMap_get? (log : List Agent) (t : Nat) :
   rw [authMapAux_get?]
   simp only [Nat.zero_add, Nat.sub_zero]
   by_cases h : 1 ≤ t ∧ t ≤ log.length
-  · rw [if_pos (by omega), if_pos h]
-  · rw [if_neg (by omega), if_neg h]
+  · rw [ite_eq_left (by omega), ite_eq_left h]
+  · rw [ite_eq_right (by omega), ite_eq_right h]
 
 theorem authMap_snoc (log : List Agent) (h : Agent) :
     authMap (log ++ [h]) = insert (authMap log) (log.length + 1) h := by
@@ -566,14 +566,14 @@ theorem authMap_snoc (log : List Agent) (h : Agent) :
   rw [authMap_get?]
   by_cases ht : t = log.length + 1
   · subst ht
-    rw [LawfulPartialMap.get?_insert_eq rfl, if_pos (by simp)]
+    rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left (by simp)]
     simp
   · rw [LawfulPartialMap.get?_insert_ne (Ne.symm ht), authMap_get?]
     simp only [List.length_append, List.length_singleton]
     by_cases h1 : 1 ≤ t ∧ t ≤ log.length
-    · rw [if_pos (by omega), if_pos h1]
+    · rw [ite_eq_left (by omega), ite_eq_left h1]
       rw [List.getElem?_append_left (by omega)]
-    · rw [if_neg (by omega), if_neg h1]
+    · rw [ite_eq_right (by omega), ite_eq_right h1]
 
 theorem authMap_nil : authMap [] = (∅ : RegMapF Agent) := rfl
 
@@ -592,31 +592,31 @@ theorem resvMapAux_get? (σ : MState) : ∀ (k j : Nat),
       if h : j < k ∧ j < NCPU then some (σ.resv ⟨j, h.2⟩, (σ.hr ⟨j, h.2⟩).acq) else none
   | 0, j => by
     simp only [resvMapAux]
-    rw [dif_neg (by omega)]
+    rw [dite_eq_right (by omega)]
     rfl
   | k + 1, j => by
     simp only [resvMapAux]
     split
     · by_cases hj : j = k
       · subst hj
-        rw [LawfulPartialMap.get?_insert_eq rfl, dif_pos ⟨by omega, by assumption⟩]
+        rw [LawfulPartialMap.get?_insert_eq rfl, dite_eq_left ⟨by omega, by assumption⟩]
       · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hj), resvMapAux_get? σ k j]
         by_cases h1 : j < k ∧ j < NCPU
-        · rw [dif_pos h1, dif_pos ⟨by omega, h1.2⟩]
-        · rw [dif_neg h1, dif_neg (by omega)]
+        · rw [dite_eq_left h1, dite_eq_left ⟨by omega, h1.2⟩]
+        · rw [dite_eq_right h1, dite_eq_right (by omega)]
     · rw [resvMapAux_get? σ k j]
       by_cases h1 : j < k ∧ j < NCPU
-      · rw [dif_pos h1, dif_pos ⟨by omega, h1.2⟩]
-      · rw [dif_neg h1, dif_neg (by omega)]
+      · rw [dite_eq_left h1, dite_eq_left ⟨by omega, h1.2⟩]
+      · rw [dite_eq_right h1, dite_eq_right (by omega)]
 
 theorem resvMap_get? (σ : MState) (c : CPU) :
     get? (resvMap σ) c.val = some (σ.resv c, (σ.hr c).acq) := by
   unfold resvMap
-  rw [resvMapAux_get?, dif_pos ⟨c.isLt, c.isLt⟩]
+  rw [resvMapAux_get?, dite_eq_left ⟨c.isLt, c.isLt⟩]
 
 theorem resvMap_get?_ge (σ : MState) (j : Nat) (h : NCPU ≤ j) : get? (resvMap σ) j = none := by
   unfold resvMap
-  rw [resvMapAux_get?, dif_neg (by omega)]
+  rw [resvMapAux_get?, dite_eq_right (by omega)]
 
 /-- Two states with the same reservations and acquire bits have the same map. -/
 theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq) :
@@ -710,8 +710,7 @@ theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 
     | none => simp
     | some p =>
       obtain ⟨d, off⟩ := p
-      cases d <;> simp [devSig, Uart.sig, Uart.writeN, Plic.sig, Plic.writeN,
-        Virtio.sig, Virtio.writeN, Option.map]
+      cases d <;> simp [Uart.writeN, Plic.writeN, Virtio.writeN, Option.map]
   · exact hn
 
 /-! ### Getting `ramBytes` out of the memory -/
@@ -796,7 +795,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [updCpu, if_true]
+    simp only [updCpu, ite_true]
     refine ⟨a1, a2, ?_, ?_⟩
     · simp only [HRead.afterLoad]; omega
     · intro a
@@ -804,7 +803,7 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
       split
       · exact htv
       · exact a4 a
-  · simp only [updCpu, hc, if_false]
+  · simp only [updCpu, hc, ite_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
@@ -816,12 +815,12 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
   simp only [MState.top] at *
   by_cases hc : c = cpu
   · subst hc
-    simp only [updCpu, if_true]
+    simp only [updCpu, ite_true]
     refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 hpub, ?_, a3, a4⟩
     split
     · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 hpub⟩
     · exact b2
-  · simp only [updCpu, hc, if_false]
+  · simp only [updCpu, hc, ite_false]
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
@@ -836,19 +835,19 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
     simp only [MState.top] at *
     by_cases hc : c = cpu
     · subst hc
-      simp only [updCpu, if_true, List.length_append, List.length_singleton]
+      simp only [updCpu, ite_true, List.length_append, List.length_singleton]
       refine ⟨?_, by omega, ?_, ?_⟩
       · split <;> omega
       · simp only [HRead.clearAcq]; omega
       · intro a; simp only [HRead.clearAcq]; have := a4 a; omega
-    · simp only [updCpu, hc, if_false, List.length_append, List.length_singleton]
+    · simp only [updCpu, hc, ite_false, List.length_append, List.length_singleton]
       exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
   · intro c r hr a v hav
     simp only [updCpu] at hr ⊢
     by_cases hc : c = cpu
     · subst hc
       simp at hr
-    · simp only [hc, if_false] at hr
+    · simp only [hc, ite_false] at hr
       have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
         intro j hj heq
         apply hno
@@ -890,8 +889,8 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
   refine ⟨h1, h2, h3, h4, fun d' => ?_⟩
   simp only [updCpu']
   by_cases hd : d' = d
-  · subst hd; simp only [if_true]; exact hnext (h5 d')
-  · simp only [hd, if_false]; exact h5 d'
+  · subst hd; simp only [ite_true]; exact hnext (h5 d')
+  · simp only [hd, ite_false]; exact h5 d'
 
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by

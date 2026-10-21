@@ -206,7 +206,7 @@ theorem fOk_fcontent (av : Aview) (s : Dst) (h : fOk av s) : fcontentOf av = s :
   intro N
   rw [fcontentOf_lookup]
   by_cases hN : uname N
-  · rw [if_pos hN]
+  · rw [ite_eq_left hN]
     have hr := fOk_row av s N h hN
     cases hs : s[N]? with
     | none =>
@@ -220,7 +220,7 @@ theorem fOk_fcontent (av : Aview) (s : Dst) (h : fOk av s) : fcontentOf av = s :
       obtain ⟨hst, hrow⟩ := hr
       rw [hst]
       simp [fRowc, hrow]
-  · rw [if_neg hN]
+  · rw [ite_eq_right hN]
     cases hs : s[N]? with
     | none => rfl
     | some p => exact absurd (fOk_dom av s N p h hs) hN

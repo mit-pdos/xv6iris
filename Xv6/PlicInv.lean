@@ -56,7 +56,7 @@ theorem plic_readN4 (p : PlicState) (off : Nat) (w : BitVec 32) (p' : PlicState)
     (devSig .plic).read p off 4 = some (w, p') := by
   show Plic.readN p off 4 = _
   unfold Plic.readN
-  rw [dif_pos rfl, h]
+  rw [dite_eq_left rfl, h]
   rfl
 
 theorem plic_writeN4 (p : PlicState) (off : Nat) (w : BitVec 32) (p' : PlicState)
@@ -64,7 +64,7 @@ theorem plic_writeN4 (p : PlicState) (off : Nat) (w : BitVec 32) (p' : PlicState
     (devSig .plic).write p off 4 w = some p' := by
   show Plic.writeN p off 4 w = _
   unfold Plic.writeN
-  rw [dif_pos rfl]
+  rw [dite_eq_left rfl]
   exact h
 
 /-! ## The four offsets, fully decoded
@@ -75,61 +75,61 @@ transaction at one of them also needs the earlier windows to MISS. -/
 
 theorem prioSrc_sclaim (hrt : Nat) : Plic.prioSrc (sclaimOff hrt) = none := by
   unfold Plic.prioSrc sclaimOff Plic.nsrc
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, -⟩
   omega
 
 theorem pendingWidx_sclaim (hrt : Nat) : Plic.pendingWidx (sclaimOff hrt) = none := by
   unfold Plic.pendingWidx sclaimOff Plic.nwords
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -⟩
   omega
 
 theorem enableCtx_sclaim (hrt : Nat) : Plic.enableCtx (sclaimOff hrt) = none := by
   unfold Plic.enableCtx sclaimOff Plic.nctx NCPU
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -, -⟩
   omega
 
 theorem threshCtx_sclaim (hrt : Nat) : Plic.threshCtx (sclaimOff hrt) = none := by
   unfold Plic.threshCtx sclaimOff
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -⟩
   omega
 
 theorem enableCtx_prio (i : Nat) (hi : i < Plic.nsrc) : Plic.enableCtx (prioOff i) = none := by
   unfold Plic.enableCtx prioOff Plic.nsrc at *
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, -, -, -⟩
   omega
 
 theorem prioSrc_senable (hrt : Nat) : Plic.prioSrc (senableOff hrt) = none := by
   unfold Plic.prioSrc senableOff Plic.nsrc
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, -⟩
   omega
 
 theorem pendingWidx_senable (hrt : Nat) : Plic.pendingWidx (senableOff hrt) = none := by
   unfold Plic.pendingWidx senableOff Plic.nwords
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -⟩
   omega
 
 theorem prioSrc_sthresh (hrt : Nat) : Plic.prioSrc (sthreshOff hrt) = none := by
   unfold Plic.prioSrc sthreshOff Plic.nsrc
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, -⟩
   omega
 
 theorem pendingWidx_sthresh (hrt : Nat) : Plic.pendingWidx (sthreshOff hrt) = none := by
   unfold Plic.pendingWidx sthreshOff Plic.nwords
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -⟩
   omega
 
 theorem enableCtx_sthresh (hrt : Nat) : Plic.enableCtx (sthreshOff hrt) = none := by
   unfold Plic.enableCtx sthreshOff Plic.nctx NCPU
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨-, h2, -, -⟩
   omega
 
@@ -456,7 +456,7 @@ theorem plicSlots_complete (γ0 γ1 : UartNames) (p : PlicState) (n : Nat)
       plicSlots γ0 γ1 (Plic.complete p n) := by
   rcases hn with rfl | rfl | rfl | rfl
   · -- 0: not a source; the completion is a no-op
-    have he : Plic.complete p 0 = p := by unfold Plic.complete; rw [if_neg (by omega)]
+    have he : Plic.complete p 0 = p := by unfold Plic.complete; rw [ite_eq_right (by omega)]
     rw [he]
     iintro ⟨#H0, #H1, Hs, -, -⟩
     iexact Hs

@@ -93,7 +93,7 @@ is never zero, so the insert never takes the delete arm. -/
 theorem lfTgt_delta (I : RegMapF FsNode) (t : Nat) (n n' : FsNode) (hnz' : fnType n' ≠ 0)
     (hrow' : absRow n' = ⟨(absRow n).anNode, fnNlink n + 1⟩) :
     absView (PartialMap.insert I t n') = deltaLinkTgt t (absRow n) (absView I) := by
-  rw [absView_insert_row I t n' _ hnz' hrow', if_neg (Nat.succ_ne_zero _)]
+  rw [absView_insert_row I t n' _ hnz' hrow', ite_eq_right (Nat.succ_ne_zero _)]
   rfl
 
 /-- THE PARENT'S ROW AT THE APPEND (Rocq's `lf_parent_row`): the `absOf`

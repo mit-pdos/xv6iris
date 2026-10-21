@@ -100,7 +100,7 @@ theorem file_read_at (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : D
     have hks : rv.toNat ≤ content.length - p := by rw [hk]; exact ardCount_sub n p content.length
     have hans : rdAnsOf rv gb = .RdBytes ((content.drop p).take rv.toNat) := by
       unfold rdAnsOf
-      rw [if_neg (by omega), hsig, Int.toNat_natCast]
+      rw [ite_eq_right (by omega), hsig, Int.toNat_natCast]
       rw [fdev_map_seq_take gb content p rv.toNat hks hg]
     rw [hans]
     icases HK with ⟨HK, -⟩

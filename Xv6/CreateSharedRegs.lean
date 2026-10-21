@@ -406,13 +406,13 @@ theorem createRegs_set (k : KCtx) (dpv ansv : BitVec 64) (ty mj mn : BitVec 16) 
   simp only [createRegs, createThr, RegMap.set_apply]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     first
-    | (rw [if_neg (Ne.symm n2)]; assumption) | (rw [if_neg (Ne.symm n8)]; assumption)
-    | (rw [if_neg (Ne.symm n9)]; assumption) | (rw [if_neg (Ne.symm n18)]; assumption)
-    | (rw [if_neg (Ne.symm n19)]; assumption) | (rw [if_neg (Ne.symm n20)]; assumption)
-    | (rw [if_neg (Ne.symm n21)]; assumption) | (rw [if_neg (Ne.symm n22)]; assumption)
-    | (rw [if_neg (Ne.symm n23)]; assumption) | (rw [if_neg (Ne.symm n24)]; assumption)
-    | (rw [if_neg (Ne.symm n25)]; assumption) | (rw [if_neg (Ne.symm n26)]; assumption)
-    | (rw [if_neg (Ne.symm n27)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n2)]; assumption) | (rw [ite_eq_right (Ne.symm n8)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n9)]; assumption) | (rw [ite_eq_right (Ne.symm n18)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n19)]; assumption) | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n21)]; assumption) | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n23)]; assumption) | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n25)]; assumption) | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- the `mv s1,a0` at +0x20 (Rocq's `cr_regs_s1`) -/
 theorem createRegs_s1 (k : KCtx) (dpv dpv' ansv : BitVec 64) (ty mj mn : BitVec 16) (R : RegMap)
@@ -420,7 +420,7 @@ theorem createRegs_s1 (k : KCtx) (dpv dpv' ansv : BitVec 64) (ty mj mn : BitVec 
     createRegs k dpv' ansv ty mj mn (R.set 9#5 v) := by
   obtain ⟨a2, a8, _, a18, a20, a21, a22, a19, a23, a24, a25, a26, a27⟩ := h
   simp only [createRegs, createThr, RegMap.set_apply]
-  simp only [BitVec.reduceEq, if_false, if_true]
+  simp only [BitVec.reduceEq, ite_false, ite_true]
   exact ⟨a2, a8, hv, a18, a20, a21, a22, a19, a23, a24, a25, a26, a27⟩
 
 /-- the writes of `s2` (Rocq's `cr_regs_s2`) -/
@@ -429,7 +429,7 @@ theorem createRegs_s2 (k : KCtx) (dpv ansv ansv' : BitVec 64) (ty mj mn : BitVec
     createRegs k dpv ansv' ty mj mn (R.set 18#5 v) := by
   obtain ⟨a2, a8, a9, _, a20, a21, a22, a19, a23, a24, a25, a26, a27⟩ := h
   simp only [createRegs, createThr, RegMap.set_apply]
-  simp only [BitVec.reduceEq, if_false, if_true]
+  simp only [BitVec.reduceEq, ite_false, ite_true]
   exact ⟨a2, a8, a9, hv, a20, a21, a22, a19, a23, a24, a25, a26, a27⟩
 
 /-- Rocq's `cr_tregs_of_regs`. -/
@@ -474,13 +474,13 @@ theorem createRegs3_set (k : KCtx) (dpv ansv s3v : BitVec 64) (ty mj mn : BitVec
   simp only [createRegs3, createThr3, RegMap.set_apply]
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     first
-    | (rw [if_neg (Ne.symm n2)]; assumption) | (rw [if_neg (Ne.symm n8)]; assumption)
-    | (rw [if_neg (Ne.symm n9)]; assumption) | (rw [if_neg (Ne.symm n18)]; assumption)
-    | (rw [if_neg (Ne.symm n19)]; assumption) | (rw [if_neg (Ne.symm n20)]; assumption)
-    | (rw [if_neg (Ne.symm n21)]; assumption) | (rw [if_neg (Ne.symm n22)]; assumption)
-    | (rw [if_neg (Ne.symm n23)]; assumption) | (rw [if_neg (Ne.symm n24)]; assumption)
-    | (rw [if_neg (Ne.symm n25)]; assumption) | (rw [if_neg (Ne.symm n26)]; assumption)
-    | (rw [if_neg (Ne.symm n27)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n2)]; assumption) | (rw [ite_eq_right (Ne.symm n8)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n9)]; assumption) | (rw [ite_eq_right (Ne.symm n18)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n19)]; assumption) | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n21)]; assumption) | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n23)]; assumption) | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n25)]; assumption) | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+    | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- the `ld s3,40(sp)` at +0xe8 / +0xf4 / +0x15c (Rocq's `cr_regs3_s3`) -/
 theorem createRegs3_s3 (k : KCtx) (dpv ansv s3v s3w : BitVec 64) (ty mj mn : BitVec 16)
@@ -488,7 +488,7 @@ theorem createRegs3_s3 (k : KCtx) (dpv ansv s3v s3w : BitVec 64) (ty mj mn : Bit
     createRegs3 k dpv ansv s3w ty mj mn (R.set 19#5 v) := by
   obtain ⟨a2, a8, a9, a18, _, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   simp only [createRegs3, createThr3, RegMap.set_apply]
-  simp only [BitVec.reduceEq, if_false, if_true]
+  simp only [BitVec.reduceEq, ite_false, ite_true]
   exact ⟨a2, a8, a9, a18, hv, a20, a21, a22, a23, a24, a25, a26, a27⟩
 
 /-- ENTRY into the `s3` epoch (Rocq's `cr_regs3_of_span`): the fresh-type
@@ -648,16 +648,16 @@ def createIty (ty : BitVec 16) (dpv : Int) : Ity :=
 def createDelta (ty : BitVec 16) : Nat := if ty = T_DIR then 2 else 1
 
 theorem create_ity_dir (ty : BitVec 16) (dpv : Int) (h : ty = T_DIR) :
-    createIty ty dpv = .tDir dpv := by unfold createIty; rw [if_pos h]
+    createIty ty dpv = .tDir dpv := by unfold createIty; rw [ite_eq_left h]
 
 theorem create_ity_file (ty : BitVec 16) (dpv : Int) (h : ty ≠ T_DIR) :
-    createIty ty dpv = .tFile := by unfold createIty; rw [if_neg h]
+    createIty ty dpv = .tFile := by unfold createIty; rw [ite_eq_right h]
 
 theorem create_delta_dir (ty : BitVec 16) (h : ty = T_DIR) : createDelta ty = 2 := by
-  unfold createDelta; rw [if_pos h]
+  unfold createDelta; rw [ite_eq_left h]
 
 theorem create_delta_file (ty : BitVec 16) (h : ty ≠ T_DIR) : createDelta ty = 1 := by
-  unfold createDelta; rw [if_neg h]
+  unfold createDelta; rw [ite_eq_right h]
 
 /-- THE FILL's PREMISE at create's own record (Rocq's `cr_fill_choice_ok`):
 the claim box stands at multiplicity zero, and the chosen value matches the
@@ -673,8 +673,8 @@ theorem create_fill_choice_ok (ty major minor : BitVec 16) (dnc : Dinode) (dind 
   rw [createSetf_type, hty]
   unfold createIty iregRegOk
   by_cases h : ty = T_DIR
-  · rw [if_pos h, h]; rfl
-  · rw [if_neg h]
+  · rw [ite_eq_left h, h]; rfl
+  · rw [ite_eq_right h]
     intro hc; apply h
     exact BitVec.eq_of_toNat_eq (by rw [hc]; rfl)
 
@@ -687,8 +687,8 @@ theorem create_delta_eq (ty major minor : BitVec 16) (dnc : Dinode) (nl : BitVec
   rw [createSetf_type, createSetf_nlink, hty, hz]
   unfold iregDotDelta createDelta
   by_cases h : ty = T_DIR
-  · rw [if_pos h, h]; rfl
-  · rw [if_neg h]
+  · rw [ite_eq_left h, h]; rfl
+  · rw [ite_eq_right h]
     have : ty.toNat ≠ iregDirTy := fun hc => h (BitVec.eq_of_toNat_eq (by rw [hc]; rfl))
     simp [this]
 
@@ -805,7 +805,7 @@ theorem create_uniq_nop (dn dn' : Dinode) (data data' : Nat → List (BitVec 8))
   have H := hu hd
   have hagr : ∀ q : Nat, dirWinAgree data data' q := by
     intro q jj _
-    rw [hrng (16 * q + jj), if_neg (by omega)]
+    rw [hrng (16 * q + jj), ite_eq_right (by omega)]
   have hk0le : k0 ≤ nrec := by rw [hk0]; exact dirSlot_le data nrec
   have hnr := dirNrec_range dn.diSize.toNat
   rw [← hnrec] at hnr

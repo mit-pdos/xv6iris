@@ -37,7 +37,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -68,36 +68,40 @@ variable {D : UFoot}
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A prefetch whose translation faults retires**, landing where the
-translation did (no trap: the fault is dropped). -/
+translation did (no trap: the fault is dropped).  Since sail-riscv 0.16 the access runs at
+`default_access_info`'s record (User) and a translation fault carries an exception context. -/
 theorem umo_zicbop_tfault (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (hp : UtrPins D s)
-    (c : cbop_zicbop) (i : BitVec 5) (off : BitVec 12) (e : ExceptionType) (s1 : UWSt) (orc1 : UOrc)
-    (htr : runRW D orc s (translateAddr (.Virtaddr (umoCbVa (uxaXget s.file i) off)) (umoPf c)) =
+    (c : cbop_zicbop) (i : BitVec 5) (off : BitVec 12) (e : ExceptionContext) (s1 : UWSt) (orc1 : UOrc)
+    (htr : runRW D orc s (translateAddr (.Virtaddr (umoCbVa (uxaXget s.file i) off)) (umoPf c) .User) =
       some (.Err (e, ()), s1, orc1)) :
     runRW D orc s (execute (.ZICBOP (c, .Regidx i, off))) = some (RETIRE_SUCCESS, s1, orc1) := by
-  have hga := umo_gtda hD orc s hU hp i
+  have hdai := umo_default_access_info hD orc s hU hp (umoPf c)
+  have hga := fun (o : BitVec 64) (w : Nat) => umo_gtda hD orc s hp i o (umoPf c)
+    { eff_privilege := .User, pmlen := 0, as_guest := false } rfl rfl w
   have hx := uxa_rX hD.ctl.alu orc s i
-  uwk_run [hga, hx]
+  unfold umoCbVa umoCbBlk at htr
+  uwk_run [hdai, hga, hx]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A prefetch whose translation succeeds retires** after the physical
-check at User (`MPRV = 0`), whatever that check answers, landing where the
-check did; no memory is accessed. -/
+check at User (the access information's privilege), whatever that check answers, landing
+where the check did; no memory is accessed. -/
 theorem umo_zicbop_ok (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (hp : UtrPins D s)
     (c : cbop_zicbop) (i : BitVec 5) (off : BitVec 12) (pa : BitVec 64) (pbmt : page_based_mem_type)
     (s1 : UWSt) (orc1 : UOrc)
-    (htr : runRW D orc s (translateAddr (.Virtaddr (umoCbVa (uxaXget s.file i) off)) (umoPf c)) =
+    (htr : runRW D orc s (translateAddr (.Virtaddr (umoCbVa (uxaXget s.file i) off)) (umoPf c) .User) =
       some (.Ok (.Physaddr pa, pbmt, ()), s1, orc1))
-    (hcp1 : s1.file .cur_privilege = .User) (hmprv1 : BitVec.extractLsb' 17 1 (s1.file .mstatus) = 0#1)
     (r : Result Phys_Mem_Access_Info ExceptionType) (s2 : UWSt) (orc2 : UOrc)
     (hpc : runRW D orc1 s1 (phys_access_check (umoPf c) pbmt .User (.Physaddr pa) 64 false) =
       some (r, s2, orc2)) :
     runRW D orc s (execute (.ZICBOP (c, .Regidx i, off))) = some (RETIRE_SUCCESS, s2, orc2) := by
-  have hga := umo_gtda hD orc s hU hp i
+  have hdai := umo_default_access_info hD orc s hU hp (umoPf c)
+  have hga := fun (o : BitVec 64) (w : Nat) => umo_gtda hD orc s hp i o (umoPf c)
+    { eff_privilege := .User, pmlen := 0, as_guest := false } rfl rfl w
   have hx := uxa_rX hD.ctl.alu orc s i
-  have hms := hD.ms
-  have hpr := hD.ctl.priv
-  cases r <;> uwk_run [hga, hx, utr_effPriv]
+  unfold umoCbVa umoCbBlk at htr
+  cases r <;> uwk_run [hdai, hga, hx]
 
 end
 

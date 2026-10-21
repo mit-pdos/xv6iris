@@ -84,13 +84,13 @@ theorem sysFdSt_key {fs : List (BitVec 64)} {sts : List FdState} (ha : syscFdAgr
     (v : BitVec 64) : sysFdSt v fs sts = syscFdKey v sts := by
   unfold sysFdSt syscFdKey argFd
   by_cases hr : 0 ≤ argZ v ∧ argZ v < NOFILE
-  · rw [if_pos hr, if_pos hr]
+  · rw [ite_eq_left hr, ite_eq_left hr]
     obtain ⟨w, st, hw, hst⟩ := syscFdAgree_lookup ha (j := (argZ v).toNat) (by omega)
     by_cases h0 : w = 0#64
     · subst h0
       simp [hw, hst, (ha.2.2 _ _ st hw hst).1 rfl]
     · simp [hw, hst, h0]
-  · rw [if_neg hr, if_neg hr]
+  · rw [ite_eq_right hr, ite_eq_right hr]
 
 /-- argfd said NO: whatever the argument names is closed (or nothing). -/
 theorem argFd_none_closed {fs : List (BitVec 64)} {sts : List FdState} (ha : syscFdAgree fs sts)
@@ -102,7 +102,7 @@ theorem argFd_none_closed {fs : List (BitVec 64)} {sts : List FdState} (ha : sys
   obtain ⟨w, st', hw, hst'⟩ := syscFdAgree_lookup ha hlt
   rw [hst] at hst'; cases hst'
   unfold argFd at h
-  rw [if_pos (by omega)] at h
+  rw [ite_eq_left (by omega)] at h
   have hk : (argZ v).toNat = fd := by omega
   rw [hk, hw] at h
   by_cases h0 : w = 0#64
@@ -413,8 +413,8 @@ theorem syscRows_ofile (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : 
     usysSeccOk_refl _ _ _ _ (hn 23 h23), Or.inl (hn 14 h14),
     Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
-      if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
+    rw [ite_eq_right (hn USYS_exec h7), ite_eq_right (hn USYS_sbrk h12), ite_eq_right (hn USYS_wait h3),
+      ite_eq_right (hn USYS_pipe h4), ite_eq_right (hn USYS_read h5), ite_eq_right (hn USYS_fstat h8)]
     rfl
   · rw [ha0]; exact hfd
   · exact syscPipeOk_quiet V _ _ _ sts sts' (hn 4 h4)
@@ -488,7 +488,7 @@ theorem syscReadRet_of (tf : List (BitVec 64)) (r : BitVec 64) (d : Nat)
     have hlt : d < 2 ^ 31 := by omega
     have e : (BitVec.ofNat 64 d).toInt = d := by
       rw [BitVec.toInt_eq_toNat_cond, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
     rw [e]
     exact ⟨by omega, hd⟩
   · left; decide
@@ -500,7 +500,7 @@ theorem syscDup_fd_none (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 
     (ha : syscFdAgree V.ofile sts) (hnone : argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) :
     syscFdOk V 0xFFFFFFFFFFFFFFFF#64 sts sts := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_neg (by decide), if_pos (by decide)]
+  rw [hnum, ite_eq_right (by decide), ite_eq_left (by decide)]
   exact Or.inr ⟨syscM1, rfl, Or.inl (argFd_none_closed ha _ hnone)⟩
 
 /-- dup's row, the table was full. -/
@@ -508,7 +508,7 @@ theorem syscDup_fd_full (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 
     (ha : syscFdAgree V.ofile sts) (hfull : fdFrees V.ofile = []) :
     syscFdOk V 0xFFFFFFFFFFFFFFFF#64 sts sts := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_neg (by decide), if_pos (by decide)]
+  rw [hnum, ite_eq_right (by decide), ite_eq_left (by decide)]
   exact Or.inr ⟨syscM1, rfl, Or.inr (fdFrees_nil_lowest ha hfull)⟩
 
 /-- dup's row, duplicated into the least free descriptor. -/
@@ -517,7 +517,7 @@ theorem syscDup_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 10
     (hsome : argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd0, fv)) (hfr : fdFrees V.ofile = fd1 :: l) :
     syscFdOk V (BitVec.ofNat 64 fd1) sts (sts.set fd1 (sts.getD fd0 .closed)) := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_neg (by decide), if_pos (by decide)]
+  rw [hnum, ite_eq_right (by decide), ite_eq_left (by decide)]
   obtain ⟨-, -, -, hz⟩ := argFd_lookup _ _ fd0 fv hsome
   have hk : (usysArgfd V.tf).toNat = fd0 := by
     show (argZ (tfW V.tf (tfArgIdx 0))).toNat = fd0; omega
@@ -531,8 +531,8 @@ theorem syscClose_fd_none (V : ProcPriv) (sts : List FdState) (hnum : syscNum V 
     (ha : syscFdAgree V.ofile sts) (hnone : argFd (tfW V.tf (tfArgIdx 0)) V.ofile = none) :
     syscFdOk V 0xFFFFFFFFFFFFFFFF#64 sts sts := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_pos (by decide)]
-  refine ⟨by rw [if_neg (by decide)], ?_⟩
+  rw [hnum, ite_eq_left (by decide)]
+  refine ⟨by rw [ite_eq_right (by decide)], ?_⟩
   intro fd st hz hst hne
   exact absurd (argFd_none_closed ha _ hnone fd st hz hst) hne
 
@@ -541,18 +541,18 @@ theorem syscClose_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 
     (fd : Nat) (fv : BitVec 64) (hsome : argFd (tfW V.tf (tfArgIdx 0)) V.ofile = some (fd, fv)) :
     syscFdOk V 0#64 sts (sts.set fd .closed) := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_pos (by decide)]
+  rw [hnum, ite_eq_left (by decide)]
   obtain ⟨-, -, -, hz⟩ := argFd_lookup _ _ fd fv hsome
   have hk : (usysArgfd V.tf).toNat = fd := by
     show (argZ (tfW V.tf (tfArgIdx 0))).toNat = fd; omega
-  refine ⟨by rw [if_pos (by decide), hk], fun _ _ _ _ _ => by decide⟩
+  refine ⟨by rw [ite_eq_left (by decide), hk], fun _ _ _ _ _ => by decide⟩
 
 /-- pipe's row, it failed. -/
 theorem syscPipe_fd_fail (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 4) :
     syscFdOk V 0xFFFFFFFFFFFFFFFF#64 sts sts := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide),
-    if_neg (by decide)]
+  rw [hnum, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide),
+    ite_eq_right (by decide)]
   exact ⟨by decide, rfl⟩
 
 /-- pipe's two least free descriptors, as the state list sees them. -/
@@ -569,8 +569,8 @@ theorem syscPipe_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 4
     (hfr : fdFrees V.ofile = fd0 :: fd1 :: l) (hne : fd0 ≠ fd1) :
     syscFdOk V 0#64 sts ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))) := by
   unfold syscFdOk usysFdOk
-  rw [hnum, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide),
-    if_pos (by decide)]
+  rw [hnum, ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide),
+    ite_eq_left (by decide)]
   obtain ⟨h0, h1⟩ := syscPipe_least V sts ha fd0 fd1 l γp hfr
   exact ⟨fd0, fd1, γp, hne, h0, h1, rfl⟩
 

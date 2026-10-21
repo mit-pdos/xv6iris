@@ -19,7 +19,7 @@ KERNEL    ?= xv6-riscv/kernel/kernel
 .PHONY: lint toolchain-check check-gen check-gen-kernel test-tools timed-build envfacts \
         coverage coverage-baseline profile dead-code dead-imports reports
 
-## lint: layering, no sorry/axiom/native_decide, module drift, toolchain pins (tools/ci/lint.sh)
+## lint: layering, no sorry/axiom/native_decide, module drift, toolchain pins, config deviation markers (tools/ci/lint.sh)
 lint:
 	tools/ci/lint.sh
 

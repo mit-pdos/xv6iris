@@ -69,10 +69,10 @@ theorem lmGoodOutPad_wild (L : LmLaws M) (K : LmHooks M) (B : LmByteLaws M) (ps 
   · exact hE
   · exact hpin1
   · unfold lmPending lmPendingAt
-    rw [if_neg hne, if_pos hr]
+    rw [ite_eq_right hne, ite_eq_left hr]
     unfold lmContAt
     rw [hat, hup, L.lmlTermNopanic _ hterm]
-    simp only [Bool.false_eq_true, if_false, List.append_nil]
+    simp only [Bool.false_eq_true, ite_false, List.append_nil]
     rw [hcont]
     exact List.prefix_refl _
   · rw [← lmD_cs_prefix M ps ps cs (cs ++ [c]) s E (List.prefix_refl _) (List.prefix_append _ _)

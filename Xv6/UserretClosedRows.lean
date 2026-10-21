@@ -155,8 +155,8 @@ theorem urc_evRow (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (V' :
     show cs' = if forkOk ι then W.ch ∪ {usysForkGen ι} else W.ch
     rw [hch]
     by_cases ho : forkOk ι
-    · rw [if_pos ho]; exact (hok ho).2
-    · rw [if_neg ho]; exact (hnok ho).2
+    · rw [ite_eq_left ho]; exact (hok ho).2
+    · rw [ite_eq_right ho]; exact (hnok ho).2
   have hWt : uvisNum (uvisRun W) = USYS_wait →
       (tfW (uvisRun W).tf (tfArgIdx 0) = 0#64 ∨ (uvisRun W).lazy = false) →
       usysWaitFits (uvisRun W) ι (tfW V'.tf (tfArgIdx 0)) cs' (syscImg V' M') := by
@@ -389,9 +389,9 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
   have hkill : (uvisRun W).gen = gn ∧ (uvisRun W).fd = W.fd := ⟨hgn, rfl⟩
   unfold uexecDep uexecDepF uexecPayDep utSysIn utForkIn utPayIn utKillIn syscSysIn syscForkIn
   by_cases hec : sc = uecallScause
-  · simp only [if_pos hec]
+  · simp only [ite_eq_left hec]
     by_cases hfk : uvisNum W = USYS_fork
-    · simp only [if_pos hfk]
+    · simp only [ite_eq_left hfk]
       iintro ⟨⟨Hpay, Hd⟩, Harm, HcX⟩
       -- THE FORK'S CHILD-ORIGIN CLAIM (NI M2-W2d): the exit was a fork
       -- ecall, so its extra claim is an origin ticket, for the child's park
@@ -412,7 +412,7 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
       isplitl []
       · ipureintro; exact hkill
       · iempintro
-    · simp only [if_neg hfk]
+    · simp only [ite_eq_right hfk]
       iintro ⟨⟨Hpay, Hd⟩, Harm, -⟩
       ihave Hpay := hpay $$ Hpay
       iframe Hpay Harm
@@ -427,7 +427,7 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
       isplitl []
       · ipureintro; exact hkill
       · iempintro
-  · simp only [if_neg hec]
+  · simp only [ite_eq_right hec]
     iintro ⟨⟨Hpay, -⟩, Harm, -⟩
     ihave Hpay := hpay $$ Hpay
     ihave Harm := (uexecArm_run sc W f hlw).mp $$ Harm
@@ -465,7 +465,7 @@ theorem urc_exec_failed (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8))
   · rw [← tfUeq_resumeGpr0 hws, hws', tfResumeGpr0_bump _ _ (by rw [hlp]; decide), tfUeq_resumeGpr0 hu]
   · rw [← tfResumePc_tfUeq hws, hws', tfResumePc_bump _ _ (by rw [hlp]; decide), tfUeq_epc hu]
   · unfold usysMemOk
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     refine ⟨rfl, ?_, ?_, ?_, ?_⟩
     · exact himg.trans hM
     · exact hperm.trans hpi.symm
@@ -596,10 +596,10 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
       (if sc = uecallScause then uexecArm sc W f else uslot (uvisRun W)) := by
     unfold utKillOut
     by_cases hec : sc = uecallScause
-    · simp only [if_pos hec]
+    · simp only [ite_eq_left hec]
       iintro ⟨-, H⟩
       iexact H
-    · simp only [if_neg hec]
+    · simp only [ite_eq_right hec]
       iintro ⟨H, -⟩
       iexact H
   iintro ⟨Hxo, Hfo, Hwo, Hko, Hso, Harm⟩

@@ -7,16 +7,25 @@ decode, execute, retire, optional clock tick — assembled from the stage
 specifications, parametric in the instruction's fetch, decode and execute
 behaviour.  Instruction rules (`WpMmode.lean`) instantiate the execute part;
 code files instantiate the fetch and decode parts.
+
+Since sail-riscv 0.16 a cycle (`try_step`) also refreshes `mip` first
+(`update_mip`: `swp_update_mip`, the script `cycle_prologue`), runs the Sdtrig
+checks (all disabled) and the breakpoint-reentrancy check around the fetch
+(they read the privilege, `PC` and `mstatus`, so the configuration is opened
+around them), and ends by clearing `written_event_index` and checking
+`written_trigger_index = none`: the cells `cycleAux` that `clockCells` now
+carries.  The statements are unchanged.
 -/
 import MachCSL.WpCycleDefs
 import MachCSL.WpStagesM
 import MachCSL.WpTick
+import MachCSL.WpStepHooks
 import MachCSL.Instr
 
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -67,27 +76,34 @@ theorem fetchSpec_base2 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF
 
 set_option hygiene false in
 /-- The retire part of the cycle, shared by both cycle lemmas: from the point
-where the step value is `Step_Execute (Retire_Success (), _)`. -/
+where the step value is `Step_Execute (Retire_Success (), _)`.  Since 0.16 the
+retire also runs the (disabled) Sdtrig icount check, clears
+`written_event_index` and checks `written_trigger_index = none`
+(`update_triggers`): the `cycleAux` cells. -/
 macro "cycle_retire" : tactic =>
   `(tactic| (cases tick
-             · swp_run 40
+             · swp_run 60
                (try split)
                all_goals
-                 swp_run 10
+                 swp_run 40
                  conf_intro HmConf
+                 ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                   Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ
-             · swp_run 40
+             · swp_run 60
                (try split)
                all_goals
-                 swp_run 5
+                 swp_run 40
                  conf_intro HmConf
                  iapply swp_tick_clock_cells (hp := hp')
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+                 ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                   Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ))
 
@@ -104,16 +120,18 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
+  ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
   mconf_cases HmConf
   unfold try_step
+  cycle_prologue
   swp_run 40
   -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
   iapply swp_bind
@@ -128,13 +146,20 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   iframe
   inext
   iintro HmConf Hmip
+  -- 0.16: the Sdtrig fetch-address trigger check and `prevent_reentrance` read the privilege,
+  -- `PC` and `mstatus` before the fetch
+  mconf_cases HmConf
   swp_run 40
+  mconf_intro HmConf
   iapply swp_bind
   iapply (hfetch _)
   iframe
   inext
   iintro HmConf HPC HR
+  -- 0.16: the fetched-instruction trigger check reads the privilege and `PC`
+  mconf_cases HmConf
   swp_run 40
+  mconf_intro HmConf
   iapply swp_bind
   iapply (hdec _)
   iframe
@@ -166,16 +191,18 @@ theorem wpLoop_m_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
+  ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
   mconf_cases HmConf
   unfold try_step
+  cycle_prologue
   swp_run 40
   -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
   iapply swp_bind
@@ -190,13 +217,20 @@ theorem wpLoop_m_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   iframe
   inext
   iintro HmConf Hmip
+  -- 0.16: the Sdtrig fetch-address trigger check and `prevent_reentrance` read the privilege,
+  -- `PC` and `mstatus` before the fetch
+  mconf_cases HmConf
   swp_run 40
+  mconf_intro HmConf
   iapply swp_bind
   iapply (hfetch _)
   iframe
   inext
   iintro HmConf HPC HR
+  -- 0.16: the fetched-instruction trigger check reads the privilege and `PC`
+  mconf_cases HmConf
   swp_run 40
+  mconf_intro HmConf
   iapply swp_bind
   iapply (hdec _)
   iframe

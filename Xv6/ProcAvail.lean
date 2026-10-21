@@ -42,10 +42,10 @@ def pavCount (f : Nat → Bool) : Nat := ((List.range NPROC).filter f).length
 def pavClear (f : Nat → Bool) (j0 : Nat) : Nat → Bool := fun j => if j = j0 then false else f j
 
 theorem pavClear_ne (f : Nat → Bool) (j0 j : Nat) (h : j ≠ j0) : pavClear f j0 j = f j := by
-  unfold pavClear; rw [if_neg h]
+  unfold pavClear; rw [ite_eq_right h]
 
 theorem pavClear_self (f : Nat → Bool) (j0 : Nat) : pavClear f j0 j0 = false := by
-  unfold pavClear; rw [if_pos rfl]
+  unfold pavClear; rw [ite_eq_left rfl]
 
 /-- Clearing a set flag of a listed slot drops the count by one. -/
 theorem pav_filter_clear (f : Nat → Bool) (j0 : Nat) (l : List Nat) (hnd : l.Nodup) (hm : j0 ∈ l)

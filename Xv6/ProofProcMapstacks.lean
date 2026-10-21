@@ -199,15 +199,15 @@ theorem pms_bne_last {α : Type} (i : Nat) (hi : i < 64) (p q : α) :
     (if bcond bop.BNE (KA.«proc» + BitVec.ofNat 64 (376 * (i + 1))) KA.«tickslock» then p else q)
       = if i + 1 = 64 then q else p := by
   by_cases he : i + 1 = 64
-  · rw [if_pos he,
-      if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((pms_s1_eq i hi).mpr he))]
-  · rw [if_neg he,
-      if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((pms_s1_eq i hi).mp hc))]
+  · rw [ite_eq_left he,
+      ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((pms_s1_eq i hi).mpr he))]
+  · rw [ite_eq_right he,
+      ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((pms_s1_eq i hi).mp hc))]
 
 /-- A branch on a value known to be nonzero. -/
 theorem pms_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- What the loop keeps across an iteration (everything callee-saved but the
 cursor `s1`). -/
@@ -554,7 +554,7 @@ theorem pms_loop (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     iframe #
     iapply wpNext_intro_pin_lc
     iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %fresh %p %hsp2 Hk Hpc Htree Hpages Hav %hpost
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     obtain ⟨hkept, hcur, hinv2⟩ := hpost
     ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     rw [show nb - (i+1) - (fr ++ fresh).length = nb - 64 - (fr ++ fresh).length from by
@@ -575,7 +575,7 @@ theorem pms_loop (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %spie2 %spp2 %R2 %fresh %p %hsp2 Hk Hpc Htree Hpages Hav %hpost
-    rw [if_neg hlast]
+    rw [ite_eq_right hlast]
     obtain ⟨hkept, hcur, hinv2⟩ := hpost
     ihave HΦ := wpNext_shift _ _ _ _ _ hp1 $$ HΦ
     iapply (ih (i+1) (by omega) _ (PtStack.pasUpd pas i p) (fr ++ fresh) hinv2 spie2 spp2 R2

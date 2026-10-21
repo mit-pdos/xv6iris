@@ -83,10 +83,10 @@ theorem waitRes_acc [CurCtx] (ξ : CtxId) (parents : Nat → BitVec 64) (j : Nat
       rw [List.getElem_range] at hy
       exact hy.symm
     subst hy
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     iexact Hk
   ihave Hv' : wordAtN ξ (pParent (procAddr j)) 8 (DFrac.own 1) (if j = j then v else parents j) $$ [Hv]
-  · rw [if_pos (rfl : j = j)]
+  · rw [ite_eq_left (rfl : j = j)]
     iexact Hv
   iapply Hback $$ %(fun (_ i : Nat) => iprop(wordAtN ξ (pParent (procAddr i)) 8 (DFrac.own 1)
     (if i = j then v else parents i))) Hbox Hv'

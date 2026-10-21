@@ -80,10 +80,10 @@ theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip
     bm data dn false off 16 olds pidv readiKVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
     hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0
-    (by simp only [Bool.false_eq_true, if_false]; exact ha1)
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha1)
     (by rw [ha3, MachCSL.signExtend_ofNat32 _ (by omega)]) (by rw [ha4]; rfl) (fun _ => holds)
   unfold wp_readi_eb_body at h
-  simp only [readiAddr, Bool.false_eq_true, if_false, and_false, false_and, false_or, fsView_gd] at h
+  simp only [readiAddr, Bool.false_eq_true, ite_false, and_false, false_and, false_or, fsView_gd] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hany, #Hkl, #Hav, Hdev, Hmeta, Hmap,
     Hblk, Hbuf, Hpid, Hsl, Hnext⟩
   ihave Hmap := inodeMapQ_1_to fscFs (DFrac.own 1) ip bm rfl $$ Hmap

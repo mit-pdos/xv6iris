@@ -44,6 +44,8 @@ rule `wp_dead`; the two remaining cases (unborn, current but powered off) are
 refuted by the certificate.  Above this lemma no rule ever sees a generation.
 -/
 import MachCSL.Ctx
+import MachCSL.SailFree
+import MachCSL.SailMem
 import Iris.ProgramLogic.Lifting
 
 noncomputable section
@@ -51,8 +53,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## The corpse rule -/
@@ -323,21 +324,27 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
 
 /-! ## Sub-computation WPs -/
 
-/-- A monadic context: commutes with every (non-failure) event at the head.
-`fun m => m >>= f`, `sailTryCatch · h` and the `ExceptT` early-return
-wrappers are all contexts. -/
+/-- A monadic context: commutes with every (non-failure) node at the head -- an event
+(`.inl (.ok o)`) and, since concurrency interface v2 makes finite choice a node of its own, a
+choice (`.inr n`).  `fun m => m >>= f`, `sailTryCatch · h` and the early-return blocks
+`SailME.run (monadLift · >>= k)` are all contexts. -/
 def MCtx {X : Type} (C : SailM X → SailM Unit) : Prop :=
-  ∀ (o : Outcome Register RegisterType) (k : o.ret → SailM X),
-    C (.impure (.ok o) k) = .impure (.ok o) (fun v => C (k v))
+  (∀ (o : InstructionEffect) (k : InstructionEffect.ret o → SailM X),
+    C (.impure (.inl (.ok o)) k) = .impure (.inl (.ok o)) (fun v => C (k v))) ∧
+  (∀ (n : Nat) (k : Fin n → SailM X), C (.impure (.inr n) k) = .impure (.inr n) (fun v => C (k v)))
 
-theorem MCtx.id : MCtx (fun m : SailM Unit => m) := fun _ _ => rfl
+theorem MCtx.id : MCtx (fun m : SailM Unit => m) := ⟨fun _ _ => rfl, fun _ _ => rfl⟩
 
 theorem MCtx.bind {X Y : Type} (f : X → SailM Y) (C : SailM Y → SailM Unit) (hC : MCtx C) :
-    MCtx (fun m : SailM X => C (m >>= f)) := by
-  intro o k
-  show C (FreeM.bind (.impure (.ok o) k) f) = _
-  simp only [FreeM.bind]
-  exact hC o (fun v => FreeM.bind (k v) f)
+    MCtx (fun m : SailM X => C (m >>= f)) :=
+  ⟨fun o k => by
+    show C (FreeM.bind (.impure (.inl (.ok o)) k) f) = _
+    simp only [FreeM.bind]
+    exact hC.1 o (fun v => FreeM.bind (k v) f),
+   fun n k => by
+    show C (FreeM.bind (.impure (.inr n) k) f) = _
+    simp only [FreeM.bind]
+    exact hC.2 n (fun v => FreeM.bind (k v) f)⟩
 
 /-- The paper's `wp Sail(m) {Φ}`. -/
 def swp (cpu : CPU) {X : Type} (m : SailM X) (Φ : X → IProp GF) : IProp GF := iprop%
@@ -383,9 +390,9 @@ theorem swp_wpHart (cpu : CPU) (m : SailM Unit) :
 /-! ## The per-event rules -/
 
 /-- The cycle boundary: to be safe forever it suffices to be safe for the next
-cycle, whichever way the clock-tick choice goes. -/
+cycle, whichever way the clock-tick and exit-wait choices go. -/
 theorem wpLoop_restart (cpu : CPU) :
-    (∀ tick : Bool, ▷ wpHart cpu (riscvStep tick)) ⊢@{IProp GF} wpLoop cpu := by
+    (∀ tick : Bool, ∀ ew : Bool, ▷ wpHart cpu (riscvStep tick ew)) ⊢@{IProp GF} wpLoop cpu := by
   unfold wpLoop
   iintro H
   iapply wpHart_lift
@@ -394,10 +401,10 @@ theorem wpLoop_restart (cpu : CPU) :
   iintro Hclose
   isplit
   · ipureintro
-    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
+    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
   inext
   iintro %m' %σ' %Hs _
-  obtain ⟨tick, rfl, rfl⟩ := Hs
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
   imod Hclose
   imodintro
   iframe Hσ
@@ -406,7 +413,7 @@ theorem wpLoop_restart (cpu : CPU) :
 /-- `wpLoop_restart`, handing the step's later credit (`wpHart_lift`'s `£ 1`)
 to the continuation: the source of every `wpNext`'s credit. -/
 theorem wpLoop_restart_lc (cpu : CPU) :
-    (∀ tick : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick))) ⊢@{IProp GF} wpLoop cpu := by
+    (∀ tick : Bool, ∀ ew : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick ew))) ⊢@{IProp GF} wpLoop cpu := by
   unfold wpLoop
   iintro H
   iapply wpHart_lift
@@ -415,10 +422,10 @@ theorem wpLoop_restart_lc (cpu : CPU) :
   iintro Hclose
   isplit
   · ipureintro
-    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
+    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
   inext
   iintro %m' %σ' %Hs Hlc
-  obtain ⟨tick, rfl, rfl⟩ := Hs
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
   imod Hclose
   imodintro
   iframe Hσ
@@ -443,9 +450,9 @@ theorem machInterp_acc (σ : MState) (cpu : CPU) :
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
-    simp only [updCpu, hy, if_false]
+    simp only [updCpu, hy, ite_false]
     iexact Hy
-  · simp only [updCpu, if_true]
+  · simp only [updCpu, ite_true]
     iexact Hf
 
 /-- Extract everything one hart's memory event touches: its register
@@ -512,16 +519,16 @@ itself, when a memory event is blocked by another hart's reservation);
 /-- `swp_event_step` with the silence shown at the machine the callback is
 handed (a register write is silent or not according to the value it
 overwrites: `hartObs_regWrite_quiet`). -/
-theorem swp_event_step_dep (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) :
+theorem swp_event_step_dep (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜hartObs cpu o σ = [] ∧ ((∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ'))⌝ ∗
-      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
-              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ σ', (∀ (v : InstructionEffect.ret o), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.inl (.ok o)) k) Φ))
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   unfold swp
   iintro H %C %hC Hcont
-  rw [hC]
+  rw [hC.1]
   iapply wpHart_lift
   iintro %σ Hσ
   imod H $$ %σ Hσ with ⟨%⟨hsil, Hred⟩, H⟩
@@ -547,22 +554,22 @@ theorem swp_event_step_dep (cpu : CPU) {X : Type} (o : Outcome Register Register
     imod H $$ %hb with ⟨Hσ, Hswp⟩
     imodintro
     iframe Hσ
-    rw [← hC]
+    rw [← hC.1]
     iapply Hswp $$ %C %hC Hcont
 
 /-- `swp_event_step_dep`, handing the step's later credit (`wpHart_lift`'s `£ 1`) to both
 continuations: for a leaf whose accessor opens an invariant AFTER the event (the write half of
 an exclusive pair). -/
-theorem swp_event_step_dep_lc (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) :
+theorem swp_event_step_dep_lc (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜hartObs cpu o σ = [] ∧ ((∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ'))⌝ ∗
-      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
-              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ σ', (∀ (v : InstructionEffect.ret o), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.inl (.ok o)) k) Φ))
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   unfold swp
   iintro H %C %hC Hcont
-  rw [hC]
+  rw [hC.1]
   iapply wpHart_lift
   iintro %σ Hσ
   imod H $$ %σ Hσ with ⟨%⟨hsil, Hred⟩, H⟩
@@ -588,18 +595,18 @@ theorem swp_event_step_dep_lc (cpu : CPU) {X : Type} (o : Outcome Register Regis
     imod H $$ %hb Hlc with ⟨Hσ, Hswp⟩
     imodintro
     iframe Hσ
-    rw [← hC]
+    rw [← hC.1]
     iapply Hswp $$ %C %hC Hcont
 
 /-- `swp_event_step`, handing the step's later credit to both continuations. -/
-theorem swp_event_step_lc (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF)
+theorem swp_event_step_lc (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF)
     (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
-      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
-              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ σ', (∀ (v : InstructionEffect.ret o), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.inl (.ok o)) k) Φ))
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   iintro H
   iapply swp_event_step_dep_lc cpu o k Φ
   iintro %σ Hσ
@@ -611,14 +618,14 @@ theorem swp_event_step_lc (cpu : CPU) {X : Type} (o : Outcome Register RegisterT
 
 /-- The per-event rule, for an event that is silent at every machine (every
 event but a register write, by computation: `hsil`'s default). -/
-theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF)
+theorem swp_event_step (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF)
     (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
-      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
-              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ σ', (∀ (v : InstructionEffect.ret o), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.inl (.ok o)) k) Φ))
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   iintro H
   iapply swp_event_step_dep cpu o k Φ
   iintro %σ Hσ
@@ -630,12 +637,12 @@ theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType
 
 /-- The per-event rule for an event that is never blocked, the silence shown
 at the machine the callback is handed. -/
-theorem swp_event_dep (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+theorem swp_event_dep (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜hartObs cpu o σ = [] ∧ ∃ v σ', evStep cpu o σ v σ'⌝ ∗
-      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   iintro H
   iapply swp_event_step_dep cpu o k Φ
   iintro %σ Hσ
@@ -654,13 +661,13 @@ theorem swp_event_dep (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
 
 /-- The per-event rule for an event that is never blocked (and silent at
 every machine: every event but a register write, `hsil`'s default). -/
-theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
+theorem swp_event (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
     (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
     (∀ σ, machInterp σ ={⊤,∅}=∗
       ⌜∃ v σ', evStep cpu o σ v σ'⌝ ∗
-      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   iintro H
   iapply swp_event_step cpu o k Φ hsil
   iintro %σ Hσ
@@ -677,6 +684,45 @@ theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
   · iintro %hb
     exact absurd hb (hnb σ σ')
 
+/-! ### The rules at a named program (concurrency interface v2)
+
+lean-sail v7's answer type `InstructionEffect.ret` is a plain `def`, which the proof mode's
+reducible unification cannot see through (and an imported definition's reducibility cannot be
+changed), so a primitive's continuation (`FreeM.pure` at `Arch.register_type r`, typed by
+`Effect.ret …`) does not unify with a rule's (`fun v => …` over `InstructionEffect.ret o`).  These
+variants take the program `m` as it appears in the goal and an equation `m = .impure (.inl (.ok o))
+k`, which Lean checks at default transparency (`rfl` for the register primitives, the
+`MachCSL/SailMem.lean` equations for the memory ones). -/
+
+theorem swp_event_at (cpu : CPU) {X : Type} (m : SailM X) (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (hm : m = .impure (.inl (.ok o)) k) (Φ : X → IProp GF)
+    (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜∃ v σ', evStep cpu o σ v σ'⌝ ∗
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu m Φ := by
+  subst hm; exact swp_event cpu o k Φ hnb hsil
+
+theorem swp_event_dep_at (cpu : CPU) {X : Type} (m : SailM X) (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (hm : m = .impure (.inl (.ok o)) k) (Φ : X → IProp GF)
+    (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜hartObs cpu o σ = [] ∧ ∃ v σ', evStep cpu o σ v σ'⌝ ∗
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu m Φ := by
+  subst hm; exact swp_event_dep cpu o k Φ hnb
+
+theorem swp_event_step_at (cpu : CPU) {X : Type} (m : SailM X) (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (hm : m = .impure (.inl (.ok o)) k) (Φ : X → IProp GF)
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
+      ▷ ∀ σ', (∀ (v : InstructionEffect.ret o), ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu m Φ))
+    ⊢ swp cpu m Φ := by
+  subst hm; exact swp_event_step cpu o k Φ hsil
+
 /-! ## Derived rules for each primitive
 
 Each rule is stated against the primitive exactly as it appears in the
@@ -688,9 +734,9 @@ the continuation `Φ` applied to the answer; `*_bind` forms handle the
 theorem swp_readReg (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r)
     (Φ : RegisterType r → IProp GF) :
     r ↦ᵣ[cpu]{dq} v ∗ ▷ (r ↦ᵣ[cpu]{dq} v -∗ Φ v) ⊢ swp cpu (readReg r) Φ := by
-  unfold readReg PreSail.readReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
-  iapply swp_event cpu (.regRead r) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (readReg r) (.regRead r none) (fun (v : RegisterType r) => FreeM.pure v) rfl Φ
+    (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_read σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
   ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
@@ -727,9 +773,9 @@ wire invariant (`MachCSL/WireInv.lean`) and not in any hart's frame.  Rocq:
 `WpIntrCore.v:115-175` (`swp_read_reg_any`). -/
 theorem swp_readReg_any (cpu : CPU) (r : Register) (Φ : RegisterType r → IProp GF) :
     ▷ (∀ v : RegisterType r, Φ v) ⊢ swp cpu (readReg r) Φ := by
-  unfold readReg PreSail.readReg PreSail.emit
   iintro HΦ
-  iapply swp_event cpu (.regRead r) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (readReg r) (.regRead r none) (fun (v : RegisterType r) => FreeM.pure v) rfl Φ
+    (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_read σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -739,13 +785,13 @@ theorem swp_readReg_any (cpu : CPU) (r : Register) (Φ : RegisterType r → IPro
     exact ⟨σ.regs cpu r, σ, rfl, rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain ⟨-, rfl⟩ := Hev
+  obtain ⟨rfl, rfl⟩ := Hev
   imod Hmask
   imodintro
   isplitl [Hregs Hclose]
   · iapply Hclose $$ Hregs
   · iapply swp_ret
-    iapply HΦ $$ %v'
+    iapply HΦ
 
 /-- The `>>=` form of `swp_readReg_any`. -/
 theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
@@ -762,9 +808,9 @@ already there (`hq`); the crossing write of `cur_privilege` is
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
     (hq : r ≠ .cur_privilege ∨ v = w) (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
-  unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
-  iapply swp_event_dep cpu (.regWrite r w) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_dep_at cpu (writeReg r w) (.regWrite r none w) (fun (v : PUnit) => FreeM.pure v) rfl Φ
+    (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
   ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
@@ -775,13 +821,14 @@ theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨hartObs_regWrite_quiet cpu σ r w ?_, (), σ.setReg cpu r w, rfl⟩
+    refine ⟨hartObs_regWrite_quiet cpu σ r none w ?_, (), σ.setReg cpu r w, rfl⟩
     rcases hq with hq | hq
     · exact Or.inl hq
     · exact Or.inr (Hv.trans hq)
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod Hmask
   imodintro
   isplitl [Hregs Hclose]
@@ -803,17 +850,17 @@ theorem swp_writeReg_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterT
 history's machine half `obsAuth h` (with `obsWf h g` and liveness) beside
 the interpretation at `g.m`, and hands it back extended by the event's own
 observations `hartObs cpu o g.m`. -/
-theorem swp_event_obs (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
-    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+theorem swp_event_obs (cpu : CPU) {X : Type} (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
     (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (GF := GF))⌝ -∗
       machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
       ⌜∃ v σ', evStep cpu o g.m v σ'⌝ ∗
-      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o g.m v σ'⌝ -∗
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o g.m v σ'⌝ -∗
         |={∅,⊤}=> machInterp σ' ∗ obsAuth (h ++ hartObs cpu o g.m) ∗ swp cpu (k v) Φ)
-    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+    ⊢ swp cpu (.impure (.inl (.ok o)) k) Φ := by
   unfold swp
   iintro H %C %hC Hcont
-  rw [hC]
+  rw [hC.1]
   iapply wpHart_lift_obs
   iintro %g %h %hf ⟨Hσ, Ha⟩
   imod H $$ %g %h %hf [Hσ Ha] with ⟨%Hred, H⟩
@@ -829,13 +876,25 @@ theorem swp_event_obs (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
   rcases Hs with ⟨v, rfl, hs⟩ | ⟨hb, _⟩
   · imod H $$ %v %σ' %hs with ⟨Hσ, Ha, Hswp⟩
     imodintro
-    have e : hartObsM cpu (FreeM.impure (.ok o) (fun v => C (k v))) g.m = hartObs cpu o g.m := rfl
+    have e : hartObsM cpu (FreeM.impure (.inl (.ok o)) (fun v => C (k v))) g.m = hartObs cpu o g.m := rfl
     rw [e]
     iframe Hσ
     isplitl [Ha]
     · iexact Ha
     iapply Hswp $$ %C %hC Hcont
   · exact absurd hb (hnb _ _)
+
+/-- `swp_event_obs` at a named program (see `swp_event_at`). -/
+theorem swp_event_obs_at (cpu : CPU) {X : Type} (m : SailM X) (o : InstructionEffect)
+    (k : InstructionEffect.ret o → SailM X) (hm : m = .impure (.inl (.ok o)) k) (Φ : X → IProp GF)
+    (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
+    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (GF := GF))⌝ -∗
+      machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
+      ⌜∃ v σ', evStep cpu o g.m v σ'⌝ ∗
+      ▷ ∀ (v : InstructionEffect.ret o) σ', ⌜evStep cpu o g.m v σ'⌝ -∗
+        |={∅,⊤}=> machInterp σ' ∗ obsAuth (h ++ hartObs cpu o g.m) ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu m Φ := by
+  subst hm; exact swp_event_obs cpu o k Φ hnb
 
 /-! ### The read frame of the boundary events (NI M2-W2a) -/
 
@@ -931,9 +990,10 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
           Register.scause ↦ᵣ[cpu] sc -∗ Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
           (∃ i, uRcpt (i, .uExit cpu s sc ep gs)) -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege Privilege.Supervisor) Φ := by
-  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
+  unfold hartObsStep
   iintro ⟨Hperm, Hr, Hs, Hsc, Hep, Hg, HΦ⟩
-  iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.Supervisor) (fun v => FreeM.pure v) Φ
+  iapply swp_event_obs_at cpu (writeReg Register.cur_privilege Privilege.Supervisor)
+    (.regWrite Register.cur_privilege none Privilege.Supervisor) (fun (v : PUnit) => FreeM.pure v) rfl Φ
     (fun _ _ h => h)
   iintro %g %h %hf ⟨Hσ, Ha⟩
   icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
@@ -952,7 +1012,7 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
   ihave %hg : ⌜hartGprs (g.m.regs cpu) = gs⌝ $$ [Hregs Hg]
   · icases gprCells_valid cpu (g.m.regs cpu) gs $$ [$Hregs $Hg] with %_
     itrivial
-  have he : hartObs cpu (.regWrite Register.cur_privilege Privilege.Supervisor) g.m =
+  have he : hartObs cpu (.regWrite Register.cur_privilege none Privilege.Supervisor) g.m =
       [.uExit cpu s sc ep gs] := by
     show hartObsPriv cpu (g.m.regs cpu) Privilege.Supervisor = _
     simp only [hartObsPriv, Hv, privUser, uExitOf, hs, hsc, hep, hg]
@@ -966,6 +1026,7 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod Hmask
   imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
   icases obsAuth_lb (h ++ [.uExit cpu s sc ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
@@ -1022,9 +1083,10 @@ theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p =
           Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
           (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User) Φ := by
-  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
+  unfold hartObsStep
   iintro ⟨Hperm, Hr, Hs, Hep, Hg, HΦ⟩
-  iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.User) (fun v => FreeM.pure v) Φ
+  iapply swp_event_obs_at cpu (writeReg Register.cur_privilege Privilege.User)
+    (.regWrite Register.cur_privilege none Privilege.User) (fun (v : PUnit) => FreeM.pure v) rfl Φ
     (fun _ _ h => h)
   iintro %g %h %hf ⟨Hσ, Ha⟩
   icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
@@ -1040,7 +1102,7 @@ theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p =
   ihave %hg : ⌜hartGprs (g.m.regs cpu) = gs⌝ $$ [Hregs Hg]
   · icases gprCells_valid cpu (g.m.regs cpu) gs $$ [$Hregs $Hg] with %_
     itrivial
-  have he : hartObs cpu (.regWrite Register.cur_privilege Privilege.User) g.m =
+  have he : hartObs cpu (.regWrite Register.cur_privilege none Privilege.User) g.m =
       [.uEnter cpu s ep gs] := by
     show hartObsPriv cpu (g.m.regs cpu) Privilege.User = _
     unfold hartObsPriv
@@ -1056,6 +1118,7 @@ theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p =
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod Hmask
   imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
   icases obsAuth_lb (h ++ [.uEnter cpu s ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
@@ -1108,9 +1171,9 @@ theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → I
     Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p'⌝ ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
-  unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, %hq, HΦ⟩
-  iapply swp_event_dep cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
+  iapply swp_event_dep_at cpu (writeReg Register.cur_privilege p') (.regWrite Register.cur_privilege none p')
+    (fun (v : PUnit) => FreeM.pure v) rfl Φ
     (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
@@ -1127,6 +1190,7 @@ theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → I
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod Hmask
   imodintro
   isplitl [Hregs Hclose]
@@ -1147,21 +1211,21 @@ theorem swp_writeReg_priv_quiet_bind (cpu : CPU) {X : Type} (p p' : Privilege) (
 
 /-- An event that leaves the state alone is silent: the only candidate, a
 register write, then writes the value already there. -/
-theorem hartObs_of_evStep_fix (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
+theorem hartObs_of_evStep_fix (cpu : CPU) (o : InstructionEffect) (u : InstructionEffect.ret o)
     (h : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ)) (σ : MState) : hartObs cpu o σ = [] := by
   cases o
-  case regWrite r w =>
+  case regWrite r a w =>
     have hfix := ((h σ () (σ.setReg cpu r w)).1 rfl).2
     have hr := congrArg (fun s : MState => s.regs cpu r) hfix
-    simp only [if_true, RegFile.set_same] at hr
-    exact hartObs_regWrite_quiet cpu σ r w (Or.inr hr.symm)
+    simp only [ite_true, RegFile.set_same] at hr
+    exact hartObs_regWrite_quiet cpu σ r a w (Or.inr hr.symm)
   all_goals rfl
 
 /-- Events that leave the state alone and are answered with a fixed value. -/
-theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
+theorem swp_silent (cpu : CPU) (o : InstructionEffect) (u : InstructionEffect.ret o)
     (h : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ)) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ')
-    (Φ : o.ret → IProp GF) :
-    ▷ Φ u ⊢ swp cpu (FreeM.impure (.ok o) (fun v => FreeM.pure v)) Φ := by
+    (Φ : InstructionEffect.ret o → IProp GF) :
+    ▷ Φ u ⊢ swp cpu (FreeM.impure (.inl (.ok o)) (fun v => FreeM.pure v)) Φ := by
   iintro HΦ
   iapply swp_event cpu o (fun v => FreeM.pure v) Φ hnb (hartObs_of_evStep_fix cpu o u h)
   iintro %σ Hσ
@@ -1181,35 +1245,39 @@ theorem swp_silent (cpu : CPU) (o : Outcome Register RegisterType) (u : o.ret)
 
 theorem swp_cycle_count (cpu : CPU) (Φ : Unit → IProp GF) :
     ▷ Φ () ⊢ swp cpu (cycle_count ()) Φ :=
-  swp_silent cpu .cycleCount () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
+  swp_silent cpu .clockCycle () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
 
 theorem swp_get_cycle_count (cpu : CPU) (Φ : Nat → IProp GF) :
     ▷ Φ 0 ⊢ swp cpu (get_cycle_count ()) Φ :=
-  swp_silent cpu .getCycleCount 0 (fun _ _ _ => Iff.rfl) (fun _ _ h => h) Φ
+  swp_silent cpu .getCycleCount (0 : Nat) (fun _ _ _ => Iff.rfl) (fun _ _ h => h) Φ
 
 theorem swp_print_effect (cpu : CPU) (s : String) (Φ : Unit → IProp GF) :
     ▷ Φ () ⊢ swp cpu (print_effect s) Φ :=
-  swp_silent cpu (.message s) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
+  swp_silent cpu (.printMessage s) () (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
 
-/-- A nondeterministic choice: the continuation must handle every answer. -/
-theorem swp_choose (cpu : CPU) (p : Sail.Primitive) (Φ : p.reflect → IProp GF) :
-    (∀ c, ▷ Φ c) ⊢ swp cpu (PreSail.choose p) Φ := by
-  unfold PreSail.choose PreSail.emit
-  iintro HΦ
-  iapply swp_event cpu (.choose p) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+/-- A finite nondeterministic choice (concurrency interface v2's choice node `.inr n`, lean-sail's
+`choose_fin n`, which `undefined_bool`/`undefined_bitvector`/`internal_pick` build on): the
+continuation must handle every answer.  `0 < n`: a choice among none (`internal_pick []`) has no
+answer, and the hart is stuck there. -/
+theorem swp_choose_fin (cpu : CPU) (n : Nat) (hn : 0 < n) (Φ : Fin n → IProp GF) :
+    (∀ c, ▷ Φ c) ⊢ swp cpu (PreSail.choose_fin n) Φ := by
+  unfold swp PreSail.choose_fin
+  iintro HΦ %C %hC Hcont
+  rw [hC.2]
+  iapply wpHart_lift
   iintro %σ Hσ
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨trivialChoiceSource.choose p (), σ, rfl⟩
+    exact ⟨rfl, _, σ, ⟨0, hn⟩, rfl, rfl⟩
   inext
-  iintro %c %σ' %Hev
-  obtain rfl := Hev
+  iintro %m' %σ' %Hs _
+  obtain ⟨c, rfl, rfl⟩ := Hs
   imod Hmask
   imodintro
   iframe Hσ
-  iapply swp_ret
+  iapply Hcont
   iapply HΦ
 
 end MachCSL
@@ -1217,8 +1285,7 @@ end MachCSL
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 variable {GF : BundledGFunctors.{0}}
@@ -1347,7 +1414,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
       intro c hc
       simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [updCpu, if_true, HRead.afterLoad]
+      simp only [updCpu, ite_true, HRead.afterLoad]
       iframe Hv Hi Hr
   · ipureintro
     exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -1425,7 +1492,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
-    (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+    (by rw [authMap_get?, ite_eq_right (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
   unfold resvFragAt
   imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro
@@ -1715,38 +1782,45 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
       iexact Hdin
     · iexact Hau
 
-/-! ## The memory leaves -/
+/-! ## The memory leaves
+
+Concurrency interface v2: each primitive is ONE event of `(memReq req)` (`MachCSL/SailMem.lean`);
+the model's answer is the event's bits as byte vectors (`memReadAns`) and the written value is
+the bits of the model's bytes (`vecbytes_to_bitvec`); the callers turn bytes back into bits with
+the round trips of `MachCSL/SailBytes.lean`.  The address is `req.address` (= `(memReq req).pa`,
+a 64-bit physical address). -/
 
 /-- An instruction fetch of never-written bytes (kernel text) returns them, at
 every instruction view. -/
-theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+theorem swp_sail_mem_read_ifetch (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    imgBytes req.pa n w ∗ ▷ (imgBytes req.pa n w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    imgBytes req.address n w ∗
+      ▷ (imgBytes req.address n w -∗ Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   iintro ⟨#Hb, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_mem_read req) (.memRead (memReq req))
+    (fun v => FreeM.pure (memReadAns v)) (sail_mem_read_def req) Φ
     (fun _ _ hb => by
       have h1 : akExcl req.access_kind = true := hb.1
       rw [hex] at h1
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ h tvn, σ.mem.readBytes h tvn req.pa n w⌝ $$ [Hmem Hb]
-  · iapply imgBytes_readable σ.mem req.pa n w $$ [Hmem Hb]
+  ihave %hrd : ⌜∀ h tvn, σ.mem.readBytes h tvn req.address n w⌝ $$ [Hmem Hb]
+  · iapply imgBytes_readable σ.mem req.address n w $$ [Hmem Hb]
     iframe Hmem
     iexact Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) 0)
+  have hram : ramBytes req.address n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) 0)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
+    exact ⟨.ok (w, 0#nt), σ, Or.inr (Or.inl
       ⟨hram, hk, σ.itv cpu, w, le_refl _, (hmm.2.1 cpu).2.1, hrd _ _, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
@@ -1766,38 +1840,39 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
     exact absurd hex' (by decide)
 
 /-- A plain load of the running context's bytes returns them. -/
-theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ownCtx cpu ξ ∗ ctxBytes ξ req.pa n dq w ∗
-    ▷ (ownCtx cpu ξ -∗ ctxBytes ξ req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ownCtx cpu ξ ∗ ctxBytes ξ req.address n dq w ∗
+    ▷ (ownCtx cpu ξ -∗ ctxBytes ξ req.address n dq w -∗
+        Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   iintro ⟨Hctx, Hb, HΦ⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
     exact hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_mem_read req) (.memRead (memReq req))
+    (fun v => FreeM.pure (memReadAns v)) (sail_mem_read_def req) Φ
     (fun _ _ hb => by
       have h1 : akExcl req.access_kind = true := hb.1
       rw [hk'.2] at h1
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
+  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.address n w⌝
       $$ [Hmm Hctx Hmem Hb]
-  · iapply ctxBytes_readable σ cpu ξ req.pa n dq w $$ [Hmm Hctx Hmem Hb]
+  · iapply ctxBytes_readable σ cpu ξ req.address n dq w $$ [Hmm Hctx Hmem Hb]
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
+  have hram : ramBytes req.address n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
+    refine ⟨.ok (w, 0#nt), σ.afterLoad cpu req.address n σ.top, Or.inr (Or.inr (Or.inl
       ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hrd _ (hmm.2.1 cpu).1, rfl, rfl⟩))⟩
     intro j _
     exact (hmm.2.1 cpu).2.2.2 _
@@ -1809,11 +1884,11 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.pa n tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.address n tvn htop $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.address n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hb
   · rw [hk'.2] at hex'
@@ -1821,13 +1896,14 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
 
 /-- `swp_sail_mem_read_plain_ctx` over the whole memory token (what the
 stage lemmas thread). -/
-theorem swp_sail_mem_read_plain (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+theorem swp_sail_mem_read_plain (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ctxTok cpu ξ ∗ ctxBytes ξ req.pa n dq w ∗
-    ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ctxTok cpu ξ ∗ ctxBytes ξ req.address n dq w ∗
+    ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.address n dq w -∗
+        Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   iintro ⟨Htok, Hb, HΦ⟩
   icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
   iapply swp_sail_mem_read_plain_ctx cpu req ξ dq w hk Φ
@@ -1839,26 +1915,30 @@ theorem swp_sail_mem_read_plain (cpu : CPU) {n vasize : Nat}
   iframe Hctx Hfrag
 
 /-- A plain store of the running context's bytes: full ownership is required,
-and is handed back at the new value (justified at ξ as ξ's own store). -/
-theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (ξ : CtxId) (w w' : BitVec (8 * n)) (hv : req.value = some w')
+and is handed back at the new value (justified at ξ as ξ's own store).  The value written is the
+bits of the model's bytes (`hv`; callers discharge it with the `SailBytes` round trip). -/
+theorem swp_sail_mem_write_plain (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (bytes : Vector (BitVec 8) n) (tags : Vector Bool nt)
+    (ξ : CtxId) (w w' : BitVec (8 * n)) (hv : vecbytes_to_bitvec bytes = w')
     (hk : akExcl req.access_kind = false)
-    (Φ : Result (Option Bool) Arch.abort → IProp GF) :
-    ctxTok cpu ξ ∗ ctxBytes ξ req.pa n (DFrac.own 1) w ∗
-    ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.pa n (DFrac.own 1) w' -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit
+    (Φ : Result (Option Bool) Unit → IProp GF) :
+    ctxTok cpu ξ ∗ ctxBytes ξ req.address n (DFrac.own 1) w ∗
+    ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.address n (DFrac.own 1) w' -∗ Φ (.Ok none))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags) Φ := by
+  subst hv
   iintro ⟨Htok, Hb, HΦ⟩
   iloeb as IH
-  iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_step_at cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags)
+    (.memWrite (memReq req) (vecbytes_to_bitvec bytes) (vecbool_to_bitvec tags))
+    (fun v => FreeM.pure (memWriteAns v)) (sail_mem_write_def req bytes tags) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hram : ⌜ramBytes req.pa n⌝ $$ [Htok Hb Hmem Hmm]
+  ihave %hram : ⌜ramBytes req.address n⌝ $$ [Htok Hb Hmem Hmm]
   · icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
-    ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
+    ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.address n w⌝
         $$ [Hmm Hctx Hmem Hb]
-    · iapply ctxBytes_readable σ cpu ξ req.pa n (DFrac.own 1) w $$ [Hmm Hctx Hmem Hb]
+    · iapply ctxBytes_readable σ cpu ξ req.address n (DFrac.own 1) w $$ [Hmm Hctx Hmem Hb]
       iframe
     ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
     · iapply memModel_mmOk $$ Hmm
@@ -1868,26 +1948,26 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
   iintro Hmask
   isplit
   · ipureintro
-    by_cases hno : othersReserve σ.resv cpu req.pa n
+    by_cases hno : othersReserve σ.resv cpu req.address n
     · exact Or.inr ⟨σ, hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+    · exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, rfl, rfl⟩
+    rcases Hev with ⟨hdev, ds₀, hdw, _, _⟩ | ⟨_, hno, rfl, rfl⟩
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
-    rw [hv] at hv'
-    obtain rfl := Option.some.inj hv'
     icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
-    imod ctx_store σ cpu ξ req.pa n w' r hram hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
-    imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
-      with ⟨Hmem, Hb⟩
+    imod ctx_store σ cpu ξ req.address n (vecbytes_to_bitvec bytes) r hram hno
+      $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    imod ctxBytes_update ξ σ.mem req.address n w (vecbytes_to_bitvec bytes) (σ.top + 1) (hartAgent cpu)
+      $$ [$Hkey $Hmem $Hb] with ⟨Hmem, Hb⟩
     imod Hmask
     imodintro
     rw [hk]
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.store cpu req.address n (vecbytes_to_bitvec bytes) false)
+        %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ [Hctx Hfrag] Hb
       iapply ctxTok_introB cpu ξ none false
@@ -1903,12 +1983,20 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
       inext
       iexact HΦ
 
+/-- The write announce (concurrency interface v2: every store and AMO announces its footprint
+first): silent, it moves nothing. -/
+theorem swp_sail_mem_address_announce (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc) (Φ : Unit → IProp GF) :
+    ▷ Φ () ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_address_announce req) Φ := by
+  exact swp_silent cpu (.memWriteAnnounce (memReq req)) ()
+    (fun _ _ _ => ⟨fun h => ⟨rfl, h⟩, fun h => h.2⟩) (fun _ _ h => h) Φ
+
 /-- A fence: the hart's views move (`MState.fence`); nothing is required. -/
 theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF) :
-    ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
+    ▷ Φ () ⊢ swp cpu (LeanRV64D.ArchSem.sail_barrier b) Φ := by
   iintro HΦ
-  iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_barrier b) (.barrier b) (fun (v : Unit) => FreeM.pure v) rfl Φ
+    (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -1919,6 +2007,7 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod memModel_fence _ σ cpu b $$ Hmm with ⟨Hmm, _⟩
   imod Hmask
   imodintro

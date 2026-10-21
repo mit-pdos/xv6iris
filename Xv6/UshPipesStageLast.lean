@@ -69,11 +69,11 @@ theorem pdep_last_ldg_mk (s : List (BitVec 8)) (hs : s = ldg (lfilts D.lR)) :
   rw [pdep_unfold D WLast s hne (Or.inr hs)]
   simp only [PdRound.pdepNe]
   by_cases hq : s = D.L
-  · rw [if_pos hq]
+  · rw [ite_eq_left hq]
     iintro #Hs
     iframe Hs
     iright; ipureintro; rw [← hq, hs]
-  · rw [if_neg hq]
+  · rw [ite_eq_right hq]
     iintro #Hs
     iframe Hs
 

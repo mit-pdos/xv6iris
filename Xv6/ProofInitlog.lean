@@ -141,13 +141,13 @@ theorem il_pay_agree (γ : BcacheNames) (γfs : FsNames)
   unfold bioPay
   cases d with
   | false =>
-    simp only [Bool.false_eq_true, if_false, hcl]
+    simp only [Bool.false_eq_true, ite_false, hcl]
     iintro ⟨Hm, %he⟩ Hc
     ihave %h := fsChalf_mclean_agree γfs bno.toNat bsc bs $$ [Hc Hm]
     case' _ => iframe Hc Hm
     ipureintro; exact h
   | true =>
-    simp only [if_true, hdt]
+    simp only [ite_true, hdt]
     iintro ⟨Hm, Hr⟩ Hc
     ihave %h := fsChalf_mdirty_agree γfs bno.toNat bsc bs $$ [Hc Hm]
     case' _ => iframe Hc Hm
@@ -247,11 +247,11 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs GF Γ]
   have h := IT.wp_install_trans_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev true n W Lw L D pidv dqp homeL Xv Xexc Rt
     hj hproc hK hnoff htier hgeom hdev hcl hdt
-    (by simp only [if_true]; exact ha0) hn hnodup hhome hlen
+    (by simp only [ite_true]; exact ha0) hn hnodup hhome hlen
     (by intro hb; exact absurd hb (by simp))
     (fun _ => hpin) (fun _ => hxexc) hpd
   unfold wp_install_trans_eb_body at h
-  simp only [installTransAddr, if_true, Nat.add_zero] at h
+  simp only [installTransAddr, ite_true, Nat.add_zero] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, HW, Hexc,
     HL, HD, HS, Hsl, #Hgen, HR0, Hnext⟩
   iapply h
@@ -734,7 +734,7 @@ theorem initlog_proof
     have he : Ls i = Xv w.toNat := (Option.some.inj h4).trans h1.symm
     refine ⟨he.symm, ?_⟩
     show (if (Ls i).length = BSIZE then Ls i else List.replicate BSIZE 0#8) = Ls i
-    rw [if_pos (by rw [he]; exact h2)]
+    rw [ite_eq_left (by rw [he]; exact h2)]
   have hLwn : ∀ i, i < hdrN bs → Lw i = Ls i := by
     intro i hi
     have hw : (ilW bs)[i]? = some (ilW bs)[i] := List.getElem?_eq_getElem (by rw [hW]; exact hi)

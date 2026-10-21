@@ -129,7 +129,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs GF] (PT : SchedNames → IProp GF) (Γ 
   unfold usertrapPost
   iintro ⟨#Hwire, #Hrc, HcR, #Hcl, #Hloop, Harm, Huh⟩ %R' %P' %V' %M' %sts' %cs' %uepc %⟨hcs, ha0⟩
     %⟨hupt', htfp'⟩ %hround
-    %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
+    %hfdk %hchk %hgk %hevq %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hh Hstvec Hppt Htf Hres
     Hxo Hfo Hwo Hko Hso Heo
   -- steps A/B: the next slot
   ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
@@ -240,7 +240,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs GF] (PT : SchedNames → IProp GF) (Γ 
       · iexact Hulb
   iapply HRS
   unfold uRcptOpt uClaimFor uClaimForRaw
-  iframe Hwire Hrc HcR Hev Hcl Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Huh Hslot
+  iframe Hwire Hrc HcR Hev Hcl Hk Hgap Hpc Hsep Hsc Hstv Hh Hstvec Hppt Htf Hres Huh Hslot
   inext
   iexact Hloop
 
@@ -291,7 +291,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iapply HUV
   iframe Hhw Hfr Hcl Htf Hleft
   inext
-  iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf - Htok
+  iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hh Hstvec Hppt Htf - Htok
   -- THE EXIT'S TOKEN, back from uservec (NI M2-W2d): the receipt the filing
   -- cites, the round claim it spends, and the fork's child-origin claim
   unfold uExitTok
@@ -315,7 +315,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     f (uvisRun W) hj hproc (uservecCtx_ok k _ _ hsie) htier hnoff hstk hVgen.symm
   unfold wp_usertrap_body at HUT
   iapply HUT
-  iframe Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Hsin Hfin Hpin Hkin
+  iframe Hk Hpc Hsep Hsc Hstv Hh Hstvec Hppt Htf Hres Hsin Hfin Hpin Hkin
   iapply wpNext_intro
   iintro %cpu'
   iapply (urc_exit UR (parkToken (GF := GF) (SG := uexecSGXv6)) Γ j W V Mp k pt ksp gn cs pid sc f cpu' hl hlw hM' hpi' (hsz.trans hVsz.symm)

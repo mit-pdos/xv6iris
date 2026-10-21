@@ -290,7 +290,7 @@ theorem node_pipe_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     · imodintro
       iintro ⟨Hc, Hm, HF, HG⟩
       rw [pdep_unfold D (WSh k) dgPipeB (panic_src_ne dgPipeB (Or.inl rfl)) (Or.inl rfl)]
-      simp only [PdRound.pdepNe, if_pos]
+      simp only [PdRound.pdepNe, ite_eq_left]
       isplitl []
       · iempintro
       iframe Hc Hm Hsk HF HG
@@ -338,7 +338,7 @@ theorem node_fork_panic (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (SP : SH_PA
     · imodintro
       iintro ⟨Hc, Hm, HF⟩
       rw [pdep_unfold D (WSh k) altForkc (panic_src_ne altForkc (Or.inr rfl)) (Or.inr rfl)]
-      simp only [PdRound.pdepNe, if_neg altForkc_ne_pipe, if_pos]
+      simp only [PdRound.pdepNe, ite_eq_right altForkc_ne_pipe, ite_eq_left]
       isplitl []
       · iempintro
       iframe Hc Hm Hsk HF

@@ -1,78 +1,70 @@
-// xv6iris config for the Sail RISC-V -> Rocq model build (the "rv64d" arch,
-// i.e. RV64 + D, vlen=256/elen=64). Used via `tools/regen_sail_model.sh` /
-// `make model-gen` (see root README.md "Regenerating the Sail model").
+// xv6iris config for the Sail RISC-V -> Lean model build (the "rv64d" arch, i.e. RV64 + D,
+// vlen=256/elen=64), for sail-riscv 0.16 (riscv/sail-riscv e5acebb0 + the xv6 fork commits).
+// Used via `tools/regen_sail_model.sh` (see root README.md "Regenerating the Sail model").
 //
-// This is sail-riscv's own config/config.json.in, fully resolved for the
-// rv64d_v256_e64 build, with exactly FOUR changes from upstream's default
-// (each marked "xv6iris" inline):
-//   1. `platform.simple_interrupt_generator.supported` := false  (see below)
-//   2. `extensions.B.supported`                        := false  (see below)
-//   3. `extensions.V.support_level`                    := "Disabled", together
-//      with the fourteen V-DEPENDENT extensions upstream leaves on
-//      (Zvabd Zvbb Zvbc Zvfbfmin Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned Zvknha
-//      Zvknhb Zvksed Zvksh Zvkt) -- see "Why disable B and V" below: the
-//      model's OWN `config_is_valid` rejects the config otherwise, since each
-//      of those requires Zve*, and Zve* comes from V's support_level.
+// This is sail-riscv's own config/config.json.in, fully resolved for the rv64d_v256_e64 build
+// (the cmake values of config/CMakeLists.txt: xlen 64, physaddr_bits 56, asidlen 16, vmidlen 14,
+// geilen 63, vlen_exp 8, elen_exp 6, mideleg 0x…2222, the Sdtrig trigger masks), with these
+// deviations from upstream's defaults, each marked "xv6iris" inline:
+//   1. `platform.simple_interrupt_generator.supported` := false -- its MMIO window
+//      [0xC000000, 0xC000020) collides with xv6's PLIC base.  The fork's hook
+//      ("Consult the external-interrupt pin registers without the SIG") keeps `sig_meip`/`sig_seip`
+//      consulted unconditionally, so this flag only removes the window and the SIG's
+//      software-interrupt sources; MachCSL's PLIC device drives the pins.
+//   2. `extensions.B.supported` := false and `extensions.V.support_level` := "Disabled" together
+//      with the V-dependent extensions (Zvabd Zvbb Zvbc Zvfbfmin Zvfbfwma Zvfh Zvfhmin Zvkg Zvkned
+//      Zvknha Zvknhb Zvksed Zvksh Zvkt).  V: every validated platform reports `misa` without V
+//      (core_csrvals slot 1, the low 32 bits: QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F),
+//      and the model's own `config_is_valid` rejects V off without its family off.  B: the platforms
+//      DISAGREE -- QEMU virt has no B, the JH7110 and CVA6 report B (the JH7110 also its vendor X:
+//      Rocq finding 29; CVA6's B is its core_csrvals capture) -- and B is off following QEMU (owner ruling, 2026-10-20, policy T0(a)'s
+//      disagreement rule): the kernel never uses it, and B on means regrowing the complete U-mode
+//      decode image (`MachCSL/UDecode.lean` pins `misa` to MISA_C; the Rocq-era measurement is in
+//      claude-notes/completed/crash.md); the boards' core_csrvals runs are its recorded finding (red
+//      for other reasons too).  The derived MISA_C = 0x800000000014112D is therefore QEMU's word
+//      without H; its MXL is the board line's, not a capture's.  (A header of 2026-10-20 had claimed
+//      every platform reports `misa` without B: false, corrected the same day.)
+//   3. The extensions upstream added after the previous pin, off, following the platforms:
+//      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd)
+//      -- the JH7110 and CVA6 report `misa` without H, QEMU virt with it (findings 19/29), so the
+//      platforms disagree and the configuration follows the boards (owner ruling, 2026-10-20, the
+//      disagreement rule: the kernel never enters a virtual privilege or touches an H CSR, and H on
+//      would add the HLV/HSV/HFENCE families to the U-mode decode image, two-stage translation to
+//      every walk leaf and the H CSRs to the power-on obligations); Sdtrig (its code is compiled in: `sys` requires the
+//      module) -- QEMU virt and the JH7110 have trigger CSRs, CVA6 does not (core_csrprobe's
+//      scoreboard slot 35, `csrr tselect`), so the platforms disagree and the configuration follows
+//      CVA6 (owner ruling, 2026-10-20; the kernel never touches a trigger CSR); the cost of Sdtrig on
+//      is estimated, not measured (trigger checks on every fetch, load, store and AMO leaf, the
+//      trigger file in the power-on obligations), and QEMU/core_csrprobe is its recorded finding.
+//      Both also keep the decoder's U-mode image narrow.  (Zilx and Svukte, also new,
+//      stay at upstream's default: they are experimental, and `Xv6Extras`'s
+//      `sys_enable_experimental_extensions = false` already disables them.)
 //   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
-// Everything else is unmodified sail-riscv default config.
+//   5. `base.medeleg.delegatable_bits` := 0x…000c_b3FF (the previous pin's value): 0.16's default
+//      0x…00fc_b7FF adds the hypervisor exceptions 10 and 20-23, which the model's own
+//      `config_is_valid` rejects as reserved when H is off (`reserved_exception_mask`).
+//   6. `extensions.Stateen.mstateen0.CONTEXT` := "CSRBit_ReadOnlyZero": the bit's feature (Sdtrig's
+//      scontext/hcontext) is unsupported with Sdtrig off, and `config_is_valid` requires the bits
+//      of unsupported features to be read-only zero (`check_stateen_config`).
+//   7. `memory.misaligned.exceptions.amo` := {"Some": "AccessFault"} (upstream default
+//      {"None": null}), kept from before the bump: a misaligned AMO always faults on the modelled
+//      platform (see the comment at the field).  Spec-permitted either way; the theorems whose
+//      statements fix the cause are MachCSL/UMemAmo.lean's; no capture exercises a misaligned AMO,
+//      so the validated platforms' cause is unwitnessed (policy T0(b)).
+// (A deviation 8 -- F and D off -- existed for one day, 2026-10-19, and was withdrawn on the
+// device-conformance evidence: every validated platform has F and D, and `misa` must not lack a
+// letter every platform reports; notes/model-policy.md T0(a), notes/model-diffs.md section 4.  F and D are
+// advertised but their instructions are not compiled: model/sail-modules.txt.)
+// Everything else is unmodified sail-riscv 0.16 default config -- INCLUDING one default that
+// changed since the previous pin and is accepted: `platform.clint.size` 0xC000 (was 0xC0000).
 //
-// To refresh this file after a sail-riscv upstream bump: resolve the new
-// `config/config.json.in` (cmake's `configure_file` substitution) with the
-// rv64d_v256_e64 values that `config/CMakeLists.txt` computes --
-//
-//   CONFIG__BASE__XLEN 64   CONFIG_XLEN_IS_32 false   CONFIG_XLEN_IS_64 true
-//   CONFIG__V__VLEN_EXP 8   CONFIG_ELEN_IS_32 false   CONFIG_ELEN_IS_64 true
-//   CONFIG__V__ELEN_EXP 6   CONFIG__V__SUPPORT Full   CONFIG__PHYSADDR__BITS 56
-//   CONFIG_MIDELEG_DELEGATABLE_BITS_VALUE 0x0000_0000_0000_2222
-//   (any placeholder cmake leaves undefined resolves to the empty string)
-//
-// -- then re-apply the four edits above, and diff against the previous file to
-// catch every other upstream default change. Two of the fields are load-bearing
-// for the proofs and worth re-reading on every bump: `memory.physaddr_bits`
-// (56 upstream, which is what `legalize_satp`'s PPN mask and `pmpaddr`'s
-// legalization width are derived from) and `memory.misaligned.exceptions`.
-//
-// Why disable B and V: the proofs are about the xv6 kernel, which is compiled
-// rv64gc -- it contains no bit-manipulation and no vector instructions, and
-// xv6's own `start()` never writes misa. Leaving them enabled made the model
-// claim a machine the proofs are not about, in two visible ways:
-//   - `reset_misa` sets one misa bit per `hartSupports` answer, so the model's
-//     architectural reset produced misa = 0x800000000034112F while the tree's
-//     platform constant `RiscvFetchExec.MISA_C` is 0x800000000014112D. That
-//     mismatch had to be carried as an explicit patch in
-//     `RiscvLang.boot_patch`; with B and V off, `reset_misa` produces MISA_C
-//     itself and the patch is gone (see iris/ColdBoot.v).
-//   - `DecodeSetU.decodable_u` claims to be the COMPLETE 32-bit decode image
-//     reachable in U-mode. With misa.B / misa.V set, the Zba/Zbb-only/Zbs and
-//     vector families reach decoder leaves and that claim is false. Disabling
-//     the extensions is the honest fix; growing the set would be verifying a
-//     machine the kernel does not run on.
-// None of these flags changes the module set sail is invoked with (Zba/Zbb/
-// Zbc/Zbs/B_types/V_core/V_types are still compiled); they change what
-// `hartSupports` answers, which is what every extension gate consults.
-//
-// AND MIND THE DEPENDENCY CASCADE: disabling V alone makes the model's own
-// `config_is_valid` return FALSE (`check_vext_config` and
-// `check_misc_extension_dependencies` both fail, on Zvfhmin / Zvfh / Zvbb /
-// Zvfbfmin / Zvfbfwma / ... "requires Zve32f/Zve32x"), and a config the model
-// rejects would make `init_model`'s assert unprovable. After ANY extension
-// flip, re-check validity -- iris/ColdBoot.v evaluates the model's cold boot
-// through that assert, so a bad config shows up there as a build failure.
-// Upstream already ships Zba/Zbb/Zbs disabled while B is enabled, so B has no
-// dependents here; V is the one with a family.
-//
-// Why disable SIG: the Sail model's built-in "Simple Interrupt Generator"
-// test device (see sail-riscv/doc/SimpleInterruptGenerator.md) claims MMIO
-// window [0xC000000, 0xC000020), which collides with xv6's real PLIC base
-// address 0xC000000 (see iris/DevModel.v's `plic_base`) -- with SIG enabled,
-// the Sail model's own `mmio_read`/`mmio_write` intercepts PLIC priority-
-// register accesses for sources 0-7 before they ever reach xv6iris's
-// interpreter-level device routing. This is safe to disable: `sig_meip`/
-// `sig_seip` (the platform-interrupt-pin registers PLIC's wire-step writes
-// into, see iris/CLAUDE.md "Device model") are declared and read
-// unconditionally in sail-riscv's simple_interrupt_generator_regs.sail --
-// only the MMIO register *window* is gated by this flag, so disabling it
-// only removes the address collision, not the interrupt-pin plumbing.
+// To refresh after a sail-riscv bump: resolve the new config/config.json.in with the cmake values
+// above, re-apply the deviations listed above (each marked "xv6iris" inline), and diff against
+// the previous file field by field -- a deviation is easily lost silently (the first 0.16 refresh
+// dropped item 7) -- re-checking the two load-bearing fields `memory.physaddr_bits` (56) and
+// `memory.misaligned.exceptions`.  notes/model-diffs.md lists every deviation from upstream.  After ANY extension flip,
+// re-check validity: `sail_riscv_sim --config <file> --validate-config`, and in the tree the
+// cold-boot proof evaluates `init_model`'s `config_is_valid` assert (MachCSL/BootInitModel.lean).
 //
 // Original file header from sail-riscv/config/config.json.in follows:
 //
@@ -80,7 +72,7 @@
 //
 // You can copy and then modify it to create a new configuration file,
 // and then use the `--config` option to use it with the
-// `sail_riscv_sim` emulator.  If any CMake  placeholders
+// `sail_riscv_sim` emulator.  If any CMake @VARIABLE@ placeholders
 // are present in this file, they will need to be replaced with valid
 // values.
 //
@@ -94,7 +86,6 @@
     // x16-31 is reserved and in this implementation will
     // raise an illegal instruction exception.
     "E": false,
-    "writable_misa": true,
     "writable_fiom": true,
     // The top 29 bits in this value control whether the corresponding
     // HPM counters (hpmcounter31 .. hpmcounter3) are supported
@@ -105,6 +96,19 @@
       "len": 32,
       "value": "0xFFFF_FFFF"
     },
+    // The precision of the HPM counter, upto 64 bits.
+    "hpmcounter_width_bits" : 64,
+    // The width of the `mhpmevent` CSRs, upto 64 bits, if Sscofpmf is
+    // not supported.  On RV32 without Sscofpmf, this can be upto 32,
+    // since the `mhpmeventh` CSRs are not accessible.
+    // If Sscofpmf is supported, the `mhpmevent` CSRs are always 64
+    // bits; this value then defines the number, upto 56, of the lowest
+    // bits of the CSRs that are used as the event selector.
+    "hpmevent_width_bits" : 56,
+    // Whether a `mhpmcounter` increments if the event it is counting
+    // was generated during a write to its corresponding `mhpmevent`
+    // CSR (which could change the monitored event).
+    "hpmcounter_increments_in_self_hpmevent_write" : false,
     // The bits in this value control whether the corresponding bits
     // of the `scounteren` CSR that control access to HPM counters,
     // and `cycle`, `time` and `instret` registers, are read-only
@@ -125,6 +129,29 @@
     "mcounteren_writable_bits": {
       "len": 32,
       "value": "0xFFFF_FFFF"
+    },
+    // The bits in this value control whether the corresponding bits
+    // of the `hcounteren` CSR that control access to HPM counters,
+    // and `cycle`, `time` and `instret` registers from VS/VU-mode,
+    // are read-only zero. A set bit specifies that the corresponding
+    // bit of `hcounteren` is writable, otherwise the bit is read-only
+    // zero. Same layout as `mcounteren`. If Shcounterenw is supported the
+    // top 29 bits must be a superset of the top 29 bits of
+    // `writable_hpm_counters`.
+    "hcounteren_writable_bits": {
+      "len": 32,
+      "value": "0xFFFF_FFFF"
+    },
+    "mcountinhibit" : {
+      // Whether the `mcountinhibit` CSR is implemented.
+      "supported": true,
+      // This bits in this value control whether the corresponding
+      // bits of the CSR are writable.  Note that bit 1 cannot be  written to
+      // as it is read-only zero.
+      "writable_bits": {
+        "len": 32,
+        "value": "0xFFFF_FFFD"
+      }
     },
     // `mtvec.{direct,vectored}.supported` indicates whether the
     // corresponding mode is supported for `mtvec`.  At least one mode
@@ -160,16 +187,38 @@
         "base_alignment": 2
       }
     },
+    // Similar to `stvec` above. If the `H` extension is not supported,
+    // these values need to be present and legal but are ignored.
+    "vstvec": {
+      // The spec requires `base_alignment` for `vstvec.direct` to be 2
+      // (i.e. 4-byte alignment), hence there is no configuration
+      // parameter for it.
+      "direct": {
+        "supported": true
+      },
+      "vectored": {
+        "supported": true,
+        "base_alignment": 2
+      }
+    },
     "medeleg": {
       // A bit set to 1 in this value specifies that the corresponding
       // bit of `medeleg` can be set to 1. It represents the subset of
       // delegatable traps of the implementation. Bits should not be
       // set for traps that cannot be delegated as per the
       // specification, and delegation of reserved traps is not
-      // supported.  This value is ignored when the `medeleg` CSR does
+      // supported.
+      // Bit 18 (software check) must not be set for privileged ISA
+      // versions before 1.13, where that exception code is reserved,
+      // unless Zicfilp or Zicfiss is supported.
+      // Bit 19 (hardware error) must not be set for
+      // privileged ISA versions before 1.13, since that exception
+      // code is reserved there.
+      // This value is ignored when the `medeleg` CSR does
       // not exist.
       "delegatable_bits": {
         "len": 64,
+        // xv6iris: the pre-0.16 value (upstream default: 0x...00fc_b7FF adds H's exceptions) -- deviation 5
         "value": "0x0000_0000_000c_b3FF"
       }
     },
@@ -192,26 +241,32 @@
     // `xtval` registers.
     "xtval_nonzero": {
       "illegal_instruction": true,
+      "virtual_instruction": true,
       "software_breakpoint": true,
       "hardware_breakpoint": true,
       "load_address_misaligned": true,
       "load_access_fault": true,
       "load_page_fault": true,
+      "load_guest_page_fault": true,
       "samo_address_misaligned": true,
       "samo_access_fault": true,
       "samo_page_fault": true,
+      "samo_guest_page_fault": true,
       "fetch_address_misaligned": true,
       "fetch_access_fault": true,
       "fetch_page_fault": true,
+      "fetch_guest_page_fault": true,
       "software_check": true,
+      "hardware_error": true,
       "reserved_exceptions": false
     },
     "reserved_behavior": {
-      // The configuration option determines how to handle the reserved behavior `amocas_odd_registers`.
+      // This option determines how to handle AMOCAS.{D,Q} instructions that specify
+      // a reserved register pair.
       // "AMOCAS_Fatal"  – raise a Sail exception, stopping execution.
       // "AMOCAS_Illegal" – treat it as an illegal instruction.
       "amocas_odd_register": "AMOCAS_Illegal",
-      // The configuration option determines how to handle execution of a floating-point
+      // This option determines how to handle execution of a floating-point
       // instruction with DYN (dynamic) rounding mode when `fcsr.FRM` contains a
       // reserved value (0b101, 0b110, 0b111).
       // This does not affect the execution of floating-point instructions that have a
@@ -219,19 +274,22 @@
       // "Fcsr_RM_Fatal"  – raise a Sail exception, stopping execution.
       // "Fcsr_RM_Illegal" – treat it as an illegal instruction.
       "fcsr_rm": "Fcsr_RM_Illegal",
-      // The configuration option determines how to handle the reserved behavior `pmpcfg_with_R0W1`.
+      // This option determines how to handle writes to a `pmpcfg` register of a reserved
+      // combination with `R=0` and `W=1`.
       // "PMP_Fatal"  – raise a Sail exception, stopping execution.
       // "PMP_ClearPermissions" – convert a PMP entry with R=0, W=1 to R=0, W=0, X=0.
+      // "PMP_Ignore" - preserve the previous value.
       "pmpcfg_write_only": "PMP_ClearPermissions",
-      // The configuration option determines how to handle the reserved behavior `xenvcfg.CBIE` with 0b10.
+      // This option determines how to handle writes of the reserved value of 0b10 to `xenvcfg.CBIE`.
       // "Xenvcfg_Fatal"  – raise a Sail exception, stopping execution.
-      // "Xenvcfg_ClearPermissions" – convert CBIE with 0b10 to 0b00.
+      // "Xenvcfg_ClearPermissions" – write 0b00 to CBIE instead.
+      // "Xenvcfg_Ignore" - preserve the previous value of the field.
       "xenvcfg_cbie": "Xenvcfg_ClearPermissions",
-      // The configuration option determines how to handle the reserved behavior `xtvec[Mode] >= 2`.
+      // This option determines how to handle writes of reserved values (>=2) to the `xtvec.Mode`.
       // "Xtvec_Fatal"  – raise a Sail exception, stopping execution.
       // "Xtvec_Ignore" – use old Mode of xtvec.
       "xtvec_mode": "Xtvec_Ignore",
-      // The configuration option determines how to handle the reserved behavior: Odd-numbered registers for RV32Zdinx.
+      // This option determines how to handle the reserved behavior: Odd-numbered registers for RV32Zdinx.
       // "Zdinx_Fatal"  – raise a Sail exception, stopping execution.
       // "Zdinx_Illegal" – treat it as an illegal instruction.
       "rv32zdinx_odd_register": "Zdinx_Illegal"
@@ -265,6 +323,42 @@
     // bitvectors in the model and since it is unlikely real implementations
     // will have lower values.
     "physaddr_bits": 56,
+    // Whether physical addresses reported in `xtval` are truncated to
+    // `physaddr_bits` can be specified.  When valid physical
+    // addresses result from truncating invalid physical addresses to
+    // `physaddr_bits`, the parameter below may specify a constant
+    // value of `xlen` bits that should be reported as an invalid
+    // address instead in `xtval`. The model does not currently
+    // support arbitrary transformations of invalid physical
+    // addresses.
+    //
+    // Any specified invalid address need not fit within the
+    // `physaddr_bits` specified above, and it should not lie within
+    // any specified PMA region.  The value should be specified as
+    //   `{"Some": {"len": "xlen", "value": "0x<constant>"}}`.
+    // Note that if pointer masking extensions are enabled, the
+    // specified address needs to be a valid pointer-masked address
+    // for each supported `PMLEN`.
+    //
+    // If no truncation should take place, use `{"None": null}`.  In
+    // this case, the original faulting address is reported without
+    // truncation.
+    "invalid_physical_address": {
+      "None": null
+    },
+    // This specifies the number of implemented ASID bits (ASIDLEN) in
+    // the `satp` register.  If ASIDLEN > 0, ASID[ASIDLEN-1:0] is writable and bits above that are
+    // read-only zero. The maximal value (ASIDMAX) is 9 for Sv32 or 16 for
+    // Sv39, Sv48, and Sv57. A value of 0 means no ASID bits are
+    // implemented (all ASID bits read as zero).
+    "asidlen": 16,
+    // This specifies the number of implemented VMID bits (VMIDLEN) in
+    // the `hgatp` register.  If VMIDLEN > 0, VMID[VMIDLEN-1:0] is
+    // writable and bits above that are read-only zero. The maximal
+    // value (VMIDMAX) is 7 for Sv32x4 and 14 for Sv39x4, Sv48x4, and
+    // Sv57x4. A value of 0 means no VMID bits are implemented (all
+    // VMID bits read as zero).
+    "vmidlen": 14,
     "pmp": {
       "grain": 0,
       // This specifies the number of PMP entries present.
@@ -301,23 +395,22 @@
         "vector": {
           "None": null
         },
-        // Similarly, a misaligned AMO can be configured with the same
+        // Similarly, a misaligned AMO and LR/SC can be configured with the same
         // option values.
         //
-        // DEVIATION from the upstream template, which defaults this to
-        // {"None": null}.  The template this project was originally generated
-        // from offered no such option -- a misaligned AMO always faulted -- so
-        // that is the platform this development models, and the proofs
-        // (UserMemArms/UserMemClassify's misaligned-AMO arms) are sound about
-        // it.  Taking upstream's new default would change the modelled
-        // hardware, not just the model.
+        // xv6iris: DEVIATION from the upstream template, which defaults this to
+        // {"None": null} (deviation 7 in the header, kept from before the 0.16
+        // bump).  The template this project was originally generated from offered
+        // no such option -- a misaligned AMO always faulted -- so that is the
+        // platform this development models, and the proofs (the user tier's
+        // misaligned-AMO arms) are about it.  Taking upstream's default would
+        // change the modelled hardware, not just the model.
         "amo": {
           "Some": "AccessFault"
         },
-        // A misaligned LR/SC currently always faults, and this field can specify
-        // whether it generates an access fault (use `"AccessFault"`)
-        // or a misaligned exception (use `"AlignmentException"`).
-        "lrsc": "AccessFault"
+        "lrsc": {
+          "Some": "AccessFault"
+        }
       },
       // If multiple memory operations are needed (e.g. when an access
       // straddles a page boundary), this controls whether they are
@@ -386,7 +479,8 @@
             "vector": {
               "None" : null
             },
-            "amo": "AccessFault"
+            "amo": "AccessFault",
+            "lrsc": "AccessFault"
           },
           "atomic_support": "AMONone",
           "misaligned_atomicity_granule_size_exp": 0,
@@ -424,7 +518,8 @@
             "vector": {
               "None" : null
             },
-            "amo": "AccessFault"
+            "amo": "AccessFault",
+            "lrsc": "AccessFault"
           },
           "atomic_support": "AMONone",
           "misaligned_atomicity_granule_size_exp": 0,
@@ -437,9 +532,6 @@
         "include_in_device_tree": false
       },
       // RAM
-      // xv6iris: 128 MiB (upstream default: 0x80000000 = 2 GiB), matching
-      // xv6's PHYSTOP = KERNBASE + 128MB (kernel/memlayout.h) and the
-      // QEMU invocation `-m 128M` in xv6-riscv/Makefile.
       {
         "base": {
           "len": 64,
@@ -447,6 +539,7 @@
         },
         "size": {
           "len": 64,
+          // xv6iris: 128 MiB (upstream default: 0x80000000 = 2 GiB), matching xv6's PHYSTOP -- deviation 4
           "value": "0x8000000"
         },
         "attributes": {
@@ -465,7 +558,8 @@
             "vector": {
               "None" : null
             },
-            "amo": "AccessFault"
+            "amo": "AccessFault",
+            "lrsc": "AccessFault"
           },
           "atomic_support": "AMOCASQ",
           "misaligned_atomicity_granule_size_exp": 4,
@@ -502,19 +596,32 @@
       // the reservation set.
       "invalidate_on_same_hart_store": false
     },
+    "interrupts": {
+      "machine": {
+        "software" : {
+          "supported" : true
+        },
+        "external" : {
+          "supported" : true
+        },
+        "timer" : {
+          "supported" : true
+        }
+      }
+    },
     "clint": {
       // Whether the platform contains a CLINT.
       "supported": true,
       // If supported, this must be in a suitable IO memory region (see `memory.regions`).
       // Otherwise, these values can be left as 0.
       "base": 33554432,
-      "size": 786432
+      "size": 49152
     },
     // Very simple MMIO device to generate interrupts for testing
     // purposes. See docs/SimpleInterruptGenerator.md for details.
     "simple_interrupt_generator": {
       // Whether the platform contains this device.
-      // xv6iris: disabled (upstream default: true) -- see file header.
+      // xv6iris: false (upstream default: true) -- deviation 1 (its MMIO window collides with the PLIC), see the header
       "supported": false,
       // If supported, this must be in a suitable IO memory region (see `memory.regions`)
       // and 4-byte aligned. The size is always 0x20.  If not supported, this can be left
@@ -534,24 +641,73 @@
     // wait. It is not possible to wait indefinitely.
     //
     // If WFI or WRS.STO (Short TimeOut) exceed this limit in
-    // non-machine privilege with mstatus[TW] set, an illegal
+    // non-machine privilege with mstatus.TW set, an illegal
     // instruction is raised. Otherwise they retire successfully.
     //
     // Note: it is also legal for these instructions to spuriously
     // retire successfully at any point, but there is currently no
     // configuration option for this behaviour.
-    "max_time_to_wait": 10
+    "max_time_to_wait": 10,
+
+    // The model can generate the following events that can be tracked
+    // using the HPM counters:
+    // - EV_FENCE
+    // - EV_MISALIGNED_LOAD_EXCEPTION
+    // - EV_MISALIGNED_STORE_EXCEPTION
+    // - EV_TLB_MISS
+    //
+    // An event can be mapped to a selector value, that when written
+    // to the event field of an `mhpmeventNN` CSR, will increment the
+    // corresponding `mhpmcounterNN` CSR as per the specification
+    // (e.g. the `Sscofpmf` extension).
+    //
+    // The selector values need to fit into the event field of an
+    // `mhpmeventNN` CSR. When Sscofpmf is not supported, this field
+    // is `base.hpmevent_width_bits` wide; with Sscofpmf, this field
+    // is the lowest 56 bits of the 64-bit `mhpeventNN` CSR.
+    //
+    // The `event_selectors` list can contain any subset of these
+    // supported events.  Events cannot be repeated in the list, and
+    // the selector values should be unique.  These selector values
+    // are always specified as 64-bit, but their values must fit the
+    // width restrictions mentioned above.
+    "event_selectors": [
+      {
+        "event": "EV_FENCE",
+        "selector": {
+          "len": 64,
+          "value": "0x1"
+        }
+      },
+      {
+        "event": "EV_MISALIGNED_LOAD_EXCEPTION",
+        "selector": {
+          "len": 64,
+          "value": "0x2"
+        }
+      },
+      {
+        "event": "EV_MISALIGNED_STORE_EXCEPTION",
+        "selector": {
+          "len": 64,
+          "value": "0x3"
+        }
+      }
+    ]
   },
   "extensions": {
     "M": {
-      "supported": true
+      "supported": true,
+      "mutable_misa": true
     },
     "A": {
-      "supported": true
+      "supported": true,
+      "mutable_misa": true
     },
     "F": {
       "supported": true,
-      // When to set mstatus[FS] and mstatus[SD] to 1, as a result of fflags
+      "mutable_misa": true,
+      // When to set mstatus.FS and mstatus.SD to 1, as a result of fflags
       // being set. There are three options:
       //
       // - Fflags_Dirty_Precise: Only set FS/SD when absolutely required, because
@@ -563,7 +719,13 @@
       "fflags_dirty_policy": "Fflags_Dirty_Precise"
     },
     "D": {
-      "supported": true
+      "supported": true,
+      "mutable_misa": true
+    },
+    "C": {
+      // There is no supported option for C. It is automatically
+      // marked as supported based on Zca, Zcf, and Zcd
+      "mutable_misa": true
     },
     "V": {
       // `support_level` must be one of the below strings:
@@ -577,8 +739,10 @@
       // For e.g. Zve32x and Zve32f require `elen_exp` >= 5,
       // Zve64x, Zve64f, and Zve64d require `elen_exp` >= 6,
       // and V requires `elen_exp` >= 6 and `vlen_exp` >= 7.
-      // xv6iris: DISABLED (upstream default: "Full") -- see the header
+      // xv6iris: "Disabled" (upstream default: "Full") -- deviation 2, see the header
       "support_level": "Disabled",
+      // mutable_misa only applies if support_level is set to Full
+      "mutable_misa": true,
       // `vlen_exp` and `elen_exp` should be between 3 and 16,
       // inclusive.  If `support_level` is `"Disabled"`, then these
       // should be left as 3 (or any other legal value).
@@ -620,14 +784,73 @@
       }
     },
     "B": {
-      // xv6iris: DISABLED (upstream default: true) -- see the header
-      "supported": false
+      // xv6iris: false (upstream default: true) -- deviation 2, see the header
+      "supported": false,
+      "mutable_misa": true
     },
     "S": {
-      "supported": true
+      "supported": true,
+      "mutable_misa": true,
+      "interrupts": {
+        "software" : {
+          "supported" : true
+        },
+        "external" : {
+          "supported" : true
+        },
+        // This should be set to true if the Sstc extension is supported.
+        "timer" : {
+          "supported" : true
+        }
+      }
     },
     "U": {
-      "supported": true
+      "supported": true,
+      "mutable_misa": true
+    },
+    "H": {
+      // xv6iris: false (upstream default: true) -- deviation 3, see the header
+      "supported": false,
+      "mutable_misa": true,
+      // GEILEN, the number of guest external interrupts. The maximum is XLEN-1.
+      "geilen": 63,
+      // Whether an implicit access to a VS-stage PTE sets the D bit of a writable G-stage PTE
+      "implicit_vs_pte_access_sets_gstage_d": false,
+      // Whether a trap into M or HS mode caused by the specified exception
+      // writes the transformed trapping instruction to `mtinst`/`htinst`.
+      // This applies to integer and floating-point loads and stores
+      // (including compressed forms), LR/SC, AMOs, HLV/HLVX/HSV and CBOs.
+      // If false, zero is written instead.
+      "transformed_instruction": {
+        "load_address_misaligned": true,
+        "load_access_fault": true,
+        "load_page_fault": true,
+        "load_guest_page_fault": true,
+        "samo_address_misaligned": true,
+        "samo_access_fault": true,
+        "samo_page_fault": true,
+        "samo_guest_page_fault": true
+      },
+      // Whether a guest-page fault writes the faulting guest physical address
+      // to `htval`/`mtval2`. If false, `htval`/`mtval2` is written as zero.
+      // Enabling Shtvala requires this option to be enabled.
+      "guest_page_fault_writes_htval": true,
+      // Which G-stage translation modes `hgatp` supports. Bare is always
+      // supported.
+      "hgatp_modes": {
+        "Sv32x4": false,
+        "Sv39x4": true,
+        "Sv48x4": true,
+        "Sv57x4": true
+      },
+      // Which VS-stage translation modes `vsatp` supports. Bare is always
+      // supported.
+      "vsatp_modes": {
+        "Sv32": false,
+        "Sv39": true,
+        "Sv48": true,
+        "Sv57": true
+      }
     },
     "Zibi": {
       "supported": true
@@ -687,6 +910,9 @@
       "supported": true
     },
     "Zihpm": {
+      "supported": true
+    },
+    "Zilx": {
       "supported": true
     },
     "Zimop": {
@@ -816,79 +1042,211 @@
       "supported": false
     },
     "Zvabd": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfbfmin": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfbfwma": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfh": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfhmin": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvbb": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvbc": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkb": {
       "supported": false
     },
     "Zvkg": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkned": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvknha": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvknhb": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvksed": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvksh": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkt": {
-      // xv6iris: DISABLED -- depends on V/Zve*, see the header
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Ssccptr": {
       "supported": true
     },
+    "Sdtrig": {
+      // xv6iris: false (upstream default: true; compiled in, `sys` requires it) -- deviation 3, see the header
+      "supported": false,
+      // The number of supported triggers.  This has to be
+      // non-negative, and greater than 0 if Sdtrig is supported.  The
+      // model does not support more than 16 triggers.
+      "num_triggers": 16,
+      // `breakpoint_reentrancy` must be one of the below strings:
+      // . `Use_tcontrol`: use the `mte` and `mpte` bits in the `tcontrol` CSR (this also makes the `tcontrol` CSR available)
+      // . `Use_interrupt_enables`: use `mstatus.MIE` and the `SIE` bits in `sstatus` and `vsstatus`
+      // . `No_reentrancy_support`: no specific support for reentrancy
+      "breakpoint_reentrancy": "Use_interrupt_enables",
+      // CSRs
+      "mcontext": {
+        "supported": true
+      },
+      "hcontext": {
+        "supported": true
+      },
+      "scontext": {
+        "supported": true
+      },
+      // Triggers
+      "icount": {
+        "supported": true,
+        "count_hardwired_one": false,
+        // Whether a `tdata1` write to an `icount` trigger with `count`=1 also makes it
+        // pending when that write's instruction matches the trigger.
+        "self_write_sets_pending": true
+      },
+      "etrigger": {
+        "supported": true,
+        // A bit set to 1 in this value specifies that the
+        // corresponding exception is supported by the trigger.
+        // Triggers for reserved exceptions are not supported.  This
+        // value is ignored when `etrigger` is not supported.
+        "supported_exceptions": {
+          "len": "xlen",
+          "value": "0x0000_0000_00fd_bfff"
+        }
+      },
+      "itrigger": {
+        "supported": true,
+        // A bit set to 1 in this value specifies that the
+        // corresponding interrupt is supported by the trigger.
+        // Triggers for reserved interrupts are not supported.  This
+        // value is ignored when `itrigger` is not supported.
+        "supported_interrupts": {
+          "len": "xlen",
+          "value": "0x0000_0000_0000_3eee"
+        }
+      },
+      "mcontrol6": {
+        "supported": true,
+        // If `mcontrol6` is supported, this value needs to be in the range
+        // 0 < `maskmax6` < XLEN.
+        "maskmax6": 63,
+        // Whether an address selection matches all the accessed addresses.
+        // If set to `false`, it matches only the lowest address.
+        "address_select_matches_all_addresses" : true,
+        // Maximum length of a chain. This cannot exceed the number of
+        // triggers.  A value of 0 implies chains are not supported.
+        "max_chain_length": 4
+      },
+      "textra": {
+        // Which context matches are supported. Writes of unsupported
+        // `mhselect` and `sselect` values are legalized to 0 (ignore).
+        "mhselect": {
+          // Values 1, 4 and 5, match on `mcontext`. Requires the
+          // `mcontext` CSR. Values 1 and 5 also require H.
+          "mcontext_match": true,
+          // Values 2 and 6, match on the VMID in `hgatp`. Requires H.
+          "vmid_match": true
+        },
+        "sselect": {
+          // Value 1, match on `scontext`. Requires S and the `scontext`
+          // CSR.
+          "scontext_match": true,
+          // Value 2, match on the ASID in `satp` or `vsatp`. Requires S.
+          "asid_match": true
+        },
+        // The number of implemented `mhvalue` and `svalue` bits. Bits
+        // above these are read only zero. At most 6 and 16 on RV32,
+        // 13 and 32 on RV64.
+        "mhvalue_len": 13,
+        "svalue_len": 32
+      }
+    },
     "Sscofpmf": {
       "supported": true
     },
+    // Enabling Sha requires H, Ssstateen, Shcounterenw, Shgatpa, Shtvala,
+    // Shvsatpa, Shvstvala and Shvstvecd.
+    "Sha": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
+    "Shcounterenw": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
     "Sscounterenw": {
+      "supported": true
+    },
+    // Enabling Shvsatpa requires that every mode supported in `satp` is also
+    // supported in `vsatp` (under `extensions.H.vsatp_modes`).
+    "Shvsatpa": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
+    // Enabling Shvstvala requires that the exceptions specified in the
+    // extension have their appropriate settings under `base.xtval_nonzero`.
+    "Shvstvala": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
+    "Shvstvecd": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
+    "Ssstrict": {
       "supported": true
     },
     "Sstc": {
       "supported": true
     },
+    // Enabling Shgatpa requires an `hgatp` SvNNx4 mode (under
+    // `extensions.H.hgatp_modes`) for every SvNN mode supported in `satp`.
+    "Shgatpa": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
+    "Shtvala": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
+      "supported": false
+    },
     // Enabling Sstvala requires that the exceptions specified in the extension
     // have their appropriate settings under `base.xtval_nonzero`.
     "Sstvala": {
+      "supported": true
+    },
+    // Enabling Sstvecd requires that `stvec` supports the `direct` mode,
+    // see `base.stvec.direct.supported`.
+    "Sstvecd": {
       "supported": true
     },
     "Svade": {
@@ -904,6 +1262,9 @@
       "supported": true
     },
     "Svnapot": {
+      "supported": true
+    },
+    "Svukte": {
       "supported": true
     },
     "Ssnpm": {
@@ -923,6 +1284,15 @@
     },
     "Smcntrpmf": {
       "supported": true
+    },
+    // The double trap extensions are not enabled by default because
+    // mstatus[MDT] is reset to 1. Unless the boot code clears it, the
+    // first trap taken will result in an unexpected double trap.
+    "Smdbltrp": {
+      "supported": false
+    },
+    "Ssdbltrp": {
+      "supported": false
     },
     "Svbare": {
       "supported": true,
@@ -947,8 +1317,44 @@
       "Ssstateen": {
         "supported": true
       },
-      "C_readonly_zero": true,
-      "SE0_readonly_zero": false
+      // Each stateen bit is one of CSRBit_Writable,
+      // CSRBit_ReadOnlyZero or CSRBit_ReadOnlyOne.
+      // Bits for features the hart does not support must be
+      // CSRBit_ReadOnlyZero. Bits that depend on misa (ENVCFG
+      // on misa.S, P1P13 on misa.H) also read as zero while that
+      // extension is disabled at run time.
+      "mstateen0": {
+        "SE0": "CSRBit_Writable",
+        "ENVCFG": "CSRBit_Writable",
+        // xv6iris: read-only zero (upstream default: writable; Sdtrig's context is unsupported) -- deviation 6
+        "CONTEXT": "CSRBit_ReadOnlyZero",
+        "P1P13": "CSRBit_ReadOnlyZero",
+        "SRMCFG": "CSRBit_Writable",
+        "FCSR": "CSRBit_ReadOnlyZero",
+        "C": "CSRBit_ReadOnlyZero"
+      },
+      // Bit 63 of mstateen1, mstateen2 and mstateen3. These can only be
+      // read-only zero if H is not supported.
+      "mstateen1": {
+        "SE1": "CSRBit_Writable"
+      },
+      "mstateen2": {
+        "SE2": "CSRBit_Writable"
+      },
+      "mstateen3": {
+        "SE3": "CSRBit_Writable"
+      },
+      // hstateen0.SE0 is always writable.
+      "hstateen0": {
+        "ENVCFG": "CSRBit_Writable",
+        "CONTEXT": "CSRBit_Writable",
+        "FCSR": "CSRBit_ReadOnlyZero",
+        "C": "CSRBit_ReadOnlyZero"
+      },
+      "sstateen0": {
+        "FCSR": "CSRBit_ReadOnlyZero",
+        "C": "CSRBit_ReadOnlyZero"
+      }
     },
     "Ssqosid": {
       "supported": true,

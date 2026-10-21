@@ -1,9 +1,10 @@
 /-
 MachCSL: `mret` from machine mode to supervisor mode.
 
-`mret` with `mstatus.MPP = S` moves the hart to supervisor mode at `mepc`:
-`mstatus.MIE := MPIE`, `MPIE := 1`, `MPP := U`, `MPRV := 0`; `elp` is
-restored from `mstatus.MPELP` (Zicfilp), which the boot code keeps clear.
+`mret` with `mstatus.MPP = S` (and `MPV = 0`) moves the hart to supervisor
+mode at `mepc`: `mstatus.MIE := MPIE`, `MPIE := 1`, `MPP := U`, `MPV := 0`,
+`MPRV := 0`; `elp` is restored from `mstatus.MPELP` (Zicfilp), which the boot
+code keeps clear.
 The rule leaves machine mode, so its postcondition is not `mConf` but the
 same cells with `cur_privilege = Supervisor` (`sConf`, the seed of the
 supervisor-mode configuration bundle).
@@ -15,21 +16,23 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `mstatus` after `mret` (from `MPP = S`): `MIE := MPIE`, `MPIE := 1`,
-`MPP := U (00)`, `MPRV := 0`, `MPELP := 0`. -/
+`MPP := U (00)`, `MPV := 0` (since sail-riscv 0.16, H or not), `MPRV := 0`, `MPELP := 0`. -/
 def mretMstatus (ms : BitVec 64) : BitVec 64 :=
   BitVec.updateSubrange
     (BitVec.updateSubrange
       (BitVec.updateSubrange
-        (~~~(1#64 <<< 7) &&&
-            (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) |||
-          1#64 <<< 7)
-        12 11 0#2)
+        (BitVec.updateSubrange
+          (~~~(1#64 <<< 7) &&&
+              (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) |||
+            1#64 <<< 7)
+          12 11 0#2)
+        39 39 0#1)
       17 17 0#1)
     41 41 0#1
 
@@ -44,11 +47,21 @@ theorem mpp_after_mie_update (ms : BitVec 64) :
       (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) ||| 1#64 <<< 7) =
     BitVec.extractLsb' 11 2 ms := by bv_decide
 
+/-- `MPV` survives the `MIE`/`MPIE` update. -/
+theorem mpv_after_mie_update (ms : BitVec 64) :
+    BitVec.extractLsb' 39 1 (~~~(1#64 <<< 7) &&&
+      (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) ||| 1#64 <<< 7) =
+    BitVec.extractLsb' 39 1 ms := by bv_decide
+
 set_option maxHeartbeats 4000000 in
-/-- The execute stage of `mret` (`MPP = S`, `menvcfg.LPE = 0`): the hart
-leaves for supervisor mode at `mepc` (bit 0 cleared). -/
+/-- The execute stage of `mret` (`MPP = S`, `MPV = 0`, `menvcfg.LPE = 0`): the
+hart leaves for supervisor mode at `mepc` (bit 0 cleared).  (Since sail-riscv
+0.16 `mret` returns to the privilege `(MPP, MPV)` names, H enabled or not:
+with `MPV = 1` it would enter `VirtualSupervisor`.  `legalize_mstatus` keeps
+`MPV` clear without H.) -/
 theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
     (hMPP : BitVec.extractLsb' 11 2 c.mstatus = 1#2)
+    (hMPV : BitVec.extractLsb' 39 1 c.mstatus = 0#1)
     (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) :
     execSpecP (GF := GF) cpu (DFrac.own 1) c Privilege.Supervisor { c with mstatus := mretMstatus c.mstatus }
       (instruction.MRET ()) pc npc₀ (c.mepc &&& 0xFFFFFFFFFFFFFFFE#64) iprop(⌜True⌝) iprop(⌜True⌝) := by
@@ -56,6 +69,10 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   iintro ⟨HmConf, HPC, HnextPC, _, HΦ⟩
   mconf_cases HmConf
   have hmpp' := mpp_after_mie_update c.mstatus
+  have hmpv' : BitVec.extractLsb' 39 1 (~~~(1#64 <<< 7) &&&
+      (~~~(1#64 <<< 3) &&& c.mstatus ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 c.mstatus) <<< 3) |||
+        1#64 <<< 7) = 0#1 := by
+    rw [mpv_after_mie_update]; exact hMPV
   unfold execute
   swp_run 200
   fix_dec
@@ -75,6 +92,7 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
 configuration with `mstatus` updated and `cur_privilege = Supervisor`. -/
 theorem wp_m_mret (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (hMPP : BitVec.extractLsb' 11 2 c.mstatus = 1#2)
+    (hMPV : BitVec.extractLsb' 39 1 c.mstatus = 0#1)
     (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) :
     instr (GF := GF) pc is_rvc (instruction.MRET ()) ∗ mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗
     pcIs cpu pc ∗
@@ -83,7 +101,7 @@ theorem wp_m_mret (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : Bi
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, HΦ⟩
   iapply wpLoop_m_instrP cpu (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
-    (execSpecP_mret cpu c pc _ hMPP hLPE)
+    (execSpecP_mret cpu c pc _ hMPP hMPV hLPE)
   iframe
   isplitl []
   · ipureintro; trivial

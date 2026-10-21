@@ -131,7 +131,7 @@ theorem best_foldl (p : PlicState) (c : Nat) (Q : Nat → Prop) :
     intro k hk
     unfold bestStep at hk
     by_cases hc : Plic.cand p c a = true
-    · rw [if_pos hc] at hk
+    · rw [ite_eq_left hc] at hk
       cases b with
       | none =>
         dsimp only at hk
@@ -140,12 +140,12 @@ theorem best_foldl (p : PlicState) (c : Nat) (Q : Nat → Prop) :
       | some m =>
         dsimp only at hk
         by_cases hbt : Plic.better p a m = true
-        · rw [if_pos hbt] at hk
+        · rw [ite_eq_left hbt] at hk
           cases hk
           exact ⟨hl a List.mem_cons_self, hc⟩
-        · rw [if_neg hbt] at hk
+        · rw [ite_eq_right hbt] at hk
           exact hb k hk
-    · rw [if_neg hc] at hk
+    · rw [ite_eq_right hc] at hk
       exact hb k hk
 
 /-- **`best_spec`**: a claim's answer is a real source, visible to the
@@ -200,7 +200,7 @@ theorem enabled_srcs (p : PlicState) (hok : plicOk p) (c i : Nat)
       exfalso
       rw [hw0] at hmask
       simp at hmask
-  rw [if_pos hw] at hmask
+  rw [ite_eq_left hw] at hmask
   have hi : Plic.srcBit i = i := by
     unfold Plic.srcWord at hw
     unfold Plic.srcBit
@@ -237,7 +237,7 @@ theorem plic_claim_other_claimed (p : PlicState) (c j : Nat) (hj : Plic.best p c
   | some i =>
     show Plic.upd p.claimed i true j = p.claimed j
     unfold Plic.upd
-    rw [if_neg]
+    rw [ite_eq_right]
     rintro rfl
     exact hj h
 
@@ -269,7 +269,7 @@ theorem plic_claim_ok (p : PlicState) (c : Nat) (hok : plicOk p) : plicOk (Plic.
     unfold Plic.upd at hj ⊢
     split at hj
     · exact absurd hj (by simp)
-    · rw [if_neg (by assumption)]
+    · rw [ite_eq_right (by assumption)]
       exact hok.2 j hj
 
 /-! ## Complete -/
@@ -278,7 +278,7 @@ theorem plic_claim_ok (p : PlicState) (c : Nat) (hok : plicOk p) : plicOk (Plic.
 theorem plic_complete_claimed_in (p : PlicState) (i : Nat) (h1 : 1 ≤ i) (h2 : i < Plic.nsrc) :
     (Plic.complete p i).claimed i = false := by
   unfold Plic.complete
-  rw [if_pos ⟨h1, h2⟩]
+  rw [ite_eq_left ⟨h1, h2⟩]
   show Plic.upd p.claimed i false i = false
   simp [Plic.upd]
 

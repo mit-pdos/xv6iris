@@ -618,7 +618,7 @@ theorem bioPay_clean (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : Bi
     (bsl : List (BitVec 8)) :
     V.clean bno.toNat bsl ⊢ bioPay (GF := GF) γ V k dev bno bsl bsl false := by
   unfold bioPay
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iintro H
   isplitl [H]
   · iexact H
@@ -630,7 +630,7 @@ theorem bioPay_clean_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno
     (bsl bsd : List (BitVec 8)) :
     bioPay (GF := GF) γ V k dev bno bsl bsd false ⊢ ⌜bsd = bsl⌝ ∗ V.clean bno.toNat bsl := by
   unfold bioPay
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iintro ⟨H, %he⟩
   isplitr [H]
   · ipureintro; exact he
@@ -642,7 +642,7 @@ theorem bioPay_dirty_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno
     bioPay (GF := GF) γ V k dev bno bsl bsd true ⊢
       V.dirty bno.toNat bsl ∗ bref γ k dev bno := by
   unfold bioPay
-  simp only [if_true]
+  simp only [ite_true]
   iintro H; iexact H
 
 /-- **THE PAYLOAD A PARKED BUFFER CARRIES** (Rocq's `buf_pay`), keyed on its
@@ -673,7 +673,7 @@ theorem bufPay_uncov (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : 
     (x : BufX) (hcov : bno.toNat ∉ V.cov) :
     ⊢ bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x := by
   unfold bufPay
-  rw [if_neg hcov]
+  rw [ite_eq_right hcov]
   iempintro
 
 /-- The INVALID covered arm, unpacked: the block's pool bundle. -/
@@ -682,14 +682,14 @@ theorem bufPay_invalid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v 
     bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
       ⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat := by
   unfold bufPay
-  rw [if_pos hcov, if_pos hv]
+  rw [ite_eq_left hcov, ite_eq_left hv]
 
 /-- ...and back in, out of the pool. -/
 theorem bufPay_of_pool (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
     (x : BufX) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) :
     poolBlk (GF := GF) V bno.toNat ⊢ bufPay γ V k ((dev, bno) : BufId) v x := by
   unfold bufPay
-  rw [if_pos hcov, if_pos hv]
+  rw [ite_eq_left hcov, ite_eq_left hv]
   iintro H
   isplitr [H]
   · ipureintro; exact hdev
@@ -703,7 +703,7 @@ theorem bufPay_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : 
       ⌜dev = V.dev⌝ ∗ ∃ (bsd : List (BitVec 8)) (d : Bool), ⌜bsd.length = BSIZE⌝ ∗
         diskBlock V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d := by
   unfold bufPay
-  rw [if_pos hcov, if_neg hv]
+  rw [ite_eq_left hcov, ite_eq_right hv]
 
 /-- ...and back in. -/
 theorem bufPay_of_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
@@ -713,7 +713,7 @@ theorem bufPay_of_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v
     diskBlock (GF := GF) V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d ⊢
       bufPay γ V k ((dev, bno) : BufId) v x := by
   unfold bufPay
-  rw [if_pos hcov, if_neg hv]
+  rw [ite_eq_left hcov, ite_eq_right hv]
   iintro ⟨H1, H2⟩
   isplitr [H1 H2]
   · ipureintro; exact hdev
@@ -848,7 +848,7 @@ theorem bufPay_evict (γ : BcacheNames) (V : BioView GF) (M : RegMapF Nat) (Ls :
       (if bno.toNat ∈ V.cov then iprop(⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat)
        else iprop(emp)) := by
   by_cases hcov : bno.toNat ∈ V.cov
-  · rw [if_pos hcov]
+  · rw [ite_eq_left hcov]
     by_cases hv : v = 0#32
     · iintro ⟨Ha, Hpay⟩
       iframe Ha
@@ -874,7 +874,7 @@ theorem bufPay_evict (γ : BcacheNames) (V : BioView GF) (M : RegMapF Nat) (Ls :
         isplitl []
         · ipureintro; exact hlen
         iframe Hblk Hcl
-  · rw [if_neg hcov]
+  · rw [ite_eq_right hcov]
     iintro ⟨Ha, -⟩
     iframe Ha
 
@@ -1036,7 +1036,7 @@ theorem bnode_off_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
   have hlo : 0x80007 ≤ (2147583816 + 24 + 1112 * k + m) / 4096 := by omega
   have hhi : (2147583816 + 24 + 1112 * k + m) / 4096 < 0x88000 := by omega
   unfold kmapClass
-  rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
+  rw [ite_eq_right (by omega), ite_eq_left (Or.inl ⟨hlo, hhi⟩)]
 
 theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     kmapClass (vpnOf (aBufData (bnode k) + BitVec.ofNat 64 m)).toNat = some .rw := by
@@ -1054,7 +1054,7 @@ theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
   have hlo : 0x80007 ≤ (2147583816 + 24 + 1112 * k + 88 + m) / 4096 := by omega
   have hhi : (2147583816 + 24 + 1112 * k + 88 + m) / 4096 < 0x88000 := by omega
   unfold kmapClass
-  rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
+  rw [ite_eq_right (by omega), ite_eq_left (Or.inl ⟨hlo, hhi⟩)]
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]

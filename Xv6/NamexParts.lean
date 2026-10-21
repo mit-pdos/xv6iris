@@ -314,14 +314,14 @@ theorem namex_name_short_list (a len : Nat) (f nf : Nat → BitVec 8) (h : len <
   unfold namexShortName
   by_cases h1 : i < len
   · rw [List.getElem?_append_left (by rw [bview_length]; exact h1), bview_lookup _ _ i h1,
-      bview_lookup _ _ i (by omega), if_pos h1]
+      bview_lookup _ _ i (by omega), ite_eq_left h1]
   · rw [List.getElem?_append_right (by rw [bview_length]; omega), bview_length]
     by_cases h2 : i = len
-    · subst h2; rw [Nat.sub_self, bview_lookup _ _ _ (by omega), if_neg h1, if_pos rfl]; rfl
+    · subst h2; rw [Nat.sub_self, bview_lookup _ _ _ (by omega), ite_eq_right h1, ite_eq_left rfl]; rfl
     · by_cases h3 : i < 14
       · obtain ⟨d, rfl⟩ : ∃ d, i = len + 1 + d := ⟨i - (len + 1), by omega⟩
         rw [show len + 1 + d - len = d + 1 by omega, List.getElem?_cons_succ, List.getElem?_drop,
-          bview_lookup _ _ _ h3, bview_lookup _ _ _ h3, if_neg h1, if_neg h2]
+          bview_lookup _ _ _ h3, bview_lookup _ _ _ h3, ite_eq_right h1, ite_eq_right h2]
       · rw [List.getElem?_eq_none_iff.mpr (by simp [bview_length]; omega),
           List.getElem?_eq_none_iff.mpr (by simp [bview_length]; omega)]
 
@@ -335,13 +335,13 @@ theorem namex_name_short (a len : Nat) (f nf : Nat → BitVec 8) (h : len < 14)
   · intro j hj
     rw [hl] at hj
     unfold namexShortName
-    rw [if_pos hj, List.getElem!_eq_getElem?_getD, List.getElem?_take,
-      if_pos (by omega), bview_lookup _ _ j hj]
+    rw [ite_eq_left hj, List.getElem!_eq_getElem?_getD, List.getElem?_take,
+      ite_eq_left (by omega), bview_lookup _ _ j hj]
     rfl
   · intro _
     rw [hl]
     unfold namexShortName
-    rw [if_neg (Nat.lt_irrefl _), if_pos rfl]
+    rw [ite_eq_right (Nat.lt_irrefl _), ite_eq_left rfl]
 
 theorem namex_name_long_bname (a e : Nat) (f : Nat → BitVec 8) (h14 : 14 ≤ e - a)
     (hne : nonul (bview (e - a) (fun i => f (a + i)))) :
@@ -349,7 +349,7 @@ theorem namex_name_long_bname (a e : Nat) (f : Nat → BitVec 8) (h14 : 14 ≤ e
   apply namex_bname _ _ hne
   · intro j hj
     rw [List.length_take, bview_length] at hj
-    rw [List.getElem!_eq_getElem?_getD, List.getElem?_take, if_pos (by omega),
+    rw [List.getElem!_eq_getElem?_getD, List.getElem?_take, ite_eq_left (by omega),
       bview_lookup _ _ j (by omega)]
     rfl
   · intro hl; rw [List.length_take, bview_length] at hl; omega
@@ -383,7 +383,7 @@ theorem namex_wi_step (Lr n ncur ncur' : Nat) (wc w' : Bool)
   have hC' := hC (by omega)
   cases wc <;> cases w' <;> simp at hW <;>
     simp only [walkSpend, ipSpendW, ipBm, iputUnits, Bool.or_false, Bool.or_true, Bool.false_or,
-      Bool.true_or, if_true, if_false, Bool.false_eq_true, Bool.or_self] at * <;>
+      Bool.true_or, ite_true, ite_false, Bool.false_eq_true, Bool.or_self] at * <;>
     refine ⟨by omega, by omega, by omega, fun _ => by omega⟩
 
 /-- A TERMINAL arm that spends one iput (credited or not). -/
@@ -393,7 +393,7 @@ theorem namex_wi_spend (n ncur n' : Nat) (wc w' cz : Bool)
     n - (walkSpend (wc || w') + 1) ≤ n' ∧ n' ≤ n := by
   cases wc <;> cases w' <;> cases cz <;> simp at hW <;>
     simp only [walkSpend, ipSpendW, ipBm, Bool.or_false, Bool.or_true, Bool.false_or,
-      Bool.true_or, if_true, if_false, Bool.false_eq_true, Bool.or_self] at * <;> omega
+      Bool.true_or, ite_true, ite_false, Bool.false_eq_true, Bool.or_self] at * <;> omega
 
 /-- An exit that spends NOTHING (`L_par`'s iunlock, namei's return). -/
 theorem namex_wi_free (n ncur : Nat) (wc : Bool) (hA : n - walkSpend wc ≤ ncur)
@@ -447,8 +447,8 @@ theorem namex_name_split (len : Nat) (nf : Nat → BitVec 8) (h : len ≤ 14) :
     intro i
     rw [List.getElem?_take]
     by_cases h1 : i < len
-    · rw [if_pos h1, bview_lookup _ _ i (by omega), bview_lookup _ _ i h1]
-    · rw [if_neg h1, List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega)])
+    · rw [ite_eq_left h1, bview_lookup _ _ i (by omega), bview_lookup _ _ i h1]
+    · rw [ite_eq_right h1, List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega)])
 
 /-- ...and after it and the terminator store (`name[len] = 0`). -/
 theorem namex_name_short_set (a len : Nat) (f nf : Nat → BitVec 8) (h : len < 14) :
@@ -463,10 +463,10 @@ theorem namex_name_short_set (a len : Nat) (f nf : Nat → BitVec 8) (h : len < 
   rw [hl]
   by_cases h2 : len = i
   · subst h2
-    rw [if_pos rfl, if_pos (by omega), List.getElem?_append_right (by simp [bview_length]),
+    rw [ite_eq_left rfl, ite_eq_left (by omega), List.getElem?_append_right (by simp [bview_length]),
       bview_length, Nat.sub_self]
     rfl
-  · rw [if_neg h2]
+  · rw [ite_eq_right h2]
     by_cases h1 : i < len
     · rw [List.getElem?_append_left (by simp [bview_length]; omega),
         List.getElem?_append_left (by simp [bview_length]; omega)]

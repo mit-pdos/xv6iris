@@ -1,4 +1,5 @@
 import LeanRV64D.LeanRV64D
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
 import LeanRV64D.Xlen
@@ -12,12 +13,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -61,6 +62,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -94,10 +97,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -143,6 +149,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -161,17 +168,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -186,12 +200,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -202,7 +219,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -269,7 +289,7 @@ def Mk_Pmpcfg_ent (v : (BitVec 8)) : (BitVec 8) :=
 
 /-- Type quantifiers: n : Nat, 0 ≤ n ∧ n ≤ 15 -/
 def pmpReadCfgReg (n : Nat) : SailM (BitVec 64) := do
-  (assert ((Int.tmod n 2) == 0) "Unexpected pmp config reg read")
+  sail_assert ((Int.tmod n 2) == 0) "Unexpected pmp config reg read"
   (pure ((GetElem?.getElem! (← readReg pmpcfg_n) ((n *i 4) +i 7)) +++ ((GetElem?.getElem!
           (← readReg pmpcfg_n) ((n *i 4) +i 6)) +++ ((GetElem?.getElem! (← readReg pmpcfg_n)
             ((n *i 4) +i 5)) +++ ((GetElem?.getElem! (← readReg pmpcfg_n) ((n *i 4) +i 4)) +++ ((GetElem?.getElem!
@@ -309,17 +329,18 @@ def pmpWriteCfg (cfg : (BitVec 8)) (v : (BitVec 8)) : SailM (BitVec 8) := do
   then (pure cfg)
   else
     (do
-      let cfg := (Mk_Pmpcfg_ent (v &&& 0x9F#8))
+      let new_cfg := (Mk_Pmpcfg_ent (v &&& 0x9F#8))
       let cfg ← do
-        if ((((_get_Pmpcfg_ent_W cfg) == 1#1) && ((_get_Pmpcfg_ent_R cfg) == 0#1)) : Bool)
+        if ((((_get_Pmpcfg_ent_W new_cfg) == 1#1) && ((_get_Pmpcfg_ent_R new_cfg) == 0#1)) : Bool)
         then
           (do
             match pmp_write_only_reserved_behavior with
             | .PMP_Fatal => (reserved_behavior "pmpcfg with R=0,W=1")
             | .PMP_ClearPermissions =>
-              (pure (_update_Pmpcfg_ent_R (_update_Pmpcfg_ent_W (_update_Pmpcfg_ent_X cfg 0#1) 0#1)
-                  0#1)))
-        else (pure cfg)
+              (pure (_update_Pmpcfg_ent_R
+                  (_update_Pmpcfg_ent_W (_update_Pmpcfg_ent_X new_cfg 0#1) 0#1) 0#1))
+            | .PMP_Ignore => (pure cfg))
+        else (pure new_cfg)
       let mode_supported : Bool :=
         match (pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A cfg)) with
         | .OFF => true
@@ -332,7 +353,7 @@ def pmpWriteCfg (cfg : (BitVec 8)) (v : (BitVec 8)) : SailM (BitVec 8) := do
 
 /-- Type quantifiers: n : Nat, 0 ≤ n ∧ n ≤ 15 -/
 def pmpWriteCfgReg (n : Nat) (v : (BitVec 64)) : SailM Unit := do
-  (assert ((Int.tmod n 2) == 0) "Unexpected pmp config reg write")
+  sail_assert ((Int.tmod n 2) == 0) "Unexpected pmp config reg write"
   let loop_i_lower := 0
   let loop_i_upper := 7
   let mut loop_vars := ()
@@ -348,7 +369,7 @@ def pmpWriteCfgReg (n : Nat) (v : (BitVec 64)) : SailM Unit := do
       else (pure ())
   (pure loop_vars)
 
-/-- Type quantifiers: k_ex673217_ : Bool, k_ex673216_ : Bool -/
+/-- Type quantifiers: k_ex1172967_ : Bool, k_ex1172966_ : Bool -/
 def pmpWriteAddr (locked : Bool) (tor_locked : Bool) (reg : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
   if ((locked || tor_locked) : Bool)
   then reg

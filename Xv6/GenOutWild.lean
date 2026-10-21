@@ -254,7 +254,7 @@ theorem lmRd_wild_stage (k : Nat) (ho : List Obs) (so : GStage M) (H : ConsHist)
   have hw : so.gsW = [] := by
     refine Classical.byContradiction fun hwne => ?_
     unfold lmDlOk at hdlok
-    rw [if_neg (fun h => hwne h.2), hEI] at hdlok
+    rw [ite_eq_right (fun h => hwne h.2), hEI] at hdlok
     have hlb := linesBytes_rest ((H.chDl ++ ws).map Prod.snd)
     rw [hr, List.length_nil] at hlb
     have hwl := List.length_pos_iff.mpr hws
@@ -262,7 +262,7 @@ theorem lmRd_wild_stage (k : Nat) (ho : List Obs) (so : GStage M) (H : ConsHist)
     omega
   refine ⟨harm, hdlall, hEI, hw, ?_⟩
   unfold lmCsLenOk at hcsl
-  rw [if_pos ⟨hw, by rw [hEI]; exact hr⟩] at hcsl
+  rw [ite_eq_left ⟨hw, by rw [hEI]; exact hr⟩] at hcsl
   exact hcsl
 
 /-! ## S5a The seccomp newline's trace, and what a later byte's is -/

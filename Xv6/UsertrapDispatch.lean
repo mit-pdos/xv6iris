@@ -71,7 +71,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 kernelvec, the running claim, the environment, the residue at the
 prologue's record, the four deposit rows and the continuation. -/
 def utDispRes (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) : IProp GF := iprop(
-  utFrame A ∗ Register.sepc ↦ᵣ[cpu] A.sep ∗ Register.stval ↦ᵣ[cpu] tv ∗
+  utFrame A ∗ Register.sepc ↦ᵣ[cpu] A.sep ∗ Register.stval ↦ᵣ[cpu] tv ∗ hTrapCsrs cpu ∗
   Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ cpuClaim cpu A.k.proc ∗ utCaps A.N ∗
   utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
   utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
@@ -90,15 +90,15 @@ cells, the vector, the environment and the installed handler are the
 trap-CSR bundle and `intrRes` -- `trapCsrsExt cpu false`. -/
 theorem ut_fold (A : UtArgs GF) (cpu : CPU) (ep sc tv : BitVec 64)
     (hI : ⊢ □ kvIhs (GF := GF) Γ cpu) (hΓ : A.N.Γ = Γ) :
-    Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+    Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗ hTrapCsrs cpu ∗
       Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ utCaps A.N ⊢ trapCsrsExt (GF := GF) cpu false := by
   rw [trapCsrsExt_false]
   unfold utCaps
   rw [hΓ]
-  iintro ⟨Hep, Hsc, Htv, Hstv, ⟨-, #Henv, -⟩⟩
+  iintro ⟨Hep, Hsc, Htv, Hh, Hstv, ⟨-, #Henv, -⟩⟩
   ihave #Hih := hI
   iapply utCsrs_fold Γ cpu ep sc tv
-  iframe Hep Hsc Htv Hstv Henv Hih
+  iframe Hep Hsc Htv Hh Hstv Henv Hih
 
 /-- The dispatch's resources, opened for an outgoing route: the folded
 bundle and the rest. -/
@@ -112,9 +112,9 @@ theorem ut_disp_open (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64)
       utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A := by
   have hf := ut_fold Γ A cpu A.sep A.sc tv hI hΓ
   unfold utDispRes
-  iintro ⟨Hsc, Hfr, Hep, Htv, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hk⟩
-  ihave Hte := hf $$ [Hep Hsc Htv Hstv]
-  · iframe Hep Hsc Htv Hstv Hcaps
+  iintro ⟨Hsc, Hfr, Hep, Htv, Hh, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hk⟩
+  ihave Hte := hf $$ [Hep Hsc Htv Hh Hstv]
+  · iframe Hep Hsc Htv Hh Hstv Hcaps
   rw [cpuClaimExt_false]
   iframe Hfr Hte Hcl Hcaps Hown Hsi Hfi Hpi Hki Hk
 
@@ -124,8 +124,8 @@ theorem ut_disp_env (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hΓ : A.N.Γ =
   have e : handlerEnvAt (GF := GF) A.N.Γ curCtx = handlerEnvAt Γ curCtx := by rw [hΓ]
   unfold utDispRes utCaps
   rw [e]
-  iintro ⟨Hfr, Hep, Htv, Hstv, Hcl, ⟨#Hp, #He, #Hpe, #Hw, #Hft, #Hr, #Hig, #Hic⟩, Hrest⟩
-  iframe He Hfr Hep Htv Hstv Hcl Hp Hpe Hw Hft Hr Hig Hic Hrest
+  iintro ⟨Hfr, Hep, Htv, Hh, Hstv, Hcl, ⟨#Hp, #He, #Hpe, #Hw, #Hft, #Hr, #Hig, #Hic⟩, Hrest⟩
+  iframe He Hfr Hep Htv Hh Hstv Hcl Hp Hpe Hw Hft Hr Hig Hic Hrest
 
 omit [MachGS GF] in
 /-- The persistent pay row, out of the deposit. -/
@@ -212,7 +212,7 @@ theorem ut_killIn_cred (A : UtArgs GF) (hne : A.sc ≠ uecallScause) :
     utKillIn (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢
       ⌜A.Wk.fd = A.sts⌝ ∗ ukillCredAt uslot A.gn A.sc A.Wk A.f := by
   unfold utKillIn
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   iintro ⟨%⟨hg, hf⟩, H⟩
   isplitr
   · ipureintro; exact hf

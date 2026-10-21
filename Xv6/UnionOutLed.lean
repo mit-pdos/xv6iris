@@ -222,7 +222,7 @@ theorem unionLed_phi (ug : UnionGn) (h : List Obs) :
     intro hd
     exfalso
     have hle := (MaxNat.le_toNat _ _).mp hv.2
-    simp only [if_pos hd] at hle
+    simp only [ite_eq_left hd] at hle
     exact absurd hle (by decide)
 
 end UnionOutLed

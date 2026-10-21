@@ -781,20 +781,21 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **Rocq `ut_trap_csrs_fold` / `ut_csrs_raw_fold`**: the three trap-scratch
-cells, the vector cell at kernelvec, the handler environment row and the
+cells (and, since sail-riscv 0.16, H's trap CSRs `hTrapCsrs`), the vector cell at kernelvec, the handler environment row and the
 handler contract at every environment the row names (`kvIhs`, out of
 `KERNELVEC.handler`; Rocq's `ihs_env`) are the trap-CSR bundle and the
 installed handler.  (Rocq also folds the dangling SIE quarter and the sret
 mirror here: D27, they are the context's indices.) -/
 theorem utCsrs_fold (Γ : SchedNames) (cpu : CPU) (ep sc tv : BitVec 64) :
     Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+      hTrapCsrs cpu ∗
       Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
       trapCsrs cpu ∗ intrRes cpu := by
-  iintro ⟨Hep, Hsc, Htv, Hstv, #Henv, #Hihs⟩
-  isplitl [Hep Hsc Htv]
+  iintro ⟨Hep, Hsc, Htv, Hh, Hstv, #Henv, #Hihs⟩
+  isplitl [Hep Hsc Htv Hh]
   · iapply trapCsrs_intro cpu ep sc tv
     unfold trapCsrsAt
-    iframe Hep Hsc Htv
+    iframe Hep Hsc Htv Hh
   · iapply intrRes_of_kvIhs Γ cpu
     iframe Hstv Henv Hihs
 

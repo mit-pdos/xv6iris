@@ -87,7 +87,7 @@ theorem ulm_echo_body (s0 : Fstate) (cs : List Nat) (I : List (BitVec 8)) (ws : 
     (hfl : lmLineAt ulmG I = Uline.LEcho ws) :
     lmBody ulmG s0 cs I 0 = wlLine (ws.drop 1) := by
   unfold lmBody lmAbs
-  simp only [show ulmG.lmCont = ucont from rfl, show ulmG.lmDec = ualtDec from rfl]
+  simp only []
   rw [ualtDec_0, hfl]
   show List.take ((lineAltsOf ws)[0]!.length - 2) (lineAltsOf ws)[0]! = _
   rw [lineAltsOf_0, List.length_append, Xv6.wrPrompt_len, Nat.add_sub_cancel, List.take_left']

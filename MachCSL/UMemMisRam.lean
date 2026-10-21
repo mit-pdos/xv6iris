@@ -17,7 +17,7 @@ import MachCSL.UMemMisPma
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The physical configuration holds at every state with the same register
@@ -40,7 +40,7 @@ theorem umm_checked_mem_read_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPh
     hram h0 hW
   exact umm_checked_mem_read D orc s pa W .PBMT_PMA .User info h0 hW hpma
     (fun j c _ hjc => uma_pmp D orc s hp _ c (umm_inRam_sub pa W j c hram hjc) _ rfl)
-    (fun j c _ hjc => uma_within_mmio_readable_ram D orc s _ c hp.pins.dhtif hp.pins.htif
+    (fun j c _ hjc => uma_within_mmio_readable_ram D orc s _ c hp.pins.dhtif hp.pins.htif hp.pins.dmhart
       (umm_inRam_sub pa W j c hram hjc)) hown
 
 /-- **A misaligned (or aligned) user store to owned RAM**: the map keeps its
@@ -56,16 +56,20 @@ theorem umm_checked_mem_write_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaP
     (fun j c st _ hjc hst => uma_pmp D orc st (umm_umaPhys_sameRegs hp hst) _ c (umm_inRam_sub pa W j c hram hjc) _
       rfl)
     (fun j c st _ hjc hst => uma_within_mmio_writable_ram D orc st _ c (umm_umaPhys_sameRegs hp hst).pins.dhtif
-      (umm_umaPhys_sameRegs hp hst).pins.htif (umm_inRam_sub pa W j c hram hjc)) hown
+      (umm_umaPhys_sameRegs hp hst).pins.htif (umm_umaPhys_sameRegs hp hst).pins.dmhart
+      (umm_inRam_sub pa W j c hram hjc)) hown
 
-/-- **The store's announce in RAM**, at User (`MPRV = 0`). -/
+/-- **The store's announce in RAM**, at User (sail-riscv 0.16: the privilege is the
+caller's argument). -/
 theorem umm_mem_write_ea_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (W : Nat) (h0 : 0 < W) (hW : W ≤ 8) (hram : inRam pa W) :
-    runRW D orc s (mem_write_ea (.Physaddr pa) W (.Store .Data) .PBMT_PMA false false false) =
+    runRW D orc s (mem_write_ea (.Physaddr pa) W .User (.Store .Data) .PBMT_PMA false false false) =
       some (.Ok (), s, orc) := by
   obtain ⟨info, hpma⟩ := umm_check_pma_ram D orc s pa W (.Store .Data) .User (.inr rfl) hp.pins.dpma hp.pins.pma
     hram h0 hW
-  exact umm_mem_write_ea D orc s pa W .PBMT_PMA info h0 hW hp.dms hp.dcp hp.mprv hp.cp hpma (fun j c _ hjc =>
-    uma_pmp D orc s hp _ c (umm_inRam_sub pa W j c hram hjc) _ rfl)
+  exact umm_mem_write_ea D orc s pa W .User .PBMT_PMA info h0 hW hpma
+    (fun j c _ hjc => uma_pmp D orc s hp _ c (umm_inRam_sub pa W j c hram hjc) _ rfl)
+    (fun j c _ hjc => uma_within_mmio_writable_ram D orc s _ c hp.pins.dhtif hp.pins.htif hp.pins.dmhart
+      (umm_inRam_sub pa W j c hram hjc))
 
 end MachCSL

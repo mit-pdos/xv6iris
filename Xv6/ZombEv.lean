@@ -216,7 +216,7 @@ theorem zScan_spec (f : Nat → ZSlot) (a : BitVec 64) :
       obtain ⟨pid0, xs0⟩ := p
       simp only
       by_cases hp : (f k).par = a
-      · rw [if_pos hp]
+      · rw [ite_eq_left hp]
         constructor
         · intro he
           simp only [Option.some.injEq, Prod.mk.injEq] at he
@@ -232,7 +232,7 @@ theorem zScan_spec (f : Nat → ZSlot) (a : BitVec 64) :
           simp only [Option.some.injEq, Prod.mk.injEq] at h4
           obtain ⟨rfl, rfl⟩ := h4
           rw [h5]
-      · rw [if_neg hp]
+      · rw [ite_eq_right hp]
         constructor
         · intro hs; exact hrest hs (fun h => absurd h hp)
         · intro hr
@@ -493,7 +493,7 @@ theorem FInv_fork {I : BitVec 64} {F G F' G' : Nat → ZSlot} {M M' : Nat → Bo
           have hGt : (G k).par ≠ procAddr t := fun hG => by
             have := (hJ k hk t ht hMt').1.mpr hG
             rw [hpar] at this; exact procAddr_nonzero ht this.symm
-          simp only [if_false, Bool.false_eq_true]
+          simp only [ite_false, Bool.false_eq_true]
           exact ⟨⟨fun h => absurd h hst', fun h => absurd h hGt⟩, fun h => absurd h hst'⟩
         · simp
       · rw [hF'k k hkj, hG'k k hkj]
@@ -544,9 +544,9 @@ theorem FInv_fork {I : BitVec 64} {F G F' G' : Nat → ZSlot} {M M' : Nat → Bo
       · subst hkj
         rw [hG'j] at hp
         cases hMs : M s
-        · rw [hMs] at hp; simp only [if_false, Bool.false_eq_true] at hp
+        · rw [hMs] at hp; simp only [ite_false, Bool.false_eq_true] at hp
           exact hP3 k hk t ht hMt hI' hp
-        · rw [hMs] at hp; simp only [if_true] at hp
+        · rw [hMs] at hp; simp only [ite_true] at hp
           have := procAddr_inj hs ht hp
           subst this
           rw [hMs] at hMt; cases hMt
@@ -585,14 +585,14 @@ theorem FInv_exit {I act : BitVec 64} {F G F' G' : Nat → ZSlot} {M : Nat → B
     intro k hk t ht hMt
     obtain ⟨hJ1, hJ2⟩ := hJ k hk t ht hMt
     by_cases hin : (zSlotOf act).any M = true
-    · rw [if_pos hin] at hG'; subst hG'
+    · rw [ite_eq_left hin] at hG'; subst hG'
       rw [hpar F k t ht hMt, hpar G k t ht hMt]
       refine ⟨⟨fun ⟨h1, h2⟩ => ⟨?_, hJ1.mp h2⟩, fun ⟨h1, h2⟩ => ⟨?_, hJ1.mpr h2⟩⟩, fun ⟨_, h2⟩ => ?_⟩
       · rw [hJ1.mp h2]; rw [h2] at h1; exact h1
       · rw [hJ1.mpr h2]; rw [h2] at h1; exact h1
       · obtain ⟨hz, hg⟩ := hJ2 h2
         rw [ezomb, ezomb, egen, egen, hz, hg]; exact ⟨rfl, rfl⟩
-    · rw [if_neg hin] at hG'; subst hG'
+    · rw [ite_eq_right hin] at hG'; subst hG'
       have hat : act ≠ procAddr t := fun e => by
         subst e; rw [zSlotOf_procAddr ht] at hin; exact hin hMt
       rw [hpar F k t ht hMt]
@@ -609,7 +609,7 @@ theorem FInv_exit {I act : BitVec 64} {F G F' G' : Nat → ZSlot} {M : Nat → B
         · exact hz
   · -- (P7)
     intro t ht hIt
-    rw [ezomb, if_neg (fun e => hia (hIt.symm.trans e))]
+    rw [ezomb, ite_eq_right (fun e => hia (hIt.symm.trans e))]
     exact hP7 t ht hIt
   · -- (P5)
     intro k hk t ht hz hp
@@ -617,7 +617,7 @@ theorem FInv_exit {I act : BitVec 64} {F G F' G' : Nat → ZSlot} {M : Nat → B
     rw [ezomb] at hz
     split at hp
     · -- reparented to `I`: `t` is init's slot, never a zombie
-      rw [if_neg (fun e => hia (hp.trans e))] at hz
+      rw [ite_eq_right (fun e => hia (hp.trans e))] at hz
       exact hz (hP7 t ht hp.symm)
     · rename_i hka
       split at hz
@@ -632,12 +632,12 @@ theorem FInv_exit {I act : BitVec 64} {F G F' G' : Nat → ZSlot} {M : Nat → B
   · -- (P3)
     intro k hk t ht hMt hIt hp
     by_cases hin : (zSlotOf act).any M = true
-    · rw [if_pos hin] at hG'; subst hG'
+    · rw [ite_eq_left hin] at hG'; subst hG'
       rw [epar] at hp
       split at hp
       · exact hIt hp.symm
       · exact hP3 k hk t ht hMt hIt hp
-    · rw [if_neg hin] at hG'; subst hG'
+    · rw [ite_eq_right hin] at hG'; subst hG'
       exact hP3 k hk t ht hMt hIt hp
 
 /-- A REAP of a zombie child `n` of the actor. -/
@@ -730,35 +730,35 @@ theorem FInv_of (I : BitVec 64) (r : BitVec 32) (h : List Zev) (hw : zevWfAt I h
       have hin : zActIn (zFamOf r h) (.ZFork (procAddr s) j pid g) = zFamOf r h s := by
         simp only [zActIn, zSlotOf_procAddr hs, Option.any_some]
       refine FInv_fork (g := g) (pid == r) hI hj hpar hjI hnc hs hsj hlive ?_ ?_ ?_ ?_ ?_ ?_
-      · simp only [famStep, if_true]
+      · simp only [famStep, ite_true]
         cases hfj : famOf h j
         rw [hfj] at hzn; simp only at hzn; subst hzn; rfl
-      · intro k hk; simp only [famStep, hk, if_false]
+      · intro k hk; simp only [famStep, hk, ite_false]
       · rw [hin]; split
         · simp [famStepR]
         · rfl
       · intro k hk; split
         · simp [famStepR, hk]
         · rfl
-      · simp only [zFamStep, if_true, zSlotOf_procAddr hs, Option.any_some]
-      · intro k hk; simp only [zFamStep, hk, if_false]
+      · simp only [zFamStep, ite_true, zSlotOf_procAddr hs, Option.any_some]
+      · intro k hk; simp only [zFamStep, hk, ite_false]
     | .ZExit act pid xs ip, ⟨hip, hia⟩ =>
       subst hip
       show FInv _ _ _ (zFamOf r h)
       refine FInv_exit (M := zFamOf r h) hI hia rfl ?_
       by_cases hin : (zSlotOf act).any (zFamOf r h) = true
-      · simp only [zActIn, hin, if_true]; rfl
-      · simp only [zActIn, hin, if_false, Bool.false_eq_true]
+      · simp only [zActIn, hin, ite_true]; rfl
+      · simp only [zActIn, hin, ite_false, Bool.false_eq_true]
     | .ZReap act n pid, ⟨hn, hpar, hz⟩ =>
       refine FInv_reap hI hn hpar hz ?_ ?_ ?_ ?_ ?_ ?_
-      · simp only [famStep, if_true]
-      · intro k hk; simp only [famStep, hk, if_false]
+      · simp only [famStep, ite_true]
+      · intro k hk; simp only [famStep, hk, ite_false]
       · by_cases hsp : (zSlotOf act).any (zFamOf r h) = true <;> simp [zActIn, famStepR, famStep, hsp]
       · intro k hk; split
         · simp [famStepR, famStep, hk]
         · rfl
-      · simp only [zFamStep, if_true]
-      · intro k hk; simp only [zFamStep, hk, if_false]
+      · simp only [zFamStep, ite_true]
+      · intro k hk; simp only [zFamStep, hk, ite_false]
 
 /-! ### 4.4 The reading lemma -/
 
@@ -774,7 +774,7 @@ theorem zScan_congr (f g : Nat → ZSlot) (a : BitVec 64) : ∀ n k,
     obtain ⟨h1, h2⟩ := hfg k (Nat.le_refl _) (by omega)
     have skip : ∀ (H : Nat → ZSlot), (H k).par ≠ a → zScan H a k (n + 1) = zScan H a (k + 1) n := by
       intro H hp; simp only [zScan]; split
-      · rw [if_neg hp]
+      · rw [ite_eq_right hp]
       · rfl
     by_cases hp : (f k).par = a
     · obtain ⟨hz, hg⟩ := h2 hp
@@ -782,7 +782,7 @@ theorem zScan_congr (f g : Nat → ZSlot) (a : BitVec 64) : ∀ n k,
       simp only [zScan]
       rw [hz]
       split
-      · rw [if_pos hp, if_pos hp', hg]
+      · rw [ite_eq_left hp, ite_eq_left hp', hg]
       · exact ih
     · rw [skip f hp, skip g (fun e => hp (h1.mpr e))]
       exact ih

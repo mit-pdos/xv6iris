@@ -96,20 +96,20 @@ theorem w_idx2 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> (Sail.BitVec.extractLsb (BitVec.ofNat 64 30) 5 0) &&& 511#64) <<< 3) + pageAddr b
       = pteAddr b (vpnIdx (vpnOf va) 2) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem w_idx1 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> (Sail.BitVec.extractLsb (BitVec.ofNat 64 21) 5 0) &&& 511#64) <<< 3) + pageAddr b
       = pteAddr b (vpnIdx (vpnOf va) 1) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem w_idx0 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> 12 &&& 511#64) <<< 3) + pageAddr b = pteAddr b (vpnIdx (vpnOf va) 0) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-- The pushed context with its pinned bits, in the callee's spelling. -/
@@ -327,7 +327,7 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
   icases HPost with ⟨⟨%hz, Hav⟩ | ⟨%hvalid, Hbuf, Hav⟩⟩
   · -- kalloc failed
     obtain ⟨hr0, hzero⟩ := hz
-    rw [hr0, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)]
+    rw [hr0, ite_eq_left (show (0#64 : BitVec 64) = 0#64 from rfl)]
     have hpin : kb.sie = false ∨ kb.proc = 0#64 → c5 = cpu :=
       fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
     ihave Hbad := wpNext_at _ _ _ c5 _ hpin $$ Hbad Hlc
@@ -342,7 +342,7 @@ theorem walk_alloc [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
       by simp [RegMap.set_apply, e25], by simp [RegMap.set_apply, e26],
       by simp [RegMap.set_apply, e27]⟩
   · -- kalloc gave a page
-    rw [if_neg (Xv6.PtRun.pageValid_ne_zero _ hvalid)]
+    rw [ite_eq_right (Xv6.PtRun.pageValid_ne_zero _ hvalid)]
     -- c.lui a2,0x1 ; c.li a1,0 ; jal memset
     k_step_gen (wp_s_lui c5 _ (KA.«walk» + 0x7e#64) true 1#20 12#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] next c6 hp6
@@ -501,7 +501,7 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c6 _ (KA.«walk» + 0x3a#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [MachCSL.ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c7 hp7
+      with [MachCSL.ite_beq, ite_eq_right (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_srli c7 _ (KA.«walk» + 0x3c#64) true 10#6 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hent] next c8 hp8
@@ -544,7 +544,7 @@ theorem walk_descend [WchG GF] (KAL : KALLOC) (MS : MEMSET) [Xv6G GF] [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c6 _ (KA.«walk» + 0x3a#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [MachCSL.ite_beq, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)] next c7 hp7
+      with [MachCSL.ite_beq, ite_eq_left (show (0#64 : BitVec 64) = 0#64 from rfl)] next c7 hp7
     iintro Hk Hpc
     have hpin7 : kb.sie = false ∨ kb.proc = 0#64 → c7 = cpu :=
       fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
@@ -1151,7 +1151,7 @@ theorem walk_nd_descend [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c6 _ (KA.«walk» + 0x3a#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [MachCSL.ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c7 hp7
+      with [MachCSL.ite_beq, ite_eq_right (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_srli c7 _ (KA.«walk» + 0x3c#64) true 10#6 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hent] next c8 hp8
@@ -1189,11 +1189,11 @@ theorem walk_nd_descend [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c6 _ (KA.«walk» + 0x3a#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [MachCSL.ite_beq, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)] next c7 hp7
+      with [MachCSL.ite_beq, ite_eq_left (show (0#64 : BitVec 64) = 0#64 from rfl)] next c7 hp7
     iintro Hk Hpc
     k_step_gen (wp_s_branch c7 _ (KA.«walk» + 0x72#64) false 36#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h22, MachCSL.ite_beq, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)] next c8 hp8
+      with [h22, MachCSL.ite_beq, ite_eq_left (show (0#64 : BitVec 64) = 0#64 from rfl)] next c8 hp8
     iintro Hk Hpc
     k_step_gen (wp_s_addi c8 _ (KA.«walk» + 0x96#64) true 0#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9

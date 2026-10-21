@@ -105,7 +105,7 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hli Hhp Hhn Hout %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_92]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_92]
   iapply wpLoop_fupd
   imod bioInitAt_of_binit cpu (k.withRegs R') γl γ V hcov0 $$ [$Hk $Hfree $Hli $Hhp $Hhn $Hout $Hbss $Hpool]
     with ⟨Hk, #Hbio⟩
@@ -193,7 +193,7 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hli Hsl %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_96]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_96]
   icases (show lockInited (GF := GF) itableLockAddr itableNameAddr ⊢
       wordPointsTo (itableLockAddr + 8#64) 8 (DFrac.own 1) itableNameAddr ∗ lkFresh itableLockAddr from by
     unfold lockInited; iintro H; iexact H) $$ Hli with ⟨-, Hfresh⟩
@@ -262,7 +262,7 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hli %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_9a]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_9a]
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_ftable_kmap $$ HS with ⟨#Hf0, #Hf16⟩
   iapply wpLoop_fupd
@@ -311,7 +311,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' %pd %pav %pu Hk Hpc %_ Hav #Hgeom _ Hfresh HR
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_9e]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_9e]
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_vdisk_kmap $$ HS with ⟨#Hv0, #Hv16⟩
   iapply wpLoop_fupd
@@ -529,7 +529,7 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
   iintro %spie %spp %R' %ip %g %⟨hsp, _, _, _⟩ Hk Hpc _ _ _
   obtain ⟨rfl, rfl⟩ := hsp (by simp)
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_a2]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_a2]
   iapply HΦ $$ %R' Hk Hpc
 
 end

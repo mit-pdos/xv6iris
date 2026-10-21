@@ -121,15 +121,15 @@ theorem itPins_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
   obtain ⟨a2, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption)
-      | (rw [if_neg (Ne.symm n20)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 theorem itPins4_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
     (hr : r ≠ 2#5 ∧ r ≠ 21#5 ∧ r ≠ 22#5 ∧ r ≠ 23#5 ∧ r ≠ 24#5 ∧ r ≠ 25#5 ∧
@@ -139,14 +139,14 @@ theorem itPins4_set (k : KCtx) (R : RegMap) (r : BitVec 5) (v : BitVec 64)
   obtain ⟨a2, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- `itPins` / `itPins4` survive a write to a scratch register. -/
 macro "itpins_tac" : tactic =>
@@ -302,18 +302,18 @@ theorem itZ_get (bm : Blkmap) (n i : Nat) (hd : bm.bmDir.length = NDIRECT)
   simp only
   unfold MAXFILE at hi
   by_cases hd' : i < NDIRECT
-  · rw [if_pos hd', if_pos hd', List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD]
+  · rw [ite_eq_left hd', ite_eq_left hd', List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD]
     by_cases hin : i < n
-    · rw [if_pos hin, List.getElem?_append_left (by simp; omega), List.getElem?_replicate,
-        if_pos hin]; rfl
-    · rw [if_neg hin, List.getElem?_append_right (by simp; omega), List.length_replicate,
+    · rw [ite_eq_left hin, List.getElem?_append_left (by simp; omega), List.getElem?_replicate,
+        ite_eq_left hin]; rfl
+    · rw [ite_eq_right hin, List.getElem?_append_right (by simp; omega), List.length_replicate,
         List.getElem?_drop]
       congr 2; omega
-  · rw [if_neg hd', if_neg hd', List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD]
+  · rw [ite_eq_right hd', ite_eq_right hd', List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD]
     by_cases hin : i < n
-    · rw [if_pos hin, List.getElem?_append_left (by simp; omega), List.getElem?_replicate,
-        if_pos (by omega)]; rfl
-    · rw [if_neg hin, List.getElem?_append_right (by simp; omega), List.length_replicate,
+    · rw [ite_eq_left hin, List.getElem?_append_left (by simp; omega), List.getElem?_replicate,
+        ite_eq_left (by omega)]; rfl
+    · rw [ite_eq_right hin, List.getElem?_append_right (by simp; omega), List.length_replicate,
         List.getElem?_drop]
       congr 2; omega
 
@@ -325,7 +325,7 @@ theorem itrunc_blocks_0 (γfs : FsNames) (bm : Blkmap) (data : Nat → List (Bit
     (hd : bm.bmDir.length = NDIRECT) (he : bm.bmEnt.length = NINDIRECT) :
     inodeBlocks (GF := GF) γfs bm data ⊢ inodeBlocks γfs (itZ bm 0) data :=
   inodeBlocks_frame γfs bm (itZ bm 0) data data
-    (fun i hi => ⟨by rw [itZ_get bm 0 i hd he hi, if_neg (by omega)], rfl⟩)
+    (fun i hi => ⟨by rw [itZ_get bm 0 i hd he hi, ite_eq_right (by omega)], rfl⟩)
 
 /-- THE ONE STEP both loops take at file index `n` (Rocq's
 `inode_blocks_take` + `it_ent_res_peel`): the cursor's `blkRes` comes out --
@@ -338,9 +338,9 @@ theorem itrunc_blocks_step (γfs : FsNames) (bm : Blkmap) (data : Nat → List (
       blkRes γfs (blkmapGet bm n) (data n) ∗ inodeBlocks γfs (itZ bm (n + 1)) data := by
   have hlk : (List.range MAXFILE)[n]? = some n := List.getElem?_range hn
   have hgn : blkmapGet (itZ bm n) n = blkmapGet bm n := by
-    rw [itZ_get bm n n hd he hn, if_neg (by omega)]
+    rw [itZ_get bm n n hd he hn, ite_eq_right (by omega)]
   have hgn1 : blkmapGet (itZ bm (n + 1)) n = 0 := by
-    rw [itZ_get bm (n + 1) n hd he hn, if_pos (by omega)]
+    rw [itZ_get bm (n + 1) n hd he hn, ite_eq_left (by omega)]
   unfold inodeBlocks inodeBlocksQ
   rw [BiEntails.to_eq (BigSepL.bigSepL_delete_cond
       (Φ := fun _ (i : Nat) => blkResQ γfs (DFrac.own 1) (blkmapGet (itZ bm n) i) (data i)) hlk),
@@ -358,14 +358,14 @@ theorem itrunc_blocks_step (γfs : FsNames) (bm : Blkmap) (data : Nat → List (
     obtain ⟨hyk, hk⟩ := rangeGetElem? hky
     subst hyk
     by_cases hkn : y = n
-    · simp only [hkn, if_pos]
-    · rw [if_neg hkn, if_neg hkn, itZ_get bm n y hd he hk, itZ_get bm (n + 1) y hd he hk]
+    · simp only [hkn, ite_eq_left]
+    · rw [ite_eq_right hkn, ite_eq_right hkn, itZ_get bm n y hd he hk, itZ_get bm (n + 1) y hd he hk]
       by_cases h1 : y < n
-      · rw [if_pos h1, if_pos (by omega)]
-      · rw [if_neg h1, if_neg (by omega)]
+      · rw [ite_eq_left h1, ite_eq_left (by omega)]
+      · rw [ite_eq_right h1, ite_eq_right (by omega)]
   rw [hrest]
   have h0 : blkResQ (GF := GF) γfs (DFrac.own 1) (0 : BitVec 32) (data n) = emp := by
-    unfold blkResQ; rw [if_pos (show (0 : BitVec 32).toNat = 0 from rfl)]
+    unfold blkResQ; rw [ite_eq_left (show (0 : BitVec 32).toNat = 0 from rfl)]
   rw [h0]
   unfold blkRes
   iintro ⟨Hb, Hr⟩
@@ -383,7 +383,7 @@ theorem itrunc_blocks_emptyAny (γfs : FsNames) (data : Nat → List (BitVec 8))
   intro k y hky
   rw [bmEmpty_get]
   unfold blkResQ
-  rw [if_pos (show (0 : BitVec 32).toNat = 0 from rfl)]
+  rw [ite_eq_left (show (0 : BitVec 32).toNat = 0 from rfl)]
 
 end
 

@@ -11,12 +11,17 @@
 #   options    no file turning `autoImplicit` back on
 #   drift      every .lean under Xv6/ and MachCSL/ is imported from the
 #              roots lake builds (a file that is not is checked by nobody)
-#   toolchain  the pins agree: lean-toolchain of the package, of the model
-#              and of lean-sail; lakefile.toml's iris revision and
-#              lake-manifest.json's (tools/ci/toolchain_check.sh)
+#   toolchain  the pins agree: lean-toolchain of the package and of the
+#              model; the two lean-sail pins (lakefile.toml and the model's);
+#              every git dependency against lake-manifest.json
+#              (tools/ci/toolchain_check.sh)
 #   roots      tools/ci/roots.txt (the cone the coverage and dead-code
 #              reports are about) and tools/audit/baseline.json (the theorems
 #              whose axioms are audited) name the same top theorems
+#   deviations tools/config_deviation_lint.py: every deviation the model
+#              configuration's header lists (model/sail-config-rv64d.json,
+#              items 1..N) has an inline `xv6iris: ... deviation K` marker,
+#              and every marker names a listed item (notes/model-policy.md T0)
 #
 # The five middle lints are tools/lean_lint.py (see its docstring for what
 # each guards).  Rocq's tools/comment_quote_check.py has no counterpart:
@@ -30,6 +35,7 @@ rc=0
 tools/check_layering.sh || rc=1
 python3 tools/lean_lint.py || rc=1
 tools/ci/toolchain_check.sh || rc=1
+python3 tools/config_deviation_lint.py || rc=1
 python3 - <<'PY' || rc=1
 import json, os, sys
 roots = [l.split("#")[0].strip() for l in open("tools/ci/roots.txt", encoding="utf-8")]

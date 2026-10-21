@@ -1,4 +1,5 @@
 import LeanRV64D.LeanRV64D
+import LeanRV64D.Arith
 import LeanRV64D.Vector
 
 set_option maxHeartbeats 1_000_000_000
@@ -7,12 +8,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -56,6 +57,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -89,10 +92,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -138,6 +144,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -156,17 +163,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -181,12 +195,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -197,7 +214,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -207,10 +227,6 @@ def not_bit (b : (BitVec 1)) : (BitVec 1) :=
   if ((b == 1#1) : Bool)
   then 0#1
   else 1#1
-
-/-- Type quantifiers: k_p : Bool -/
-def not (b : Bool) : Bool :=
-  (! b)
 
 def print_log_instr (message : String) (_pc : (BitVec 64)) : Unit :=
   (print_endline message)
@@ -228,6 +244,9 @@ def get_config_print_exception (_ : Unit) : Bool :=
   false
 
 def get_config_print_interrupt (_ : Unit) : Bool :=
+  false
+
+def get_config_print_trigger (_ : Unit) : Bool :=
   false
 
 def get_config_print_htif (_ : Unit) : Bool :=
@@ -261,7 +280,7 @@ def ones {n : _} : (BitVec n) :=
 def trunc {m : _} (v : (BitVec k_n)) : (BitVec m) :=
   (Sail.BitVec.truncate v m)
 
-/-- Type quantifiers: k_ex671976_ : Bool -/
+/-- Type quantifiers: k_ex1170426_ : Bool -/
 def bool_bit_forwards (arg_ : Bool) : (BitVec 1) :=
   match arg_ with
   | true => 1#1
@@ -272,7 +291,7 @@ def bool_bit_backwards (arg_ : (BitVec 1)) : Bool :=
   | 1 => true
   | _ => false
 
-/-- Type quantifiers: k_ex671977_ : Bool -/
+/-- Type quantifiers: k_ex1170427_ : Bool -/
 def bool_bit_forwards_matches (arg_ : Bool) : Bool :=
   match arg_ with
   | true => true
@@ -284,32 +303,32 @@ def bool_bit_backwards_matches (arg_ : (BitVec 1)) : Bool :=
   | 0 => true
   | _ => false
 
-/-- Type quantifiers: k_ex671978_ : Bool -/
+/-- Type quantifiers: k_ex1170428_ : Bool -/
 def bool_int_forwards (arg_ : Bool) : Int :=
   match arg_ with
   | false => 0
   | true => 1
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {0, 1} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [0, 1] -/
 def bool_int_backwards (arg_ : Nat) : Bool :=
   match arg_ with
   | 0 => false
   | _ => true
 
-/-- Type quantifiers: k_ex671980_ : Bool -/
+/-- Type quantifiers: k_ex1170430_ : Bool -/
 def bool_int_forwards_matches (arg_ : Bool) : Bool :=
   match arg_ with
   | false => true
   | true => true
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {0, 1} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [0, 1] -/
 def bool_int_backwards_matches (arg_ : Nat) : Bool :=
   match arg_ with
   | 0 => true
   | 1 => true
   | _ => false
 
-/-- Type quantifiers: k_ex671982_ : Bool -/
+/-- Type quantifiers: k_ex1170432_ : Bool -/
 def bool_to_bit (x : Bool) : (BitVec 1) :=
   (bool_bit_forwards x)
 
@@ -323,9 +342,9 @@ def to_bits {l : _} (n : Nat) : (BitVec l) :=
 /-- Type quantifiers: n : Int, l : Nat, l ≥ 0, l ≥ 0 -/
 def to_bits_checked {l : _} (n : Int) : SailM (BitVec l) := do
   let bv := (get_slice_int l n 0)
-  (assert ((BitVec.toNatInt bv) == n) (HAppend.hAppend "Couldn't convert integer "
+  sail_assert ((BitVec.toNatInt bv) == n) (HAppend.hAppend "Couldn't convert integer "
     (HAppend.hAppend (Int.repr n)
-      (HAppend.hAppend " to " (HAppend.hAppend (Int.repr l) " bits without overflow.")))))
+      (HAppend.hAppend " to " (HAppend.hAppend (Int.repr l) " bits without overflow."))))
   (pure bv)
 
 /-- Type quantifiers: n : Int, l : Nat, l ≥ 0, l ≥ 0 -/
@@ -396,7 +415,7 @@ def zopz0zIzJ_u (x : (BitVec k_n)) (y : (BitVec k_n)) : Bool :=
 def zopz0zKzJ_u (x : (BitVec k_n)) (y : (BitVec k_n)) : Bool :=
   ((BitVec.toNatInt x) ≥b (BitVec.toNatInt y))
 
-/-- Type quantifiers: k_ex671987_ : Bool, k_ex671986_ : Bool -/
+/-- Type quantifiers: k_ex1170437_ : Bool, k_ex1170436_ : Bool -/
 def zopz0zJzJzK (x : Bool) (y : Bool) : Bool :=
   ((not x) || y)
 
@@ -420,7 +439,7 @@ def rotate_bits_right (value : (BitVec k_m)) (shift : (BitVec k_n)) : (BitVec k_
 def rotate_bits_left (value : (BitVec k_m)) (shift : (BitVec k_n)) : (BitVec k_m) :=
   (rotatel value (BitVec.toNatInt shift))
 
-/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n > 0 -/
+/-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ≥ 0 -/
 def reverse_bits (xs : (BitVec k_n)) : (BitVec k_n) := Id.run do
   let ys : (BitVec k_n) := (zeros (n := (Sail.BitVec.length xs)))
   let loop_i_lower := 0

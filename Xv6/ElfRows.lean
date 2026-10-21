@@ -157,14 +157,14 @@ theorem elfRead_rows (rows : List Nat) (size : Nat) (t : RowTree) (hsz : size �
   unfold elfRead rowsRd leAt leBytes
   rw [rowsBytes_length rows size hsz]
   by_cases h : o + n ≤ size
-  · rw [if_pos h, if_pos h]
+  · rw [ite_eq_left h, ite_eq_left h]
     congr 2
     apply List.map_congr_left
     intro j hj
     rw [List.mem_range] at hj
-    rw [List.getElem!_eq_getElem?_getD, rowsBytes_getElem? rows size _ hsz, if_pos (by omega),
+    rw [List.getElem!_eq_getElem?_getD, rowsBytes_getElem? rows size _ hsz, ite_eq_left (by omega),
       Option.getD_some, rowByte_eq, RowTree.get_eq t ht, htl]
-  · rw [if_neg h, if_neg h]
+  · rw [ite_eq_right h, ite_eq_right h]
 
 /-! ## Row-aligned segment windows -/
 

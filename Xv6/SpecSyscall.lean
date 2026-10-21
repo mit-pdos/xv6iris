@@ -431,7 +431,7 @@ theorem syscPayIn_exit (hk : syscNum V = USYS_exit) :
     syscPayIn f V ⊢ myPay V.gen (sexitPay f) ∗ sexitPay f (exitXs V.tf) := by
   unfold syscPayIn upayAt
   have hn : usysEff V.pvSecc V.tf = USYS_exit := hk
-  rw [if_pos rfl, if_pos hn]
+  rw [ite_eq_left rfl, ite_eq_left hn]
 
 /-- **Rocq `sysc_sys_out_quiet`** (deviation 2: at the instance's
 `spost_at_emp`, `hE`): a number without a contract owes nothing. -/

@@ -86,7 +86,7 @@ theorem sys_unlink_ent_at [Fscfg] [Icfg] (inum : Nat) (dnd : Dinode) (bmd : Blkm
     (dirEntries (eraNode dnd bmd datd))[dirBname datd kk]? =
       some (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
   have htyz : dnd.diType.toNat = T_DIR_z := by rw [hty]; rfl
-  rw [dirEntries_eraNode dnd bmd datd hop.1.2.2.2.2.2.1 hop.1.2.2.2.2.1, if_pos htyz,
+  rw [dirEntries_eraNode dnd bmd datd hop.1.2.2.2.2.2.1 hop.1.2.2.2.2.1, ite_eq_left htyz,
     MachCSL.zext32_toNat]
   exact dirView_live datd _ kk (hop.2.2.2.2.2 htyz) (dirFirst_lt _ _ _ _ hfn)
     (dirFirst_live _ _ _ _ hfn)
@@ -204,7 +204,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
       CoPset.subseteq_top (by omega)) $$ Hinv Hdii Htok with ⟨%⟨-, hokty⟩, Hdii, Htok⟩
   have hnotD : dirBname datd kk ∉ D := by
     intro hin
-    rw [if_pos (decide_eq_true hin)] at hutyd
+    rw [ite_eq_left (decide_eq_true hin)] at hutyd
     rw [hutyd] at hokty
     exact htyi hokty
   rw [sys_unlink_erase_nmem D _ hnotD]

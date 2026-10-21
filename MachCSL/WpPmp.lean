@@ -20,7 +20,7 @@ import MachCSL.WpPmpDefs
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -44,14 +44,13 @@ theorem swp_pmpCheck_allOff (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width :
   unfold pmpCheck
   swp_run 3
   simp only [IntRange.instForIn'IntInferInstanceMembershipOfMonad, IntRange.forIn'_eq]
-  iapply swp_bind
-  iapply swp_intrange_loop_later cpu _ rfl _
+  iapply swp_run_intrange_loop_later cpu _ rfl _
     iprop(Register.pmpcfg_n ↦ᵣ[cpu]{dq} cfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr)
-    _ _ (by decide) _
+    _ _ _ (by decide) _
   iframe
   isplitl []
   · imodintro
-    iintro %i %h %Ψ ⟨⟨Hpmpcfg_n, Hpmpaddr_n⟩, HΨ⟩
+    iintro %i %h %g %Ψ ⟨⟨Hpmpcfg_n, Hpmpaddr_n⟩, HΨ⟩
     have e1 : BitVec.extractLsb' 3 2 cfg[(i-1).toNat]! = 0#2 := pmpEntryOff_A' (hcfg _)
     have e2 : _get_Pmpcfg_ent_A cfg[(i-1).toNat]! = 0#2 := pmpEntryOff_A (hcfg _)
     have e3 : BitVec.extractLsb' 3 2 cfg[i.toNat]! = 0#2 := pmpEntryOff_A' (hcfg _)

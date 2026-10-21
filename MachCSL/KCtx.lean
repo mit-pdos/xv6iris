@@ -97,7 +97,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## The register map -/
@@ -424,32 +424,65 @@ pinned accordingly). -/
 def transSlot [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) : IProp GF := iprop%
   ⌜tier = curTier⌝ ∗ transSlotAt cpu tier root
 
+/-- The hypervisor trap CSRs a supervisor trap ALSO writes since sail-riscv
+0.16, H enabled or not (`hstatus`'s SPV/GVA bits, `htval := 0`,
+`htinst := 0`), at unspecified values: with H disabled nothing reads them.
+They ride with the supervisor trap CSRs (`trapCsrsAt`, `trapCsrs`). -/
+def hTrapCsrs (cpu : CPU) : IProp GF := iprop%
+  (∃ v : BitVec 64, Register.hstatus ↦ᵣ[cpu] v) ∗
+  (∃ v : BitVec 64, Register.htval ↦ᵣ[cpu] v) ∗
+  (∃ v : BitVec 64, Register.htinst ↦ᵣ[cpu] v)
+
+theorem hTrapCsrs_cases (cpu : CPU) :
+    hTrapCsrs (GF := GF) cpu ⊢ ∃ hs v w : BitVec 64,
+      Register.hstatus ↦ᵣ[cpu] hs ∗ Register.htval ↦ᵣ[cpu] v ∗ Register.htinst ↦ᵣ[cpu] w := by
+  unfold hTrapCsrs
+  iintro ⟨⟨%hs, H1⟩, ⟨%v, H2⟩, ⟨%w, H3⟩⟩
+  iexists hs, v, w
+  iframe
+
+theorem hTrapCsrs_intro (cpu : CPU) (hs v w : BitVec 64) :
+    Register.hstatus ↦ᵣ[cpu] hs ∗ Register.htval ↦ᵣ[cpu] v ∗ Register.htinst ↦ᵣ[cpu] w ⊢
+    hTrapCsrs (GF := GF) cpu := by
+  unfold hTrapCsrs
+  iintro ⟨H1, H2, H3⟩
+  isplitl [H1]
+  · iexists hs; iexact H1
+  isplitl [H2]
+  · iexists v; iexact H2
+  · iexists w; iexact H3
+
 /-- The trap CSRs at given values (what a trap leaves: `sepc`, `scause`,
-`stval`). -/
+`stval`; and, since 0.16, the hypervisor trap CSRs `hTrapCsrs` at unspecified
+values). -/
 def trapCsrsAt (cpu : CPU) (epc cause tv : BitVec 64) : IProp GF := iprop%
-  Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] cause ∗ Register.stval ↦ᵣ[cpu] tv
+  Register.sepc ↦ᵣ[cpu] epc ∗ Register.scause ↦ᵣ[cpu] cause ∗ Register.stval ↦ᵣ[cpu] tv ∗
+  hTrapCsrs cpu
 
 /-- The trap CSRs a trap scribbles; owned by the enabled arm. -/
 def trapCsrs (cpu : CPU) : IProp GF := iprop%
   (∃ v : BitVec 64, Register.sepc ↦ᵣ[cpu] v) ∗
   (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu] v) ∗
-  (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu] v)
+  (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu] v) ∗
+  hTrapCsrs cpu
 
 theorem trapCsrs_cases (cpu : CPU) :
     trapCsrs (GF := GF) cpu ⊢ ∃ a b c : BitVec 64, trapCsrsAt cpu a b c := by
   unfold trapCsrs trapCsrsAt
-  iintro ⟨⟨%a, Ha⟩, ⟨%b, Hb⟩, ⟨%c, Hc⟩⟩
+  iintro ⟨⟨%a, Ha⟩, ⟨%b, Hb⟩, ⟨%c, Hc⟩, Hh⟩
   iexists a, b, c
   iframe
 
 theorem trapCsrs_intro (cpu : CPU) (a b c : BitVec 64) : trapCsrsAt (GF := GF) cpu a b c ⊢ trapCsrs cpu := by
   unfold trapCsrs trapCsrsAt
-  iintro ⟨Ha, Hb, Hc⟩
+  iintro ⟨Ha, Hb, Hc, Hh⟩
   isplitl [Ha]
   · iexists a; iexact Ha
   isplitl [Hb]
   · iexists b; iexact Hb
+  isplitl [Hc]
   · iexists c; iexact Hc
+  · iexact Hh
 
 /-- The index of the trap handler's contract: the ENVIRONMENT the handler
 closes over (Rocq `ihs kt E`: the contract is a family over environments),

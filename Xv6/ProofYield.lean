@@ -180,7 +180,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   subst hstr
   -- the mirror: the lock's half joins the claim's
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr j) RUNNING
-  rw [if_neg (by decide : ¬ unclaimed RUNNING)] at hsplit
+  rw [ite_eq_right (by decide : ¬ unclaimed RUNNING)] at hsplit
   ihave Hpst := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst
   ihave Hwhole := hsplit.mpr $$ [$Hpsl $Hpst]
   -- li a5,3 ; sw a5,24(s1): p->state = RUNNABLE
@@ -222,7 +222,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     have h := SC.wp_sched (GF := GF) Γ cpu k' j RUNNABLE ch' hj
       (by decide : parkOk RUNNABLE) hK' hsie' hnoff' hlocks' htier' hproc'
     unfold wp_sched_body at h
-    rw [if_pos (show needsCtx RUNNABLE from by decide)] at h
+    rw [ite_eq_left (show needsCtx RUNNABLE from by decide)] at h
     simp only [schedAddr] at h
     exact h
   ihave Hvc : ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) $$ [Hvc]
@@ -239,7 +239,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   isplitl []
   · iintro Hstk
     unfold parkPay parkPayAt
-    rw [if_neg (by decide : ¬ invDormant RUNNABLE)]
+    rw [ite_eq_right (by decide : ¬ invDormant RUNNABLE)]
     iempintro
   iapply wpNext_intro_pin
   iintro %h1 %hp1 %R4 %spie %spp %ch2 %hcs4 Hk Hpc Hheld Htc Hres Hcells Htag Hvc

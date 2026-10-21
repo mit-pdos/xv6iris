@@ -71,7 +71,7 @@ theorem ushBytes_upd (γd : GName) (a k j : Nat) (f : Nat → BitVec 8) (hj : j 
     simp only [Nat.add_zero, ushSet_at]
     iexact Hb
   · iapply ushBytes_ext γd _ (a + j + 1) q (fun i => f (j + (1 + i))) (fun i => ushSet f j b (j + (1 + i)))
-      (fun i _ => by unfold ushSet; rw [if_neg (by omega)]) $$ Hrest
+      (fun i _ => by unfold ushSet; rw [ite_eq_right (by omega)]) $$ Hrest
 
 /-- **Rocq `ushc_bytes_sub`**: a sub-run, out and back. -/
 theorem ushcBytes_sub (γd : GName) (a Nb : Nat) (f : Nat → BitVec 8) (k L : Nat) (hkl : k + L ≤ Nb) :
