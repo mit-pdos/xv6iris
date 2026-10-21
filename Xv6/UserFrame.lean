@@ -110,14 +110,20 @@ theorem ufFoot_rd (r : Register) (h : r ∈ ufRwList ++ ufRoList) : ufFoot.Dr r 
   simp only [ufFoot, uFootL, Bool.or_eq_true, List.contains_iff_mem]
   exact List.mem_append.1 h
 
-theorem ufFoot_wr (r : Register) (h : r ∈ ufRwList.erase .cur_privilege) : ufFoot.Dw r = true := by
-  have hm : r ∈ ufRwList := List.mem_of_mem_erase h
+theorem ufFoot_wr (r : Register) (h : r ∈ (ufRwList.erase .cur_privilege).erase .scause) :
+    ufFoot.Dw r = true := by
+  have hm1 : r ∈ ufRwList.erase .cur_privilege := List.mem_of_mem_erase h
+  have hm : r ∈ ufRwList := List.mem_of_mem_erase hm1
   have hne : r ≠ .cur_privilege := by
-    rintro rfl; exact absurd h (by decide)
+    rintro rfl; exact absurd hm1 (by decide)
   have hns : r ≠ .satp := by
     rintro rfl; exact absurd hm (by decide)
+  have hnc : r ≠ .scause := by
+    rintro rfl; exact absurd h (by decide)
+  have hnm : r ≠ .mcause := by
+    rintro rfl; exact absurd hm (by decide)
   simp only [ufFoot, uFootL, Bool.and_eq_true, List.contains_iff_mem, bne_iff_ne, ne_eq]
-  exact ⟨⟨hm, hne⟩, hns⟩
+  exact ⟨⟨⟨⟨hm, hne⟩, hns⟩, hnc⟩, hnm⟩
 
 /-- U1-X1's footprint premise. -/
 theorem ufFoot_uxa : UxaFoot ufFoot :=

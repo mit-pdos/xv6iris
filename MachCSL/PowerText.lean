@@ -261,7 +261,7 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
     inext
     iintro %e₂ %g₂ %eₜ %Hstep _
     obtain ⟨rfl, h⟩ := primStep_power_inv Hstep
-    rcases h with ⟨hp, _, _, _⟩ | ⟨_, rfl, rfl, hgen, hpow', hbf, hdevs⟩
+    rcases h with ⟨hp, _, _, _⟩ | ⟨_, rfl, rfl, hgen, hpow', hbf, hdevs, -⟩
     · rw [hpow] at hp
       exact absurd hp (by decide)
     imod Hclose

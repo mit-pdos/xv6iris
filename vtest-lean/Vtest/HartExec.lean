@@ -490,7 +490,7 @@ theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : Outcome Register
   | regWrite r w =>
     simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨-, rfl⟩ := h
-    exact ⟨_, XState.abs_setReg .., Or.inl rfl⟩
+    exact ⟨_, ⟨XState.abs_setReg .., MState.excOk_unarmed _ _ _ _ rfl⟩, Or.inl rfl⟩
   | readRam a b c => simp [evExec] at h
   | writeRam a b c d => simp [evExec] at h
   | barrier b =>

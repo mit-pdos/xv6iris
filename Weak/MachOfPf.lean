@@ -151,6 +151,7 @@ def pfStepTsoStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
+    (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -379,14 +380,14 @@ structure SimRel (c : Wpcfg Pexv6 Efab)
 `bootFacts`'), the boot image, an empty log, zero views, the reset devices. -/
 def bootG1 (σ0 : WGState) (ds : DevStates) : GState :=
   { m := ⟨σ0.wgregs, imgFlat bootImage, [], fun _ => 0, fun _ => 0, fun _ => HRead.zero,
-          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, [], fun _ => [], fun _ => 0⟩,
+          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, [], fun _ => [], fun _ => 0, true⟩,
     gen := 0, pow := true }
 
 theorem bootShapeG1 (g0 : GState) (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0)
     (hg : g0.gen = 0) (hd : g0.m.devs = ds) : bootShape g0 (bootG1 σ0 ds) := by
   obtain ⟨-, -, -, -, -, hregs, -, -⟩ := hb
   refine ⟨hg.symm, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hregs, fun _ => rfl, rfl,
-    fun _ => ⟨rfl, rfl⟩⟩, ?_⟩
+    fun _ => ⟨rfl, rfl⟩⟩, ?_, rfl⟩
   show ds.reset = g0.m.devs.reset
   rw [hd]
 
@@ -827,7 +828,7 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
     · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
     all_goals exact ⟨rfl, rfl, rfl⟩
   | regRead r => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
-  | regWrite r v => subst h; exact ⟨rfl, rfl, rfl⟩
+  | regWrite r v => obtain ⟨rfl, -⟩ := h; exact ⟨rfl, rfl, rfl⟩
   | readRam => exact h.elim
   | writeRam => exact h.elim
   | getCycleCount => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
@@ -853,7 +854,7 @@ theorem ramOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
     (∀ n va req, o = .memRead n va req → devAddr req.pa = false → ramBytes req.pa n) ∧
     (∀ n va req, o = .memWrite n va req → devAddr req.pa = false → ramBytes req.pa n) := by
   obtain ⟨obs, e', g', efs, hs⟩ := hred
-  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, t, hland, -⟩
+  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, -, t, hland, -⟩
   · refine ⟨fun n va req ho hda => ?_, fun n va req ho hda => ?_⟩
     · subst ho
       rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb', -⟩, -⟩
@@ -892,7 +893,7 @@ theorem devOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
     (∀ n va req, o = .memRead n va req → devAddr req.pa = true → devBytes req.pa n) ∧
     (∀ n va req, o = .memWrite n va req → devAddr req.pa = true → devBytes req.pa n) := by
   obtain ⟨obs, e', g', efs, hs⟩ := hred
-  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, t, hland, -⟩
+  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, -, t, hland, -⟩
   · refine ⟨fun n va req ho hda => ?_, fun n va req ho hda => ?_⟩
     · subst ho
       rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb', -⟩, -⟩
@@ -970,7 +971,7 @@ theorem hartRunLand {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU
     (cpu : CPU) {ib : Ibch} {ws : Wstate} {pr : GSet Nat}
     (hlk : c.pcAgs[cpu.val]? = some ⟨.PHart cpu (H cpu) (g.m.regs cpu) none ib, ws, pr⟩)
     {m' : SailM Unit} {σ1 : MState} (hh : hartStep cpu (H cpu) g.m m' σ1) (T : Nat)
-    (hland : σ1.landOk cpu T) :
+    (hland : σ1.landOk cpu T) (hks : ¬ σ1.kStuck cpu m') :
     MRun 2 (t, g) (pfStepObs c cpu.val .node)
       (t.set (cpu.val + 1) (.hart 0 cpu m'), { g with m := σ1.land cpu T }) := by
   have h1 := hartRun ht hgen hpow cpu hlk hh
@@ -979,7 +980,7 @@ theorem hartRunLand {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU
     have := poolHart (updH H cpu m') c.pcDev vs cpu
     rw [this]; simp [updH]
   have hs := primStep_hart_land (gen := 0) (m := m') (g := { g with m := σ1 })
-    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hland
+    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hks hland
   have h2 := mrunOne hj hs
   have := mrunTrans h1 h2
   simpa using this
@@ -1005,7 +1006,7 @@ theorem hartRunLandTail {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H :
     (cpu : CPU) {ib : Ibch} {ws : Wstate} {pr : GSet Nat}
     (hlk : c.pcAgs[cpu.val]? = some ⟨.PHart cpu (H cpu) (g.m.regs cpu) none ib, ws, pr⟩)
     {m' : SailM Unit} {σ1 : MState} (hh : hartStep cpu (H cpu) g.m m' σ1) (T : Nat)
-    (hland : σ1.landOk cpu T) :
+    (hland : σ1.landOk cpu T) (hks : ¬ σ1.kStuck cpu m') :
     MRunPcTail 2 (t, g) (t.set (cpu.val + 1) (.hart 0 cpu m'), { g with m := σ1.land cpu T }) := by
   have h1 := hartRun ht hgen hpow cpu hlk hh
   have hj : (t.set (cpu.val + 1) (Expr.hart 0 cpu m'))[cpu.val + 1]? = some (Expr.hart 0 cpu m') := by
@@ -1013,10 +1014,30 @@ theorem hartRunLandTail {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H :
     have := poolHart (updH H cpu m') c.pcDev vs cpu
     rw [this]; simp [updH]
   have hs := primStep_hart_land (gen := 0) (m := m') (g := { g with m := σ1 })
-    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hland
+    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hks hland
   have h2 := mrunOne hj hs
   simp only [List.set_set, List.append_nil] at h2
   exact Or.inr ⟨_, _, h1, rfl, rfl, mrun1Step h2⟩
+
+/-- **[OWN.115] After a hart step the hart is not stuck** (so its issued store may land): the
+state after the step is reachable, so the exported non-stuckness (`HypsC.safe`) holds there. -/
+theorem landNotStuck {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {g0 : GState} {c0 : Wpcfg Pexv6 Efab} (hH : HypsC fok fcutT g0 c0)
+    {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU → SailM Unit}
+    {vs : List Expr} {n : Nat} {κ : List Obs} (ht : t = poolOf H c.pcDev vs) (hgen : g.gen = 0)
+    (hpow : g.pow = true) (cpu : CPU) {ib : Ibch} {ws : Wstate} {pr : GSet Nat}
+    (hlk : c.pcAgs[cpu.val]? = some ⟨.PHart cpu (H cpu) (g.m.regs cpu) none ib, ws, pr⟩)
+    (hreach : MRun n ([Expr.power], g0) κ (t, g))
+    {m' : SailM Unit} {σ1 : MState} (hh : hartStep cpu (H cpu) g.m m' σ1) :
+    ¬ σ1.kStuck cpu m' := by
+  have h1 := hartRun ht hgen hpow cpu hlk hh
+  have hj : (t.set (cpu.val + 1) (Expr.hart 0 cpu m'))[cpu.val + 1]? = some (Expr.hart 0 cpu m') := by
+    rw [ht, poolHartSet]
+    have := poolHart (updH H cpu m') c.pcDev vs cpu
+    rw [this]; simp [updH]
+  have hred := hH.safe _ _ _ _ (mrunTrans hreach h1) _ (List.mem_of_getElem? hj)
+  exact MState.not_kStuck_of_reducible (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hred
 
 theorem poolOfProg (H : CPU → SailM Unit) (F F' : Efab) (vs : List Expr) (h0 : F'.efU0 = F.efU0)
     (h1 : F'.efU1 = F.efU1) (hp : F'.efPlic = F.efPlic) : poolOf H F' vs = poolOf H F vs := by
@@ -1211,6 +1232,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
         (fun base tvs hl => by
           subst hl; exact hH.cut st c t g n κ hrun hreach hR0 cpu base tvs c' hs hf hcf)
         (fun aq base tvs asrc hl => ⟨hcoh, hex aq base tvs asrc hl⟩) rfl hl1 hl2 hfi1 hfi2
+        (fun r v ho => by subst ho; exact MState.excOk_of_reducible hlive hred)
     simp only [Pexv6.PHart.injEq] at hp'
     obtain ⟨-, hmk, -, -, -⟩ := hp'
     obtain ⟨hdv, hrg, -⟩ := evStepShape cpu o g.m σ1 v hev hdaR hdaW
@@ -1220,11 +1242,14 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
         (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc) (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩)) heg'
     · exact post (k v) fn' _ 2 hmk
         (hartRunLandTail ht hgen hpow cpu (by rw [hm]; exact hlkc)
-          (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩) _ hlok) hfn' (by rw [MState.land_regs, hrg, hors])
+          (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩) _ hlok
+          (landNotStuck hH ht hgen hpow cpu (by rw [hm]; exact hlkc) hreach
+            (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩))) hfn' (by rw [MState.land_regs, hrg, hors])
         (fun c'' hc => by rw [MState.land_regs, hrg, oRegsOther _ _ _ _ hc])
         (by rw [MState.land_devs, hd'', hdv]; exact hDS) hmem' hview'
         (hartRunLand ht hgen hpow cpu (by rw [hm]; exact hlkc) (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩)
-          _ hlok) heg'
+          _ hlok (landNotStuck hH ht hgen hpow cpu (by rw [hm]; exact hlkc) hreach
+            (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩))) heg'
 
   -- the per-event dispatch
   cases o with
@@ -1233,6 +1258,11 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     exact silent (g.m.regs cpu r) ⟨rfl, rfl⟩ hl hm' hors hfn' (by rw [hd''])
   | regWrite r v =>
     obtain ⟨hl, rfl, rfl, rfl, hd'', -, -⟩ := hn
+    -- [OWN.115] the write is allowed: the exported non-stuckness (`HypsC.safe`)
+    have hred := hH.safe n κ t g hreach _
+      (List.mem_of_getElem? (by rw [ht]; exact poolHart H c.pcDev vs cpu))
+    rw [hm] at hred
+    have hexc : g.m.excOk cpu r v := MState.excOk_of_reducible hlive hred
     obtain ⟨hin, hfr⟩ := lbInertErw (erwOf (depsOfIb ib.ibBits) ib.ibRds r)
     rw [← hl] at hin hfr
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m.setReg cpu r v) hs hfr (Or.inl hin) hadj hmem
@@ -1240,7 +1270,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     exact post _ none _ 1 rfl (Or.inl (by omega)) (fun _ h => by cases h) (by simp)
       (fun c'' hc => by simp [hc]) (by rw [hd'']; exact hDS) hm1 hv1
       (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
-        (by rw [hm]; exact Or.inl ⟨(), rfl, rfl⟩)) heg
+        (by rw [hm]; exact Or.inl ⟨(), rfl, rfl, hexc⟩)) heg
   | memRead nb va req =>
     have hn' : pnodeStep (.impure (.ok (.memRead nb va req)) k) (g.m.regs cpu) ib c.pcDev.efDev l m'
       ors fn' c'.pcDev.efDev oib obar := hn

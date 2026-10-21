@@ -82,7 +82,7 @@ theorem stepAt_sound (i : Nat) (pol : HPol) (ans : Nat) (pool : List Expr) (x : 
           simp [hi]
         have s2 := Language.step_update_of_getElem? ({ gOf x with m := σ1 } : GState)
           { ({ gOf x with m := σ1 } : GState) with m := σ1.land cpu t } hget'
-          (primStep_hart_land (gen := 0) ⟨rfl, rfl⟩ hok)
+          (primStep_hart_land (gen := 0) ⟨rfl, rfl⟩ (MState.not_kStuck_unarmed _ _ _ (congrArg MState.kArm he).symm) hok)
         have e2 : ({ ({ gOf x with m := σ1 } : GState) with m := σ1.land cpu t } : GState) = gOf x1 := by
           unfold gOf; rw [he]
         have e3 : (pool.set i (.hart 0 cpu m') ++ []).set i (.hart 0 cpu m') ++ [] =
@@ -150,7 +150,7 @@ theorem errorNode_noStep (x : XState) (e : Expr) (h : errorNode e = true) :
     · obtain ⟨-, -, m', σ', -, hs, -⟩ := hl
       exact hs
     · exact hd.1 (live0 x)
-    · obtain ⟨-, -, -, t, hok, -⟩ := hland
+    · obtain ⟨-, -, -, -, t, hok, -⟩ := hland
       exact MState.not_landOk_of_nil _ cpu t rfl hok
   · exact absurd h (by simp)
 

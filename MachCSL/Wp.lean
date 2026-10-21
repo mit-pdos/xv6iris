@@ -261,17 +261,17 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     -- the history so far, lent to the callback
     unfold obsInterp
     icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
-    by_cases hlo : ∃ t, g.m.landOk cpu t
+    by_cases hlo : ¬ g.m.kStuck cpu m ∧ ∃ t, g.m.landOk cpu t
     · ---- THE LAND ARM IS ENABLED: the hart is reducible by it, the callback is POSTPONED
-      obtain ⟨t0, ht0⟩ := hlo
+      obtain ⟨hks, t0, ht0⟩ := hlo
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hclose
       isplit
       · ipureintro
-        exact ⟨[], .hart _ cpu m, { g with m := g.m.land cpu t0 }, [], primStep_hart_land hl ht0⟩
+        exact ⟨[], .hart _ cpu m, { g with m := g.m.land cpu t0 }, [], primStep_hart_land hl hks ht0⟩
       iintro %e₂ %g₂ %eₜ %Hstep Hcred
       obtain ⟨rfl, hc⟩ := primStep_hart_inv Hstep
-      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, hobs, rfl, t, hlt, rfl⟩
+      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, _, hobs, rfl, t, hlt, rfl⟩
       · -- an EVENT step: the callback runs now (mask re-opened), its `▷` merged with the step's
         imod Hclose
         imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨_, H⟩
@@ -355,7 +355,7 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
         exact ⟨_, .hart _ cpu m', { g with m := σ' }, [], primStep_hart_live hl hs⟩
       iintro %e₂ %g₂ %eₜ %Hstep Hcred
       obtain ⟨rfl, hc⟩ := primStep_hart_inv Hstep
-      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, _, _, t, hlo', _⟩
+      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, hks, _, _, t, hlo', _⟩
       · imodintro
         inext
         imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
@@ -390,7 +390,7 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
           iexact Hcert
         · exact BigSepL.bigSepL_nil_intro
       · exact absurd hl hnl
-      · exact absurd ⟨t, hlo'⟩ hlo
+      · exact absurd ⟨hks, t, hlo'⟩ hlo
   · -- a passed generation: derive the death certificate and self-loop
     have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
     ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
@@ -964,7 +964,8 @@ A SILENT write (NI M2-W1): any register but `cur_privilege` and (W8
 `swp_writeReg_priv_quiet`/`_mret`, and a `satp` write
 `swp_writeReg_satp`. -/
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
-    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (Φ : PUnit → IProp GF) :
+    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (hk : ∀ f : RegFile, kExcWrite f r w = false)
+    (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
@@ -979,13 +980,13 @@ theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨hartObs_regWrite_quiet cpu σ r w ?_, (), σ.setReg cpu r w, rfl⟩
+    refine ⟨hartObs_regWrite_quiet cpu σ r w ?_, (), σ.setReg cpu r w, rfl, σ.excOk_of cpu r w hk⟩
     rcases hq with hq | hq
     · exact Or.inl hq.1
     · exact Or.inr (Hv.trans hq)
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imodintro
   have hk := regFile_set_keep (σ.regs cpu) r w (by
@@ -998,12 +999,72 @@ theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
     iapply HΦ $$ Hr
 
 theorem swp_writeReg_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterType r)
-    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (hk : ∀ f : RegFile, kExcWrite f r w = false)
+    (f : PUnit → SailM X) (Φ : X → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ swp cpu (f ()) Φ) ⊢ swp cpu (writeReg r w >>= f) Φ := by
   iintro ⟨Hr, HΦ⟩
   iapply swp_bind
-  iapply swp_writeReg cpu r v w hq $$ [Hr HΦ]
+  iapply swp_writeReg cpu r v w hq hk $$ [Hr HΦ]
   iframe Hr HΦ
+
+/-- **A trap-cause write out of a non-Supervisor mode** ([OWN.115]): the write is allowed
+whatever its interrupt bit, read off the `cur_privilege` cell (any fraction, handed back) --
+the U→S trap tower's `scause` writes (`MachCSL.UTrap`). -/
+theorem swp_writeReg_ucause (cpu : CPU) (r : Register) (v w : RegisterType r)
+    (hq : r ≠ .cur_privilege ∧ r ≠ .satp) (p : Privilege) (hp : privSup p = false) (dq : DFrac)
+    (Φ : PUnit → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗ r ↦ᵣ[cpu] v ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} p -∗ r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit
+  iintro ⟨Hp, Hr, HΦ⟩
+  iapply swp_event_dep cpu (.regWrite r w) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iintro %σ Hσ
+  icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu r = v⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (σ.regs cpu) r (DFrac.own 1) v $$ [$Hregs $Hr] with %_
+    itrivial
+  ihave %Hpv : ⌜σ.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hp]
+  · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege dq p $$ [$Hregs $Hp] with %_
+    itrivial
+  have hk : σ.excOk cpu r w := fun _ => kExcWrite_of_priv _ r w (by rw [Hpv]; exact hp)
+  imod reg_update cpu (σ.regs cpu) r v w $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨hartObs_regWrite_quiet cpu σ r w (Or.inl hq.1), (), σ.setReg cpu r w, rfl, hk⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain ⟨rfl, -⟩ := Hev
+  imod Hmask
+  imodintro
+  have hkeep := regFile_set_keep (σ.regs cpu) r w (Or.inl hq)
+  isplitl [Hregs Hclose]
+  · iapply Hclose $$ %((σ.regs cpu).set r w) %hkeep Hregs
+  · iapply swp_ret
+    iapply HΦ $$ Hp Hr
+
+/-- `swp_writeReg_ucause_bind` out of User mode (the form `swp_run` uses: the U→S tower). -/
+theorem swp_writeReg_ucauseU_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterType r)
+    (hq : r ≠ .cur_privilege ∧ r ≠ .satp) (dq : DFrac) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.User ∗ r ↦ᵣ[cpu] v ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.User -∗ r ↦ᵣ[cpu] w -∗ swp cpu (f ()) Φ) ⊢
+      swp cpu (writeReg r w >>= f) Φ := by
+  iintro ⟨Hp, Hr, HΦ⟩
+  iapply swp_bind
+  iapply swp_writeReg_ucause cpu r v w hq Privilege.User rfl dq $$ [Hp Hr HΦ]
+  iframe Hp Hr HΦ
+
+theorem swp_writeReg_ucause_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterType r)
+    (hq : r ≠ .cur_privilege ∧ r ≠ .satp) (p : Privilege) (hp : privSup p = false) (dq : DFrac)
+    (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗ r ↦ᵣ[cpu] v ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} p -∗ r ↦ᵣ[cpu] w -∗ swp cpu (f ()) Φ) ⊢
+      swp cpu (writeReg r w >>= f) Φ := by
+  iintro ⟨Hp, Hr, HΦ⟩
+  iapply swp_bind
+  iapply swp_writeReg_ucause cpu r v w hq p hp dq $$ [Hp Hr HΦ]
+  iframe Hp Hr HΦ
 
 /-! ## The user boundary: the observed privilege write (NI M2-W1) -/
 
@@ -1170,10 +1231,10 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.Supervisor, rfl⟩
+    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.Supervisor, rfl, fun _ => rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
   icases obsAuth_lb (h ++ [.uExit cpu s sc ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
@@ -1282,10 +1343,10 @@ theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p =
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.User, rfl⟩
+    exact ⟨(), g.m.setReg cpu Register.cur_privilege Privilege.User, rfl, fun _ => rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imod Hperm $$ %h %g %⟨hf.1, hf.2.1⟩ Ha with ⟨Ha, HOut⟩
   icases obsAuth_lb (h ++ [.uEnter cpu s ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
@@ -1356,10 +1417,10 @@ theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → I
   isplit
   · ipureintro
     exact ⟨hartObsPriv_quiet cpu _ p' (by rw [Hv]; exact hq), (),
-      σ.setReg cpu Register.cur_privilege p', rfl⟩
+      σ.setReg cpu Register.cur_privilege p', rfl, fun _ => rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imodintro
   isplitl [Hregs Huep Hclose]
@@ -1411,10 +1472,10 @@ theorem swp_writeReg_priv_mret (cpu : CPU) (p' : Privilege) (hp' : privUser p' =
   isplit
   · ipureintro
     exact ⟨hartObsPriv_quiet cpu _ p' (by rw [Hv]; exact hp'.symm), (),
-      σ.setReg cpu Register.cur_privilege p', rfl⟩
+      σ.setReg cpu Register.cur_privilege p', rfl, fun _ => rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imodintro
   isplitl [Hregs Huep Hclose]
@@ -1482,10 +1543,10 @@ theorem swp_writeReg_satp (cpu : CPU) (s0 s1 : BitVec 64) (P Q : IProp GF) (Φ :
   isplit
   · ipureintro
     exact ⟨hartObs_regWrite_quiet cpu σ Register.satp s1 (Or.inl (by decide)), (),
-      σ.setReg cpu Register.satp s1, rfl⟩
+      σ.setReg cpu Register.satp s1, rfl, fun _ => rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imodintro
   isplitl [Hcpu Hclose Hmem Hmm Hdev Huep]
@@ -1530,10 +1591,10 @@ theorem hartObs_of_evStep_fix (cpu : CPU) (o : Outcome Register RegisterType) (u
     (h : ∀ σ v σ', evStep cpu o σ v σ' ↔ (v = u ∧ σ' = σ)) (σ : MState) : hartObs cpu o σ = [] := by
   cases o
   case regWrite r w =>
-    have hfix := ((h σ () (σ.setReg cpu r w)).1 rfl).2
+    have hfix := ((h σ () σ).2 ⟨rfl, rfl⟩).1
     have hr := congrArg (fun s : MState => s.regs cpu r) hfix
     simp only [if_true, RegFile.set_same] at hr
-    exact hartObs_regWrite_quiet cpu σ r w (Or.inr hr.symm)
+    exact hartObs_regWrite_quiet cpu σ r w (Or.inr hr)
   all_goals rfl
 
 /-- Events that leave the state alone and are answered with a fixed value. -/

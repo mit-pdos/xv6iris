@@ -499,7 +499,7 @@ theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV6
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
   case barrier => obtain ⟨_, rfl⟩ := h; rfl
-  all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
+  all_goals (have h' := h; simp only [evStep] at h'; first | (subst h'; rfl) | (obtain ⟨h'', -⟩ := h'; subst h''; rfl))
 
 theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
     (j : UartId) : σ'.devs.wire j = σ.devs.wire j := by
@@ -536,7 +536,7 @@ theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
   case barrier => obtain ⟨_, rfl⟩ := h; rfl
-  all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
+  all_goals (have h' := h; simp only [evStep] at h'; first | (subst h'; rfl) | (obtain ⟨h'', -⟩ := h'; subst h''; rfl))
 
 theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
     (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
@@ -974,7 +974,7 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
   cases e with
   | hart gen cpu m =>
     obtain ⟨rfl, hc⟩ := primStep_hart_inv hstep
-    rcases hc with ⟨⟨hpw, _⟩, rfl, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨_, rfl, rfl, t, _, rfl⟩
+    rcases hc with ⟨⟨hpw, _⟩, rfl, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨_, _, rfl, rfl, t, _, rfl⟩
     · -- a hart node: its events (only ever a user-boundary event) keep the
       -- power on and the boot count, skip the console segment, and it never
       -- moves a wire or a receiver
@@ -1023,7 +1023,7 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
       show obsBoots (h ++ [Obs.powerOff]) = g.gen + 1 + 0
       rw [obsBoots_app]; simpa [obsBoots] using hbt
     · -- PowerOn: the next cycle opens empty, over reset UARTs
-      obtain ⟨hgen, hpw', _, hdevs⟩ := hb
+      obtain ⟨hgen, hpw', _, hdevs, -⟩ := hb
       rw [hpw] at hsh hbt
       refine ⟨?_, ?_, fun _ i => ?_, fun _ i => ?_⟩
       · rw [hpw']; exact traceShape_snoc h _ false true hsh rfl

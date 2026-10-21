@@ -288,7 +288,7 @@ end XState
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
     (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt) (h11 : a.llog = b.llog)
-    (h12 : a.sb = b.sb) (h13 : a.sbEp = b.sbEp) : a = b := by
+    (h12 : a.sb = b.sb) (h13 : a.sbEp = b.sbEp) (h14 : a.kArm = b.kArm) : a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -431,6 +431,7 @@ theorem abs_storeP (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (
     simp only [updCpu, if_pos, List.nil_append, ite_true]
     split <;> simp
   · rfl
+  · rfl
 
 /-- An EXCLUSIVE write (route P: `MState.storeL`, it lands at once). -/
 def storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
@@ -477,6 +478,7 @@ theorem abs_storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (
   · rfl
   · show List.range' 1 (x.log ++ [hartAgent cpu]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
     rw [List.length_append, List.length_singleton, range'_snoc_one]
+  · rfl
   · rfl
   · rfl
 
@@ -539,6 +541,7 @@ theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     · rfl
     · show List.range' 1 (x.log ++ [diskAgent]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
       rw [List.length_append, List.length_singleton, range'_snoc_one]
+    · rfl
     · rfl
     · rfl
 

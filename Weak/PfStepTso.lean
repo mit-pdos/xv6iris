@@ -98,7 +98,10 @@ explicit parameters unchanged:
     or below `q` and not overwritten up to `q` (TsoMem's fetch arm exactly; M1 pristine text: any
     `q ∈ [itv, |log|]`; M2: W5d's cut);
 (4) at an exclusive read, `ownCoh c` (preserved by `ownCohStep`) and `exclOkTs` at the read
-    (the pair's own write checks it at the store; no foreign step lies between the halves). -/
+    (the pair's own write checks it at the store; no foreign step lies between the halves);
+(5) ([OWN.115], MachCSL queue Q1) at a register write, the armed stuck instrument allows it
+    (`MState.excOk`: no kernel-mode synchronous exception) -- W4 supplies it from the exported
+    non-stuckness (`HypsC.safe`, `MState.excOk_of_reducible`). -/
 def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) : Prop :=
   ∀ (c c' : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (σ : MState) (cpu : CPU)
     (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile)
@@ -124,6 +127,7 @@ def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
+    (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -330,6 +334,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
+    (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -337,7 +342,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
       rmem c' (st ++ [(hartAgent cpu, l)]) σ' ∧
       viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) ∧
       σ'.llog = List.range' 1 σ'.log.length := by
-  intro hp hstep hadj hfacts hramR hramW hR hV heg hA hfetch hexl hfn hls hld hfi hsf
+  intro hp hstep hadj hfacts hramR hramW hR hV heg hA hfetch hexl hfn hls hld hfi hsf hexc
   have hm := PfStepTsoMem.memEager c st σ hR heg
   have hlog := logEq c st σ hR hA
   obtain ⟨m', ors, fn', dd, oib, obar, hn, rs', ib', rfl⟩ := nodeOf cpu _ rs fn ib c.pcDev l p' d' hp hld hfn
@@ -348,7 +353,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
   | regRead r => exact absurd hn.1 hls
   | regWrite r v =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    exact ⟨PUnit.unit, σ.setReg cpu r v, _, rfl, Or.inl rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl rfl,
+    exact ⟨PUnit.unit, σ.setReg cpu r v, _, ⟨rfl, hexc r v rfl⟩, Or.inl rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl rfl,
       viewRelInert cohSrc σ _ st _ _ (erwInert _) hV (sameReadSetReg σ cpu r v), heg⟩
   | memRead n va req =>
     have hram := hramR n va req rfl

@@ -124,6 +124,11 @@ structure MState where
   /-- Each hart's current STORE EPOCH ([OWN.113]): bumped by every fence with a W predecessor
   and a W successor (`fenceEpoch`); a buffered store records the epoch it was issued in. -/
   sbEp : CPU → Nat := fun _ => 0
+  /-- THE STUCK INSTRUMENT'S ARMING BIT ([OWN.115], Q1; ghost, erasable: read only by the
+  instrument's guards, `MState.excOk`): set by `PowerOn` (`bootShape`), moved by no step.  Every
+  registered root starts at `Expr.power`, so it runs armed; a hand-built state (the Vtest
+  validation runs, `Vtest.testMState`) runs unarmed, i.e. on the unguarded Sail machine. -/
+  kArm : Bool := false
 
 /-- The top of the store order: the timestamp of the latest store (route P: the ISSUE stamp
 of the latest issued store). -/
@@ -375,9 +380,10 @@ def bootFacts (σ : MState) : Prop :=
 
 /-- The state a `PowerOn` hands over: same generation (`PowerOff` already
 bumped it), power on, a booted machine, and every device reset from what it
-was (the disk keeps its durable image). -/
+was (the disk keeps its durable image); the stuck instrument ARMED
+([OWN.115], `MState.kArm`). -/
 def bootShape (g g' : GState) : Prop :=
-  g'.gen = g.gen ∧ g'.pow = true ∧ bootFacts g'.m ∧ g'.m.devs = g.m.devs.reset
+  g'.gen = g.gen ∧ g'.pow = true ∧ bootFacts g'.m ∧ g'.m.devs = g.m.devs.reset ∧ g'.m.kArm = true
 
 /-- A booted state (so the power-on arm is always enabled,
 `MachCSL.bootShape_bootWitness`): run the boot program on every hart's
@@ -385,7 +391,7 @@ current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
           fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1,
-          [], fun _ => [], fun _ => 0⟩,
+          [], fun _ => [], fun _ => 0, true⟩,
     gen := g.gen, pow := true }
 
 /-- All harts. -/
@@ -1306,6 +1312,95 @@ theorem MState.drvOkGuard_of_ne (σ : MState) (cpu : CPU) (h : cpu.val ≠ 0) :
 theorem MState.drvOkGuard_of_pc (σ : MState) (cpu : CPU) (h : (σ.regs cpu) Register.PC ≠ drvOkPc) :
     σ.drvOkGuard cpu := fun _ hpc => absurd hpc h
 
+/-! ## The stuck instrument ([OWN.115], MachCSL queue Q1)
+
+A synchronous exception taken FROM Supervisor mode makes the hart STUCK (when the
+instrument is armed, `MState.kArm`): Sail's `trap_handler` (`SysControl.lean:733-792`)
+first writes the cause register of the handling mode (`mcause` / `scause`), bit 63 =
+`is_interrupt` (its second write keeps bit 63), while `cur_privilege` still holds the
+trapping mode (the privilege is its last write).  So the guarded event is the write of a
+cause register with bit 63 CLEAR by a hart in Supervisor mode (`kExcWrite`); an interrupt
+(bit 63 set) and every trap out of User or Machine mode are unaffected.  The guard removes
+transitions only; the WP proves none is ever needed, and the exported non-stuckness
+(`Reducible`) gives "no kernel-mode synchronous exception" at every realized state
+(`MState.excOk_of_reducible`).  FAITHFUL ([OWN.115] (a)): the reachable states are the
+unguarded machine's. -/
+
+/-- Supervisor mode. -/
+def privSup : Privilege → Bool
+  | .Supervisor => true
+  | _ => false
+
+/-- **A KERNEL-MODE SYNCHRONOUS EXCEPTION** ([OWN.115]): a write of `scause` or `mcause`
+whose interrupt bit (63) is clear, made from the register file `f` of a hart in Supervisor
+mode. -/
+def kExcWrite (f : RegFile) : (r : Register) → RegisterType r → Bool
+  | .scause, v => !(v.getLsbD 63) && privSup (f .cur_privilege)
+  | .mcause, v => !(v.getLsbD 63) && privSup (f .cur_privilege)
+  | _, _ => false
+
+/-- The armed guard on a register write of hart `cpu` in state `σ`. -/
+def MState.excOk (σ : MState) (cpu : CPU) (r : Register) (v : RegisterType r) : Prop :=
+  σ.kArm = true → kExcWrite (σ.regs cpu) r v = false
+
+/-- A write of a register other than the two cause registers is never guarded. -/
+theorem kExcWrite_of_ne (f : RegFile) (r : Register) (v : RegisterType r) (h1 : r ≠ .scause)
+    (h2 : r ≠ .mcause) : kExcWrite f r v = false := by
+  cases r <;> first | rfl | exact absurd rfl h1 | exact absurd rfl h2
+
+/-- A cause write with the interrupt bit set is never guarded. -/
+theorem kExcWrite_scause_intr (f : RegFile) (v : BitVec 64) (h : v.getLsbD 63 = true) :
+    kExcWrite f .scause v = false := by
+  show (!(v.getLsbD 63) && privSup (f .cur_privilege)) = false
+  rw [h]; rfl
+
+theorem kExcWrite_mcause_intr (f : RegFile) (v : BitVec 64) (h : v.getLsbD 63 = true) :
+    kExcWrite f .mcause v = false := by
+  show (!(v.getLsbD 63) && privSup (f .cur_privilege)) = false
+  rw [h]; rfl
+
+/-- A cause write by a hart that is not in Supervisor mode is never guarded. -/
+theorem kExcWrite_of_priv (f : RegFile) (r : Register) (v : RegisterType r)
+    (h : privSup (f .cur_privilege) = false) : kExcWrite f r v = false := by
+  cases r <;> first | rfl | (show (_ && _) = false; rw [h]; exact Bool.and_false _)
+
+/-- An unguarded write is allowed in every state. -/
+theorem MState.excOk_of (σ : MState) (cpu : CPU) (r : Register) (v : RegisterType r)
+    (h : ∀ f : RegFile, kExcWrite f r v = false) : σ.excOk cpu r v :=
+  fun _ => h _
+
+/-- An unarmed state allows every write (the Vtest validation runs). -/
+theorem MState.excOk_unarmed (σ : MState) (cpu : CPU) (r : Register) (v : RegisterType r)
+    (h : σ.kArm = false) : σ.excOk cpu r v :=
+  fun h' => by rw [h] at h'; cases h'
+
+/-- **THE HART IS STUCK** ([OWN.115]): its head event is a guarded event the armed
+instrument refuses.  Then no event step answers it (`evStep`'s guarded arm) and no pending
+store of the hart lands (`primStep`'s land arm), so the hart thread is not reducible. -/
+def MState.kStuck (σ : MState) (cpu : CPU) : SailM Unit → Prop
+  | .impure (.ok (.regWrite r v)) _ => ¬ σ.excOk cpu r v
+  | _ => False
+
+/-- What a stuck head is: a guarded register write. -/
+theorem MState.kStuck_inv (σ : MState) (cpu : CPU) (m : SailM Unit) (h : σ.kStuck cpu m) :
+    ∃ (r : Register) (v : RegisterType r) (k : Unit → SailM Unit),
+      m = .impure (.ok (.regWrite r v)) k ∧ ¬ σ.excOk cpu r v := by
+  cases m with
+  | pure _ => exact False.elim h
+  | impure c k =>
+    cases c with
+    | error _ => exact False.elim h
+    | ok o =>
+      cases o with
+      | regWrite r v => exact ⟨r, v, k, rfl, h⟩
+      | _ => exact False.elim h
+
+theorem MState.not_kStuck_unarmed (σ : MState) (cpu : CPU) (m : SailM Unit) (h : σ.kArm = false) :
+    ¬ σ.kStuck cpu m := by
+  intro hs
+  obtain ⟨r, v, k, -, hn⟩ := σ.kStuck_inv cpu m hs
+  exact hn (σ.excOk_unarmed cpu r v h)
+
 /-! ## The per-event step relation -/
 
 /-- `evStep cpu o σ v σ'`: in state `σ`, hart `cpu`'s event `o` can be
@@ -1355,6 +1450,10 @@ the order in which stores land; `MState.lp`, `MState.ltop`).
 (The narrow δ1 stale exclusive read and its silent write [OWN.105] are
 RETIRED, [OWN.114]: under route P a failed acquire reads the landed top.)
 
+A register write additionally passes the armed stuck instrument `MState.excOk` ([OWN.115]):
+a write of a cause register with bit 63 clear by a hart in Supervisor mode (a kernel-mode
+synchronous exception, `kExcWrite`) has no answer.
+
 An MMIO store additionally passes `MState.drvOkGuard` -- NAMED ASSUMPTION [OWN.127]/[OWN.131]
 (xv6 weak-memory bug #1): hart 0's `DRIVER_OK` store waits for its pending virtqueue-page
 stores (blocked until then, `blockedStep`); every other MMIO store is unaffected. -/
@@ -1362,7 +1461,7 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
     o.ret → MState → Prop :=
   match o with
   | .regRead r => fun v σ' => v = σ.regs cpu r ∧ σ' = σ
-  | .regWrite r v => fun _ σ' => σ' = σ.setReg cpu r v
+  | .regWrite r v => fun _ σ' => σ' = σ.setReg cpu r v ∧ σ.excOk cpu r v
   | .memRead n _ req => fun v σ' =>
       (devBytes req.pa n ∧
         ∃ w ds', devRead σ.devs req.pa n = some (w, ds') ∧ v = .Ok (w, none) ∧
@@ -1624,7 +1723,9 @@ def devStep (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
   [OWN.110] [OWN.111], increment P-M1): a live hart may instead land one of
   its pending stores (`MState.land`, guard `MState.landOk`), SILENTLY, its
   computation stuttering (whatever event is at its head: a landing is no
-  event of the model, so it emits no user-boundary event).
+  event of the model, so it emits no user-boundary event) -- unless the hart
+  is STUCK ([OWN.115], `MState.kStuck`: its head is an event the armed
+  instrument refuses), so that a stuck hart thread is not reducible.
 * A device task of generation `gen`: if live, one step of its program
   (`devStep`: possibly observed, possibly forking); otherwise the corpse
   arm.
@@ -1638,7 +1739,7 @@ def primStep : Expr × GState → List Obs → Expr × GState × List Expr → P
     ((threadLive g gen ∧ obs = hartObsM cpu m g.m ∧ ∃ m' σ', e' = .hart gen cpu m' ∧
         hartStep cpu m g.m m' σ' ∧ g' = { g with m := σ' }) ∨
      (¬ threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧ g' = g) ∨
-     (threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧
+     (threadLive g gen ∧ ¬ g.m.kStuck cpu m ∧ obs = [] ∧ e' = .hart gen cpu m ∧
         ∃ t, g.m.landOk cpu t ∧ g' = { g with m := g.m.land cpu t }))
   | (.dev gen d tid m, g), obs, (e', g', efs) =>
     (threadLive g gen ∧ ∃ m' σ', e' = .dev gen d tid m' ∧ devStep gen d tid m g.m obs m' σ' efs ∧
@@ -1675,7 +1776,7 @@ theorem primStep_hart_inv {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
     ((threadLive g gen ∧ obs = hartObsM cpu m g.m ∧ ∃ m' σ', e' = .hart gen cpu m' ∧
         hartStep cpu m g.m m' σ' ∧ g' = { g with m := σ' }) ∨
      (¬ threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧ g' = g) ∨
-     (threadLive g gen ∧ obs = [] ∧ e' = .hart gen cpu m ∧
+     (threadLive g gen ∧ ¬ g.m.kStuck cpu m ∧ obs = [] ∧ e' = .hart gen cpu m ∧
         ∃ t, g.m.landOk cpu t ∧ g' = { g with m := g.m.land cpu t })) := h
 
 theorem primStep_hart_live {gen : Nat} {cpu : CPU} {m m' : SailM Unit} {g : GState}
@@ -1692,10 +1793,10 @@ theorem primStep_hart_dead {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
 /-- THE LAND ARM IS SILENT (route P): a landing stutters the hart's
 computation and emits nothing, whatever event is at its head. -/
 theorem primStep_hart_land {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState} {t : Nat}
-    (hl : threadLive g gen) (h : g.m.landOk cpu t) :
+    (hl : threadLive g gen) (hk : ¬ g.m.kStuck cpu m) (h : g.m.landOk cpu t) :
     PrimStep.primStep (Expr.hart gen cpu m, g) ([] : List Obs)
       (.hart gen cpu m, { g with m := g.m.land cpu t }, []) :=
-  ⟨rfl, Or.inr (Or.inr ⟨hl, rfl, rfl, t, h, rfl⟩)⟩
+  ⟨rfl, Or.inr (Or.inr ⟨hl, hk, rfl, rfl, t, h, rfl⟩)⟩
 
 theorem primStep_dev_inv {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {g : GState}
     {obs : List Obs} {e' : Expr} {g' : GState} {efs : List Expr}
@@ -1730,5 +1831,34 @@ theorem primStep_power_off {g : GState} (h : g.pow = true) :
 theorem primStep_power_on {g g' : GState} (h : g.pow = false) (hb : bootShape g g') :
     PrimStep.primStep (Expr.power, g) [Obs.powerOn] (.power, g', powerFork g.gen) :=
   ⟨rfl, Or.inr ⟨h, rfl, rfl, hb⟩⟩
+
+/-! ## The stuck instrument, exported ([OWN.115])
+
+Adequacy exports non-stuckness: every thread of a reachable configuration is `Reducible`.
+For a LIVE hart thread that reads: its head is no event the armed instrument refuses. -/
+
+/-- A live hart thread that is reducible is not stuck. -/
+theorem MState.not_kStuck_of_reducible {gen : Nat} {cpu : CPU} {m : SailM Unit} {g : GState}
+    (hl : threadLive g gen) (hr : PrimStep.Reducible (Expr.hart gen cpu m, g)) :
+    ¬ g.m.kStuck cpu m := by
+  obtain ⟨obs, e', g', efs, hs⟩ := hr
+  obtain ⟨-, hc⟩ := primStep_hart_inv hs
+  intro hk
+  rcases hc with ⟨_, _, m', σ', _, hst, _⟩ | ⟨hnl, _⟩ | ⟨_, hk', _⟩
+  · obtain ⟨r, v, k, rfl, hn⟩ := g.m.kStuck_inv cpu m hk
+    rcases hst with ⟨v', _, hev⟩ | ⟨hb, _⟩
+    · exact hn hev.2
+    · exact hb
+  · exact hnl hl
+  · exact hk' hk
+
+/-- **NO KERNEL-MODE SYNCHRONOUS EXCEPTION** ([OWN.115]): a live, reducible hart thread whose
+head is a register write makes an allowed write (armed: not a cause write with bit 63 clear
+from Supervisor mode). -/
+theorem MState.excOk_of_reducible {gen : Nat} {cpu : CPU} {r : Register} {v : RegisterType r}
+    {k : Unit → SailM Unit} {g : GState} (hl : threadLive g gen)
+    (hr : PrimStep.Reducible (Expr.hart gen cpu (.impure (.ok (.regWrite r v)) k), g)) :
+    g.m.excOk cpu r v :=
+  Classical.byContradiction fun h => MState.not_kStuck_of_reducible hl hr h
 
 end MachCSL

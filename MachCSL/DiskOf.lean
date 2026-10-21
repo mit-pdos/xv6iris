@@ -142,6 +142,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
     · cases o <;> simp only [evStep] at hev
       all_goals first
         | (obtain rfl := hev; rfl)
+        | (obtain ⟨rfl, _⟩ := hev; rfl)
         | (obtain ⟨_, rfl⟩ := hev; rfl)
         | exact hev.elim
         | skip
@@ -196,5 +197,107 @@ theorem devStep_diskOf {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {�
     rcases h with ⟨v, _, hop⟩ | ⟨_, _, rfl, _⟩
     · exact devOpStep_diskOf hd hop
     · rfl
+
+/-! ## [OWN.115] The stuck instrument's arming bit is constant while the power is on
+
+No step moves `MState.kArm`; `PowerOn` sets it (`bootShape`).  So every powered state reachable
+from a machine whose powered states are armed (in particular from one that is off, as every
+registered root's `Expr.power` start) is armed -- what a consumer of `MState.excOk_of_reducible`
+needs to read "no kernel-mode synchronous exception" off the exported non-stuckness. -/
+
+theorem hartStep_kArm {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM Unit} {σ' : MState}
+    (h : hartStep cpu m σ m' σ') : σ'.kArm = σ.kArm := by
+  unfold hartStep at h
+  split at h
+  · obtain ⟨_, _, rfl⟩ := h; rfl
+  · exact h.elim
+  · rename_i o k
+    rcases h with ⟨v, _, hev⟩ | ⟨hb, _⟩
+    · cases o <;> simp only [evStep] at hev
+      all_goals first
+        | (obtain rfl := hev; rfl)
+        | (obtain ⟨rfl, _⟩ := hev; rfl)
+        | (obtain ⟨_, rfl⟩ := hev; rfl)
+        | exact hev.elim
+        | skip
+      · rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+          ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
+        all_goals rfl
+      · rcases hev with ⟨_, w, ds', _, hw, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
+        all_goals rfl
+    · cases o <;> simp only [blockedStep] at hb
+      all_goals first
+        | exact hb.elim
+        | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl)
+        | (obtain ⟨_, _, rfl⟩ := hb; rfl)
+        | (obtain ⟨_, rfl⟩ := hb; rfl)
+
+theorem devOpStep_kArm {gen : Nat} {d : DevId} {o : DevOp (DevSt d) (DevTask d)} {σ : MState}
+    {v : o.ret} {σ' : MState} {obs : List Obs} {efs : List Expr}
+    (h : devOpStep gen d o σ v σ' obs efs) : σ'.kArm = σ.kArm := by
+  cases o with
+  | step g =>
+    obtain ⟨s', _, _, _, rfl, _, _⟩ := h
+    rfl
+  | get => obtain ⟨_, rfl, _⟩ := h; rfl
+  | choose => obtain ⟨rfl, _⟩ := h; rfl
+  | dmaRead pa n => obtain ⟨_, rfl, _⟩ := h; rfl
+  | dmaWrite g pa n w =>
+    obtain ⟨_, _, ⟨s', _, _, _, _, rfl⟩ | ⟨_, rfl⟩⟩ := h
+    · by_cases hn : n = 0
+      · simp only [MState.storeDma, if_pos hn]
+      · simp only [MState.storeDma, if_neg hn]
+    · rfl
+  | sample src => obtain ⟨_, rfl, _⟩ := h; rfl
+  | setPin c mm b =>
+    obtain ⟨_, _, rfl⟩ := h
+    split <;> rfl
+  | fork t => obtain ⟨_, _, rfl, _⟩ := h; rfl
+  | join tid => obtain ⟨_, rfl, _⟩ := h; rfl
+
+theorem devStep_kArm {gen : Nat} {d : DevId} {tid : TaskId} {m : DevProg d} {σ : MState}
+    {obs : List Obs} {m' : DevProg d} {σ' : MState} {efs : List Expr}
+    (h : devStep gen d tid m σ obs m' σ' efs) : σ'.kArm = σ.kArm := by
+  cases m with
+  | pure _ =>
+    obtain ⟨_, _, ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩⟩ := h
+    · rfl
+    · split <;> rfl
+  | op o k =>
+    rcases h with ⟨v, _, hop⟩ | ⟨_, _, rfl, _⟩
+    · exact devOpStep_kArm hop
+    · rfl
+
+/-- "Powered ⇒ armed" is kept by every primitive step. -/
+theorem primStep_kArm {e : Expr} {g : GState} {obs : List Obs} {e' : Expr} {g' : GState}
+    {efs : List Expr} (h : primStep (e, g) obs (e', g', efs)) (hk : g.pow = true → g.m.kArm = true) :
+    g'.pow = true → g'.m.kArm = true := by
+  cases e with
+  | hart gen cpu m =>
+    obtain ⟨-, hc⟩ := h
+    rcases hc with ⟨_, _, m', σ', _, hs, rfl⟩ | ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, t, _, rfl⟩
+    · intro hp; exact (hartStep_kArm hs).trans (hk hp)
+    · exact hk
+    · exact hk
+  | dev gen d tid m =>
+    rcases h with ⟨_, m', σ', _, hs, rfl⟩ | ⟨_, _, _, _, rfl⟩
+    · intro hp; exact (devStep_kArm hs).trans (hk hp)
+    · exact hk
+  | power =>
+    obtain ⟨-, ⟨_, _, _, rfl⟩ | ⟨_, _, _, hb⟩⟩ := h
+    · intro hp; cases hp
+    · intro _; exact hb.2.2.2.2
+
+/-- **ARMED ALONG A RUN**: from a configuration whose powered state is armed, every reachable
+powered state is armed. -/
+theorem nsteps_kArm {n : Nat} {ρ ρ' : List Expr × GState} {κ : List Obs}
+    (h : Iris.ProgramLogic.Language.NSteps n ρ κ ρ') (hk : ρ.2.pow = true → ρ.2.m.kArm = true) :
+    ρ'.2.pow = true → ρ'.2.m.kArm = true := by
+  induction h with
+  | refl => exact hk
+  | cons hs _ ih =>
+    apply ih
+    cases hs with
+    | atomic H t₁ t₂ => exact primStep_kArm H hk
 
 end MachCSL

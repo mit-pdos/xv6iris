@@ -101,7 +101,7 @@ theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : 
   | regRead r => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
   | getCycleCount => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
   | barrier b => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
-  | _ => subst h; exact Or.inl ⟨rfl, rfl⟩
+  | _ => first | (subst h; exact Or.inl ⟨rfl, rfl⟩) | (obtain ⟨rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩)
 
 /-- A blocked hart event keeps the pc log. -/
 theorem CapPcLog.blockedPc (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState)
@@ -182,7 +182,7 @@ theorem CapPcLog.primStepPc {e : Expr} {g : GState} {obs : List Obs} {e' : Expr}
     {efs : List Expr} (h : primStep (e, g) obs (e', g', efs)) (hp : g.pow = true) : CapPcLog.stepPc g.m g'.m := by
   cases e with
   | hart gen cpu m =>
-    obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := h
+    obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, -, t, -, rfl⟩⟩ := h
     · rcases CapPcLog.hartStepPc cpu m g.m m' σ' hs with hk | ⟨n, va, req, w, he⟩
       · exact Or.inl hk
       · exact Or.inr (Or.inl ⟨cpu, n, va, req, w, he⟩)
@@ -279,7 +279,7 @@ theorem CapPcLog.stepStoreOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
   | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
     cases e with
     | hart gen cpu m =>
-      obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := H
+      obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, -, t, -, rfl⟩⟩ := H
       · rcases CapPcLog.hartStepStore cpu m g.m m' σ' hs with hk | ⟨n, va, req, k, w, rfl, he⟩
         · exact Or.inl hk
         · exact Or.inr (Or.inl ⟨t₁, t₂, gen, cpu, n, va, req, k, w, rfl, he⟩)
@@ -323,7 +323,7 @@ theorem CapPcLog.stepHartN {t t' : List Expr} {g g' : GState} {obs : List Obs}
     have hsame : CapPcLog.isHartOf cpu e' = CapPcLog.isHartOf cpu e ∧ CapPcLog.hartN cpu eₜ = 0 := by
       cases e with
       | hart gen c m =>
-        obtain ⟨rfl, ⟨-, -, m', σ', rfl, -, -⟩ | ⟨-, -, rfl, -⟩ | ⟨-, -, rfl, -⟩⟩ := H <;> exact ⟨rfl, rfl⟩
+        obtain ⟨rfl, ⟨-, -, m', σ', rfl, -, -⟩ | ⟨-, -, rfl, -⟩ | ⟨-, -, -, rfl, -⟩⟩ := H <;> exact ⟨rfl, rfl⟩
       | dev gen d tid m =>
         rcases H with ⟨-, m', σ', rfl, hs, -⟩ | ⟨-, -, rfl, rfl, -⟩
         · refine ⟨rfl, ?_⟩
@@ -360,7 +360,7 @@ theorem CapPcLog.stepGen {t t' : List Expr} {g g' : GState} {obs : List Obs}
   | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
     cases e with
     | hart gen c m =>
-      obtain ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := H <;>
+      obtain ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, -, t, -, rfl⟩⟩ := H <;>
         exact ⟨Nat.le_refl _, fun hp => Or.inl ⟨rfl, hp⟩⟩
     | dev gen d tid m =>
       rcases H with ⟨-, m', σ', -, -, rfl⟩ | ⟨-, -, -, -, rfl⟩ <;>

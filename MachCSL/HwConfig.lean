@@ -190,7 +190,7 @@ theorem RegFile.set_eq_self (f : RegFile) (r : Register) (v : RegisterType r) (h
 cell suffices, since the register file does not move (and the write is
 silent, NI M2-W1: no privilege crossing). -/
 theorem swp_writeReg_same (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r)
-    (Φ : PUnit → IProp GF) :
+    (hk : ∀ f : RegFile, kExcWrite f r v = false) (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu]{dq} v ∗ ▷ (r ↦ᵣ[cpu]{dq} v -∗ Φ ()) ⊢ swp cpu (writeReg r v) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
@@ -204,10 +204,10 @@ theorem swp_writeReg_same (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterT
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨hartObs_regWrite_quiet cpu σ r v (Or.inr Hv), (), σ.setReg cpu r v, rfl⟩
+    exact ⟨hartObs_regWrite_quiet cpu σ r v (Or.inr Hv), (), σ.setReg cpu r v, rfl, σ.excOk_of cpu r v hk⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨rfl, -⟩ := Hev
   imod Hmask
   imodintro
   isplitl [Hregs Hclose]
@@ -274,6 +274,7 @@ theorem swp_writeReg_hw_bind (cpu : CPU) {X : Type} (r : Register) (v : Register
   ihave #Hr := hwConfig_reg cpu r v h $$ Hhw
   iapply swp_bind
   iapply swp_writeReg_same cpu r DFrac.discard v
+    (fun f => kExcWrite_of_ne f r v (by rintro rfl; cases h) (by rintro rfl; cases h))
   iframe Hr
   inext
   iintro -

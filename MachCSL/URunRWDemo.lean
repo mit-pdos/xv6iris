@@ -42,10 +42,12 @@ written; the two wire pins are answered by the oracle. -/
 def urwDemoFoot : UFoot where
   Dr r := !(decide (r = .sig_meip) || decide (r = .sig_seip))
   Dw r := !(decide (r = .sig_meip) || decide (r = .sig_seip) || decide (r = .cur_privilege) ||
-    decide (r = .satp))
+    decide (r = .satp) || decide (r = .scause) || decide (r = .mcause))
   Dany r := decide (r = .sig_meip) || decide (r = .sig_seip)
   noPriv := by decide
   noSatp := by decide
+  noScause := by decide
+  noMcause := by decide
 
 /-! ## RTYPE: `add x3, x1, x2` -/
 

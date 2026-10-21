@@ -204,6 +204,16 @@ def pureBindValueCore (e : Lean.Expr) : SimpM Simp.Step := do
 
 simproc_decl pureBindValue (_) := pureBindValueCore
 
+/-- [OWN.115] The interrupt bit (63) of a trap-cause value the model writes is set: by
+evaluation, or through `Sail.BitVec.updateSubrange` and `bv_decide`. -/
+macro "cause_bit" : tactic =>
+  `(tactic| first
+    | rfl
+    | decide
+    | (simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', LeanRV64D.Functions.bool_to_bit,
+        LeanRV64D.Functions.bool_bit_forwards, LeanRV64D.Functions.trapCause_is_interrupt]; bv_decide)
+    | (simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']; bv_decide))
+
 /-- Normalise the head of the computation. -/
 macro "sail_norm" : tactic =>
   `(tactic| simp only [reduceClosedBEq, reduceClosedBNe, reduceClosedNot, reduceClosedAnd,
@@ -660,7 +670,19 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         let hw := mkIdent `Hhw
         evalTactic (← `(tactic| first
           | (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); iframe $hw:ident; try inext)
-          | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+          | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide)) (hk := fun _ => rfl)); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      else if rE.isAppOf ``LeanRV64D.Register.scause || rE.isAppOf ``LeanRV64D.Register.mcause then
+        -- [OWN.115] A TRAP-CAUSE WRITE (the stuck instrument's guarded event): an interrupt's
+        -- (bit 63 set, by computation), or one made out of a non-Supervisor mode (the
+        -- `cur_privilege` cell `Hcur_privilege`, as the U→S trap tower holds it)
+        let hcp := mkIdent `Hcur_privilege
+        let intrLem := if rE.isAppOf ``LeanRV64D.Register.scause then mkIdent ``kExcWrite_scause_intr
+          else mkIdent ``kExcWrite_mcause_intr
+        evalTactic (← `(tactic| first
+          | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))
+               (hk := fun f => $intrLem f _ (by cause_bit))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))
+          | (iapply (swp_writeReg_ucauseU_bind (r := $rStx) (w := $wStx) (hq := by decide));
+             iframe $hcp:ident $h:ident; try (inext; iintro $hcp:ident $h:ident))))
       else if rE.isAppOf ``LeanRV64D.Register.satp then
         -- W8 (f3-utext) (F-REGS): a `satp` write moves the user-epoch record,
         -- by the client's ghost step `Hsatpw : satpStep cpu s0 s1 P Q` run on
@@ -694,7 +716,7 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
              iframe $hu:ident $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
              try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))))
       else
-        evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+        evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide)) (hk := fun _ => rfl)); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then
       -- normalise the request's address arithmetic so the bytes frame, then
       -- read the access kind off the request: a fetch reads image bytes
