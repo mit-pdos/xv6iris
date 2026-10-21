@@ -822,6 +822,8 @@ import Weak.SbVirtio
 import Weak.SbHeldPin
 import Weak.SbPteCust
 import Weak.CapFrame
+import Weak.G7FetchOwn
+import Weak.SbProg
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
