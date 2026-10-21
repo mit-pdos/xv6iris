@@ -488,7 +488,7 @@ def fence (x : XState) (cpu : CPU) (b : barrier_kind) : XState :=
   let tv' := fencePost (fenceDrains b) (fenceAcq b) h.tv h.hr.rv pub
   { x.setHart cpu { h with
       tv := tv',
-      itv := if fenceIfetch b then max h.itv (fencePost true false h.tv h.hr.rv pub) else h.itv } with
+      itv := if fenceIfetch b then max h.itv (fencePost true true h.tv h.hr.rv pub) else h.itv } with
     sbEp := updCpu x.sbEp cpu (if fenceEpoch b then x.sbEp cpu + 1 else x.sbEp cpu) }
 
 /-- Replacing the store epochs denotes the same replacement. -/

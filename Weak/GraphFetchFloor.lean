@@ -4,7 +4,7 @@ Weak: **W5d-G G5 (part 2) — the floor bound** (plan rev 48 §C W5d-G G5 "the f
 Lean-only, no Rocq twin.
 
 The M2 fetch clause (`PfRunUnpinned.fcutEM2`) is the cut form at the instruction view `itvOf`,
-which rises only at a `fence.i` (`PfRunUnpinned.itvStep`) to MachCSL's value `fencePost true false
+which rises only at a `fence.i` (`PfRunUnpinned.itvStep`) to MachCSL's value `fencePost true true
 tv rv (ownPub i au)` read off the TRACE shadow (`TsoShadow.shadowRun`).  `GraphFetch.linFetchCut`
 (`Weak/GraphFetchCut.lean`) passes the cut form at every view at or below the fence.i
 contributors' maximum.  This file supplies the bound, in the rule-14 linearization `linCand G`:
@@ -459,14 +459,14 @@ theorem GraphFetchFloor.shadowCone (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (
       exact GraphFetchFloor.stepOther G stamp i _ _ e.1 (glbl G e) _ hag ih'
 
 /-- **THE FLOOR BOUND at a fence**: at hart `i`'s event `(i, f)` (trace index `K`), the value
-MachCSL's `fence.i` arm raises the instruction view to -- `fencePost true false tv rv (ownPub i
+MachCSL's `fence.i` arm raises the instruction view to -- `fencePost true true tv rv (ownPub i
 au)` at the trace shadow before the step -- is at or below the cone of the events before `f`. -/
 theorem GraphFetchFloor.fencePostCone (G : Gexec) (hwf : gwf G) (h14 : grule14 G)
     (stamp : CohStamp)
     (hL : ∀ i coh base srcs tvn a, stamp.load i coh base srcs tvn a ≤ max (coh a) (shForeign i srcs))
     (hS : ∀ coh base n a, stamp.store coh base n a ≤ coh a) (K i f : Nat) :
     (glinEids G)[K]? = some (i, f) →
-    MachCSL.fencePost true false (shadowRun stamp i ((linCand G).cdTr.take K)).2.tv
+    MachCSL.fencePost true true (shadowRun stamp i ((linCand G).cdTr.take K)).2.tv
       (shadowRun stamp i ((linCand G).cdTr.take K)).2.rv
       (MachCSL.ownPub i (shadowRun stamp i ((linCand G).cdTr.take K)).1) ≤
       GraphFetchFloor.cone G i f := by
@@ -482,7 +482,7 @@ theorem GraphFetchFloor.fencePostCone (G : Gexec) (hwf : gwf G) (h14 : grule14 G
 theorem GraphFetchFloor.fencePostConeSrc (G : Gexec) (hwf : gwf G) (h14 : grule14 G)
     (K i f : Nat) :
     (glinEids G)[K]? = some (i, f) →
-    MachCSL.fencePost true false (shadowRun cohSrc i ((linCand G).cdTr.take K)).2.tv
+    MachCSL.fencePost true true (shadowRun cohSrc i ((linCand G).cdTr.take K)).2.tv
       (shadowRun cohSrc i ((linCand G).cdTr.take K)).2.rv
       (MachCSL.ownPub i (shadowRun cohSrc i ((linCand G).cdTr.take K)).1) ≤
       GraphFetchFloor.cone G i f :=

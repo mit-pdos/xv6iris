@@ -2,9 +2,11 @@
 MachCSL: **`fence.i` and the stamp** (Rocq `HartBarrier.ifence_step`,
 `wp_hart_fence_i`, `TsoCtx.ctx_phys_xstamp`; claude-notes/design/icache.md).
 
-`fence.i` drains nothing on the data side, but it raises the hart's
-INSTRUCTION view to `max itv (max tv pub)` (`MState.fence`): past its data
-view and its own last store.  That is the one moment an instruction-view
+`fence.i` moves nothing on the data side (route P: it waits for the hart's
+store buffer to be empty, the documented STRONGER drain, EX-FENCEI-1), and it
+raises the hart's INSTRUCTION view to `max itv (max tv (max rv pub))`
+(`MState.fence`, [OWN.143] F1): past its data view, its read watermark and
+its own last store.  That is the one moment an instruction-view
 receipt is born, and the moment a context's bytes can be STAMPED: every
 timestamp the running context justifies is under the data view (clean, or
 dirty under the bound) or is the hart's own store (dirty, authored here), so

@@ -23,7 +23,7 @@ trace in `pcLog`).  A plain load runs at the MINIMAL legal view
   bit of `emFenceI`'s criterion).  `itv` moves only at an own `LFence false×4` whose latest own
   `LInstr`/`LIFetch` step is `LInstr` (fence.i: boundary `LInstr`, fetch, announce `LInstr`,
   barrier; the `sfence.vma` marker: boundary `LInstr`, fetch, marker — `notes/W5dG-spike.md`
-  `emFenceI`): `itv := max itv (fencePost true false tv rv ownPub)`, MachCSL's `fence.i` arm
+  `emFenceI`): `itv := max itv (fencePost true true tv rv ownPub)`, MachCSL's `fence.i` arm
   (`Lang.lean:155-163`).  The TRACE shadow `shadowOf` stays MEMORY-ONLY ([R11.3]: the two
   `LFence false×4` are indistinguishable in `E.exTr`; W5d's `itvOf` carries `itv` there).
   Neither `LFence false×4` moves a memory field (`TsoShadow.ShSt.fenceNoSucc`).
@@ -310,13 +310,13 @@ def lbFenceZero (l : Wlabel) : Bool :=
   | _ => false
 
 /-- The viewer's own step on the full shadow: the memory step; `itv` raised at a `fence.i`
-(`lbFenceZero` with `fiArm`) to `max itv (fencePost true false tv rv ownPub)` at the PRE-step
+(`lbFenceZero` with `fiArm`) to `max itv (fencePost true true tv rv ownPub)` at the PRE-step
 `tv`/`rv` (MachCSL's `fence.i` arm, `Lang.lean:155-163`); `fiArm` set by `LInstr`, cleared by
 `LIFetch`. -/
 def shStepF (stamp : CohStamp) (i : Nat) (au : List Nat) (f : ShFull) (l : Wlabel) : ShFull :=
   ⟨shStep stamp i au f.mem l,
    if lbFenceZero l && f.fiArm then
-     max f.itv (MachCSL.fencePost true false f.mem.tv f.mem.rv (MachCSL.ownPub i au))
+     max f.itv (MachCSL.fencePost true true f.mem.tv f.mem.rv (MachCSL.ownPub i au))
    else f.itv,
    match l with
    | .LInstr => true

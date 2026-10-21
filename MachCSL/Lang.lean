@@ -193,14 +193,16 @@ abbrev MState.storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVe
 
 /-- **THE FENCE** (route P): the floor per `fencePost`, its publication the hart's last LANDED
 store (`ownPubL`; a draining fence finds the hart's buffer empty, so it is the hart's last store);
-`fence.i` raises the instruction view past the floor and that store; a fence with a W predecessor
+`fence.i` raises the instruction view past the floor, the read watermark and that store (Zifencei:
+later fetches see the stores already visible to the hart -- its floor, what its loads have read
+past, its own stores; [OWN.143] F1: `fencePost true true` joins `rv`); a fence with a W predecessor
 and a W successor opens a new store epoch (`fenceEpoch`, [OWN.113]). -/
 abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
   let pub := ownPubL (hartAgent cpu) σ.log σ.llog
   let tv' := fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv pub
   { σ with tv := updCpu σ.tv cpu tv',
            itv := updCpu σ.itv cpu
-             (if fenceIfetch b then max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv pub)
+             (if fenceIfetch b then max (σ.itv cpu) (fencePost true true (σ.tv cpu) (σ.hr cpu).rv pub)
               else σ.itv cpu),
            sbEp := updCpu σ.sbEp cpu (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) }
 

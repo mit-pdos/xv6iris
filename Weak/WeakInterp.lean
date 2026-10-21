@@ -58,7 +58,7 @@ Rocq model never emits `AK_ifetch`/`AK_ttw` (fetch and walk both landed in
   move, as in Rocq and as MachCSL's `fencePost` with neither edge), and the
   barrier arm also sets `wmItv' := itvPost ws itv b`, which for `fence.i` is
   `max itv (max ws.wVrNew ws.wVwOld)` and `itv` otherwise (`fenceIfetch`, reused
-  from MachCSL).  This is MachCSL's `max itv (fencePost true false tv rv pub)` =
+  from MachCSL).  This is MachCSL's pre-[OWN.143] `max itv (fencePost true false tv rv pub)` =
   `max itv (max tv pub)` with the data floor `tv ↦ wVrNew` and the hart's own
   last store `pub ↦ wVwOld` (`itvPostMachCSL`).  The read watermark is not
   joined (MachCSL's `acq = false`).
@@ -373,7 +373,7 @@ theorem itvPostNotI (ws : Wstate) (itv : Nat) (b : barrier_kind) :
     fenceIfetch b = false → itvPost ws itv b = itv := by
   intro h; simp [itvPost, h]
 
-/-- The MachCSL shape (`MState.fence`): `max itv (fencePost true false tv rv pub)`
+/-- The pre-[OWN.143] MachCSL shape (`MState.fence` before F1 joined `rv`): `max itv (fencePost true false tv rv pub)`
 with `tv ↦ wVrNew`, `pub ↦ wVwOld` (the read watermark is not joined). -/
 theorem itvPostMachCSL (ws : Wstate) (itv rv : Nat) (b : barrier_kind) :
     itvPost ws itv b =

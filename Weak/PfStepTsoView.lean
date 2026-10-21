@@ -478,7 +478,7 @@ theorem shStepFBound (stamp : CohStamp) (hs : StampOk stamp) (i : Nat) (au : Lis
   obtain ⟨⟨htv, hrv, hcoh⟩, hitv⟩ := h
   refine ⟨shStepBound stamp hs i au f.mem l ⟨htv, hrv, hcoh⟩, Nat.le_trans ?_ (Nat.le_add_right _ _)⟩
   show (if lbFenceZero l && f.fiArm then
-      max f.itv (MachCSL.fencePost true false f.mem.tv f.mem.rv (MachCSL.ownPub i au))
+      max f.itv (MachCSL.fencePost true true f.mem.tv f.mem.rv (MachCSL.ownPub i au))
     else f.itv) ≤ au.length
   split
   · exact Nat.max_le.2 ⟨hitv, MachCSL.fencePost_le _ _ _ _ _ _ htv hrv (MachCSL.ownPub_le i au)⟩
@@ -756,7 +756,7 @@ theorem rowFence (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (c
       (σ.hr cpu).rv (MachCSL.ownPub (hartAgent cpu) σ.log) := by
     simp only [MState.fence, updCpu, if_true, hpub]
   have hI : (σ.fence cpu b).itv cpu =
-      (if fenceIfetch b then max (σ.itv cpu) (MachCSL.fencePost true false (σ.tv cpu) (σ.hr cpu).rv
+      (if fenceIfetch b then max (σ.itv cpu) (MachCSL.fencePost true true (σ.tv cpu) (σ.hr cpu).rv
         (MachCSL.ownPub (hartAgent cpu) σ.log)) else σ.itv cpu) := by
     simp only [MState.fence, updCpu, if_true, hpub]
   generalize hf : tsoShadow stamp st (hartAgent cpu) = f at hr hfi ⊢

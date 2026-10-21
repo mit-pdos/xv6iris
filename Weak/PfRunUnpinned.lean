@@ -26,7 +26,7 @@ constrained per index by M2's instance `fcutEM2` of `execProgOk'SC`'s per-index 
 (closing over the execution `E`, [R31.s1]): the leading star's fetches satisfy `fcutM2` at
 `itvOf k ag`; `fiOf (k+1) ag` is the star's `LInstr`/`LIFetch` fold of `fiOf k ag` (`fiFold`);
 `itvOf (k+1) ag` raises at a `LFence false×4` realizing label iff that fold is armed, to
-`max itv (fencePost true false tv rv (ownPub ag au))` at the trace shadow's `tv`/`rv` and the
+`max itv (fencePost true true tv rv (ownPub ag au))` at the trace shadow's `tv`/`rv` and the
 log's authors (MachCSL's `fence.i` arm, `Lang.lean:155-163`); every other agent is framed; the
 boot values are `itvOf 0 i = 0`, `fiOf 0 i = false` (`ShFull.zero`, [R31.s3]).
 
@@ -101,7 +101,7 @@ def PfRunUnpinned.itvStep (stamp : CohStamp) (E : Exec) (k ag itv : Nat) (arm : 
   match E.exTr[k]? with
   | some s =>
     if PfRunUnpinned.lbFenceZeroL s.esLb && arm then
-      max itv (MachCSL.fencePost true false (shadowRun stamp ag (E.exTr.take k)).2.tv
+      max itv (MachCSL.fencePost true true (shadowRun stamp ag (E.exTr.take k)).2.tv
         (shadowRun stamp ag (E.exTr.take k)).2.rv
         (MachCSL.ownPub ag (shadowRun stamp ag (E.exTr.take k)).1))
     else itv

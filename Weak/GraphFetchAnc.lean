@@ -296,7 +296,7 @@ theorem GraphFetchAnc.shadowConeA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G
 theorem GraphFetchAnc.fencePostConeSrcA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G)
     (hok : ancOk G anc) (K i f : Nat) :
     (glinEidsA G anc)[K]? = some (i, f) →
-    MachCSL.fencePost true false (shadowRun cohSrc i ((linCandA G anc).cdTr.take K)).2.tv
+    MachCSL.fencePost true true (shadowRun cohSrc i ((linCandA G anc).cdTr.take K)).2.tv
       (shadowRun cohSrc i ((linCandA G anc).cdTr.take K)).2.rv
       (MachCSL.ownPub i (shadowRun cohSrc i ((linCandA G anc).cdTr.take K)).1) ≤
       GraphFetchFloor.cone G i f := by

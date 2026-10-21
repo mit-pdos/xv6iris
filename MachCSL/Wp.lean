@@ -2145,7 +2145,7 @@ theorem memModel_fence_acc (σ : MState) (cpu : CPU) (b : barrier_kind) :
     simp [updCpu]
   have e_itv : (σ.fence cpu b).itv cpu =
       (if fenceIfetch b then
-        max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv (ownPubL (hartAgent cpu) σ.log σ.llog))
+        max (σ.itv cpu) (fencePost true true (σ.tv cpu) (σ.hr cpu).rv (ownPubL (hartAgent cpu) σ.log σ.llog))
        else σ.itv cpu) := by
     simp [updCpu]
   imod MonoNat.own_update _ (.ofNat (σ.tv cpu)) (.ofNat ((σ.fence cpu b).tv cpu))
