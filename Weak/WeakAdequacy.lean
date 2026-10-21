@@ -94,7 +94,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 registry either (W8 (f2-ctx) [OWN.49]: the static list is empty, so it
 registers no pipe slots), and no sealed kernel table shape (`kptOk`: any). -/
 def WeakAdequacy.rsvNone : KernelRsv :=
-  ⟨[], ⟨List.nodup_nil, fun a ha => by simp [rsvBytes] at ha, List.nodup_nil⟩, fun _ => True, []⟩
+  ⟨[], ⟨List.nodup_nil, fun a ha => by simp [rsvBytes] at ha, List.nodup_nil⟩, fun _ => True, [], []⟩
 
 /-- The fixed record: the adequacy's invariant world, placeholder names, trivial client slots. -/
 @[reducible] def weakAdeqFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF) :

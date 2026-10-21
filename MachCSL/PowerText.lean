@@ -116,7 +116,8 @@ def powerBootResT [KernelMap] [KernelRsv] (lo hi : Nat) (Mof : (Nat → BitVec 8
   -- THE RESERVED REGIONS (W8-β′, `powerBootRes`'s rows): which list was reserved...
   ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ ∗
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ ∗
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
   ([∗list] cpu ∈ cpus, regCellsNoPins (E.regName cpu) (σ.regs cpu)) ∗
@@ -149,7 +150,8 @@ other hook and step is `wp_power`'s. -/
 theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
     (hkpt : (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs))
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs))
     (hwin : ∀ a ∈ rsvBytes KernelRsv.static, ¬ (lo ≤ a.toNat ∧ a.toNat < hi))
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ dk : Nat → BitVec 8,
@@ -795,7 +797,7 @@ theorem riscvPowerAdequacyT [MachGpreS hlc GF] [KernelMap] [KernelRsv] (lo hi : 
           (Tk c) (Hk c) γobs T (Pt γreg γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
-          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ lo hi rfl ⟨rfl, rfl⟩ hwin
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ lo hi rfl ⟨rfl, rfl, rfl⟩ hwin
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (Pon γreg γobs c)

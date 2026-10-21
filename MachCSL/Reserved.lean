@@ -391,6 +391,10 @@ class KernelRsv where
   release stores -- every release entry of a static spinlock and every
   publication entry is a plain store issued at one of them. -/
   relPcs : List Int
+  /-- THE PUBLICATION READ SITES ([OWN.119] (b-1)): the pcs of the client's loads of another
+  hart's publication word (xv6: the boot spin `main+0x16`) -- every plain load of such a word's
+  base byte is issued at one of them (`MachCSL.ldPcOk`). -/
+  pubLdPcs : List Int
 
 /-! ## Membership facts -/
 

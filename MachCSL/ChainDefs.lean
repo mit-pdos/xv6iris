@@ -623,6 +623,122 @@ theorem relPc_dmaOld (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
   · simp only [MState.storeDma, if_pos hn]
   · simp only [MState.storeDma, if_neg hn]; rw [if_neg (by omega)]
 
+/-! ### The publication reads' provenance ([OWN.119] (b-1), Q4) -/
+
+/-- **The publication reads' provenance** at `σ` for the static list `rs` and the publication-read
+pcs `ps`: a hart's POSITIVE coherence floor at the base byte of ANOTHER hart's publication word was
+last raised at a pc of `ps` -- the ghost load-pc record (`MState.ldPcAt`) names the hart's latest
+plain load of the byte, and only a plain load raises a floor (`HRead.afterLoad`; a store resets the
+footprint's floors, an exclusive read, a fence, a landing and a DMA write keep them). -/
+def ldPcOk (rs : List RsvRegion) (ps : List Int) (σ : MState) : Prop :=
+  ∀ (f : PAddr) (w j : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → j ≠ w → 0 < (σ.hr j).coh f →
+    σ.ldPcAt j f ∈ ps
+
+/-- **What a plain load owes the publication reads' provenance**: when a byte of its footprint is
+the base byte of another hart's publication word, the load is issued at a pc of `ps`. -/
+def ldPcObl (rs : List RsvRegion) (ps : List Int) (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) : Prop :=
+  ∀ j, j < n → ∀ w : CPU, (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) ∈ rs → w ≠ cpu →
+    ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int) ∈ ps
+
+/-- A load none of whose footprint bytes is a publication base byte owes nothing. -/
+theorem ldPcObl_off {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    (h : ∀ j, j < n → ∀ w : CPU, (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) ∈ rs → w = cpu) :
+    ldPcObl rs ps σ cpu pa n :=
+  fun j hj w hw hne => absurd (h j hj w hw) hne
+
+/-- A load issued at a publication-read pc owes nothing more. -/
+theorem ldPcObl_of_pc {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    (h : ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int) ∈ ps) : ldPcObl rs ps σ cpu pa n :=
+  fun _ _ _ _ _ => h
+
+/-- The record reads only the floors and the load-pc record. -/
+theorem ldPcOk_congr {rs : List RsvRegion} {ps : List Int} {σ σ' : MState} (hl : σ'.ldPcAt = σ.ldPcAt)
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) : ldPcOk rs ps σ' = ldPcOk rs ps σ := by
+  unfold ldPcOk
+  apply propext
+  constructor
+  · intro h f w j hf hj hpos
+    rw [← hl]; exact h f w j hf hj (by rw [hc]; exact hpos)
+  · intro h f w j hf hj hpos
+    rw [hl]; exact h f w j hf hj (by rw [← hc]; exact hpos)
+
+/-- A step that keeps the load-pc record and raises no positive floor keeps the record (a
+store's footprint reset, every step that moves no floor). -/
+theorem ldPcOk_mono {rs : List RsvRegion} {ps : List Int} {σ σ' : MState} (hl : σ'.ldPcAt = σ.ldPcAt)
+    (hc : ∀ (j : CPU) (a : PAddr), 0 < (σ'.hr j).coh a → (σ'.hr j).coh a ≤ (σ.hr j).coh a)
+    (h : ldPcOk rs ps σ) : ldPcOk rs ps σ' := by
+  intro f w j hf hj hpos
+  rw [hl]; exact h f w j hf hj (Nat.lt_of_lt_of_le hpos (hc j f hpos))
+
+/-- A footprint reset lowers every floor it moves. -/
+theorem HRead.resetCoh_coh_le (hr : HRead) (pa : PAddr) (n : Nat) (a : PAddr) :
+    (hr.resetCoh pa n).coh a ≤ hr.coh a := by
+  unfold HRead.resetCoh
+  dsimp only
+  split
+  · exact Nat.zero_le _
+  · exact Nat.le_refl _
+
+/-- Off the footprint, a load's stamp is 0. -/
+theorem LoadSrcs.stamp_off (srcs : LoadSrcs) (me : Agent) (pa : PAddr) (n : Nat) (a : PAddr)
+    (h : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) : srcs.stamp me pa n a = 0 := by
+  apply Nat.le_antisymm _ (Nat.zero_le _)
+  unfold LoadSrcs.stamp
+  refine TsoMem.foldrMax_le _ _ (fun x hx => ?_)
+  obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hx
+  rw [if_neg (h j (List.mem_range.1 hj))]
+  exact Nat.le_refl _
+
+/-- A plain store's issue keeps the publication reads' provenance (its footprint's floors reset). -/
+theorem ldPcOk_issue {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (h : ldPcOk rs ps σ) : ldPcOk rs ps (σ.issue cpu pa n w) := by
+  refine ldPcOk_mono (σ := σ) (σ' := σ.issue cpu pa n w) rfl (fun j a _ => ?_) h
+  by_cases hj : j = cpu
+  · subst hj
+    simp only [MState.issue, updCpu, if_true]
+    exact HRead.resetCoh_coh_le _ _ _ _
+  · simp only [MState.issue, updCpu, if_neg hj]
+    exact Nat.le_refl _
+
+/-- A write that lands at once keeps the publication reads' provenance (its footprint's floors reset). -/
+theorem ldPcOk_storeL {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (h : ldPcOk rs ps σ) : ldPcOk rs ps (σ.storeL cpu pa n w) := by
+  refine ldPcOk_mono (σ := σ) (σ' := σ.storeL cpu pa n w) rfl (fun j a _ => ?_) h
+  by_cases hj : j = cpu
+  · subst hj
+    simp only [MState.storeL, updCpu, if_true]
+    exact HRead.resetCoh_coh_le _ _ _ _
+  · simp only [MState.storeL, updCpu, if_neg hj]
+    exact Nat.le_refl _
+
+/-- **A plain load keeps the publication reads' provenance**, given what it owes. -/
+theorem ldPcOk_afterLoad {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr)
+    (n tvn : Nat) (hob : ldPcObl rs ps σ cpu pa n) (h : ldPcOk rs ps σ) :
+    ldPcOk rs ps (σ.afterLoad cpu pa n tvn) := by
+  intro f w j hf hj hpos
+  show (if j = cpu ∧ (List.range n).any (fun k => f == pa + BitVec.ofNat 64 k) = true
+    then (((σ.regs cpu) LeanRV64D.Register.PC).toNat : Int) else σ.ldPcAt j f) ∈ ps
+  by_cases hfp : j = cpu ∧ (List.range n).any (fun k => f == pa + BitVec.ofNat 64 k) = true
+  · rw [if_pos hfp]
+    obtain ⟨rfl, hany⟩ := hfp
+    obtain ⟨k, hk, hkf⟩ := List.any_eq_true.1 hany
+    have hfk : f = pa + BitVec.ofNat 64 k := by simpa using hkf
+    subst hfk
+    exact hob k (List.mem_range.1 hk) w hf (fun e => hj e.symm)
+  · rw [if_neg hfp]
+    refine h f w j hf hj ?_
+    by_cases hjc : j = cpu
+    · subst hjc
+      have hoff : ∀ k, k < n → f ≠ pa + BitVec.ofNat 64 k := by
+        intro k hk he
+        exact hfp ⟨rfl, List.any_eq_true.2 ⟨k, List.mem_range.2 hk, by simp [he]⟩⟩
+      have hpos' : 0 < max ((σ.hr j).coh f)
+          ((σ.mem.loadSrcsP σ.lp (hartAgent j) tvn pa n).stamp (hartAgent j) pa n f) := by
+        simpa [MState.afterLoad, updCpu, HRead.afterLoad] using hpos
+      rw [LoadSrcs.stamp_off _ _ _ _ _ hoff, Nat.max_zero] at hpos'
+      exact hpos'
+    · simpa [MState.afterLoad, updCpu, hjc] using hpos
+
 /-- **The release under an acquire was issued at a release pc** (mcslrec (2)
 [OWN.82] (a1), Q-MCSL2-DYN ruled (i); route P: over the LANDED-ONLY history,
 where the acquire at `a` has landed, design D6): in `b`'s history, every entry at `r`

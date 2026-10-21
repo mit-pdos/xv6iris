@@ -19,7 +19,8 @@ the static mapping claims, and (W8-β′) which static list the era reserved
 instance : KernelImage GF :=
   ⟨iprop(kernelText ∗ kernelData ∗ kmapStatic ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝),
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝),
     inferInstance⟩
 
 /-- The context's copy of the image, spelled out. -/
@@ -30,7 +31,8 @@ theorem kctx_image [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) from .rfl) $$ Hro with
     ⟨#Ht, #Hd, #Hs, _⟩
   iframe H
   iframe Ht Hd Hs
@@ -44,7 +46,8 @@ theorem kctx_rsvEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) from .rfl) $$ Hro with
     ⟨_, _, _, %h⟩
   iframe H
   ipureintro; exact h.1
@@ -59,7 +62,8 @@ theorem kctx_kptOkEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) 
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) from .rfl) $$ Hro with
     ⟨_, _, _, %h⟩
   iframe H
   ipureintro; exact h.2.1
@@ -74,10 +78,31 @@ theorem kctx_relPcsEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx)
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) from .rfl) $$ Hro with
     ⟨_, _, _, %h⟩
   iframe H
-  ipureintro; exact h.2.2
+  ipureintro; exact h.2.2.1
+
+/-- The publication-read pcs the era runs with ([OWN.119] (b-1)), out of the context. -/
+theorem kctx_pubLdPcsEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢
+      ⌜MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs⌝ ∗ kctxL lent cpu k := by
+  iintro H
+  icases kctx_ro cpu k $$ H with ⟨#Hro, H⟩
+  icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) from .rfl) $$ Hro with
+    ⟨_, _, _, %h⟩
+  iframe H
+  ipureintro; exact h.2.2.2
+
+/-- The boot spin's load of `started` is a publication read site ([OWN.119] (b-1)). -/
+theorem xv6PubLdPc_main (h : MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs) :
+    ((((KA.«main» + 22#64 : BitVec 64).toNat : Nat) : Int)) ∈ MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) := by
+  rw [h]; decide +kernel
 
 /-- `release`'s free store is a release site (mcslrec (2) [OWN.82] (a1)). -/
 theorem xv6RelPc_release (h : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs) :

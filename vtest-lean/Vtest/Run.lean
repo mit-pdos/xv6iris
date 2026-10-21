@@ -335,6 +335,7 @@ theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testM
     · rfl
     · rfl
     · rfl
+    · rfl
   · exact absurd h (by simp)
 
 /-- A run of test `t`: an execution of the language from the test's own

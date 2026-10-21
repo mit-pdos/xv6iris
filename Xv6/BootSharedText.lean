@@ -37,7 +37,8 @@ def powerBootRowsT (Mof : (Nat → BitVec 8) → LogMirror) (σ : MState) : IPro
     rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
     ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) ∗
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ∗
   (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗ kmapStatic (hlc := hlc) (GF := GF) ∗
@@ -159,7 +160,8 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
       rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) ∗
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) ∗
       ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
       ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
       ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ⊢

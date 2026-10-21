@@ -211,6 +211,10 @@ def xv6KptOk (dyn : List KSlot) : Prop :=
 def xv6RelPcs : List Int :=
   [(MachCSL.KernelSyms.«release» : Int) + 0x1a, (MachCSL.KernelSyms.«main» : Int) + 0xb0]
 
+/-- **xv6's publication read site** ([OWN.119] (b-1)): `main+0x16`, the `lw a5,0(a4)` of the boot
+spin `while (started == 0)` -- the only load of `started` by a hart other than its writer. -/
+def xv6PubLdPcs : List Int := [(MachCSL.KernelSyms.«main» : Int) + 0x16]
+
 /-- xv6's static reserved regions, as the machine's class (with its dynamic
 spinlocks' registration slots, `xv6PipeSlotsR`), and its sealed kernel table's
 shape. -/
@@ -219,6 +223,7 @@ instance : KernelRsv where
   wf := xv6RsvStatic_wf
   kptOk := xv6KptOk
   relPcs := xv6RelPcs
+  pubLdPcs := xv6PubLdPcs
 
 /-- The pipe slots are registered. -/
 theorem xv6RsvStatic_pipeSlots : xv6PipeSlotsR ∈ xv6RsvStatic := by decide +kernel

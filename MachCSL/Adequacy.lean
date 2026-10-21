@@ -228,6 +228,7 @@ trace predicate `Ptp`, and the application's slots. -/
   rsvStatic_wf := KernelRsv.wf
   kptOk := KernelRsv.kptOk
   relPcs := KernelRsv.relPcs
+  pubLdPcs := KernelRsv.pubLdPcs
 
 theorem crashN_obsN : (↑obsN : CoPset) ⊆ ⊤ \ ↑crashN := by
   have hd : (↑obsN : CoPset) ## ↑crashN := ndot_ne_disjoint nroot (by decide)
@@ -447,7 +448,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] [KernelRsv] (ndisk : N
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
-          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ rfl ⟨rfl, rfl⟩
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ rfl ⟨rfl, rfl, rfl⟩
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)

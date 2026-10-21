@@ -129,6 +129,11 @@ structure MState where
   registered root starts at `Expr.power`, so it runs armed; a hand-built state (the Vtest
   validation runs, `Vtest.testMState`) runs unarmed, i.e. on the unguarded Sail machine. -/
   kArm : Bool := false
+  /-- THE LOAD-PC RECORD ([OWN.119] (b-1), Q4; ghost, erasable: no step reads it): for each hart
+  and byte, the `PC` of the hart's latest PLAIN load covering the byte (an explicit load or a page
+  walk's read, `MState.afterLoad`) -- in particular of the load that last raised the hart's
+  coherence floor there; `-1` before any. -/
+  ldPcAt : CPU → PAddr → Int := fun _ _ => -1
 
 /-- The top of the store order: the timestamp of the latest store (route P: the ISSUE stamp
 of the latest issued store). -/
@@ -153,13 +158,16 @@ abbrev updCpu' {α : Type} (f : DevId → α) (d : DevId) (x : α) : DevId → �
   fun d' => if d' = d then x else f d'
 
 /-- After a plain load of `n` bytes at `pa` at (landing) view `tvn`: the read side
-moves, nothing else; the coherence floors take the LANDING POSITIONS of the bytes'
+moves (and the ghost load-pc record), nothing else; the coherence floors take the LANDING POSITIONS of the bytes'
 FOREIGN sources, read off the histories over the landing positions
-(`FlatMem.loadSrcsP`; route P: co order is landing order). -/
+(`FlatMem.loadSrcsP`; route P: co order is landing order); the ghost load-pc record
+(`MState.ldPcAt`, [OWN.119]) takes the hart's `PC` at every footprint byte. -/
 abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (tvn : Nat) : MState :=
   { σ with hr := updCpu σ.hr cpu ((σ.hr cpu).afterLoad (hartAgent cpu) pa n tvn
-      (σ.mem.loadSrcsP σ.lp (hartAgent cpu) tvn pa n)) }
+      (σ.mem.loadSrcsP σ.lp (hartAgent cpu) tvn pa n)),
+           ldPcAt := fun c a => if c = cpu ∧ (List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) = true
+             then (((σ.regs cpu) Register.PC).toNat : Int) else σ.ldPcAt c a }
 
 /-- **THE EXCLUSIVE READ'S EFFECT** (route P): the watermark to the LANDING top, the floor to it
 iff an acquire, the acquire bit recorded, the snapshot (of the LANDED top, `FlatMem.topBytesL`)
@@ -393,7 +401,7 @@ current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
           fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1,
-          [], fun _ => [], fun _ => 0, true⟩,
+          [], fun _ => [], fun _ => 0, true, fun _ _ => -1⟩,
     gen := g.gen, pow := true }
 
 /-- All harts. -/

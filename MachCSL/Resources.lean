@@ -416,6 +416,9 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   /-- THE RELEASE SITES (mcslrec (2) [OWN.82] (a1)): the client's
   `KernelRsv.relPcs`, filled by `bootFixedGS` (`MachCSL.relPcOk`). -/
   relPcs : List Int
+  /-- THE PUBLICATION READ SITES ([OWN.119] (b-1)): the client's `KernelRsv.pubLdPcs`, filled by
+  `bootFixedGS` (`MachCSL.ldPcOk`). -/
+  pubLdPcs : List Int
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre

@@ -209,6 +209,8 @@ structure XState where
   pcAt : Nat → Int
   /-- the store epochs (`MState.sbEp`, route P) -/
   sbEp : CPU → Nat := fun _ => 0
+  /-- the ghost load-pc record (`MState.ldPcAt`, [OWN.119]) -/
+  ldPcAt : CPU → PAddr → Int := fun _ _ => -1
   /-- no history entry is above the top (a proof, erased at run time) -/
   stampOk : stampsLe mem log.length
 
@@ -273,6 +275,7 @@ def abs (x : XState) : MState where
   llog := List.range' 1 x.log.length
   sb := fun _ => []
   sbEp := x.sbEp
+  ldPcAt := x.ldPcAt
 
 /-- The landing positions an `XState` denotes. -/
 theorem abs_lp (x : XState) : x.abs.lp = vlp x.log.length := lpOf_range'_vlp _
@@ -288,7 +291,8 @@ end XState
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
     (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt) (h11 : a.llog = b.llog)
-    (h12 : a.sb = b.sb) (h13 : a.sbEp = b.sbEp) (h14 : a.kArm = b.kArm) : a = b := by
+    (h12 : a.sb = b.sb) (h13 : a.sbEp = b.sbEp) (h14 : a.kArm = b.kArm) (h15 : a.ldPcAt = b.ldPcAt) :
+    a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -356,9 +360,11 @@ theorem afterLoadHR_eq (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : N
 
 /-- A plain load's effect (route P: the coherence floors take the sources' landing positions). -/
 def afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) : XState :=
-  x.setHart cpu { x.hart cpu with
-    hr := afterLoadHR (x.hart cpu).hr (hartAgent cpu) pa n tvn
-      (x.mem.loadSrcsP (vlp x.log.length) (hartAgent cpu) tvn pa n) }
+  ({ x with ldPcAt := fun c a => if c = cpu ∧ (List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) = true
+      then (((x.hart cpu).regs.file Register.PC).toNat : Int) else x.ldPcAt c a }).setHart cpu
+    { x.hart cpu with
+      hr := afterLoadHR (x.hart cpu).hr (hartAgent cpu) pa n tvn
+        (x.mem.loadSrcsP (vlp x.log.length) (hartAgent cpu) tvn pa n) }
 
 theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) :
     (x.afterLoad cpu pa n tvn).abs = x.abs.afterLoad cpu pa n tvn := by
@@ -432,6 +438,7 @@ theorem abs_storeP (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (
     split <;> simp
   · rfl
   · rfl
+  · rfl
 
 /-- An EXCLUSIVE write (route P: `MState.storeL`, it lands at once). -/
 def storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
@@ -478,6 +485,7 @@ theorem abs_storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (
   · rfl
   · show List.range' 1 (x.log ++ [hartAgent cpu]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
     rw [List.length_append, List.length_singleton, range'_snoc_one]
+  · rfl
   · rfl
   · rfl
   · rfl
@@ -541,6 +549,7 @@ theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     · rfl
     · show List.range' 1 (x.log ++ [diskAgent]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
       rw [List.length_append, List.length_singleton, range'_snoc_one]
+    · rfl
     · rfl
     · rfl
     · rfl

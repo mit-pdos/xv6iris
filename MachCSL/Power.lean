@@ -340,7 +340,8 @@ def powerBootRes [KernelMap] [KernelRsv] (Mof : (Nat → BitVec 8) → LogMirror
   -- THE RESERVED REGIONS (W8-β′): which list was reserved...
   ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ ∗
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ ∗
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
   ([∗list] cpu ∈ cpus, regCellsNoPins (E.regName cpu) (σ.regs cpu)) ∗
@@ -444,7 +445,8 @@ turn only, as here. -/
 theorem wp_power [KernelMap] [KernelRsv]
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
     (hkpt : (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs))
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs))
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ dk : Nat → BitVec 8,
       diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF}

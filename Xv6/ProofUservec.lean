@@ -157,7 +157,8 @@ theorem uservec_proof : USERVEC :=
   icases (show KernelImage.ro ⊢ iprop((kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
         (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ : IProp GF)) from .rfl) $$ Hro with
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ : IProp GF)) from .rfl) $$ Hro with
     ⟨#Htext, _, #HS, _⟩
   unfold cpuOwn hartCsrs
   icases Hcpu with ⟨Hcells, Hlocks, %s0, Hss⟩

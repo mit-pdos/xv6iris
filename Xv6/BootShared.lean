@@ -115,7 +115,8 @@ def bootMemRes (σ : MState) : IProp GF := iprop%
   rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
   ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝
 
 /-- **The power thread's boot rows at the AMBIENT forms** (Rocq
 `power_boot_res_unpack`'s right-hand side): `MachCSL.powerBootRes` less the
@@ -301,7 +302,8 @@ register rows, held-lock sets and running tokens, the GOT row, and the
 theorem bootShared_harts (σ : MState) (hbf : bootFacts σ)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)) :
     kmapStatic (GF := GF) ∗ bootGotRo ⊢
       ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) -∗
       ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) -∗

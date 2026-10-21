@@ -154,7 +154,8 @@ def bootHartBss (c : CPU) : IProp GF := iprop%
   rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) ∗
   ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ ∗
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ ∗
   cpuCtxFree c
 
 /-- A top-down word family: the `n` words below `T`, slot `i` at
@@ -409,7 +410,8 @@ the two families' per-element outputs, with `boot_hart_pre`'s
 `cpu_ctx_free` mint). -/
 theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
       bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) -∗
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bhCpuLo c) (bhCpuLo c + 128) -∗
@@ -434,7 +436,8 @@ families, `boot_cran_stride_family_seq` over `hart_stack_raw` and
 `cpus[8]`, carved once for all harts. -/
 theorem bootCarve_harts (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)) :
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, viewLb c 0) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus»
@@ -491,7 +494,8 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
       (∃ b : Bool, cpuCell c (aCpuIntena c) 4 (intenaVal b)) ∗
       cpuCtxFree c ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
     (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ := by
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ := by
   unfold bootHartBss
   iintro ⟨#Hk, #Hg, Hs, Hh, %hin, Hf⟩
   ihave Hw := bootGot_word $$ Hg

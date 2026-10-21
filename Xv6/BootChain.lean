@@ -85,12 +85,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 text and the rodata. -/
 theorem bootChain_ro (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
       (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)) :
     kernelText (GF := GF) ⊢ kernelData -∗ KernelImage.ro := by
   have e : (KernelImage.ro : IProp GF) = iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
         (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
-      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) := rfl
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs ∧
+        MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝) := rfl
   rw [e]
   iintro #Ht #Hd
   ihave #Hk := kernelText_kmapStatic $$ Ht
