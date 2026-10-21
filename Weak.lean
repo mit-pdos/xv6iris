@@ -829,6 +829,7 @@ import Weak.CapFetchOfs
 import Weak.CapFetchCyG
 import Weak.CapDataOk
 import Weak.SbRealP
+import Weak.SbConfLit
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
