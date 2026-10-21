@@ -195,7 +195,8 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   conformance note and the policy's own decision cells now say the owner rules a T0 disagreement;
   the H and Sdtrig rulings carry the kernel-use and cost arguments the rule asks for (Sdtrig's an
   estimate); README names the sealed boot image beside the two opaque predicates and says the sixth
-  fork commit and the compiler merge await the owner's push.
+  fork commit and the compiler merge await the owner's push -- pushed 2026-10-21 (`ls-remote`: both
+  branches at the pins), the one blocking item of all three audits closed.
 
 ## From `notes/briefs/crash_layer.md`
 

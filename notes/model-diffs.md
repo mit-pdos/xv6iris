@@ -38,13 +38,13 @@ Pinned by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`.
 | 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | **T1** module selection (a `requires` edit), plus a code edit (the two dropped arms) that T1 does not cover: unreachable here twice over (`transformed_instruction` runs only under `currentlyEnabled Ext_H`; without `FD_instructions` the `LOAD_FP`/`STORE_FP` constructors do not exist, which is why the edit was needed); behaviour-changing in a configuration with H and the F/D instructions (mtinst/htinst get 0), hence local, not an upstream candidate | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
 | 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | **T4** bug fix (precedents: `mideleg` ignored without S, `hedeleg` without H; upstream's own Lean emulator notes that H's registers are read without H: `lean_emulator/LeanRiscv.lean:249-264`, "registers read during reset and interrupt polling even when executing in Machine mode", with `hideleg` initialised to `undefined_Minterrupts ()`) | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
 
-Commits 1-5 are pushed; commit 6 awaits the owner's push (a fresh clone cannot check it out until
-then).
+All six commits are on the public branch (`git ls-remote` shows `refs/heads/xv6` at `f0ef9813`,
+2026-10-21), so a fresh clone checks the pin out.
 
 ## 2. The compiler fork: `dongjaelee1/sail`, branch `xv6`
 
-Named in `tools/regen_sail_model.sh`'s header (merge `b49c997e`; the merge with commit `b72d7e842`
-awaits the owner's push).
+Named in `tools/regen_sail_model.sh`'s header (merge `b49c997e`, on the public branch since
+2026-10-21: `git ls-remote` shows `refs/heads/xv6` at `b49c997e`).
 
 | Commit | Change | Kind |
 |---|---|---|
