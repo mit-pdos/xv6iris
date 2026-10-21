@@ -31,25 +31,13 @@ Recorded in `claude-notes/kernel-defects.md` ("Benign but load-bearing"):
   `holding+0x12` read is an exempt read in the replay ([OWN.124], REVISIT-flagged).
 * (b) `ilock` / `iunlock` read `ip->ref` without `itable.lock` (`ilock+0xe`, `iunlock+0x1c`) — exempt reads [OWN.112].
 
-## 3. `kvminit`: root pointer may become visible before the kernel page table's last entries (ordering gap; probably benign)
+## 3. (WITHDRAWN — not a bug) `kvminit` root store vs the last PTE stores
 
-* **Where.** `kernel/vm.c`, `kvminit`: `kernel_pagetable = kvmmake();` — `kvmmake`'s last PTE stores (after its last
-  `kalloc`, whose `release` fence opened the current store epoch) and the root store are plain stores of hart 0 to
-  different addresses with no fence between.
-* **What RVWMO allows.** W→W to different addresses is unordered without a fence: another hart could see the new
-  `kernel_pagetable` while some of its PTEs still read their old (junk) contents.
-* **Why it is probably benign in xv6.** Other harts read `kernel_pagetable` only after `main`'s `started`
-  publication, which `__sync_synchronize()` precedes; hart 0's own walker reads forward from its own store buffer.
-  It breaks a proof-level invariant (the export's page-table facts, store-buffer form, are false in that window),
-  not observed behaviour.
-* **Fix (not applied).** `__sync_synchronize();` (or `fence w,w`) before the root store, i.e. at the end of `kvmmake`.
-* **In the theorem.** [OWN.129]: a NAMED assumption scoped to this one store ("hart 0's `kvmmake` page-table stores
-  have landed before the root store `kernel_pagetable` lands"). Found 2026-10-20 (finding F-11.4).
-
-## Rule for new entries ([OWN.129], owner 2026-10-20)
-
-If something looks like a bug — i.e. the CODE lacks an ordering RVWMO needs, not merely a proof that cannot see why the code is safe — record it here, and carry a NAMED assumption scoped to exactly that code step (never
-a general assumption for the rest of the proof). The code fixes come later.
+Recorded 2026-10-20, withdrawn the same day ([OWN.135]): the root store `kernel_pagetable = kvmmake()` may land before
+`kvmmake`'s last PTE stores (plain W→W, no fence), but no other hart reads `kernel_pagetable` until after `main`'s
+`__sync_synchronize()` before `started = 1`, and hart 0's own walker forwards its own pending stores. Only the proof's
+export claimed the page-table facts too early (finding F-11.4/F-11.4c); fixed in the proof (the facts are claimed
+once `started` has landed), no assumption.
 
 ## 4. (WITHDRAWN — not a bug) `pipealloc` lock words vs earlier stores
 
