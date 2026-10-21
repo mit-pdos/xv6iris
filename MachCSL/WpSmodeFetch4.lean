@@ -53,10 +53,11 @@ theorem swp_fetch_s4_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch4_S (hok := hok') (hram := hram) (hal := hal)
+  iapply swp_checked_mem_read_ifetch4_S (hok := hok') (hram := hram) (hal := hal) (pc := pc)
+    (hpa := Or.inl rfl)
   iframe
   inext
-  iintro HmConf Hbytes
+  iintro HmConf HPC Hbytes
   -- the fetched bits' `isRVC` matters only from here: split after the shared
   -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc

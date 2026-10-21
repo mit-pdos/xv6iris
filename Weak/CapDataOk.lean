@@ -24,6 +24,10 @@ realized state (`MState.excOk_of_reducible`, `Lang.lean:1858`; armed by `nsteps_
   `CapF2.cycFactsAt` replacement) and **`CapDataOk.cycRunOfHartConffQ1`** (the `CapF5.cycRunOfHartConffR`
   replacement): `fetchOkRealized` and `dataRealized` are GONE; what stays is `fetchRealized` (the
   fetch-address half `fetchOkRF` (i), Q1-c [OWN.144]) and `cycReal`.
+* §4 (Q1-c [OWN.144] (E2)) **`CapDataOk.fetchOkRFiOfReal`** — `fetchOkRF` (i) from the export (the
+  MachCSL fetch guard + the Sail-text offset lemma `CapFetchOfs.foFetch`), and
+  **`CapDataOk.cycFactsAtQ1c`** / **`CapDataOk.cycRunOfHartConffQ1c`**: `fetchRealized` GONE too; what
+  stays of 6d is `cycReal` (which now also carries `PC`).
 
 What it consumes: `fetchOkRF` (i) — the fetch-address oracle `kAa` (without it the fetched word need not
 be the kernel's and the decoded instruction could write `cur_privilege`), exactly as the merged
@@ -37,6 +41,7 @@ by the member's schedule — `PROGRESS-6d.md` §0 (3), F-6d-1).  Every name is `
 import Weak.CapDataTrap
 import Weak.CapF5
 import Weak.MachOfPf
+import Weak.CapFetchCyG
 
 namespace Weak
 
@@ -58,7 +63,7 @@ open PinDataOk CapDataTrap
 /-- **THE REALIZATION OF A WALK CYCLE (NAMED INTERFACE, header; P-W6's state map at the member)**:
 every in-cycle state of a walk cycle at `pc` (started at the boundary's first `LInstr`) is realized
 by a MachCSL configuration reachable from `([power], g0)`: the hart's thread runs the same Sail monad,
-live, with the same `cur_privilege`. -/
+live, with the same `cur_privilege` and (Q1-c [OWN.144]: the fetch guard reads it) the same `PC`. -/
 def cycReal (g0 : GState) (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
   ∀ (pfx : List Eitem) (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) (ls1 : List Wlabel) (cpu : CPU)
     (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (dm : Efab),
@@ -66,7 +71,7 @@ def cycReal (g0 : GState) (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) :
     irun ls1 q d1 (.PHart cpu m rs fn ib) dm →
     ∃ (n : Nat) (κ : List Obs) (t : List Expr) (g : GState) (gen : Nat),
       MRun n ([Expr.power], g0) κ (t, g) ∧ Expr.hart gen cpu m ∈ t ∧ threadLive g gen ∧
-      g.m.regs cpu .cur_privilege = rs .cur_privilege
+      g.m.regs cpu .cur_privilege = rs .cur_privilege ∧ g.m.regs cpu .PC = rs .PC
 
 /-- The exported non-stuckness (`MachOfPf.HypsC.safe`'s shape). -/
 def safeFrom (g0 : GState) : Prop :=
@@ -145,7 +150,7 @@ theorem matchedAll (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
       cyDStopAt privS st1 m1 → cyMatch st1 rs1 ib1 → False := by
     intro la m1 rs1 fn1 ib1 dd st1 hcin hira hst hm1
     obtain ⟨r, v, k, rfl, hsr, hcb, hT⟩ := hst
-    obtain ⟨n, κ, t, g, gen, hmr, he, hl, hpr⟩ := hreal pfx ls0 _ d1 la cpu0 _ rs1 fn1 ib1 dd hni hcs0 hcin hira
+    obtain ⟨n, κ, t, g, gen, hmr, he, hl, hpr, -⟩ := hreal pfx ls0 _ d1 la cpu0 _ rs1 fn1 ib1 dd hni hcs0 hcin hira
     have hS : g.m.regs cpu0 .cur_privilege = Privilege.Supervisor := by
       rw [hpr, hm1.1 .cur_privilege (by decide)]; exact hT
     have := causeIntrOf hp0 hsafe hmr he hl hS hsr
@@ -226,7 +231,7 @@ theorem noExcAt (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
     hsafe hreal pfx ls0 q d1 hni hcs
   obtain ⟨m1, rs1, fn1, ib1, st1, hpm, hc, hm1⟩ := hM ls1 pm dm hcin hir
   rw [hpm] at hir
-  obtain ⟨n, κ, t, g, gen, hmr, he, hl, hpr⟩ := hreal pfx ls0 q d1 ls1 _ _ _ _ _ dm hni hcs hcin hir
+  obtain ⟨n, κ, t, g, gen, hmr, he, hl, hpr, -⟩ := hreal pfx ls0 q d1 ls1 _ _ _ _ _ dm hni hcs hcin hir
   obtain ⟨cpu, r, v, k, rs, fn, ib, hpe, hsr, hcb⟩ := hac
   rw [hpm] at hpe
   injection hpe with e1 e2 e3 e4 e5
@@ -307,6 +312,167 @@ theorem cycRunOfHartConffQ1 (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6)
     intro s n l hx hp hne
     obtain ⟨h1, h2⟩ := hreal s n l hx hp hne
     exact cycFactsAtQ1 pcL w own s n l hm hw hx hp hne p0 d0 em hft hfeN h1 g0 hp0 hsafe h2
+  exact CapF5.cycRunOfHartConff G i row p0 dvi dvo tq d0 em pcL w own hcf hm hw hft
+    (fun s n l hs hp hne => cySailOfWalk pcL w own s n l hm hw hs hp hne
+      (PinCycRunFetch.fetchCyR1Of _) (execCyOfWalk pcL w own s n l hm hw hs hp hne))
+    (fun s n l hx hp hne => (hfacts s n l hx hp hne).1)
+    (fun s n l hx hp hne => (hfacts s n l hx hp hne).2) hexc base rest hes
+    (fun p d hr => by
+      obtain ⟨cpu, rs, fn, ib, hp, hpc, hc⟩ := hstart p d hr
+      exact ⟨cpu, rs, fn, ib, hp, PinCycRunFetch.kInvOfCfg _ rs hpc hc⟩)
+
+/-! ## 4. The fetch address from the export (Q1-c [OWN.144] (E2))
+
+The merged route took `fetchOkRF` (i) from the run interface `fetchRealized`
+(`PinFetchPa.fetchOkRFiOf`, `Weak/PinFetchPaAsm.lean:66`: the fetch translations' configurations —
+`satp`, the TLB, the PTE answers — facts that live only inside each hart's WP).  [OWN.144] (E2) makes
+a Supervisor-mode fetch at a RAM `PC` off `{PC, PC + 2}` STUCK in the machine (`MachCSL.kFetchBad`),
+so the exported `Reducible` gives `pa ∈ {PC, PC + 2}` at every realized fetch read of a walk cycle
+(`MachCSL.MState.fetchPa_of_reducible`), and the Sail text gives `pa ≡ PC + 2k (mod 4096)`, `k < 2`
+(`CapFetchOfs.foFetch`, along the cycle and the run: `CapFetchCyG.cyGSailOf`, `CapFetchCyG.cyGRun`)
+— together exactly `pc + 2k` (**`fetchOkRFiOfReal`**).  `fetchOkRFOfReal`, `cycFactsAtQ1c`,
+`cycRunOfHartConffQ1c` are §3's chain with `fetchRealized` GONE: what stays of 6d is `cycReal`. -/
+
+open CapFetchCyG (cyGB kAg cyGSailOf cyGRun)
+
+/-- A walk pc is a RAM program counter. -/
+theorem ramPcOfText (pc : Int) (h : textLo ≤ pc ∧ pc + 3 < textHi) :
+    ramPc (BitVec.ofInt 64 pc) = true := by
+  simp only [textLo, textHi] at h
+  have e := PinFetchPa.toNatOfInt pc (by omega) (by omega)
+  simp only [ramPc, ramBase, ramEnd, Bool.and_eq_true, decide_eq_true_eq]
+  omega
+
+/-- `PC + 2` at a walk pc, as an integer. -/
+theorem toNatPc2 (pc : Int) (h0 : 0 ≤ pc) (hlt : pc + 2 < 18446744073709551616) :
+    ((BitVec.ofInt 64 pc + 2#64).toNat : Int) = pc + 2 := by
+  have e := PinFetchPa.toNatOfInt pc h0 (by omega)
+  rw [BitVec.toNat_add]
+  have h2 : (2#64 : BitVec 64).toNat = 2 := rfl
+  rw [h2]
+  simp only [Nat.reducePow]
+  omega
+
+set_option maxHeartbeats 4000000 in
+/-- **`fetchOkRF` (i) FROM THE EXPORT** (header; replaces `PinFetchPa.fetchOkRFiOf`'s
+`fetchRealized`): at a walk pc, every fetch label of a walk cycle that is a step of the in-cycle
+run after `ls1` is at `pc + 2·|feLabs ls1|`. -/
+theorem fetchOkRFiOfReal (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
+    (htext : textLo ≤ pc ∧ pc + 3 < textHi)
+    (g0 : GState) (hp0 : g0.pow = false) (hsafe : safeFrom g0) (hreal : cycReal g0 p0 d0 em pc) :
+    PinFetchPa.fetchOkRFi p0 d0 em pc := by
+  have h0 : 0 ≤ pc := by simp only [textLo] at htext; omega
+  have hlt' : pc + 2 < 18446744073709551616 := by simp only [textHi] at htext; omega
+  have hlt : pc + 2 < 2 ^ 64 := by simp only [Int.reducePow]; exact hlt'
+  intro pfx ls0 q d1 ls1 pm dm a tvs hni hcs hcin hir
+  have hcs0 := hcs
+  obtain ⟨p, d, hbd, hrun0, -⟩ := hcs
+  obtain ⟨-, -, cpu0, rs, fn, ib, rfl, hkinv⟩ := hbd
+  rcases pureSplit _ _ _ _ _ hrun0 cpu0 rs fn ib rfl hkinv.2.2 with hni' |
+    ⟨ls0', ls1', rs'', tick', d1'', hls, -, -, hr0, hr1, hag, hrb'⟩
+  · exact absurd (List.mem_append_right _ List.mem_cons_self) hni'
+  obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
+  subst ls0'
+  subst ls1'
+  obtain ⟨hq, -⟩ := pevrunNil hr1
+  subst hq
+  have hkinv' : kInv pc rs'' := PinCycRun.kInvAgree pc rs rs'' hag hrb' hkinv
+  let st0 : CySt := ⟨rs'', [], false, ⟨OpRoles.ORnone, [], 0, true⟩⟩
+  have hcy0 : cyGB (kAg pc) (fun _ _ => True) (riscvStep tick') st0 :=
+    cyGSailOf pc h0 hlt tick' st0 rfl rfl hkinv'.1 hkinv'.2.1.1 hkinv'.2.2
+  have hm0 : cyMatch st0 rs'' ibNone := ⟨fun _ _ => rfl, hrb', hrb', rfl, rfl, rfl⟩
+  obtain ⟨m1, rs1, fn1, ib1, dd1, st1, hir1, hm1, hlen, ⟨hk2, hofs, hpc1, hS1⟩,
+      n, va, req, k1, rfl, hif, hdv, hpa⟩ :=
+    cyGRun _ _ _ _ _ hir cpu0 (riscvStep tick') rs'' none ibNone st0 rfl hcy0 hm0 ls1 a tvs [] rfl
+  -- the realization of the fetch read's pre-state, and the machine's guard there
+  obtain ⟨nn, κ, t, g, gen, hmr, he, hl, hpr, hPC⟩ :=
+    hreal pfx ls0 _ d1 ls1 cpu0 _ rs1 fn1 ib1 dd1 hni hcs0
+      (cycInPrefix em pfx ls0 _ ls1 [] _ hcin rfl) hir1
+  have hred := hsafe nn κ t g hmr _ he
+  have harm : g.m.kArm = true :=
+    nsteps_kArm hmr (fun h => absurd (h.symm.trans hp0) (by decide)) hl.1
+  have hrs1PC : rs1 .PC = BitVec.ofInt 64 pc := (hm1.1 .PC (by decide)).trans hpc1
+  have hrs1S : rs1 .cur_privilege = Privilege.Supervisor :=
+    (hm1.1 .cur_privilege (by decide)).trans hS1
+  have hS : privSup (g.m.regs cpu0 .cur_privilege) = true := by rw [hpr, hrs1S]; rfl
+  have hPCm : g.m.regs cpu0 .PC = BitVec.ofInt 64 pc := hPC.trans hrs1PC
+  have hram : ramPc (g.m.regs cpu0 .PC) = true := by rw [hPCm]; exact ramPcOfText pc htext
+  have hnd : ¬ (devBytes req.pa n ∧ 0 < n) := by
+    rintro ⟨hdb, hn⟩
+    have h1 := hdb 0 hn
+    simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h1
+    rw [hdv] at h1
+    cases h1
+  have hfp := MState.fetchPa_of_reducible hl hred harm hif hnd hS hram
+  rw [hPCm] at hfp
+  have e1 : ((BitVec.ofInt 64 pc).toNat : Int) = pc := PinFetchPa.toNatOfInt pc h0 (by omega)
+  have e2 := toNatPc2 pc h0 hlt'
+  have hpaZ : paZ req.pa = pc ∨ paZ req.pa = pc + 2 := by
+    rcases hfp with h | h
+    · left; rw [h]; exact e1
+    · right; rw [h]; exact e2
+  have hk : st1.fe.length = 0 + (feLabs ls1).length := hlen
+  rw [Nat.zero_add] at hk
+  show a = pc + 2 * ((feLabs ls1).length : Int)
+  rw [← hk]
+  subst hpa
+  rcases hpaZ with h | h <;> rw [h] at hofs ⊢ <;> omega
+
+/-- **`fetchOkRF` FROM THE EXPORT** (header): both halves, with no realization interface but
+`cycReal`. -/
+theorem fetchOkRFOfReal (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
+    (htext : textLo ≤ pc ∧ pc + 3 < textHi) (a : instruction) (hdec : PinWalkTab.decS pc = some a)
+    (hfetch1 : fetchCyR1 pc) (hexec : execCyAt pc) (hnw : dfNwRole (krole pc)) (hft : kFetchText em)
+    (hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none)
+    (g0 : GState) (hp0 : g0.pow = false) (hsafe : safeFrom g0) (hreal : cycReal g0 p0 d0 em pc) :
+    fetchOkRF p0 d0 em pc := by
+  have hfi := fetchOkRFiOfReal p0 d0 em pc htext g0 hp0 hsafe hreal
+  exact fetchOkRFOfParts p0 d0 em pc hfi
+    (fetchOkRFiiOfReal p0 d0 em pc htext a hdec hfetch1 hexec hnw hft hfeN hfi g0 hp0 hsafe hreal)
+
+/-- **`fetchOkRF ∧ dataOkRF` AT A REACHED NON-PIN WALK STATE** (header; `CapDataOk.cycFactsAtQ1`
+with `fetchRealized` gone). -/
+theorem cycFactsAtQ1c (pc : Int) (w : Pin) (own : Bool) (x : PState) (n : Nat) (l : List PState)
+    (hm : (pc, w) ∈ pinsW9a) (hw : walkOwn w = some own) (hx : preach own (pinStart pc) x n)
+    (hp : pstep own x = some l) (hne : l ≠ [])
+    (p0 : Pexv6) (d0 : Efab) (em : Hemission) (hft : kFetchText em)
+    (hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none)
+    (g0 : GState) (hp0 : g0.pow = false) (hsafe : safeFrom g0)
+    (hreal : cycReal g0 p0 d0 em x.psPc) :
+    fetchOkRF p0 d0 em x.psPc ∧ dataOkRF p0 d0 em x.psPc := by
+  have ht := walkText pc w own x n l hm hw hx hp hne
+  obtain ⟨a, hdec, -⟩ := walkDec pc w own x n l hm hw hx hp hne
+  have hnw := walkNw pc w own x n l hm hw hx hp hne
+  have hexec := execCyOfWalk pc w own x n l hm hw hx hp hne
+  have hr1 := PinCycRunFetch.fetchCyR1Of x.psPc
+  have hfi := fetchOkRFiOfReal p0 d0 em x.psPc ht g0 hp0 hsafe hreal
+  exact ⟨fetchOkRFOfParts p0 d0 em x.psPc hfi
+      (fetchOkRFiiOfReal p0 d0 em x.psPc ht a hdec hr1 hexec hnw hft hfeN hfi g0 hp0 hsafe hreal),
+    dataOkRFOfReal p0 d0 em x.psPc ht a hdec hr1 hexec hnw hft hfeN hfi g0 hp0 hsafe hreal⟩
+
+/-- **`cycRun` FROM `hartConff`, BOTH CYCLE OBLIGATIONS FROM THE EXPORT** (header):
+`CapDataOk.cycRunOfHartConffQ1` with `fetchRealized` gone — left: `cycReal` (P-W6), `excRetR`,
+`walkStartRealized` (6c). -/
+theorem cycRunOfHartConffQ1c (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6)
+    (dvi dvo : Nat → Efab) (tq : Nat → Bool) (d0 : Efab)
+    (em : Hemission) (pcL : Int) (w : Pin) (own : Bool)
+    (hcf : hartConff i row p0 dvi dvo tq em) (hm : (pcL, w) ∈ pinsW9a) (hw : walkOwn w = some own)
+    (hft : kFetchText em) (g0 : GState) (hp0 : g0.pow = false) (hsafe : safeFrom g0)
+    (hreal : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      cycReal g0 p0 d0 em s.psPc)
+    (hexc : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      excRetR G i p0 d0 em s.psPc)
+    (base rest : List Eitem) (hes : em.emItems = base ++ rest)
+    (hstart : walkStartRealized p0 d0 base (pinStart pcL).psPc) :
+    ∃ (mid rest' : List Eitem) (s : PState) (n : Nat) (p' : Pexv6) (d' : Efab),
+      rest = mid ++ rest' ∧ cycRun G i em own base (pinStart pcL) mid s ∧
+      preach own (pinStart pcL) s n ∧ walkBd p0 d0 em (base ++ mid) s.psPc p' d' ∧
+      cycStop G i p0 d0 em own (base ++ mid) s rest' := by
+  have hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none :=
+    hartConffFeNone i row p0 dvi dvo tq em hcf
+  have hfacts : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      fetchOkRF p0 d0 em s.psPc ∧ dataOkRF p0 d0 em s.psPc := fun s n l hx hp hne =>
+    cycFactsAtQ1c pcL w own s n l hm hw hx hp hne p0 d0 em hft hfeN g0 hp0 hsafe (hreal s n l hx hp hne)
   exact CapF5.cycRunOfHartConff G i row p0 dvi dvo tq d0 em pcL w own hcf hm hw hft
     (fun s n l hs hp hne => cySailOfWalk pcL w own s n l hm hw hs hp hne
       (PinCycRunFetch.fetchCyR1Of _) (execCyOfWalk pcL w own s n l hm hw hs hp hne))

@@ -9,6 +9,8 @@ interrupts disabled -- the regime of early boot (`main` before
   interrupt is deliverable since `mie & ~mideleg = 0`);
 * the PMP check passes for kernel accesses under xv6's tables in S-mode;
 * fetch at `satp = 0` is physical.
+The fetch reads take the `PC` cell and the guard's side condition ([OWN.144]: the read at
+`PC`/`PC + 2`, or a non-RAM `PC`), `MachCSL.swp_sail_mem_read_ifetch_pc`.
 -/
 import MachCSL.WpPmpXv6
 import MachCSL.SConfPhysDefs
@@ -50,7 +52,7 @@ set_option hygiene false in
 /-- The shared script of the supervisor-mode physical reads. -/
 macro "checked_mem_read_S_proof" pa:ident n:num hram:ident hal:ident : tactic =>
   `(tactic| (
-    iintro ⟨HmConf, Hbytes, HΦ⟩
+    iintro ⟨HmConf, HPC, Hbytes, HΦ⟩
     conf_cases HmConf
     obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
     obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
@@ -66,15 +68,17 @@ macro "checked_mem_read_S_proof" pa:ident n:num hram:ident hal:ident : tactic =>
     iintro Hpmpcfg_n Hpmpaddr_n
     swp_run 80
     conf_intro HmConf
-    iapply HΦ $$ HmConf Hbytes))
+    iapply HΦ $$ HmConf HPC Hbytes))
 
 set_option maxHeartbeats 4000000 in
 theorem swp_checked_mem_read_ifetch4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0)
+    (pc : BitVec 64) (hpa : pa = pc ∨ pa = pc + 2#64 ∨ ramPc pc = false)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ imgBytes pa 4 w ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ imgBytes pa 4 w -∗ Φ (.Ok (w, ())))
+    confCells cpu dq Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc ∗ imgBytes pa 4 w ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc -∗ imgBytes pa 4 w -∗
+        Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.InstructionFetch ()) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 4 false false false false) Φ := by
   checked_mem_read_S_proof pa 4 hram hal
@@ -83,9 +87,11 @@ set_option maxHeartbeats 4000000 in
 theorem swp_checked_mem_read_ifetch2_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w : BitVec (8 * 2)) (hram : inRam pa 2) (hal : pa.toNat % 2 = 0)
+    (pc : BitVec 64) (hpa : pa = pc ∨ pa = pc + 2#64 ∨ ramPc pc = false)
     (Φ : Result ((BitVec (8 * 2)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ imgBytes pa 2 w ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ imgBytes pa 2 w -∗ Φ (.Ok (w, ())))
+    confCells cpu dq Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc ∗ imgBytes pa 2 w ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc -∗ imgBytes pa 2 w -∗
+        Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.InstructionFetch ()) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 2 false false false false) Φ := by
   checked_mem_read_S_proof pa 2 hram hal

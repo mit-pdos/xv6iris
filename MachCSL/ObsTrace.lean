@@ -486,7 +486,7 @@ theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV6
     (j : UartId) : σ'.devs.wire j = σ.devs.wire j := by
   cases o
   case memRead n _ req =>
-    rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+    rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
       ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devRead_wire _ _ _ _ _ hr j
     all_goals rfl
@@ -523,7 +523,7 @@ theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV
     (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
   cases o
   case memRead n _ req =>
-    rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+    rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
       ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devRead_recvd _ _ _ _ _ hr j
     all_goals rfl

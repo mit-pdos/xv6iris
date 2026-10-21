@@ -94,7 +94,7 @@ theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : 
     · exact Or.inr ⟨n, va, req, w, rfl, by simp only [CapPcLog.storeOf, hk]; rfl⟩
   | memRead n va req =>
     left
-    rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
+    rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, -, tvn, w, -, -, -, -, rfl⟩ |
       ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ | ⟨-, -, -, -, w, -, -, rfl⟩ <;> exact ⟨rfl, rfl⟩
   | readRam => exact absurd h id
   | writeRam => exact absurd h id

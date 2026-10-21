@@ -184,7 +184,8 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
           (ukRider cpu (uxTextOwn curCtx K (ukTextAddrs P.um) T))) := by
   iintro ⟨#Hhw, #Hwi, #HK, Hfr, HX⟩
   iapply swp_bind
-  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) K (ukTextAddrs P.um) T (fetch ()) s
+  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) (by decide) K (ukTextAddrs P.um) T (fetch ()) s
+    (by rw [hop.land.priv]; rfl)
     (fun fr' s1 => fr' = fr ∧ UkLand C P T s1 ∧ (∀ r, r ≠ .tlb → s1.file r = s.file r) ∧ ukView P.um s1.mm T = V)
     (fun orc => by
       obtain ⟨s1, o1, hw, hl1, hf1, hv1⟩ := hF s hop.land hop.hpc hop.view orc
@@ -218,7 +219,8 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
         runRW_of_runRead ufFoot udrefU orc s1 hdref _ i₀ b hrd
       exact ⟨_, s2, o2, uk_afterFetch_rvc orc o2 s1 s2 h i₀ r hd1 help (uf_ucMisa C P s1 hl1.cfg) hdech
         ((uk_execAs_redirect orc _ i₀ i hexa).trans hw), r, _, rfl, hout⟩
-  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1
+  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) (by decide) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1
+    (by rw [hl1.priv]; rfl)
     (fun st s2 => ∃ (r : ExecutionResult) (ib : BitVec 32), st = Step_Execute (r, ib) ∧
         ((r = RETIRE_SUCCESS ∧ Rt s2) ∨
          (∃ exc : sync_exception, r = .Trap (Privilege.User, exc, pc) ∧ Ex exc ∧ exc.ext = none ∧

@@ -57,7 +57,7 @@ set_option maxHeartbeats 4000000 in
 theorem swp_fetch_s4X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa)
     (w : BitVec 32) (hram : inRam pa 4) (hal : pc.toNat % 4 = 0) (hpal : pa.toNat % 4 = 0)
-    (Φ : FetchResult → IProp GF) :
+    (hpcr : ramPc pc = false) (Φ : FetchResult → IProp GF) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc ∗ T ∗ imgBytes pa 4 w ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc -∗ T -∗
         imgBytes pa 4 w -∗ Φ (fetched4 w))
@@ -79,10 +79,11 @@ theorem swp_fetch_s4X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal)
+  iapply swp_checked_mem_read_ifetch4_S (hok := hok) (hram := hram) (hal := hpal) (pc := pc)
+    (hpa := Or.inr (Or.inr hpcr))
   iframe
   inext
-  iintro HmConf Hbytes
+  iintro HmConf HPC Hbytes
   -- the fetched word's `isRVC` matters only from here: split here, not
   -- before the walk (the translation and the read were walked twice)
   rcases Bool.eq_false_or_eq_true (isRVC (BitVec.extractLsb' 0 16 w)) with hc | hc
@@ -98,7 +99,7 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
     (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa)
     (htr2 : transSpecX cpu c T (pc + 2#64) (pa + 2#64))
     (lo hi : BitVec 16) (hram : inRam pa 4) (hal : pc.toNat % 4 = 2) (hpal : pa.toNat % 4 = 2)
-    (Φ : FetchResult → IProp GF) :
+    (hpcr : ramPc pc = false) (Φ : FetchResult → IProp GF) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc ∗ T ∗
     imgBytes pa 2 lo ∗ imgBytes (pa + 2#64) 2 hi ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc -∗ T -∗
@@ -127,10 +128,11 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2)
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2) (hal := hal2) (pc := pc)
+    (hpa := Or.inr (Or.inr hpcr))
   iframe
   inext
-  iintro HmConf Hlo
+  iintro HmConf HPC Hlo
   -- the low half's `isRVC` matters only from here (split after the shared walk)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
   all_goals simp only [fetched2, hc, Bool.false_eq_true, ite_false, ite_true]
@@ -147,10 +149,11 @@ theorem swp_fetch_s2X (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF 
     swp_run 40
     conf_intro HmConf
     iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2') (hal := hal2')
+    iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram2') (hal := hal2') (pc := pc)
+      (hpa := Or.inr (Or.inr hpcr))
     iframe
     inext
-    iintro HmConf Hhi
+    iintro HmConf HPC Hhi
     swp_run 40
     iapply HΦ $$ HmConf HPC HT Hlo Hhi
 
@@ -159,7 +162,7 @@ set_option maxHeartbeats 4000000 in
 theorem swp_fetch_s2_rvcX (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa)
     (lo : BitVec 16) (hram : inRam pa 2) (hal : pc.toNat % 4 = 2) (hpal : pa.toNat % 2 = 0)
-    (hc : isRVC lo = true) (Φ : FetchResult → IProp GF) :
+    (hc : isRVC lo = true) (hpcr : ramPc pc = false) (Φ : FetchResult → IProp GF) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc ∗ T ∗ imgBytes pa 2 lo ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc -∗ T -∗
         imgBytes pa 2 lo -∗ Φ (FetchResult.F_RVC lo))
@@ -181,10 +184,11 @@ theorem swp_fetch_s2_rvcX (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys 
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram) (hal := hpal)
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok) (hram := hram) (hal := hpal) (pc := pc)
+    (hpa := Or.inr (Or.inr hpcr))
   iframe
   inext
-  iintro HmConf Hlo
+  iintro HmConf HPC Hlo
   swp_run 40
   iapply HΦ $$ HmConf HPC HT Hlo
 
@@ -219,7 +223,7 @@ instance instrX_persistent (pc pa : BitVec 64) (is_rvc : Bool) (i : instruction)
 
 theorem fetchSpecS_instrBytesX_base (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa)
-    (htr2 : transSpecX cpu c T (pc + 2#64) (pa + 2#64)) (w : BitVec 32) :
+    (htr2 : transSpecX cpu c T (pc + 2#64) (pa + 2#64)) (w : BitVec 32) (hpcr : ramPc pc = false) :
     fetchSpecS (GF := GF) cpu (DFrac.own 1) c pc T (instrBytesX pc pa (FetchResult.F_Base w))
       (FetchResult.F_Base w) := by
   intro Φ
@@ -229,7 +233,7 @@ theorem fetchSpecS_instrBytesX_base (cpu : CPU) (c : MConf) (sie : Bool) (hok : 
   obtain ⟨hram, hal2, hpal, hc⟩ := hgeo
   have h4 : pc.toNat % 4 = 0 ∨ pc.toNat % 4 = 2 := by omega
   rcases h4 with h4 | h4
-  · have := swp_fetch_s4X cpu c sie hok T pc pa htr w hram h4 (by omega) Φ
+  · have := swp_fetch_s4X cpu c sie hok T pc pa htr w hram h4 (by omega) hpcr Φ
     simp only [fetched4, hc, Bool.false_eq_true, ite_false] at this
     iapply this
     iframe HmConf HPC HT Hbytes
@@ -237,7 +241,7 @@ theorem fetchSpecS_instrBytesX_base (cpu : CPU) (c : MConf) (sie : Bool) (hok : 
     iintro HmConf HPC HT _
     iapply HΦ $$ HmConf HPC HT HB
   · have := swp_fetch_s2X cpu c sie hok T pc pa htr htr2 (BitVec.extractLsb' 0 16 w)
-      (BitVec.extractLsb' 16 16 w) hram h4 (by omega) Φ
+      (BitVec.extractLsb' 16 16 w) hram h4 (by omega) hpcr Φ
     simp only [fetched2, hc, Bool.false_eq_true, ite_false, append_extract_self] at this
     ihave #Hsplit := imgBytes_split4 pa w $$ Hbytes
     icases Hsplit with ⟨#Hlo, #Hhi⟩
@@ -248,7 +252,8 @@ theorem fetchSpecS_instrBytesX_base (cpu : CPU) (c : MConf) (sie : Bool) (hok : 
     iapply HΦ $$ HmConf HPC HT HB
 
 theorem fetchSpecS_instrBytesX_rvc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
-    (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa) (h : BitVec 16) :
+    (T : IProp GF) (pc pa : BitVec 64) (htr : transSpecX cpu c T pc pa) (h : BitVec 16)
+    (hpcr : ramPc pc = false) :
     fetchSpecS (GF := GF) cpu (DFrac.own 1) c pc T (instrBytesX pc pa (FetchResult.F_RVC h))
       (FetchResult.F_RVC h) := by
   intro Φ
@@ -256,7 +261,7 @@ theorem fetchSpecS_instrBytesX_rvc (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   simp only [instrBytesX]
   icases +keep HB with ⟨%hgeo, ⟨%h4, %w, %hw, #Hbytes⟩ | ⟨%h4, #Hbytes⟩⟩
   · obtain ⟨hram, hal2, hpal, hc⟩ := hgeo
-    have := swp_fetch_s4X cpu c sie hok T pc pa htr w hram h4 (by omega) Φ
+    have := swp_fetch_s4X cpu c sie hok T pc pa htr w hram h4 (by omega) hpcr Φ
     simp only [fetched4, hw, hc, ite_true] at this
     iapply this
     iframe HmConf HPC HT Hbytes
@@ -265,7 +270,7 @@ theorem fetchSpecS_instrBytesX_rvc (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
     iapply HΦ $$ HmConf HPC HT HB
   · obtain ⟨hram, hal2, hpal, hc⟩ := hgeo
     have hram2 : inRam pa 2 := by simp only [inRam] at *; omega
-    iapply (swp_fetch_s2_rvcX cpu c sie hok T pc pa htr h hram2 h4 (by omega) hc Φ)
+    iapply (swp_fetch_s2_rvcX cpu c sie hok T pc pa htr h hram2 h4 (by omega) hc hpcr Φ)
     iframe HmConf HPC HT Hbytes
     inext
     iintro HmConf HPC HT _
@@ -276,14 +281,16 @@ set_option maxHeartbeats 4000000 in
 executing the instruction at virtual `pc` (physically `pa`) through the
 translation resource `T` (`htr`/`htr2`: the fetch translations of `pc` and
 `pc + 2`), the execute stage taking `T ∗ P` to any `Q` and landing in
-supervisor or user mode. -/
+supervisor or user mode.  The trampoline's `pc` is no RAM address (`hpcr`: the
+fetch guard [OWN.144] does not apply). -/
 theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c false)
     (hmie : c.mie &&& ~~~c.mideleg = 0#64) (hmenv : c.menvcfg = menvcfgS)
     (p' : Privilege) (hp' : p' = Privilege.Supervisor ∨ p' = Privilege.User)
     (pc pa npc : BitVec 64) (is_rvc : Bool) (i : instruction) (T P Q : IProp GF)
     (htr : transSpecX cpu c T pc pa) (htr2 : transSpecX cpu c T (pc + 2#64) (pa + 2#64))
     (hexec : execSpecPP cpu (DFrac.own 1) Privilege.Supervisor c p' c' i pc (pc + instrLen is_rvc) npc
-      iprop(T ∗ P) Q) (hT : resvOut cpu T) :
+      iprop(T ∗ P) Q) (hT : resvOut cpu T)
+    (hpcr : ramPc pc = false := by assumption) :
     instrX pc pa is_rvc i ∗ confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗
     pcIs cpu pc ∗ T ∗ P ∗
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ Q -∗ wpLoop cpu)
@@ -297,7 +304,7 @@ theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c
     subst hr
     simp only [instrLen] at hexec
     iapply (wpLoop_sT_base cpu c c' hok hmie p' hp' pc npc w i T (instrBytesX pc pa (FetchResult.F_Base w)) P Q
-      (fetchSpecS_instrBytesX_base cpu c false hok T pc pa htr htr2 w) (hdec.2 cpu (DFrac.own 1) c hmenv)
+      (fetchSpecS_instrBytesX_base cpu c false hok T pc pa htr htr2 w hpcr) (hdec.2 cpu (DFrac.own 1) c hmenv)
       hexec.clk hT)
     iframe HmConf Hclock Hpc HT HP
     iframe #
@@ -310,7 +317,7 @@ theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c
     subst hr
     simp only [instrLen] at hexec
     iapply (wpLoop_sT_rvc cpu c c' hok hmie p' hp' pc npc h i₀ i T (instrBytesX pc pa (FetchResult.F_RVC h)) P Q
-      (fetchSpecS_instrBytesX_rvc cpu c false hok T pc pa htr h) (hdec16.2 cpu (DFrac.own 1) c hmenv) hexp
+      (fetchSpecS_instrBytesX_rvc cpu c false hok T pc pa htr h hpcr) (hdec16.2 cpu (DFrac.own 1) c hmenv) hexp
       hexec.clk hT)
     iframe HmConf Hclock Hpc HT HP
     iframe #

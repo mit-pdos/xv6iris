@@ -52,6 +52,7 @@ theorem uservec_ux [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF
   subst hnpc
   unfold urSt
   iintro ⟨#HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HE, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc i iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) iprop(gprFile cpu R ∗ E)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R' ∗ E')
@@ -127,6 +128,7 @@ theorem uservec_usd [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
   have hexec := execSpecF_sdX (GF := GF) cpu c false P.root hok iprop(uptSlot cpu P ∗ □ kmapStatic) pc
     (pc + instrLen is_rvc) (urImm n) 10#5 rs2 R (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat)))
     (tfW ws (4 + n.toNat)) hal' hram halp htr'
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc (uvSd n rs2) iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat))) 8 (DFrac.own 1)
@@ -211,6 +213,7 @@ theorem uservec_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
   have hexec := execSpecF_ldX (GF := GF) cpu c false P.root hok iprop(uptSlot cpu P ∗ □ kmapStatic) pc
     (pc + instrLen is_rvc) (uvKImm j) rd 10#5 hrd R (pageAddr P.tfp + BitVec.ofNat 64 (8 * j.toNat))
     (DFrac.own 1) (tfW ws j.toNat) hal' hram halp htr'
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc (uvLd j rd) iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * j.toNat)) 8 (DFrac.own 1)

@@ -748,25 +748,7 @@ theorem not_devBytes_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn 
   rw [devAddr_false_of_ramBytes h hn] at h1
   exact absurd h1 (by decide)
 
-/-! ### Zero-width MMIO
-
-No device answers a zero-byte transaction (every window is 1/2/4/8 bytes
-wide), so the MMIO arms of `evStep` are enabled only at a positive width --
-which is what lets a memory rule dismiss them from its footprint's cells. -/
-
-theorem devRead_pos {ds : DevStates} {pa : PAddr} {n : Nat} {r : BitVec (8 * n) × DevStates}
-    (h : devRead ds pa n = some r) : 0 < n := by
-  rcases Nat.eq_zero_or_pos n with rfl | hn
-  · exfalso
-    unfold devRead at h
-    revert h
-    cases hd : devDecode pa with
-    | none => simp
-    | some p =>
-      obtain ⟨d, off⟩ := p
-      cases d <;> simp [devSig, Uart.sig, Uart.readN, Plic.sig, Plic.readN,
-        Virtio.sig, Virtio.readN]
-  · exact hn
+-- (Zero-width MMIO: `devRead_pos` lives in `MachCSL.Lang`, the fetch instrument's `kStuck` uses it.)
 
 theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (h : devWrite ds pa n w = some ds') : 0 < n := by

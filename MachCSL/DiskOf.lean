@@ -147,7 +147,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         | exact hev.elim
         | skip
       · -- a load: MMIO or DRAM
-        rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+        rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
           ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
         · exact devRead_diskOf _ _ _ _ _ hr
         all_goals rfl
@@ -220,7 +220,7 @@ theorem hartStep_kArm {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM Uni
         | (obtain ⟨_, rfl⟩ := hev; rfl)
         | exact hev.elim
         | skip
-      · rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
+      · rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
           ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
         all_goals rfl
       · rcases hev with ⟨_, w, ds', _, hw, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩

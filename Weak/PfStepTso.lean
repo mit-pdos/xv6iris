@@ -101,7 +101,10 @@ explicit parameters unchanged:
     (the pair's own write checks it at the store; no foreign step lies between the halves);
 (5) ([OWN.115], MachCSL queue Q1) at a register write, the armed stuck instrument allows it
     (`MState.excOk`: no kernel-mode synchronous exception) -- W4 supplies it from the exported
-    non-stuckness (`HypsC.safe`, `MState.excOk_of_reducible`). -/
+    non-stuckness (`HypsC.safe`, `MState.excOk_of_reducible`);
+(6) ([OWN.144], MachCSL queue Q1-c) at a RAM instruction fetch, the armed fetch instrument allows
+    it (`MState.fetchOk`: a Supervisor-mode fetch at a RAM `PC` reads `PC`/`PC + 2`) -- W4 supplies
+    it from the same export (`MState.fetchOk_of_reducible`). -/
 def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) : Prop :=
   ∀ (c c' : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (σ : MState) (cpu : CPU)
     (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile)
@@ -128,6 +131,8 @@ def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
     (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
+    (∀ n va req, o = .memRead n va req → akIfetch req.access_kind = true →
+       σ.fetchOk cpu req.pa) →                                                     -- (6) [OWN.144]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -335,6 +340,8 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
     (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
+    (∀ n va req, o = .memRead n va req → akIfetch req.access_kind = true →
+       σ.fetchOk cpu req.pa) →                                                     -- (6) [OWN.144]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -342,7 +349,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
       rmem c' (st ++ [(hartAgent cpu, l)]) σ' ∧
       viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) ∧
       σ'.llog = List.range' 1 σ'.log.length := by
-  intro hp hstep hadj hfacts hramR hramW hR hV heg hA hfetch hexl hfn hls hld hfi hsf hexc
+  intro hp hstep hadj hfacts hramR hramW hR hV heg hA hfetch hexl hfn hls hld hfi hsf hexc hfok
   have hm := PfStepTsoMem.memEager c st σ hR heg
   have hlog := logEq c st σ hR hA
   obtain ⟨m', ors, fn', dd, oib, obar, hn, rs', ib', rfl⟩ := nodeOf cpu _ rs fn ib c.pcDev l p' d' hp hld hfn
@@ -367,7 +374,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
         obtain ⟨q, hq1, hq2, hq3, hq4⟩ := hfetch _ _ rfl
         have hfr := pfFetchRowMemCut c st σ cpu q req.pa (paZ req.pa) n tvs w hR hq3 hq4 rfl hram
           (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
-        refine ⟨.Ok (w, none), σ, σ, Or.inr (Or.inl ⟨hram, hif, q, w, ?_, ?_,
+        refine ⟨.Ok (w, none), σ, σ, Or.inr (Or.inl ⟨hram, hif, hfok n va req rfl hif, q, w, ?_, ?_,
           (PfStepTsoMem.readBytesPEager σ.mem σ.lp hm _ _ _ _ _).2 hfr, rfl, rfl⟩), Or.inl rfl,
           ⟨_, _, _, rfl⟩, frame trivial σ rfl rfl rfl rfl,
           viewRelInert cohSrc σ σ st _ _ rfl hV (sameReadRefl σ), heg⟩

@@ -49,6 +49,7 @@ theorem userret_ualu [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk 
   subst hnpc
   unfold urSt
   iintro ⟨#HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc i iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R')
@@ -128,6 +129,7 @@ theorem userret_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
   have hexec := execSpecF_ldX (GF := GF) cpu c false P.root hok iprop(uptSlot cpu P ∗ □ kmapStatic) pc
     (pc + instrLen is_rvc) (urImm n) n 10#5 hn R (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat)))
     (DFrac.own 1) (tfW ws (4 + n.toNat)) hal' hram halp htr'
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc (urLd n) iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat))) 8 (DFrac.own 1)
@@ -177,6 +179,7 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
   -- the user-boundary consent for the `sret`'s privilege write, at the event
   -- its read frame names, with the entry's evidence (NI M2-W1/W2a/W2c)
   ihave Hpriv := wireInv_enter (Obs.uEnter cpu c.satp epc (gprList R)) ox rfl hf $$ Hwi Hrc Hcl Hev
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c { c with mstatus := sretMs c.mstatus } hok.phys hmie hmenv
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false urSret
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)

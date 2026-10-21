@@ -1575,6 +1575,21 @@ theorem runRW_wp (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x
     (fun _ => ⟨rfl, rfl, rfl⟩)
     (fun _ _ _ _ _ _ => ⟨rfl, rfl, rfl⟩) m orc s x s' orc' h
 
+/-- **A walk keeps the privilege** ([OWN.144]: the U-mode fetch leaves read it; the walker
+never writes `cur_privilege`, `UFoot.noPriv`). -/
+theorem runRW_priv (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X) (s' : UWSt)
+    (orc' : UOrc) (h : runRW D orc s m = some (x, s', orc')) :
+    s'.file .cur_privilege = s.file .cur_privilege :=
+  runRW_preserves D (fun s s' => s'.file .cur_privilege = s.file .cur_privilege)
+    (fun _ => rfl)
+    (fun _ _ _ h1 h2 => h2.trans h1)
+    (fun s r v hdw => by
+      rw [UWSt.file_setPin]
+      refine RegFile.set_other _ _ _ _ (fun hr => ?_)
+      subst hr; rw [D.noPriv] at hdw; exact Bool.noConfusion hdw)
+    (fun _ => rfl)
+    (fun _ _ _ _ _ _ => rfl) m orc s x s' orc' h
+
 end preserves
 
 end MachCSL

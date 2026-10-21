@@ -87,20 +87,22 @@ theorem uxPost_step {X : Type} (T : BMap) (s s'' : UWSt) (m m' : SailM X) (Φ : 
   iapply HP $$ %orc %x %s' %orc'' %(e.trans h) Hfr
 
 /-- **A8, the text-map walk rule.** -/
-theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X) :
-    ∀ (s : UWSt), (∀ orc, (uxRun D T orc s m).isSome = true) → ∀ Φ : X → IProp GF,
+theorem swp_uxRun {X : Type} (hDp : D.Dr .cur_privilege = true) (K : Nat) (DT : List PAddr) (T : BMap)
+    (m : SailM X) :
+    ∀ (s : UWSt), privSup (s.file .cur_privilege) = false → (∀ orc, (uxRun D T orc s m).isSome = true) →
+      ∀ Φ : X → IProp GF,
       uFr RF BF s ∗ uxTextOwn ξ K DT T ∗ iviewLb cpu K ∗
         uxPost RF BF T s m (fun x => iprop(uxTextOwn ξ K DT T -∗ Φ x)) ⊢ swp cpu m Φ := by
   induction m with
   | pure x =>
-    intro s _ Φ
+    intro s _ _ Φ
     iintro ⟨Hfr, Htx, _, HP⟩
     iapply swp_ret
     unfold uxPost
     ihave HΦ := HP $$ %(UOrc.dflt s.rs) %x %s %(UOrc.dflt s.rs) %rfl Hfr
     iapply HΦ $$ Htx
   | impure c k ih =>
-    intro s hok Φ
+    intro s hU hok Φ
     cases hc : uxrIsText T c with
     | true =>
       obtain ⟨n, vasize, req, rfl, htx⟩ := uxr_isText_true hc
@@ -128,13 +130,22 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       iapply swp_bind
       cases hif : akIfetch req.access_kind with
       | true =>
-        iapply swp_sail_mem_read_ifetch_x cpu req ξ K (DFrac.own Qp.threeQuarters) w hif (fun v => swp cpu (k v) Φ)
-        iframe Hb Hiv
+        unfold uFr
+        icases Hfr with ⟨%hwp, HF, HB, Hc, Hr⟩
+        icases RF.rd s.file .cur_privilege hDp $$ HF with ⟨%dqp, Hp, HFc⟩
+        iapply swp_sail_mem_read_ifetch_x cpu req ξ K (DFrac.own Qp.threeQuarters) w hif
+          (s.file .cur_privilege) hU dqp (fun v => swp cpu (k v) Φ)
+        iframe Hp Hb Hiv
         inext
-        iintro Hb
+        iintro Hp Hb
+        ihave HF := HFc $$ Hp
         ihave Htx := Hcl $$ Hb
-        iapply ih (.Ok (w, none)) s hok' Φ
-        iframe Hfr Htx Hiv HP
+        iapply ih (.Ok (w, none)) s hU hok' Φ
+        iframe Htx Hiv HP
+        unfold uFr
+        isplitr
+        · ipureintro; exact hwp
+        iframe
       | false =>
         have hpl : akPlain req.access_kind = true := by simp [akPlain, hif, hex]
         unfold uFr
@@ -144,7 +155,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
         inext
         iintro Hc Hb
         ihave Htx := Hcl $$ Hb
-        iapply ih (.Ok (w, none)) s hok' Φ
+        iapply ih (.Ok (w, none)) s hU hok' Φ
         iframe Htx Hiv HP
         unfold uFr
         isplitr
@@ -176,7 +187,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       have hok' : ∀ o, (uxRun D T o s' (k v)).isSome = true := fun o => by
         obtain ⟨orc₀, h0⟩ := hre o
         rw [← h0]; exact hok orc₀
-      iapply ih v s' hok' Φ
+      iapply ih v s' (by rw [runRW_priv D _ orc s _ _ _ h]; exact hU) hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
@@ -186,7 +197,8 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       iapply uxPost_step RF BF T s s' _ _ _ hre $$ HP
 
 /-- **A8, with a described landing** (as `swp_uftRun_of`). -/
-theorem swp_uxRun_of {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X) (s : UWSt)
+theorem swp_uxRun_of {X : Type} (hDp : D.Dr .cur_privilege = true) (K : Nat) (DT : List PAddr) (T : BMap)
+    (m : SailM X) (s : UWSt) (hU : privSup (s.file .cur_privilege) = false)
     (Pd : X → UWSt → Prop)
     (hw : ∀ orc, ∃ x s' orc', uxRun D T orc s m = some (x, s', orc') ∧ Pd x s') (Φ : X → IProp GF) :
     uFr RF BF s ∗ uxTextOwn ξ K DT T ∗ iviewLb cpu K ∗
@@ -195,7 +207,7 @@ theorem swp_uxRun_of {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : Sail
   have hok : ∀ orc, (uxRun D T orc s m).isSome = true := fun orc => by
     obtain ⟨x, s', orc', h, -⟩ := hw orc
     rw [h]; rfl
-  iapply swp_uxRun RF BF K DT T m s hok Φ
+  iapply swp_uxRun RF BF hDp K DT T m s hU hok Φ
   iframe Hfr Htx Hiv
   unfold uxPost
   iintro %orc %x %s' %orc' %h Hfr

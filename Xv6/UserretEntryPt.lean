@@ -66,6 +66,7 @@ theorem userret_kstep [CurCtx] (cpu : CPU) (c c' : MConf) (kroot : BitVec 44)
   rw [hv2, urPa2 pc hpc'] at htr2
   subst hnpc
   iintro ⟨#HI, HmConf, Hclock, Hpc, Htt, #Hcl, HP, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c' hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + 4#64) false i iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) P Q htr htr2 hexec
     (resvOut_sepL _ (resvOut_transTok cpu KTier.kpt kroot)))
@@ -116,6 +117,7 @@ theorem userret_wstep [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44) (P : 
   rw [hv2, urPa2 pc hpc'] at htr2
   subst hnpc
   iintro ⟨#HI, #Hcl, #HS, HmConf, Hclock, Hpc, Hwin, Htok, HR, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + 4#64) false urSfence
     iprop(pt2WinU cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)

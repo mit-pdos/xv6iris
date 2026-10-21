@@ -732,10 +732,26 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       let akE ← withDefault <| whnf (← mkProjection req `access_kind)
       let reqStx ← Lean.Elab.Term.exprToSyntax req
       if akE.isAppOf ``Sail.ConcurrencyInterfaceV1.Access_kind.AK_ifetch then
+        -- the fetch guard ([OWN.144]): out of a non-Supervisor mode, read off
+        -- `Hcur_privilege`; else off `HPC`, the read at `PC`/`PC + 2` (or a
+        -- non-RAM `PC`) a hypothesis of the context (`assumption`)
+        let hp := mkIdent `Hcur_privilege
+        let hpc := mkIdent `HPC
+        let hb := mkIdent `Hbytes
         if bind then
-          evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_read_ifetch _ $reqStx _ rfl); iframe; try (inext; iintro $(mkIdent `Hbytes):ident))))
+          evalTactic (← `(tactic| (iapply swp_bind; first
+            | (iapply (swp_sail_mem_read_ifetch_priv _ $reqStx _ rfl); iframe $hp:ident $hb:ident;
+               isplitl []; (ipureintro; first | rfl | decide); try (inext; iintro $hp:ident $hb:ident))
+            | (iapply (swp_sail_mem_read_ifetch_pc _ $reqStx _ rfl); iframe $hpc:ident $hb:ident;
+               isplitl []; (ipureintro; first | assumption | (simp only [] at *; assumption));
+               try (inext; iintro $hpc:ident $hb:ident)))))
         else
-          evalTactic (← `(tactic| (iapply (swp_sail_mem_read_ifetch _ $reqStx _ rfl); iframe; try (inext; iintro $(mkIdent `Hbytes):ident))))
+          evalTactic (← `(tactic| first
+            | (iapply (swp_sail_mem_read_ifetch_priv _ $reqStx _ rfl); iframe $hp:ident $hb:ident;
+               isplitl []; (ipureintro; first | rfl | decide); try (inext; iintro $hp:ident $hb:ident))
+            | (iapply (swp_sail_mem_read_ifetch_pc _ $reqStx _ rfl); iframe $hpc:ident $hb:ident;
+               isplitl []; (ipureintro; first | assumption | (simp only [] at *; assumption));
+               try (inext; iintro $hpc:ident $hb:ident))))
       else
         if bind then
           evalTactic (← `(tactic| (iapply swp_bind; iapply (swp_sail_mem_read_plain _ $reqStx _ _ _ rfl); iframe; try (inext; iintro $(mkIdent `Htok):ident $(mkIdent `Hbytes):ident))))

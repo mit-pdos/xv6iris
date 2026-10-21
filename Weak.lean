@@ -825,6 +825,8 @@ import Weak.CapFrame
 import Weak.G7FetchOwn
 import Weak.SbProg
 import Weak.CapDataTrap
+import Weak.CapFetchOfs
+import Weak.CapFetchCyG
 import Weak.CapDataOk
 import Weak.SbRealP
 import Weak.CapRetag

@@ -92,7 +92,8 @@ translation of the fetch. -/
 theorem ustFetchSpec_of_xlate (cpu : CPU) (hX : UftXlate C P) : UstFetchSpec (GF := GF) cpu C P := by
   intro t0 mm0 s Ψ hl
   iintro ⟨_, Hfr, HΨ⟩
-  iapply swp_uftFetch (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) (uftTrOf hX t0 mm0) s hl Ψ
+  iapply swp_uftFetch (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) (uftTrOf hX t0 mm0) s hl (by decide)
+    (by rw [hl.priv]; rfl) Ψ
   iframe Hfr
   iintro %fr %s' %hout Hfr
   iapply HΨ $$ %fr %s' %(ustFetchOut_of_uftOut hout) Hfr

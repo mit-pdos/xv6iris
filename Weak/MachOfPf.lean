@@ -152,6 +152,8 @@ def pfStepTsoStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
     (∀ (r : Register) (v : RegisterType r), o = .regWrite r v → σ.excOk cpu r v) →   -- (5) [OWN.115]
+    (∀ n va req, o = .memRead n va req → akIfetch req.access_kind = true →
+       σ.fetchOk cpu req.pa) →                                                     -- (6) [OWN.144]
     ∃ (v : o.ret) (σ1 σ' : MState),
       evStep cpu o σ v σ1 ∧
       (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
@@ -818,7 +820,7 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
   cases o with
   | memRead n va req =>
     have hda := hR n va req rfl
-    rcases h with ⟨-, w, ds', hdr, -, -⟩ | ⟨-, -, -, -, -, -, -, -, rfl⟩ |
+    rcases h with ⟨-, w, ds', hdr, -, -⟩ | ⟨-, -, -, -, -, -, -, -, -, rfl⟩ |
         ⟨-, -, -, -, -, -, -, -, -, rfl⟩ | ⟨-, -, -, -, -, -, -, rfl⟩
     · rw [devReadNone _ _ _ hda] at hdr; cases hdr
     all_goals exact ⟨rfl, rfl, rfl⟩
@@ -1233,6 +1235,10 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
           subst hl; exact hH.cut st c t g n κ hrun hreach hR0 cpu base tvs c' hs hf hcf)
         (fun aq base tvs asrc hl => ⟨hcoh, hex aq base tvs asrc hl⟩) rfl hl1 hl2 hfi1 hfi2
         (fun r v ho => by subst ho; exact MState.excOk_of_reducible hlive hred)
+        (fun n va req ho hif => by
+          subst ho
+          exact MState.fetchOk_of_reducible hlive hred hif (fun ⟨hdb, hn⟩ =>
+            not_devBytes_of_ramBytes (hrbR n va req rfl (hdaR n va req rfl)) hn hdb))
     simp only [Pexv6.PHart.injEq] at hp'
     obtain ⟨-, hmk, -, -, -⟩ := hp'
     obtain ⟨hdv, hrg, -⟩ := evStepShape cpu o g.m σ1 v hev hdaR hdaW

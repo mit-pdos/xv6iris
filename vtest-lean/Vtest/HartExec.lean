@@ -282,7 +282,7 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
           obtain ⟨rfl, rfl⟩ := h
           simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
           obtain ⟨⟨h1, h2⟩, h3⟩ := hc
-          refine ⟨hram', hif, _, _, h1, (by rw [htop]; exact h2), ?_, rfl, rfl⟩
+          refine ⟨hram', hif, MState.fetchOk_unarmed _ _ _ rfl, _, _, h1, (by rw [htop]; exact h2), ?_, rfl, rfl⟩
           rw [hlp]
           exact (readBytesPB_iff _ _ _ _ _ _ _).1 h3
         · exact absurd h (by simp)

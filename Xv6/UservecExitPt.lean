@@ -92,6 +92,7 @@ theorem uservec_usfence [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConf
   subst hnpc
   unfold urSt
   iintro ⟨#HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + 4#64) false urSfence iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R)
@@ -129,6 +130,7 @@ theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urC
   iintro ⟨#Hkr, #HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HΦ⟩
   -- the hart's user epoch closes (W8 (f3-utext), F-REGS: `satpStep_close`)
   ihave Hsatpw := satpStep_close (GF := GF) cpu (DFrac.own 1) c.satp kroot P.root (satpTable_of_sconfKpt hok) hne
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c { c with satp := satpOf KTier.kpt kroot } hok.phys hmie hmenv
     Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc) (pc + 4#64) false uvCsrwSatp
     iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
@@ -184,6 +186,7 @@ theorem uservec_wstep [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44) (P : 
   rw [hv2, urPa2 pc hpc'] at htr2
   subst hnpc
   iintro ⟨#HI, #Hcl, #HS, HmConf, Hclock, Hpc, Hwin, Htok, HR, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + 4#64) false urSfence
     iprop(pt2Win cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
@@ -219,6 +222,7 @@ theorem uservec_kjalr [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44)
   have htr2 := transSpecX_kpt (GF := GF) cpu c false kroot hok (pc + 2#64) hlt2 trampPpn
   rw [hv2, urPa2 pc hpc'] at htr2
   iintro ⟨#HI, HmConf, Hclock, Hpc, Htt, #Hcl, HR, HΦ⟩
+  have hpcr : ramPc pc = false := urPc_notRam pc hpc'
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (jumpPc (R.get 5#5)) true uvJalr iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) (gprFile cpu R)
     iprop((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu (R.set 1#5 (pc + 2#64))) htr htr2

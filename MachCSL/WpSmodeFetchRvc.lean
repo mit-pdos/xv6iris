@@ -52,10 +52,11 @@ theorem swp_fetch_s2_rvc_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram) (hal := hal2)
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram) (hal := hal2) (pc := pc)
+    (hpa := Or.inl rfl)
   iframe
   inext
-  iintro HmConf Hlo
+  iintro HmConf HPC Hlo
   swp_run 40
   iapply HΦ $$ HmConf HPC [Htrans Htok] Hlo
   iframe Htrans Htok

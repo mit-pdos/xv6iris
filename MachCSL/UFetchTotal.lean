@@ -157,9 +157,11 @@ variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UB
 /-- **The fetch, in Iris** (the cycle's fetch obligation,
 `UCycleSwp.swp_ucRunHartActive`): from the walker frames at a state of `I`,
 `fetch ()` lands in `uftOut`, frames handed back. -/
-theorem swp_uftFetch {I : UWSt → Prop} (T : UftTr D I) (s : UWSt) (hI : I s) (Φ : FetchResult → IProp GF) :
+theorem swp_uftFetch {I : UWSt → Prop} (T : UftTr D I) (s : UWSt) (hI : I s)
+    (hDp : D.Dr .cur_privilege = true) (hU : privSup (s.file .cur_privilege) = false)
+    (Φ : FetchResult → IProp GF) :
     uFr RF BF s ∗ (∀ fr s', ⌜uftOut I s fr s'⌝ -∗ uFr RF BF s' -∗ Φ fr) ⊢ swp cpu (fetch ()) Φ :=
-  swp_uftRun_of RF BF (fetch ()) s (uftOut I s) (uft_fetch_total T s hI) Φ
+  swp_uftRun_of RF BF hDp (fetch ()) s hU (uftOut I s) (uft_fetch_total T s hI) Φ
 
 end swp
 

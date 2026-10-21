@@ -45,6 +45,16 @@ def urPcOk (pc : BitVec 64) : Prop :=
 
 instance (pc : BitVec 64) : Decidable (urPcOk pc) := by unfold urPcOk; infer_instance
 
+/-- A trampoline `pc` is no RAM address (the fetch guard [OWN.144] does not apply). -/
+theorem urPc_notRam (pc : BitVec 64) (h : urPcOk pc) : ramPc pc = false := by
+  have hv := congrArg BitVec.toNat h.2.2.1
+  simp only [vpnOf, trampVpn, BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow] at hv
+  have hlt : ¬ pc.toNat < ramEnd := by
+    simp only [ramEnd]
+    simp at hv
+    omega
+  simp [ramPc, hlt]
+
 /-- The physical address of `pc + 2` on the page. -/
 theorem urPa2 (pc : BitVec 64) (h : urPcOk pc) : paOf trampPpn (pc + 2#64) = paOf trampPpn pc + 2#64 := by
   have h1 : vpnOf (pc + 2#64) = vpnOf pc := by rw [h.2.2.1, h.2.2.2]

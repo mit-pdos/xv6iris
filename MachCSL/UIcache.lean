@@ -157,11 +157,13 @@ returns exactly them. -/
 theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
+    (p : Privilege) (hp : privSup p = false) (dqp : DFrac)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ctxBytesX ξ K req.pa n dq w ∗ iviewLb cpu K ∗ ▷ (ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
+    Register.cur_privilege ↦ᵣ[cpu]{dqp} p ∗ ctxBytesX ξ K req.pa n dq w ∗ iviewLb cpu K ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu]{dqp} p -∗ ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
-  iintro ⟨Hb, #Hiv, HΦ⟩
+  iintro ⟨Hp, Hb, #Hiv, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
   iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
     (fun _ _ hb => by
@@ -170,6 +172,10 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %Hpv : ⌜σ.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hp]
+  · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege dqp p $$ [$Hregs $Hp] with %_
+    itrivial
+  have hfo : σ.fetchOk cpu req.pa := fun _ => kFetchBad_of_priv _ _ (by rw [Hpv]; exact hp)
   ihave %hrd : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytesP σ.lp ag tvn req.pa n w⌝
       $$ [Hmem Hmm Hb]
   · iapply uic_ctxBytesX_read σ ξ K req.pa n dq w $$ [Hmem Hmm Hb]
@@ -186,10 +192,10 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
   isplit
   · ipureintro
     exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
-      ⟨hram, hk, σ.itv cpu, w, le_refl _, (mmOk_views hmm cpu).2.1, hrd _ _ hK, rfl, rfl⟩)⟩
+      ⟨hram, hk, hfo, σ.itv cpu, w, le_refl _, (mmOk_views hmm cpu).2.1, hrd _ _ hK, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', hitv, _, hrd', rfl, hσ⟩ |
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, _, tvn, w', hitv, _, hrd', rfl, hσ⟩ |
     ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'
@@ -199,7 +205,7 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
-      iapply HΦ $$ Hb
+      iapply HΦ $$ Hp Hb
   · simp [akPlain, hk] at hpl
   · rw [hex] at hex'
     exact absurd hex' (by decide)

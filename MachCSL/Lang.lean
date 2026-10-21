@@ -1376,17 +1376,103 @@ theorem MState.excOk_unarmed (σ : MState) (cpu : CPU) (r : Register) (v : Regis
     (h : σ.kArm = false) : σ.excOk cpu r v :=
   fun h' => by rw [h] at h'; cases h'
 
-/-- **THE HART IS STUCK** ([OWN.115]): its head event is a guarded event the armed
-instrument refuses.  Then no event step answers it (`evStep`'s guarded arm) and no pending
-store of the hart lands (`primStep`'s land arm), so the hart thread is not reducible. -/
+/-! ### Zero-width MMIO
+
+No device answers a zero-byte transaction (every window is 1/2/4/8 bytes
+wide), so the MMIO arms of `evStep` are enabled only at a positive width --
+which is what lets a memory rule dismiss them from its footprint's cells. -/
+
+theorem devRead_pos {ds : DevStates} {pa : PAddr} {n : Nat} {r : BitVec (8 * n) × DevStates}
+    (h : devRead ds pa n = some r) : 0 < n := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · exfalso
+    unfold devRead at h
+    revert h
+    cases hd : devDecode pa with
+    | none => simp
+    | some p =>
+      obtain ⟨d, off⟩ := p
+      cases d <;> simp [devSig, Uart.sig, Uart.readN, Plic.sig, Plic.readN,
+        Virtio.sig, Virtio.readN]
+  · exact hn
+
+/-! ### The fetch instrument ([OWN.144] (E2), MachCSL queue Q1-c)
+
+A Supervisor-mode instruction fetch at a RAM `PC` reads its granule: Sail's `fetch ()`
+(`Fetch.lean:217-288`) reads granule `PC` and, on the 2+2 arm, granule `PC + 2`, each
+through `translateAddr` (`Vmem.lean:567`) -- the kernel's text is identity-mapped, so a
+kernel-text fetch read OFF `{PC, PC + 2}` is refused when the instrument is armed
+(`kFetchBad`; the index of the read is not in the event, so the exact `PC + 2k` is the Weak
+side's Sail-text lemma: `translateAddr` keeps the page offset).  A trampoline fetch (its `PC`
+is no RAM address) and every fetch out of User or Machine mode are unaffected.  The guard
+removes transitions only; the WP discharges it at every kernel fetch (`swp_sail_mem_read_ifetch_reg`
+and the S-mode fetch rules), so the reachable states are the unguarded machine's: FAITHFUL. -/
+
+/-- A RAM program counter. -/
+def ramPc (pc : BitVec 64) : Bool := decide (ramBase ≤ pc.toNat) && decide (pc.toNat < ramEnd)
+
+/-- **A KERNEL-TEXT FETCH OFF ITS GRANULE** ([OWN.144]): an instruction-fetch read at `pa`
+made from the register file `f` of a hart in Supervisor mode at a RAM `PC`, `pa` neither `PC`
+nor `PC + 2`. -/
+def kFetchBad (f : RegFile) (pa : PAddr) : Bool :=
+  privSup (f .cur_privilege) && ramPc (f .PC) && !(pa == f .PC) && !(pa == f .PC + 2#64)
+
+/-- The armed guard on an instruction-fetch read of hart `cpu` at `pa` in state `σ`. -/
+def MState.fetchOk (σ : MState) (cpu : CPU) (pa : PAddr) : Prop :=
+  σ.kArm = true → kFetchBad (σ.regs cpu) pa = false
+
+/-- A fetch by a hart that is not in Supervisor mode is never guarded. -/
+theorem kFetchBad_of_priv (f : RegFile) (pa : PAddr) (h : privSup (f .cur_privilege) = false) :
+    kFetchBad f pa = false := by
+  unfold kFetchBad; rw [h]; rfl
+
+/-- A fetch at `PC` or `PC + 2`, or at a `PC` that is no RAM address, is never guarded. -/
+theorem kFetchBad_of_pc (f : RegFile) (pa : PAddr)
+    (h : pa = f .PC ∨ pa = f .PC + 2#64 ∨ ramPc (f .PC) = false) : kFetchBad f pa = false := by
+  unfold kFetchBad
+  rcases h with h | h | h
+  · subst h; simp
+  · subst h; simp
+  · rw [h]; simp
+
+/-- What an allowed fetch is, in Supervisor mode at a RAM `PC`: a read of `PC` or `PC + 2`. -/
+theorem kFetchBad_false (f : RegFile) (pa : PAddr) (h : kFetchBad f pa = false)
+    (hS : privSup (f .cur_privilege) = true) (hr : ramPc (f .PC) = true) :
+    pa = f .PC ∨ pa = f .PC + 2#64 := by
+  unfold kFetchBad at h
+  rw [hS, hr] at h
+  by_cases h1 : pa = f .PC
+  · exact Or.inl h1
+  · by_cases h2 : pa = f .PC + 2#64
+    · exact Or.inr h2
+    · simp [h1, h2] at h
+
+/-- An unarmed state allows every fetch (the Vtest validation runs). -/
+theorem MState.fetchOk_unarmed (σ : MState) (cpu : CPU) (pa : PAddr) (h : σ.kArm = false) :
+    σ.fetchOk cpu pa :=
+  fun h' => by rw [h] at h'; cases h'
+
+/-- **THE HART IS STUCK** ([OWN.115], [OWN.144]): its head event is a guarded event the armed
+instrument refuses -- a refused register write (`excOk`), or an instruction-fetch read that no
+arm answers (no MMIO footprint of positive width, and no RAM footprint the fetch guard `fetchOk`
+allows).  Then
+no event step answers it (`evStep`'s guarded arms) and no pending store of the hart lands
+(`primStep`'s land arm), so the hart thread is not reducible. -/
 def MState.kStuck (σ : MState) (cpu : CPU) : SailM Unit → Prop
   | .impure (.ok (.regWrite r v)) _ => ¬ σ.excOk cpu r v
+  | .impure (.ok (.memRead n _ req)) _ =>
+      σ.kArm = true ∧ akIfetch req.access_kind = true ∧ ¬ (devBytes req.pa n ∧ 0 < n) ∧
+        ¬ (ramBytes req.pa n ∧ σ.fetchOk cpu req.pa)
   | _ => False
 
-/-- What a stuck head is: a guarded register write. -/
+/-- What a stuck head is: a guarded register write, or an unanswered armed fetch. -/
 theorem MState.kStuck_inv (σ : MState) (cpu : CPU) (m : SailM Unit) (h : σ.kStuck cpu m) :
-    ∃ (r : Register) (v : RegisterType r) (k : Unit → SailM Unit),
-      m = .impure (.ok (.regWrite r v)) k ∧ ¬ σ.excOk cpu r v := by
+    (∃ (r : Register) (v : RegisterType r) (k : Unit → SailM Unit),
+      m = .impure (.ok (.regWrite r v)) k ∧ ¬ σ.excOk cpu r v) ∨
+    (∃ (n vasize : Nat) (req : _) (k : _),
+      m = .impure (.ok (Outcome.memRead n vasize req)) k ∧ σ.kArm = true ∧
+        akIfetch req.access_kind = true ∧ ¬ (devBytes req.pa n ∧ 0 < n) ∧
+        ¬ (ramBytes req.pa n ∧ σ.fetchOk cpu req.pa)) := by
   cases m with
   | pure _ => exact False.elim h
   | impure c k =>
@@ -1394,14 +1480,16 @@ theorem MState.kStuck_inv (σ : MState) (cpu : CPU) (m : SailM Unit) (h : σ.kSt
     | error _ => exact False.elim h
     | ok o =>
       cases o with
-      | regWrite r v => exact ⟨r, v, k, rfl, h⟩
+      | regWrite r v => exact Or.inl ⟨r, v, k, rfl, h⟩
+      | memRead n vasize req => exact Or.inr ⟨n, vasize, req, k, rfl, h⟩
       | _ => exact False.elim h
 
 theorem MState.not_kStuck_unarmed (σ : MState) (cpu : CPU) (m : SailM Unit) (h : σ.kArm = false) :
     ¬ σ.kStuck cpu m := by
   intro hs
-  obtain ⟨r, v, k, -, hn⟩ := σ.kStuck_inv cpu m hs
-  exact hn (σ.excOk_unarmed cpu r v h)
+  rcases σ.kStuck_inv cpu m hs with ⟨r, v, k, -, hn⟩ | ⟨n, vasize, req, k, -, ha, -⟩
+  · exact hn (σ.excOk_unarmed cpu r v h)
+  · rw [h] at ha; cases ha
 
 /-! ## The per-event step relation -/
 
@@ -1454,7 +1542,9 @@ RETIRED, [OWN.114]: under route P a failed acquire reads the landed top.)
 
 A register write additionally passes the armed stuck instrument `MState.excOk` ([OWN.115]):
 a write of a cause register with bit 63 clear by a hart in Supervisor mode (a kernel-mode
-synchronous exception, `kExcWrite`) has no answer.
+synchronous exception, `kExcWrite`) has no answer.  A RAM fetch additionally passes the armed
+fetch instrument `MState.fetchOk` ([OWN.144]): a Supervisor-mode fetch at a RAM `PC` off
+`{PC, PC + 2}` (`kFetchBad`) has no answer.
 
 An MMIO store additionally passes `MState.drvOkGuard` -- NAMED ASSUMPTION [OWN.127]/[OWN.131]
 (xv6 weak-memory bug #1): hart 0's `DRIVER_OK` store waits for its pending virtqueue-page
@@ -1468,7 +1558,7 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
       (devBytes req.pa n ∧
         ∃ w ds', devRead σ.devs req.pa n = some (w, ds') ∧ v = .Ok (w, none) ∧
           σ' = { σ with devs := ds' }) ∨
-      (ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧
+      (ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧ σ.fetchOk cpu req.pa ∧
         ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧
           σ.mem.readBytesP σ.lp (ifetchAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧ σ' = σ) ∨
       (ramBytes req.pa n ∧ akPlain req.access_kind = true ∧
@@ -1847,12 +1937,50 @@ theorem MState.not_kStuck_of_reducible {gen : Nat} {cpu : CPU} {m : SailM Unit} 
   obtain ⟨-, hc⟩ := primStep_hart_inv hs
   intro hk
   rcases hc with ⟨_, _, m', σ', _, hst, _⟩ | ⟨hnl, _⟩ | ⟨_, hk', _⟩
-  · obtain ⟨r, v, k, rfl, hn⟩ := g.m.kStuck_inv cpu m hk
-    rcases hst with ⟨v', _, hev⟩ | ⟨hb, _⟩
-    · exact hn hev.2
-    · exact hb
+  · rcases g.m.kStuck_inv cpu m hk with ⟨r, v, k, rfl, hn⟩ | ⟨n, vasize, req, k, rfl, -, hif, hnd, hnr⟩
+    · rcases hst with ⟨v', _, hev⟩ | ⟨hb, _⟩
+      · exact hn hev.2
+      · exact hb
+    · have hex := akExcl_of_ifetch _ hif
+      rcases hst with ⟨v', _, hev⟩ | ⟨hb, _⟩
+      · rcases hev with ⟨hd, w, ds', hdr, _⟩ | ⟨hr, _, hf, _⟩ | ⟨_, hpl, _⟩ | ⟨_, hx, _⟩
+        · exact hnd ⟨hd, devRead_pos hdr⟩
+        · exact hnr ⟨hr, hf⟩
+        · simp [akPlain, hif] at hpl
+        · rw [hex] at hx; cases hx
+      · have hx : akExcl req.access_kind = true := hb.1
+        rw [hex] at hx; cases hx
   · exact hnl hl
   · exact hk' hk
+
+/-- **NO KERNEL-TEXT FETCH OFF ITS GRANULE** ([OWN.144]): a live, reducible hart thread whose
+head is an instruction-fetch read that is no MMIO transaction (of positive width) makes an
+allowed fetch -- and, armed, reads RAM. -/
+theorem MState.fetchRam_of_reducible {gen : Nat} {cpu : CPU} {n vasize : Nat} {req : _}
+    {k : _} {g : GState} (hl : threadLive g gen)
+    (hr : PrimStep.Reducible (Expr.hart gen cpu (.impure (.ok (Outcome.memRead n vasize req)) k), g))
+    (harm : g.m.kArm = true) (hif : akIfetch req.access_kind = true)
+    (hnd : ¬ (devBytes req.pa n ∧ 0 < n)) :
+    ramBytes req.pa n ∧ g.m.fetchOk cpu req.pa :=
+  Classical.byContradiction fun h => MState.not_kStuck_of_reducible hl hr ⟨harm, hif, hnd, h⟩
+
+theorem MState.fetchOk_of_reducible {gen : Nat} {cpu : CPU} {n vasize : Nat} {req : _}
+    {k : _} {g : GState} (hl : threadLive g gen)
+    (hr : PrimStep.Reducible (Expr.hart gen cpu (.impure (.ok (Outcome.memRead n vasize req)) k), g))
+    (hif : akIfetch req.access_kind = true) (hnd : ¬ (devBytes req.pa n ∧ 0 < n)) :
+    g.m.fetchOk cpu req.pa :=
+  fun harm => (MState.fetchRam_of_reducible hl hr harm hif hnd).2 harm
+
+/-- **THE KERNEL FETCH READS ITS GRANULE** ([OWN.144], the consumer form): as
+`fetchOk_of_reducible`, armed, in Supervisor mode at a RAM `PC` the read is at `PC` or `PC + 2`. -/
+theorem MState.fetchPa_of_reducible {gen : Nat} {cpu : CPU} {n vasize : Nat} {req : _}
+    {k : _} {g : GState} (hl : threadLive g gen)
+    (hr : PrimStep.Reducible (Expr.hart gen cpu (.impure (.ok (Outcome.memRead n vasize req)) k), g))
+    (harm : g.m.kArm = true) (hif : akIfetch req.access_kind = true)
+    (hnd : ¬ (devBytes req.pa n ∧ 0 < n))
+    (hS : privSup (g.m.regs cpu .cur_privilege) = true) (hram : ramPc (g.m.regs cpu .PC) = true) :
+    req.pa = g.m.regs cpu .PC ∨ req.pa = g.m.regs cpu .PC + 2#64 :=
+  kFetchBad_false _ _ (MState.fetchOk_of_reducible hl hr hif hnd harm) hS hram
 
 /-- **NO KERNEL-MODE SYNCHRONOUS EXCEPTION** ([OWN.115]): a live, reducible hart thread whose
 head is a register write makes an allowed write (armed: not a cause write with bit 63 clear

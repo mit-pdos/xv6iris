@@ -248,19 +248,20 @@ theorem uftPost_step {X : Type} (s s'' : UWSt) (m m' : SailM X) (Φ : X → IPro
 /-- **The fetch-walk rule** (the analogue of `swp_runRW`): a computation
 every oracle's fetch-walk runs through, from the frames of `s`, with the
 obligation at every landing. -/
-theorem swp_uftRun {X : Type} (m : SailM X) :
-    ∀ (s : UWSt), s.ro = BF.ro → s.pt = BF.pt → BF.satpOk (s.file .satp) → (∀ orc, (uftRun D orc s m).isSome = true) →
+theorem swp_uftRun {X : Type} (hDp : D.Dr .cur_privilege = true) (m : SailM X) :
+    ∀ (s : UWSt), s.ro = BF.ro → s.pt = BF.pt → BF.satpOk (s.file .satp) →
+      privSup (s.file .cur_privilege) = false → (∀ orc, (uftRun D orc s m).isSome = true) →
       ∀ Φ : X → IProp GF,
       uFr RF BF s ∗ uftPost RF BF s m Φ ⊢ swp cpu m Φ := by
   induction m with
   | pure x =>
-    intro s _ _ _ _ Φ
+    intro s _ _ _ _ _ Φ
     iintro ⟨Hfr, HP⟩
     iapply swp_ret
     unfold uftPost
     iapply HP $$ %(UOrc.dflt s.rs) %x %s %(UOrc.dflt s.rs) %rfl Hfr
   | impure c k ih =>
-    intro s hro hpt hsat hok Φ
+    intro s hro hpt hsat hU hok Φ
     cases hc : uftIsFetch c with
     | true =>
       obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
@@ -281,13 +282,15 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
         swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ
       unfold uFr
       iintro ⟨⟨%_, HF, HB, Hc, Hr⟩, HP⟩
-      iapply ufm_swp_ifetch_bind cpu BF s.mm req k hk hcond.1 hcond.2 Φ
-      iframe HB
+      icases RF.rd s.file .cur_privilege hDp $$ HF with ⟨%dqp, Hp, HFc⟩
+      iapply ufm_swp_ifetch_bind cpu BF s.mm req k hk hcond.1 hcond.2 (s.file .cur_privilege) hU dqp Φ
+      iframe Hp HB
       inext
-      iintro %w' HB
+      iintro %w' Hp HB
+      ihave HF := HFc $$ Hp
       have hok' : ∀ o, (uftRun D o s (k (.Ok (w', none)))).isSome = true := fun o => by
         rw [← hstep w' o]; exact hok _
-      iapply ih (.Ok (w', none)) s hro hpt hsat hok' Φ
+      iapply ih (.Ok (w', none)) s hro hpt hsat hU hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
@@ -318,7 +321,8 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
         obtain ⟨orc₀, h0⟩ := hre o
         rw [← h0]; exact hok orc₀
       have hwp := runRW_wp D _ orc s v s' orc' h
-      iapply ih v s' (hwp.1.trans hro) (hwp.2.1.trans hpt) (by rw [hwp.2.2]; exact hsat) hok' Φ
+      iapply ih v s' (hwp.1.trans hro) (hwp.2.1.trans hpt) (by rw [hwp.2.2]; exact hsat)
+        (by rw [runRW_priv D _ orc s v s' orc' h]; exact hU) hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
@@ -329,7 +333,8 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
 /-- **A fetch-walk with a described landing** (the form the cycle's fetch
 obligation is discharged in): every oracle's walk lands on a result and a
 state satisfying `P`, and the obligation holds at every such landing. -/
-theorem swp_uftRun_of {X : Type} (m : SailM X) (s : UWSt) (P : X → UWSt → Prop)
+theorem swp_uftRun_of {X : Type} (hDp : D.Dr .cur_privilege = true) (m : SailM X) (s : UWSt)
+    (hU : privSup (s.file .cur_privilege) = false) (P : X → UWSt → Prop)
     (hw : ∀ orc, ∃ x s' orc', uftRun D orc s m = some (x, s', orc') ∧ P x s') (Φ : X → IProp GF) :
     uFr RF BF s ∗ (∀ x s', ⌜P x s'⌝ -∗ uFr RF BF s' -∗ Φ x) ⊢ swp cpu m Φ := by
   iintro ⟨Hfr, HΦ⟩
@@ -337,7 +342,7 @@ theorem swp_uftRun_of {X : Type} (m : SailM X) (s : UWSt) (P : X → UWSt → Pr
     obtain ⟨x, s', orc', h, -⟩ := hw orc
     rw [h]; rfl
   ihave %hwp := uFr_wp RF BF s $$ Hfr
-  iapply swp_uftRun RF BF m s hwp.1 hwp.2.1 hwp.2.2 hok Φ
+  iapply swp_uftRun RF BF hDp m s hwp.1 hwp.2.1 hwp.2.2 hU hok Φ
   iframe Hfr
   unfold uftPost
   iintro %orc %x %s' %orc' %h Hfr

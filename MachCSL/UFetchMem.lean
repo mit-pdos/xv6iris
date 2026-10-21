@@ -125,12 +125,14 @@ value readable at a view ≥ `itv`), and hands the bytes back unchanged. -/
 theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
+    (p : Privilege) (hp : privSup p = false) (dqp : DFrac)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ctxBytes ξ req.pa n dq w ∗
-    ▷ (∀ w' : BitVec (8 * n), ctxBytes ξ req.pa n dq w -∗ Φ (.Ok (w', none)))
+    Register.cur_privilege ↦ᵣ[cpu]{dqp} p ∗ ctxBytes ξ req.pa n dq w ∗
+    ▷ (∀ w' : BitVec (8 * n), Register.cur_privilege ↦ᵣ[cpu]{dqp} p -∗ ctxBytes ξ req.pa n dq w -∗
+        Φ (.Ok (w', none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
-  iintro ⟨Hb, HΦ⟩
+  iintro ⟨Hp, Hb, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
   iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
     (fun _ _ hb => by
@@ -139,6 +141,10 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %Hpv : ⌜σ.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hp]
+  · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege dqp p $$ [$Hregs $Hp] with %_
+    itrivial
+  have hfo : σ.fetchOk cpu req.pa := fun _ => kFetchBad_of_priv _ _ (by rw [Hpv]; exact hp)
   ihave %hh : ⌜ufmHist σ.mem req.pa n⌝ $$ [Hmem Hb]
   · iapply ufm_ctxBytes_hist σ.mem ξ req.pa n dq w $$ [Hmem Hb]
     iframe
@@ -151,10 +157,10 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
   isplit
   · ipureintro
     exact ⟨.Ok (w0, none), σ, Or.inr (Or.inl
-      ⟨hram, hk, σ.ltop, w0, (mmOk_views hmm cpu).2.1, le_refl _, hrd, rfl, rfl⟩)⟩
+      ⟨hram, hk, hfo, σ.ltop, w0, (mmOk_views hmm cpu).2.1, le_refl _, hrd, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
     ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'
@@ -163,7 +169,7 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
-      iapply HΦ $$ %w' Hb
+      iapply HΦ $$ %w' Hp Hb
   · simp [akPlain, hk] at hpl
   · rw [hex] at hex'
     exact absurd hex' (by decide)
@@ -173,29 +179,34 @@ map answers some value, the frame handed back at the same map. -/
 theorem ufm_swp_ifetch_frame (cpu : CPU) {ξ : CtxId} (BF : UByteFrame GF ξ) (mm : BMap) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned mm req.pa n = true)
+    (p : Privilege) (hp : privSup p = false) (dqp : DFrac)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    BF.B mm ∗ ▷ (∀ w' : BitVec (8 * n), BF.B mm -∗ Φ (.Ok (w', none)))
+    Register.cur_privilege ↦ᵣ[cpu]{dqp} p ∗ BF.B mm ∗
+      ▷ (∀ w' : BitVec (8 * n), Register.cur_privilege ↦ᵣ[cpu]{dqp} p -∗ BF.B mm -∗ Φ (.Ok (w', none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  iintro ⟨HB, HΦ⟩
+  iintro ⟨Hp, HB, HΦ⟩
   icases BF.accR mm req.pa n hn ho $$ HB with ⟨%dq, %w, %hw, Hb, HBc⟩
-  iapply swp_sail_mem_read_ifetch_ctx cpu req ξ dq w hk Φ
-  iframe Hb
+  iapply swp_sail_mem_read_ifetch_ctx cpu req ξ dq w hk p hp dqp Φ
+  iframe Hp Hb
   inext
-  iintro %w' Hb
+  iintro %w' Hp Hb
   ihave HB := HBc $$ Hb
-  iapply HΦ $$ %w' HB
+  iapply HΦ $$ %w' Hp HB
 
 /-- The bind form: a fetch followed by its continuation. -/
 theorem ufm_swp_ifetch_bind (cpu : CPU) {ξ : CtxId} (BF : UByteFrame GF ξ) (mm : BMap) {n vasize : Nat}
     {X : Type} (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned mm req.pa n = true)
+    (p : Privilege) (hp : privSup p = false) (dqp : DFrac)
     (Φ : X → IProp GF) :
-    BF.B mm ∗ ▷ (∀ w' : BitVec (8 * n), BF.B mm -∗ swp cpu (k (.Ok (w', none))) Φ)
+    Register.cur_privilege ↦ᵣ[cpu]{dqp} p ∗ BF.B mm ∗
+      ▷ (∀ w' : BitVec (8 * n), Register.cur_privilege ↦ᵣ[cpu]{dqp} p -∗ BF.B mm -∗
+          swp cpu (k (.Ok (w', none))) Φ)
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ := by
   iintro H
   iapply swp_bind
-  iapply ufm_swp_ifetch_frame cpu BF mm req hk hn ho (fun v => swp cpu (k v) Φ) $$ H
+  iapply ufm_swp_ifetch_frame cpu BF mm req hk hn ho p hp dqp (fun v => swp cpu (k v) Φ) $$ H
 
 end
 

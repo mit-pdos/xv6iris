@@ -60,10 +60,11 @@ theorem swp_fetch_s2_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   swp_run 40
   conf_intro HmConf
   iapply swp_bind
-  iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2) (hal := hal2)
+  iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2) (hal := hal2) (pc := pc)
+    (hpa := Or.inl rfl)
   iframe
   inext
-  iintro HmConf Hlo
+  iintro HmConf HPC Hlo
   -- the fetched bits' `isRVC` matters only from here: split after the shared
   -- walk (splitting first walked the translation and the read twice)
   rcases Bool.eq_false_or_eq_true (isRVC lo) with hc | hc
@@ -84,10 +85,11 @@ theorem swp_fetch_s2_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
     swp_run 40
     conf_intro HmConf
     iapply swp_bind
-    iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2') (hal := hal2')
+    iapply swp_checked_mem_read_ifetch2_S (hok := hok') (hram := hram2') (hal := hal2') (pc := pc)
+      (hpa := Or.inr (Or.inl rfl))
     iframe
     inext
-    iintro HmConf Hhi
+    iintro HmConf HPC Hhi
     swp_run 40
     iapply HΦ $$ HmConf HPC [Htrans Htok] Hlo Hhi
     iframe Htrans Htok

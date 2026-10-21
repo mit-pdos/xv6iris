@@ -2917,15 +2917,22 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
 /-! ## The memory leaves -/
 
 /-- An instruction fetch of never-written bytes (kernel text) returns them, at
-every instruction view. -/
-theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
+every instruction view -- the fetch guard ([OWN.144], `MState.fetchOk`) read off ONE register
+cell `r0 ↦ v0` (any fraction, handed back): every register file holding `v0` at `r0` allows
+the read (`hok`).  The two instances: `swp_sail_mem_read_ifetch_pc` (the `PC` cell, the read at
+`PC`/`PC + 2` or a non-RAM `PC`) and `swp_sail_mem_read_ifetch_priv` (the privilege cell, not
+Supervisor). -/
+theorem swp_sail_mem_read_ifetch_reg (cpu : CPU) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
+    (r0 : Register) (dq0 : DFrac) (v0 : RegisterType r0)
+    (hok : ∀ f : RegFile, f r0 = v0 → kFetchBad f req.pa = false)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    imgBytes req.pa n w ∗ ▷ (imgBytes req.pa n w -∗ Φ (.Ok (w, none)))
+    r0 ↦ᵣ[cpu]{dq0} v0 ∗ imgBytes req.pa n w ∗
+      ▷ (r0 ↦ᵣ[cpu]{dq0} v0 -∗ imgBytes req.pa n w -∗ Φ (.Ok (w, none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
-  iintro ⟨#Hb, HΦ⟩
+  iintro ⟨Hr0, #Hb, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
   iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
     (fun _ _ hb => by
@@ -2934,6 +2941,10 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu r0 = v0⌝ $$ [Hregs Hr0]
+  · icases reg_valid cpu (σ.regs cpu) r0 dq0 v0 $$ [$Hregs $Hr0] with %_
+    itrivial
+  have hfo : σ.fetchOk cpu req.pa := fun _ => hok _ Hv
   ihave %hrd : ⌜∀ h tvn, σ.mem.readBytesP σ.lp h tvn req.pa n w⌝ $$ [Hmem Hb]
   · iapply imgBytes_readable σ.mem σ.lp rfl req.pa n w $$ [Hmem Hb]
     iframe Hmem
@@ -2946,10 +2957,10 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
   isplit
   · ipureintro
     exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
-      ⟨hram, hk, σ.itv cpu, w, le_refl _, (mmOk_views hmm cpu).2.1, hrd _ _, rfl, rfl⟩)⟩
+      ⟨hram, hk, hfo, σ.itv cpu, w, le_refl _, (mmOk_views hmm cpu).2.1, hrd _ _, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
     ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'
@@ -2959,10 +2970,37 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
-      iapply HΦ $$ Hb
+      iapply HΦ $$ Hr0 Hb
   · simp [akPlain, hk] at hpl
   · rw [hex] at hex'
     exact absurd hex' (by decide)
+
+/-- **A kernel fetch** ([OWN.144]): the guard read off the `PC` cell -- the read is at `PC` or
+`PC + 2`, or `PC` is no RAM address (the trampoline).  The side condition is the first premise
+(the form `swp_run` discharges). -/
+theorem swp_sail_mem_read_ifetch_pc (cpu : CPU) {n vasize : Nat}
+    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+    (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true) (dq : DFrac) (pc : BitVec 64)
+    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
+    ⌜req.pa = pc ∨ req.pa = pc + 2#64 ∨ ramPc pc = false⌝ ∗ Register.PC ↦ᵣ[cpu]{dq} pc ∗
+      imgBytes req.pa n w ∗ ▷ (Register.PC ↦ᵣ[cpu]{dq} pc -∗ imgBytes req.pa n w -∗ Φ (.Ok (w, none)))
+    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+  iintro ⟨%hpa, H⟩
+  iapply swp_sail_mem_read_ifetch_reg cpu req w hk .PC dq pc
+    (fun f hf => kFetchBad_of_pc f req.pa (by rw [hf]; exact hpa)) Φ $$ H
+
+/-- **A fetch out of a non-Supervisor mode** ([OWN.144]): the guard read off the privilege cell
+(the side condition first, as `swp_sail_mem_read_ifetch_pc`). -/
+theorem swp_sail_mem_read_ifetch_priv (cpu : CPU) {n vasize : Nat}
+    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+    (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true) (dq : DFrac) (p : Privilege)
+    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
+    ⌜privSup p = false⌝ ∗ Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
+      imgBytes req.pa n w ∗ ▷ (Register.cur_privilege ↦ᵣ[cpu]{dq} p -∗ imgBytes req.pa n w -∗ Φ (.Ok (w, none)))
+    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+  iintro ⟨%hp, H⟩
+  iapply swp_sail_mem_read_ifetch_reg cpu req w hk .cur_privilege dq p
+    (fun f hf => kFetchBad_of_priv f req.pa (by rw [hf]; exact hp)) Φ $$ H
 
 
 /-- A plain load of the running context's bytes returns them. -/
