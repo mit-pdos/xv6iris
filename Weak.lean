@@ -830,6 +830,15 @@ import Weak.CapFetchCyG
 import Weak.CapDataOk
 import Weak.SbRealP
 import Weak.SbConfLit
+import Weak.SpikeSP
+import Weak.SpikeSR
+import Weak.SbDom
+import Weak.SbOrdR
+import Weak.SbArmR
+import Weak.SbProgR
+import Weak.SbWalkR
+import Weak.SbKillR
+import Weak.SbDomLit
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
