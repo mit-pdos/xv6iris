@@ -491,9 +491,9 @@ theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV6
     · exact devRead_wire _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devWrite_wire _ _ _ _ _ hw j
-    · rfl
+    all_goals rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
@@ -512,9 +512,9 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
     · exact evStep_wire cpu o σ v σ' hs j
     · unfold blockedStep at hb
       split at hb
-      · obtain ⟨_, _, rfl⟩ := hb; rfl
-      · obtain ⟨_, rfl⟩ := hb; rfl
-      · obtain ⟨_, _, rfl⟩ := hb; rfl
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
       · exact hb.elim
 
 /-- ...and never makes a byte arrive (Rocq `mnode_step_u_recv`). -/
@@ -528,9 +528,9 @@ theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV
     · exact devRead_recvd _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl, _⟩ | ⟨_, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devWrite_recvd _ _ _ _ _ hw j
-    · rfl
+    all_goals rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
@@ -549,9 +549,9 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
     · exact evStep_recvd cpu o σ v σ' hs j
     · unfold blockedStep at hb
       split at hb
-      · obtain ⟨_, _, rfl⟩ := hb; rfl
-      · obtain ⟨_, rfl⟩ := hb; rfl
-      · obtain ⟨_, _, rfl⟩ := hb; rfl
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
+      · first | (rcases hb with ⟨_, _, rfl⟩ | ⟨_, _, _, rfl⟩ <;> rfl; done) | (obtain ⟨_, _, rfl⟩ := hb; rfl)
       · exact hb.elim
 
 /-- THE OBSERVATIONS ARE FAITHFUL: a device step's events are device events,

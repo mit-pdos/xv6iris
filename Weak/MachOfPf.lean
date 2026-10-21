@@ -137,7 +137,7 @@ def pfStepTsoStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     pfStepFactsT fok TsoShadow.cohSrc st c (hartAgent cpu) l →
     (∀ n va req, o = .memRead n va req → ramBytes req.pa n) →
     (∀ n va req, o = .memWrite n va req → ramBytes req.pa n) →
-    rmem c st σ → viewRel TsoShadow.cohSrc σ st →
+    rmem c st σ → viewRel TsoShadow.cohSrc σ st → σ.llog = List.range' 1 σ.log.length →
     c.pcLog.map Wmsg.wmTid = (stAuthors st).map some →                             -- (2)
     (∀ base tvs, l = .LIFetch base tvs →                                           -- (3)
        ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
@@ -151,11 +151,13 @@ def pfStepTsoStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
-    ∃ (v : o.ret) (σ' : MState),
-      evStep cpu o σ v σ' ∧
+    ∃ (v : o.ret) (σ1 σ' : MState),
+      evStep cpu o σ v σ1 ∧
+      (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
       (∃ rs' fn' ib', p' = .PHart cpu (k v) rs' fn' ib') ∧
       rmem c' (st ++ [(hartAgent cpu, l)]) σ' ∧
-      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)])
+      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) ∧
+      σ'.llog = List.range' 1 σ'.log.length
 
 /-! ## (F2) `NSteps` helpers (iris `Language.lean` has no transitivity lemma) -/
 
@@ -367,6 +369,9 @@ structure SimRel (c : Wpcfg Pexv6 Efab)
   view : viewRel TsoShadow.cohSrc g.m st
   auth : c.pcLog.map Wmsg.wmTid = (stAuthors st).map some
   coh : ownCoh c
+  /-- Route P, design D5: every store lands in the step that issues it, so the landing log is the
+  issue order. -/
+  eag : g.m.llog = List.range' 1 g.m.log.length
 
 /-! ## (F3) The boot bridge: `wbootFacts` → `bootShape`, the one `PowerOn` step -/
 
@@ -429,7 +434,7 @@ theorem simRelBoot (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0) (hds :
   refine ⟨rfl, rfl, ⟨fun _ => FreeM.pure (), [DevLoop 0 .virtio], none, wsInit, ∅,
     by rw [hds]; rfl, hlen, fun cpu => ⟨none, σ0.wgib cpu, wsInit, ∅, hcpu cpu,
       fun _ h => by cases h⟩, hdisk, hDS⟩, ?_, ?_, by simp [wpInit, stAuthors],
-    ownCohInit _ _ _⟩
+    ownCohInit _ _ _, rfl⟩
   · rw [himg]
     exact rmemBoot _ _ _ ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hb.2.2.2.2.2.1, fun _ => rfl, rfl,
       fun _ => ⟨rfl, rfl⟩⟩
@@ -818,7 +823,7 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
     all_goals exact ⟨rfl, rfl, rfl⟩
   | memWrite n va req =>
     have hda := hW n va req rfl
-    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, w, -, -, -, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, -, w, -, -, rfl⟩ | ⟨-, -, w, -, -, -, -, rfl⟩
     · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
     all_goals exact ⟨rfl, rfl, rfl⟩
   | regRead r => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
@@ -858,12 +863,13 @@ theorem ramOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
       · exact absurd hor (hno _ _)
       · exact absurd hsb' (MState.not_sbOverlaps_of_nil _ _ _ _ hsb)
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
-      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb, -⟩ | ⟨hdv, hpos, hng, -⟩, -⟩
+      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩
         · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
         all_goals exact hb
       · exact absurd hor (hno _ _)
       · exact hsb.1
+      · exact absurd (MState.drvOkGuard_of_sb_nil _ _ hsb) hng
   · exact absurd hlive hd
   · -- the land arm (route P): no store is buffered (`rmem`)
     exact absurd hland (MState.not_landOk_of_nil _ _ _ hsb)
@@ -896,12 +902,13 @@ theorem devOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
       · exact absurd hor (hno _ _)
       · exact absurd hsb' (MState.not_sbOverlaps_of_nil _ _ _ _ hsb)
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
-      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb, -⟩ | ⟨hdv, -, -, -⟩, -⟩
+      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩
         · exact hb
         all_goals exact ramNotDev hb hda
       · exact absurd hor (hno _ _)
       · exact ramNotDev hsb.1 hda
+      · exact hdv
   · exact absurd hlive hd
   · -- the land arm (route P): no store is buffered (`rmem`)
     exact absurd hland (MState.not_landOk_of_nil _ _ _ hsb)
@@ -956,6 +963,61 @@ theorem hartRun {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU →
   rw [hartObsMEq, ← obsNode hlk] at this
   simpa using this
 
+/-- **A hart step followed by the landing of the store it issued** (route P, design D5): two steps
+of hart `cpu`'s thread, the second silent (`Lang.primStep_hart_land`). -/
+theorem hartRunLand {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU → SailM Unit}
+    {vs : List Expr} (ht : t = poolOf H c.pcDev vs) (hgen : g.gen = 0) (hpow : g.pow = true)
+    (cpu : CPU) {ib : Ibch} {ws : Wstate} {pr : GSet Nat}
+    (hlk : c.pcAgs[cpu.val]? = some ⟨.PHart cpu (H cpu) (g.m.regs cpu) none ib, ws, pr⟩)
+    {m' : SailM Unit} {σ1 : MState} (hh : hartStep cpu (H cpu) g.m m' σ1) (T : Nat)
+    (hland : σ1.landOk cpu T) :
+    MRun 2 (t, g) (pfStepObs c cpu.val .node)
+      (t.set (cpu.val + 1) (.hart 0 cpu m'), { g with m := σ1.land cpu T }) := by
+  have h1 := hartRun ht hgen hpow cpu hlk hh
+  have hj : (t.set (cpu.val + 1) (Expr.hart 0 cpu m'))[cpu.val + 1]? = some (Expr.hart 0 cpu m') := by
+    rw [ht, poolHartSet]
+    have := poolHart (updH H cpu m') c.pcDev vs cpu
+    rw [this]; simp [updH]
+  have hs := primStep_hart_land (gen := 0) (m := m') (g := { g with m := σ1 })
+    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hland
+  have h2 := mrunOne hj hs
+  have := mrunTrans h1 h2
+  simpa using this
+
+/-- A one-step run is a step. -/
+theorem mrun1Step {ρ ρ' : List Expr × GState} {κ : List Obs} (h : MRun 1 ρ κ ρ') :
+    ∃ o, Language.Step ρ o ρ' := by
+  cases h with
+  | cons hs hr =>
+    cases hr with
+    | refl => exact ⟨_, hs⟩
+
+/-- **A pf step's machine run, by its pc-log shape** (route P, design D5): at most one machine step,
+or a one-step run followed by one step that keeps the issue log and the pc record (the silent
+landing of the store the first step issued). -/
+def MRunPcTail (m : Nat) (ρ ρ' : List Expr × GState) : Prop :=
+  m ≤ 1 ∨ ∃ (ρ1 : List Expr × GState) (o1 : List Obs), MRun 1 ρ o1 ρ1 ∧ ρ'.2.m.log = ρ1.2.m.log ∧
+    ρ'.2.m.pcAt = ρ1.2.m.pcAt ∧ ∃ o2, Language.Step ρ1 o2 ρ'
+
+/-- `hartRunLand`'s run has the pc-log shape: its second step is the landing. -/
+theorem hartRunLandTail {c : Wpcfg Pexv6 Efab} {t : List Expr} {g : GState} {H : CPU → SailM Unit}
+    {vs : List Expr} (ht : t = poolOf H c.pcDev vs) (hgen : g.gen = 0) (hpow : g.pow = true)
+    (cpu : CPU) {ib : Ibch} {ws : Wstate} {pr : GSet Nat}
+    (hlk : c.pcAgs[cpu.val]? = some ⟨.PHart cpu (H cpu) (g.m.regs cpu) none ib, ws, pr⟩)
+    {m' : SailM Unit} {σ1 : MState} (hh : hartStep cpu (H cpu) g.m m' σ1) (T : Nat)
+    (hland : σ1.landOk cpu T) :
+    MRunPcTail 2 (t, g) (t.set (cpu.val + 1) (.hart 0 cpu m'), { g with m := σ1.land cpu T }) := by
+  have h1 := hartRun ht hgen hpow cpu hlk hh
+  have hj : (t.set (cpu.val + 1) (Expr.hart 0 cpu m'))[cpu.val + 1]? = some (Expr.hart 0 cpu m') := by
+    rw [ht, poolHartSet]
+    have := poolHart (updH H cpu m') c.pcDev vs cpu
+    rw [this]; simp [updH]
+  have hs := primStep_hart_land (gen := 0) (m := m') (g := { g with m := σ1 })
+    (⟨hpow, hgen⟩ : threadLive { g with m := σ1 } 0) hland
+  have h2 := mrunOne hj hs
+  simp only [List.set_set, List.append_nil] at h2
+  exact Or.inr ⟨_, _, h1, rfl, rfl, mrun1Step h2⟩
+
 theorem poolOfProg (H : CPU → SailM Unit) (F F' : Efab) (vs : List Expr) (h0 : F'.efU0 = F.efU0)
     (h1 : F'.efU1 = F.efU1) (hp : F'.efPlic = F.efPlic) : poolOf H F' vs = poolOf H F vs := by
   simp only [poolOf, h0, h1, hp]
@@ -990,10 +1052,11 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     (hex : ∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →
       exclOkTs c.pcLog i base (tvs.map Prod.fst) (c.pcLog.length + 1)) :
     ∃ (m : Nat) (t' : List Expr) (g' : GState),
-      m ≤ 1 ∧ MRun m (t, g) (pfStepObs c i .node) (t', g') ∧ SimRel c' (st ++ [(i, l)]) t' g' := by
+      MRunPcTail m (t, g) (t', g') ∧ MRun m (t, g) (pfStepObs c i .node) (t', g') ∧
+        SimRel c' (st ++ [(i, l)]) t' g' := by
   have hR0 := hR
   obtain ⟨hgen, hpow, ⟨H, vs, dp, dws, dpr, ht, hlen, hharts, hdisk, hDS⟩, hmem, hview,
-    hauth, hcoh⟩ := hR
+    hauth, hcoh, heg⟩ := hR
   obtain ⟨ag, p', ws', hlk, hks, himg, hags⟩ := hk
   -- the agent is a hart
   have hi : i < NCPU := by
@@ -1026,18 +1089,20 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
   -- `R_mem` re-establishes the relation
   have post : ∀ (m1 : SailM Unit) (fn1 : Option (Bool × Bool × Bool × Bool)) (σ' : MState)
       (nn : Nat),
-      m' = m1 → nn ≤ 1 → fnOk fn' → σ'.regs cpu = ors.getD (g.m.regs cpu) →
+      m' = m1 → MRunPcTail nn (t, g) (t.set (cpu.val + 1) (.hart 0 cpu m1), { g with m := σ' }) →
+      fnOk fn' → σ'.regs cpu = ors.getD (g.m.regs cpu) →
       (∀ c'', c'' ≠ cpu → σ'.regs c'' = g.m.regs c'') → diskSide dp vs c'.pcDev.efDev σ'.devs →
       rmem c' (st ++ [(cpu.val, l)]) σ' → viewRel TsoShadow.cohSrc σ' (st ++ [(cpu.val, l)]) →
       MRun nn (t, g) (pfStepObs c cpu.val .node)
         (t.set (cpu.val + 1) (.hart 0 cpu m1), { g with m := σ' }) →
+      σ'.llog = List.range' 1 σ'.log.length →
       ∃ (m : Nat) (t' : List Expr) (g' : GState),
-        m ≤ 1 ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
+        MRunPcTail m (t, g) (t', g') ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
         SimRel c' (st ++ [(cpu.val, l)]) t' g' := by
-    intro m1 _ σ' nn hm1 hnn hfn' hrc hro hdv hmem' hview' hrun'
+    intro m1 _ σ' nn hm1 hnn hfn' hrc hro hdv hmem' hview' hrun' heg'
     subst hm1
     refine ⟨nn, _, _, hnn, hrun', hgen, hpow, ⟨updH H cpu m', vs, dp, dws, dpr, ?_, ?_, ?_, ?_, hdv⟩,
-      hmem', hview', authStep hs hauth, ownCohStep pstepEv pclsEv _ _ c c' hcoh hs⟩
+      hmem', hview', authStep hs hauth, ownCohStep pstepEv pclsEv _ _ c c' hcoh hs, heg'⟩
     · rw [ht, poolHartSet]
       exact (poolOfProg _ _ _ _ hprog.1 hprog.2.1 hprog.2.2).symm
     · rw [hags, List.length_set, hlen]
@@ -1063,8 +1128,8 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     have hobs : pfStepObs c cpu.val .node = [] := by simp [pfStepObs, hlkc]
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m) hs trivial (Or.inr rfl) hadj hmem hview hauth
       hcoh rfl rfl rfl (sameReadRefl _)
-    refine post (H cpu) none g.m 0 rfl (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl)
-      (by rw [hd'']; exact hDS) hm1 hv1 ?_
+    refine post (H cpu) none g.m 0 rfl (Or.inl (by omega)) (fun _ h => by cases h) rfl (fun _ _ => rfl)
+      (by rw [hd'']; exact hDS) hm1 hv1 ?_ heg
     rw [hobs, ht, poolHartSet, updHSelf]
     exact mrunRefl _
   | none =>
@@ -1076,10 +1141,10 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     obtain ⟨tick, rfl, rfl, rfl, rfl, hd'', -, -⟩ := hn
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m) hs trivial (Or.inl rfl) hadj hmem hview hauth
       hcoh rfl rfl rfl (sameReadRefl _)
-    exact post _ none (g.m.dropResv cpu) 1 rfl (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl)
+    exact post _ none (g.m.dropResv cpu) 1 rfl (Or.inl (by omega)) (fun _ h => by cases h) rfl (fun _ _ => rfl)
       (by rw [hd'']; exact hDS) (rmemDropResv cpu hm1) (viewRelSame hv1 (sameReadDropResv g.m cpu))
       (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
-        (by rw [hm]; exact ⟨tick, rfl, rfl⟩))
+        (by rw [hm]; exact ⟨tick, rfl, rfl⟩)) heg
   | impure e k =>
   cases e with
   | error _ => exact hn.elim
@@ -1088,15 +1153,15 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
   have silent : ∀ (v : o.ret), evStep cpu o g.m v g.m → l = .LSilent → m' = k v → ors = none →
       fn' = none → c'.pcDev.efDev = c.pcDev.efDev →
       ∃ (m : Nat) (t' : List Expr) (g' : GState),
-        m ≤ 1 ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
+        MRunPcTail m (t, g) (t', g') ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
         SimRel c' (st ++ [(cpu.val, l)]) t' g' := by
     intro v hev hl hm' hors hfn' hd''
     subst hl hm' hors hfn'
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m) hs trivial (Or.inl rfl) hadj hmem hview hauth
       hcoh rfl rfl rfl (sameReadRefl _)
-    exact post _ none g.m 1 rfl (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl) (by rw [hd'']; exact hDS)
+    exact post _ none g.m 1 rfl (Or.inl (by omega)) (fun _ h => by cases h) rfl (fun _ _ => rfl) (by rw [hd'']; exact hDS)
       hm1 hv1 (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
-        (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩))
+        (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩)) heg
   have mmio : ∀ (v : o.ret) (dsM' : DevStates),
       (∀ n va req, o = .memRead n va req → devAddr req.pa = true) →
       (∀ n va req, o = .memWrite n va req → devAddr req.pa = true) →
@@ -1106,7 +1171,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       diskSide dp vs c'.pcDev.efDev dsM' →
       lbInert l = true → frameLbl l → m' = k v → ors = none → fn' = none →
       ∃ (m : Nat) (t' : List Expr) (g' : GState),
-        m ≤ 1 ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
+        MRunPcTail m (t, g) (t', g') ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
         SimRel c' (st ++ [(cpu.val, l)]) t' g' := by
     intro v dsM' hdaR hdaW hev hdsM hin hfr hm' hors hfn'
     subst hm' hors hfn'
@@ -1118,17 +1183,17 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       (fun n va req ho => hdbW n va req ho (hdaW n va req ho))
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := { g.m with devs := dsM' }) hs hfr
       (Or.inl hin) hadj hmem hview hauth hcoh rfl rfl rfl (sameReadDevs _ _)
-    exact post _ none { g.m with devs := dsM' } 1 rfl (by omega) (fun _ h => by cases h) rfl
+    exact post _ none { g.m with devs := dsM' } 1 rfl (Or.inl (by omega)) (fun _ h => by cases h) rfl
       (fun _ _ => rfl) hdsM hm1 hv1
       (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
-        (by rw [hm]; exact Or.inl ⟨v, rfl, hev'⟩))
+        (by rw [hm]; exact Or.inl ⟨v, rfl, hev'⟩)) heg
   have tso : l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
       c'.pcDev.efDev = c.pcDev.efDev → fnOk fn' →
       (∀ n va req, o = .memRead n va req → devAddr req.pa = false) →
       (∀ n va req, o = .memWrite n va req → devAddr req.pa = false) →
       ors.getD (g.m.regs cpu) = oRegs cpu o g.m cpu →
       ∃ (m : Nat) (t' : List Expr) (g' : GState),
-        m ≤ 1 ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
+        MRunPcTail m (t, g) (t', g') ∧ MRun m (t, g) (pfStepObs c cpu.val .node) (t', g') ∧
         SimRel c' (st ++ [(cpu.val, l)]) t' g' := by
     intro hl1 hl2 hd'' hfn' hdaR hdaW hors
     have hred := hH.safe n κ t g hreach _
@@ -1139,19 +1204,28 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     have hps : pstepEv (.PHart cpu (.impure (.ok o) k) (g.m.regs cpu) none ib) c.pcDev l
         (.PHart cpu m' (ors.getD (g.m.regs cpu)) fn' (oib.getD ib)) c'.pcDev :=
       ⟨rfl, ors, oib, obar, rfl, rfl, Or.inl ⟨hn, hd⟩⟩
-    obtain ⟨v, σ', hev, ⟨rs'', fn'', ib'', hp'⟩, hmem', hview'⟩ :=
+    obtain ⟨v, σ1, σ', hev, hland, ⟨rs'', fn'', ib'', hp'⟩, hmem', hview', heg'⟩ :=
       hH.tso c c' st g.m cpu o k (g.m.regs cpu) none ib l _ c'.pcDev rest hps hs hadj ⟨hf, hfT⟩
         (fun n va req ho => hrbR n va req ho (hdaR n va req ho))
-        (fun n va req ho => hrbW n va req ho (hdaW n va req ho)) hmem hview hauth
+        (fun n va req ho => hrbW n va req ho (hdaW n va req ho)) hmem hview heg hauth
         (fun base tvs hl => by
           subst hl; exact hH.cut st c t g n κ hrun hreach hR0 cpu base tvs c' hs hf hcf)
         (fun aq base tvs asrc hl => ⟨hcoh, hex aq base tvs asrc hl⟩) rfl hl1 hl2 hfi1 hfi2
     simp only [Pexv6.PHart.injEq] at hp'
     obtain ⟨-, hmk, -, -, -⟩ := hp'
-    obtain ⟨hdv, hrg, -⟩ := evStepShape cpu o g.m σ' v hev hdaR hdaW
-    exact post (k v) fn' σ' 1 hmk (by omega) hfn' (by rw [hrg, hors]) (fun c'' hc => by rw [hrg, oRegsOther _ _ _ _ hc])
-      (by rw [hd'', hdv]; exact hDS) hmem' hview'
-      (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc) (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩))
+    obtain ⟨hdv, hrg, -⟩ := evStepShape cpu o g.m σ1 v hev hdaR hdaW
+    rcases hland with rfl | ⟨hlok, rfl⟩
+    · exact post (k v) fn' σ' 1 hmk (Or.inl (by omega)) hfn' (by rw [hrg, hors]) (fun c'' hc => by rw [hrg, oRegsOther _ _ _ _ hc])
+        (by rw [hd'', hdv]; exact hDS) hmem' hview'
+        (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc) (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩)) heg'
+    · exact post (k v) fn' _ 2 hmk
+        (hartRunLandTail ht hgen hpow cpu (by rw [hm]; exact hlkc)
+          (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩) _ hlok) hfn' (by rw [MState.land_regs, hrg, hors])
+        (fun c'' hc => by rw [MState.land_regs, hrg, oRegsOther _ _ _ _ hc])
+        (by rw [MState.land_devs, hd'', hdv]; exact hDS) hmem' hview'
+        (hartRunLand ht hgen hpow cpu (by rw [hm]; exact hlkc) (by rw [hm]; exact Or.inl ⟨v, rfl, hev⟩)
+          _ hlok) heg'
+
   -- the per-event dispatch
   cases o with
   | regRead r =>
@@ -1163,10 +1237,10 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     rw [← hl] at hin hfr
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m.setReg cpu r v) hs hfr (Or.inl hin) hadj hmem
       hview hauth hcoh rfl rfl rfl (sameReadSetReg _ _ _ _)
-    exact post _ none _ 1 rfl (by omega) (fun _ h => by cases h) (by simp)
+    exact post _ none _ 1 rfl (Or.inl (by omega)) (fun _ h => by cases h) (by simp)
       (fun c'' hc => by simp [hc]) (by rw [hd'']; exact hDS) hm1 hv1
       (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
-        (by rw [hm]; exact Or.inl ⟨(), rfl, rfl⟩))
+        (by rw [hm]; exact Or.inl ⟨(), rfl, rfl⟩)) heg
   | memRead nb va req =>
     have hn' : pnodeStep (.impure (.ok (.memRead nb va req)) k) (g.m.regs cpu) ib c.pcDev.efDev l m'
       ors fn' c'.pcDev.efDev oib obar := hn
@@ -1201,7 +1275,8 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
         obtain ⟨dsM', hdwM, hdsM⟩ := diskSideWrite hDS req.pa nb v _ hdw
         exact mmio (.Ok (some true)) dsM' (fun _ _ _ ho => by cases ho)
           (fun _ _ _ ho => by cases ho; exact hda)
-          (fun _ hdb => Or.inl ⟨hdb nb va req rfl, v, dsM', hv, hdwM, rfl, rfl⟩) hdsM
+          (fun _ hdb => Or.inl ⟨hdb nb va req rfl, v, dsM', hv, hdwM, rfl, rfl,
+            MState.drvOkGuard_of_sb_nil _ _ (hmem.2.2.2.2 cpu)⟩) hdsM
           (by rw [hl]; rfl) (by rw [hl]; trivial) hm' hors hfn'
       · exact hn'.elim
     · rename_i hda
@@ -1224,8 +1299,8 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
           have hobs : pfStepObs c cpu.val .node = [] := by rw [obsNode hlkc]; rfl
           obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m) hs trivial (Or.inl rfl) hadj hmem hview
             hauth hcoh rfl rfl rfl (sameReadRefl _)
-          refine post (H cpu) none g.m 0 hm.symm (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl)
-            (by rw [hd'']; exact hDS) hm1 hv1 ?_
+          refine post (H cpu) none g.m 0 hm.symm (Or.inl (by omega)) (fun _ h => by cases h) rfl (fun _ _ => rfl)
+            (by rw [hd'']; exact hDS) hm1 hv1 ?_ heg
           rw [hobs, ht, poolHartSet, updHSelf]
           exact mrunRefl _
       · exact hn'.elim
@@ -1367,7 +1442,7 @@ theorem simDev {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
       m ≤ 1 ∧ MRun m (t, g) (pfStepObs c i k) (t', g') ∧ SimRel c' (st ++ [(i, l)]) t' g' := by
   have hR0 := hR
   obtain ⟨hgen, hpow, ⟨H, vs, dp, dws, dpr, ht, hlen, hharts, hdisk, hDS⟩, hmem, hview,
-    hauth, hcoh⟩ := hR
+    hauth, hcoh, heg⟩ := hR
   obtain ⟨ag, p', ws', hlk, hks, himg, hags⟩ := hk
   obtain ⟨hk1, hk2, hk3⟩ := hkd
   -- the stepping agent is the disk agent
@@ -1426,7 +1501,7 @@ theorem simDev {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
     refine ⟨1, t.set (uartThr u) (.dev 0 (.uart u) rootTask m'), { g with m := { g.m with devs := dsM' } },
       Nat.le_refl _, by rw [hobs] at hrun; simpa [pfStepObs, uartObs] using hrun, hgen, hpow,
       ⟨H, vs, dp, ws', dpr, ?_, by rw [hags, List.length_set, hlen], fun cpu => ?_, hags'.1,
-        by rw [hdev']; exact hDS'⟩, hm1, hv1, ha1, hc1⟩
+        by rw [hdev']; exact hDS'⟩, hm1, hv1, ha1, hc1, heg⟩
     · rw [ht, poolUartSet H c.pcDev vs u m' ds', hd']
     · rw [hags'.2 cpu]; exact hharts cpu
   | gate =>
@@ -1441,7 +1516,7 @@ theorem simDev {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
     refine ⟨1, t.set plicThr (.dev 0 .plic rootTask m'), { g with m := { g.m with devs := dsM' } },
       Nat.le_refl _, by simpa [pfStepObs] using hrun, hgen, hpow,
       ⟨H, vs, dp, ws', dpr, ?_, by rw [hags, List.length_set, hlen], fun cpu => ?_, hags'.1,
-        by rw [hdev']; exact hDS'⟩, hm1, hv1, ha1, hc1⟩
+        by rw [hdev']; exact hDS'⟩, hm1, hv1, ha1, hc1, heg⟩
     · rw [ht, poolPlicSet H c.pcDev vs m' ds', hd']
     · rw [hags'.2 cpu]; exact hharts cpu
 
@@ -1468,7 +1543,7 @@ theorem simWire {c c' : Wpcfg Pexv6 Efab}
     ∃ (m : Nat) (t' : List Expr) (g' : GState),
       m ≤ 1 ∧ MRun m (t, g) (pfStepObs c i .wire) (t', g') ∧ SimRel c' (st ++ [(i, l)]) t' g' := by
   obtain ⟨hgen, hpow, ⟨H, vs, dp, dws, dpr, ht, hlen, hharts, hdisk, hDS⟩, hmem, hview,
-    hauth, hcoh⟩ := hR
+    hauth, hcoh, heg⟩ := hR
   obtain ⟨ag, p', ws', hlk, hks, himg, hags⟩ := hk
   have hi : i < NCPU := by
     rcases Nat.lt_or_ge i NCPU with h | h
@@ -1504,7 +1579,7 @@ theorem simWire {c c' : Wpcfg Pexv6 Efab}
   refine ⟨1, t.set plicThr (.dev 0 .plic rootTask (kp ())), { g with m := pinM g.m cpu mm b },
     Nat.le_refl _, by simpa [pfStepObs] using hrun, hgen, hpow,
     ⟨H, vs, dp, dws, dpr, ?_, by rw [hags, List.length_set, hlen], fun c'' => ?_, ?_, ?_⟩,
-    hm1, hv1, ha1, hc1⟩
+    hm1, hv1, ha1, hc1, by unfold pinM; split <;> exact heg⟩
   · rw [ht, poolPlicSet H c.pcDev vs (kp ()) c.pcDev.efDev, hd']
   · by_cases hc : c'' = cpu
     · subst hc
@@ -1652,19 +1727,20 @@ structure DevOnly (σ σ' : MState) : Prop where
   resv : σ'.resv = σ.resv
   read : sameRead σ σ'
   xs : σ'.sb = σ.sb
+  llog : σ'.llog = σ.llog
 
-theorem devOnlyRefl (σ : MState) : DevOnly σ σ := ⟨rfl, rfl, rfl, rfl, sameReadRefl σ, rfl⟩
+theorem devOnlyRefl (σ : MState) : DevOnly σ σ := ⟨rfl, rfl, rfl, rfl, sameReadRefl σ, rfl, rfl⟩
 
 theorem devOnlyTrans {σ1 σ2 σ3 : MState} (h1 : DevOnly σ1 σ2) (h2 : DevOnly σ2 σ3) :
     DevOnly σ1 σ3 :=
   ⟨h2.regs.trans h1.regs, h2.mem.trans h1.mem, h2.log.trans h1.log, h2.resv.trans h1.resv,
-    sameReadTrans h1.read h2.read, h2.xs.trans h1.xs⟩
+    sameReadTrans h1.read h2.read, h2.xs.trans h1.xs, h2.llog.trans h1.llog⟩
 
 theorem devOnlySetDev (σ : MState) (d : DevId) (s : DevSt d) : DevOnly σ (σ.setDev d s) :=
-  ⟨rfl, rfl, rfl, rfl, sameReadSetDev σ d s, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, sameReadSetDev σ d s, rfl, rfl⟩
 
 theorem devOnlySetRt (σ : MState) (d : DevId) (rt : DevRt) : DevOnly σ (σ.setRt d rt) :=
-  ⟨rfl, rfl, rfl, rfl, sameReadSetRt σ d rt, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, sameReadSetRt σ d rt, rfl, rfl⟩
 
 theorem rmemCongr {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {σ σ' : MState}
     (h : rmem c st σ) (hd : DevOnly σ σ') : rmem c st σ' := by
@@ -1689,16 +1765,24 @@ theorem diskStore {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {σ
     {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {data : List (BitVec 8)} (s' : VirtioState)
     (hs : wpPfStep pstepEv pclsEv NCPU (.LStore false (paZ pa) data [] []) c c')
     (hadj : pairAdjacent (st ++ (NCPU, .LStore false (paZ pa) data [] []) :: rest))
-    (hR : rmem c st σ) (hV : viewRel TsoShadow.cohSrc σ st) (hd : DevOnly σ σ1)
+    (hR : rmem c st σ) (hV : viewRel TsoShadow.cohSrc σ st) (heg : σ.llog = List.range' 1 σ.log.length)
+    (hd : DevOnly σ σ1)
     (hram : ramBytes pa n) (hdl : data.length = n) (hn : n ≠ 0)
     (hb : ∀ j, j < n → data[j]? = some (nthByte w j)) :
     ¬ anyReserve σ1.resv pa n ∧
       rmem c' (st ++ [(NCPU, .LStore false (paZ pa) data [] [])]) ((σ1.storeDma pa n w).setDev .virtio s') ∧
       viewRel TsoShadow.cohSrc ((σ1.storeDma pa n w).setDev .virtio s')
-        (st ++ [(NCPU, .LStore false (paZ pa) data [] [])]) := by
+        (st ++ [(NCPU, .LStore false (paZ pa) data [] [])]) ∧
+      ((σ1.storeDma pa n w).setDev .virtio s').llog =
+        List.range' 1 ((σ1.storeDma pa n w).setDev .virtio s').log.length := by
+  have heg1 : σ1.llog = List.range' 1 σ1.log.length := by rw [hd.llog, hd.log]; exact heg
   obtain ⟨h1, h2⟩ := pfDWriteDevRowMem pstepEv pclsEv c c' st rest σ1 false (paZ pa) data [] [] pa n w
-    .virtio s' (rmemCongr hR hd) hs hadj rfl hram hdl hn hb
-  exact ⟨h1, h2, rowDiskWrite _ σ1 st pa n w .virtio s' (paZ pa) data (viewRelSame hV hd.read)⟩
+    .virtio s' (rmemCongr hR hd) heg1 hs hadj rfl hram hdl hn hb
+  refine ⟨h1, h2, rowDiskWrite _ σ1 st pa n w .virtio s' (paZ pa) data (viewRelSame hV hd.read), ?_⟩
+  show (if n = 0 then σ1.llog else σ1.llog ++ [σ1.top + 1]) =
+    List.range' 1 (if n = 0 then σ1.log else σ1.log ++ [diskAgent]).length
+  rw [if_neg hn, if_neg hn, heg1, List.length_append, List.length_singleton, List.range'_concat]
+  simp only [MState.top]; congr 2; omega
 
 theorem bytesOfGet {n : Nat} (w : BitVec (8 * n)) (j : Nat) (hj : j < n) :
     (bytesOf w)[j]? = some (nthByte w j) := by
@@ -1713,6 +1797,7 @@ theorem bvOfBytesGet (n : Nat) (data : List (BitVec 8)) (hd : data.length = n) (
 byte, a wrapped byte (past `2^64`) included when it misses DRAM (`hwrap`). -/
 theorem dmaViewOf {c c' : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {σ : MState} {aq : Bool}
     {pa : PAddr} {n : Nat} {tvs : List (Nat × BitVec 8)} (hR : rmem c st σ)
+    (heg : σ.llog = List.range' 1 σ.log.length)
     (hs : wpPfStep pstepEv pclsEv NCPU (.LLoad aq false (paZ pa) tvs []) c c')
     (hfT : pfLoadFactsT TsoShadow.cohSrc st c NCPU (.LLoad aq false (paZ pa) tvs []))
     (htl : tvs.length = n) (hwrap : paZ pa + (n : Int) ≤ 2 ^ 64 + (ramBase : Int)) :
@@ -1744,9 +1829,11 @@ theorem dmaViewOf {c c' : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {σ : MS
       simp only [paZ, accAddr]
       rw [toNatAdd pa j hlt]
       omega
+    have hlenL : c.pcLog.length = σ.log.length := by
+      have := congrArg List.length hR.1.1; simpa using this
     rw [hR.2.2.1.1 _ hin, hpz] at hbt
-    simp only [Option.bind_some] at hbt
-    rw [htop] at hbt
+    simp only [Option.bind_some, MState.lp, heg] at hbt
+    rw [PfStepTsoMem.topLHistOf _ _ _ _ (Nat.le_of_eq hlenL), htop] at hbt
     have hb : nthByte (bvOfBytes n (tvs.map Prod.snd)) j = v := by
       rw [nthByte_bvOfBytes n _ j hj]
       simp [List.getD, htj]
@@ -1926,7 +2013,8 @@ moved only the devices / task bookkeeping (and, at a store, the memory), related
 def DiskGoal (c' : Wpcfg Pexv6 Efab) (st' : List (Nat × Wlabel)) (dp' : Option (DM Dres))
     (vs : List Expr) (σ : MState) : Prop :=
   ∃ (n : Nat) (vs' : List Expr) (σ' : MState), VRun n vs σ vs' σ' ∧ σ'.regs = σ.regs ∧
-    rmem c' st' σ' ∧ viewRel TsoShadow.cohSrc σ' st' ∧ diskSide dp' vs' c'.pcDev.efDev σ'.devs
+    rmem c' st' σ' ∧ viewRel TsoShadow.cohSrc σ' st' ∧ diskSide dp' vs' c'.pcDev.efDev σ'.devs ∧
+    σ'.llog = List.range' 1 σ'.log.length
 
 /-- The context of a disk-program step (F9). -/
 structure DCtx (c c' : Wpcfg Pexv6 Efab) (st rest : List (Nat × Wlabel)) (l : Wlabel)
@@ -1936,6 +2024,7 @@ structure DCtx (c c' : Wpcfg Pexv6 Efab) (st rest : List (Nat × Wlabel)) (l : W
   mem : rmem c st σ
   view : viewRel TsoShadow.cohSrc σ st
   lf : pfLoadFactsT TsoShadow.cohSrc st c NCPU l
+  eag : σ.llog = List.range' 1 σ.log.length
 
 theorem goalFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l : Wlabel}
     {σ : MState} (X : DCtx c c' st rest l σ) (hl : frameLbl l) {dp' : Option (DM Dres)} {n : Nat}
@@ -1943,7 +2032,7 @@ theorem goalFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l 
     (hds : diskSide dp' vs' c'.pcDev.efDev σ'.devs) :
     DiskGoal c' (st ++ [(NCPU, l)]) dp' vs σ :=
   ⟨n, vs', σ', hr, hd.regs, (diskFrame X.step hl X.adj X.mem X.view hd).1,
-    (diskFrame X.step hl X.adj X.mem X.view hd).2, hds⟩
+    (diskFrame X.step hl X.adj X.mem X.view hd).2, hds, by rw [hd.llog, hd.log]; exact X.eag⟩
 
 theorem goalStore {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l : Wlabel}
     {σ : MState} (X : DCtx c c' st rest l σ) {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
@@ -1956,8 +2045,8 @@ theorem goalStore {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l 
     (hds : diskSide dp' vs' c'.pcDev.efDev (setDvirtio σ1.devs s')) :
     DiskGoal c' (st ++ [(NCPU, l)]) dp' vs σ := by
   subst hl
-  obtain ⟨hres, hm, hv⟩ := diskStore s' X.step X.adj X.mem X.view hd1 hram hdl hn hb
-  exact ⟨m1 + 1, vs', _, vrunTrans hr1 (hwr hres), hd1.regs, hm, hv, hds⟩
+  obtain ⟨hres, hm, hv, he⟩ := diskStore s' X.step X.adj X.mem X.view X.eag hd1 hram hdl hn hb
+  exact ⟨m1 + 1, vs', _, vrunTrans hr1 (hwr hres), hd1.regs, hm, hv, hds, he⟩
 
 theorem vsOkTask (ts : List Expr) (j : Nat) (tid : TaskId) (hj : j < ts.length) (m : Virtio.VM Unit) :
     vsOk (Expr.dev 0 .virtio rootTask (.pure ()) :: ts.set j (.dev 0 .virtio tid m)) (.pure ())
@@ -2050,7 +2139,7 @@ theorem caseStart {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l 
     subst hl'
     obtain ⟨k, hk, hkw⟩ := rootAGLive v0 hl
     have r := rRead (ts := ts) (σ := σ) (k := k) (bvOfBytes 2 (tvs.map Prod.snd)) hk
-      (dmaViewOf X.mem X.step X.lf htl (smallNoWrap _ _ (by decide)))
+      (dmaViewOf X.mem X.eag X.step X.lf htl (smallNoWrap _ _ (by decide)))
     rw [hkw] at r
     refine goalFrame X trivial r (devOnlyRefl σ)
       ⟨_, none, .eq, ⟨ts, rfl, fun _ h => by cases h⟩, by rw [hdp]; exact .ai _ _, ?_⟩
@@ -2079,7 +2168,7 @@ theorem caseAi {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l : W
     subst hl'
     obtain ⟨k, hk, hkw⟩ := rootAINe v0 ai hne
     have r := rRead (ts := ts) (σ := σ) (k := k) (bvOfBytes 2 (tvs.map Prod.snd)) hk
-      (dmaViewOf X.mem X.step X.lf htl (smallNoWrap _ _ (by decide)))
+      (dmaViewOf X.mem X.eag X.step X.lf htl (smallNoWrap _ _ (by decide)))
     rw [hkw] at r
     refine goalFrame X trivial r (devOnlyRefl σ)
       ⟨_, none, .eq, ⟨ts, rfl, fun _ h => by cases h⟩, by rw [hdp]; exact .ring _, ?_⟩
@@ -2242,7 +2331,7 @@ theorem caseSvc {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l : 
             devOnlyTrans (devOnlySetDev _ _ _) (devOnlySetDev _ _ _)
           have r3 := tRead (x := Expr.dev 0 .virtio rootTask (.pure ())) (tid := tid) (pa := r.buf) (k := k2) hj
             (bvOfBytes r.len.toNat (tvs.map Prod.snd)) rfl
-            (dmaViewOf (rmemCongr X.mem hd2) X.step X.lf htl
+            (dmaViewOf (rmemCongr X.mem hd2) (by rw [hd2.llog, hd2.log]; exact X.eag) X.step X.lf htl
               (by
                 have h1 : ¬ (2 ^ 64 < r.buf.toNat + r.len.toNat) := by
                   simpa [VirtioProg.outWraps] using hwr'
@@ -2408,7 +2497,7 @@ theorem caseFetch {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l 
       (m := DevM.bind (.op (.dmaRead pa n) kM) (serveMatch h))
       (k := fun x => DevM.bind (kM x) (serveMatch h)) hj
       (bvOfBytes n (tvs.map Prod.snd)) rfl
-      (dmaViewOf X.mem X.step X.lf htl (smallNoWrap _ _ hn))
+      (dmaViewOf X.mem X.eag X.step X.lf htl (smallNoWrap _ _ hn))
     refine goalFrame X trivial r (devOnlyRefl σ)
       ⟨.pure (), some _, .eq, vsOkTask _ _ _ hj _,
         by rw [hdp]; exact .fetch h _ _ (hk _ (by simp [htl])), ?_⟩
@@ -2712,7 +2801,7 @@ theorem simDisk {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {t : 
     ∃ (m : Nat) (t' : List Expr) (g' : GState),
       MRun m (t, g) [] (t', g') ∧ SimRel c' (st ++ [(NCPU, l)]) t' g' := by
   obtain ⟨hgen, hpow, ⟨H, vs, dp, dws, dpr, ht, hlen, hharts, hdisk, mr, ot, κ, ⟨ts, hvs, hot⟩,
-    hpos, hag⟩, hmem, hview, hauth, hcoh⟩ := hR
+    hpos, hag⟩, hmem, hview, hauth, hcoh, heg⟩ := hR
   obtain ⟨ag, p', ws', hlk, hks, himg, hags⟩ := hk
   rw [hdisk] at hlk
   cases hlk
@@ -2720,7 +2809,7 @@ theorem simDisk {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {t : 
   | PHart _ _ _ _ _ => exact hks.elim
   | PDisk dp' =>
   obtain ⟨hpd, hdev⟩ := hks
-  have X : DCtx c c' st rest l g.m := ⟨hs, hadj, hmem, hview, hfT⟩
+  have X : DCtx c c' st rest l g.m := ⟨hs, hadj, hmem, hview, hfT, heg⟩
   have hgoal : DiskGoal c' (st ++ [(NCPU, l)]) dp' vs g.m := by
     subst hvs
     cases hpos with
@@ -2762,10 +2851,10 @@ theorem simDisk {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {t : 
       exact caseIdx X (lenOf htk) h r ui cf hpd hag
     | fin => exact caseFin X hpd hag
     | stall => exact caseStall X hpd hag
-  obtain ⟨n, vs', σ', hr, hregs, hm', hv', hds⟩ := hgoal
+  obtain ⟨n, vs', σ', hr, hregs, hm', hv', hds, heg'⟩ := hgoal
   refine ⟨n, poolOf H c.pcDev vs', { g with m := σ' }, ?_, hgen, hpow,
     ⟨H, vs', dp', ws', dpr, ?_, ?_, fun cpu => ?_, ?_, hds⟩, hm', hv', authStep hs hauth,
-    ownCohStep pstepEv pclsEv _ _ c c' hcoh hs⟩
+    ownCohStep pstepEv pclsEv _ _ c c' hcoh hs, heg'⟩
   · rw [ht]; exact hr H c.pcDev g rfl ⟨hpow, hgen⟩
   · rw [hdev]; rfl
   · rw [hags, List.length_set, hlen]
@@ -2892,20 +2981,21 @@ theorem simStep {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     (hex : ∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →
       exclOkTs c.pcLog i base (tvs.map Prod.fst) (c.pcLog.length + 1)) :
     ∃ (m : Nat) (t' : List Expr) (g' : GState),
-      (k ≠ .disk → m ≤ 1) ∧ MRun m (t, g) (pfStepObs c i k) (t', g') ∧ SimRel c' (st ++ [(i, l)]) t' g' := by
+      (k ≠ .disk → MRunPcTail m (t, g) (t', g')) ∧ MRun m (t, g) (pfStepObs c i k) (t', g') ∧
+        SimRel c' (st ++ [(i, l)]) t' g' := by
   cases k with
   | node =>
     obtain ⟨m, t', g', hle, hm, hR'⟩ := simNode hH hR hreach hrun hs hf hfT hcf hk hadj hex
     exact ⟨m, t', g', fun _ => hle, hm, hR'⟩
   | wire =>
     obtain ⟨m, t', g', hle, hm, hR'⟩ := simWire hR hs hk hadj
-    exact ⟨m, t', g', fun _ => hle, hm, hR'⟩
+    exact ⟨m, t', g', fun _ => Or.inl hle, hm, hR'⟩
   | uart u =>
     obtain ⟨m, t', g', hle, hm, hR'⟩ := simDev (fok := fok) hR hs hk ⟨nofun, nofun, nofun⟩ hadj
-    exact ⟨m, t', g', fun _ => hle, hm, hR'⟩
+    exact ⟨m, t', g', fun _ => Or.inl hle, hm, hR'⟩
   | gate =>
     obtain ⟨m, t', g', hle, hm, hR'⟩ := simDev (fok := fok) hR hs hk ⟨nofun, nofun, nofun⟩ hadj
-    exact ⟨m, t', g', fun _ => hle, hm, hR'⟩
+    exact ⟨m, t', g', fun _ => Or.inl hle, hm, hR'⟩
   | disk =>
     obtain ⟨ag, p', ws', hlk, hks, himg, hags⟩ := hk
     obtain ⟨st0, ws0, pr0⟩ := ag

@@ -79,35 +79,94 @@ theorem pteVariant_nonleaf {c v : BitVec 64} (hc : pteLeafB c = false) (h : pteV
   · rfl
   · rw [hc', pteLeafB_kLeaf] at hc; cases hc
 
+/-- **A frozen head's landing licence for an entry by `g`** (route P, design D13, [OWN.126]): the
+position is the image's (`0`), a store of `g` itself (an authorship receipt in `ts`), or certified
+landed (`ls`). -/
+def headLic (ts : List (Nat × Agent)) (ls : List (Nat × Nat)) (g : Agent) (s : Nat) : Prop :=
+  s = 0 ∨ (s, g) ∈ ts ∨ ∃ p, (s, p) ∈ ls
+
+theorem headLic_mono {ts ts' : List (Nat × Agent)} {ls ls' : List (Nat × Nat)} {g : Agent} {s : Nat}
+    (hts : ∀ q ∈ ts, q ∈ ts') (hls : ∀ q ∈ ls, q ∈ ls') (h : headLic ts ls g s) : headLic ts' ls' g s := by
+  rcases h with h | h | ⟨p, hp⟩
+  · exact .inl h
+  · exact .inr (.inl (hts _ h))
+  · exact .inr (.inr ⟨p, hls _ hp⟩)
+
+/-- A key's licence (`ownCtx_keys_vis`) is a head licence. -/
+theorem headLic_of_vis {ts : List (Nat × Agent)} {ls : List (Nat × Nat)} {g : Agent} {s K : Nat}
+    (h : s = 0 ∨ (s, g) ∈ ts ∨ ∃ p, (s, p) ∈ ls ∧ p ≤ K) : headLic ts ls g s := by
+  rcases h with h | h | ⟨p, hp, _⟩
+  · exact .inl h
+  · exact .inr (.inl h)
+  · exact .inr (.inr ⟨p, hp⟩)
+
+/-- **The table's frozen positions all satisfy `P`** (design D13): the root word's eight (`fr`) and
+every entry's eight (`fl`). -/
+def kptFrozenOk (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) (P : Nat → Prop) : Prop :=
+  (∀ j, j < 8 → P (fr j)) ∧ ∀ n x, (t.entries 2)[n]? = some x → ∀ j, j < 8 → P (fl n j)
+
+theorem kptFrozenOk_mono {t : PTree} {fl : Nat → Nat → Nat} {fr : Nat → Nat} {P Q : Nat → Prop}
+    (hPQ : ∀ s, P s → Q s) (h : kptFrozenOk t fl fr P) : kptFrozenOk t fl fr Q :=
+  ⟨fun j hj => hPQ _ (h.1 j hj), fun n x hx j hj => hPQ _ (h.2 n x hx j hj)⟩
+
 /-- One LEAF of the shared table at `addr`, canonical value `c`, under the
 word discipline since the PER-BYTE positions `ts`: every write is a variant,
 at or after the seal position `S`.  The positions are per byte because the
 entry was zeroed by `memset`'s byte stores -- eight stores at eight
 positions -- before it was placed under the word discipline.  W8 (f3-ptek):
 HALF of the leaf's bytes -- the state interpretation holds the other half
-from the seal on (`MachCSL.kptModelAt`), so no generic writer reaches it. -/
-def pteCell (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) : IProp GF := iprop%
+from the seal on (`MachCSL.kptModelAt`), so no generic writer reaches it.  Route P (design D13,
+[OWN.126]): each post-seal entry also carries the frozen heads' licences for its writer (`Fz` is the
+table's `kptFrozenOk`): a reader whose own key cannot certify a head landed finds it certified here. -/
+def pteCell (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (Fz : (Nat → Prop) → Prop) : IProp GF := iprop%
   ∃ (v0 : BitVec 64) (W : WordHist 8) (Hold : Nat → Hist),
     histBytes addr 8 (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ∗ ⌜tailOkT 8 ts v0 Hold⌝ ∗
-    ⌜pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t⌝
+    ⌜pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t⌝ ∗
+    ∃ (lsW : List (Nat × Nat)) (tsH : List (Nat × Agent)), landedAll lsW ∗ ([∗list] q ∈ tsH, authoredBy q.1 q.2) ∗
+      ⌜(∀ e ∈ W, ∃ p, (e.t, p) ∈ lsW) ∧ ∀ e ∈ W, Fz (headLic tsH lsW e.tid)⌝
 
-instance pteCell_timeless (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) :
-    Timeless (pteCell (GF := GF) addr c ts S) := by
+instance pteCell_timeless (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (Fz : (Nat → Prop) → Prop) :
+    Timeless (pteCell (GF := GF) addr c ts S Fz) := by
   unfold pteCell histBytes; infer_instance
 
-theorem pteCell_cases (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) :
-    pteCell (GF := GF) addr c ts S ⊢ ∃ (v0 : BitVec 64) (W : WordHist 8) (Hold : Nat → Hist),
+theorem pteCell_cases (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (Fz : (Nat → Prop) → Prop) :
+    pteCell (GF := GF) addr c ts S Fz ⊢ ∃ (v0 : BitVec 64) (W : WordHist 8) (Hold : Nat → Hist),
       histBytes addr 8 (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ∗ ⌜tailOkT 8 ts v0 Hold⌝ ∗
-      ⌜pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t⌝ := by
+      ⌜pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t⌝ ∗
+      ∃ (lsW : List (Nat × Nat)) (tsH : List (Nat × Agent)), landedAll lsW ∗ ([∗list] q ∈ tsH, authoredBy q.1 q.2) ∗
+        ⌜(∀ e ∈ W, ∃ p, (e.t, p) ∈ lsW) ∧ ∀ e ∈ W, Fz (headLic tsH lsW e.tid)⌝ := by
   unfold pteCell; iintro H; iexact H
 
-theorem pteCell_intro (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (v0 : BitVec 64) (W : WordHist 8)
-    (Hold : Nat → Hist) (htail : tailOkT 8 ts v0 Hold)
-    (hpin : pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t) :
-    histBytes (GF := GF) addr 8 (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ⊢ pteCell addr c ts S := by
-  unfold pteCell; iintro H; iexists v0, W, Hold; iframe H; isplit
+/-- A leaf's cell, re-established (route P: its post-seal entries -- exclusive A/D writes, landed at
+once -- carry their landing certificates `lsW`). -/
+theorem pteCell_intro (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (Fz : (Nat → Prop) → Prop) (v0 : BitVec 64)
+    (W : WordHist 8) (Hold : Nat → Hist) (htail : tailOkT 8 ts v0 Hold)
+    (hpin : pteVariant c v0 ∧ ∀ e ∈ W, pteVariant c e.v ∧ S ≤ e.t) (lsW : List (Nat × Nat)) (tsH : List (Nat × Agent))
+    (hlsW : ∀ e ∈ W, ∃ p, (e.t, p) ∈ lsW) (hfz : ∀ e ∈ W, Fz (headLic tsH lsW e.tid)) :
+    landedAll (GF := GF) lsW ∗ ([∗list] q ∈ tsH, authoredBy (GF := GF) q.1 q.2) ∗
+      histBytes addr 8 (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ⊢ pteCell addr c ts S Fz := by
+  unfold pteCell; iintro ⟨#Hl, #Ht, H⟩; iexists v0, W, Hold; iframe H; isplit
   · ipureintro; exact htail
+  isplit
   · ipureintro; exact hpin
+  · iexists lsW, tsH
+    iframe Hl Ht
+    ipureintro; exact ⟨hlsW, hfz⟩
+
+/-- A FRESH leaf's cell (no post-seal entry), at every licence demand `Fz`. -/
+theorem pteCell_nil (addr c : BitVec 64) (ts : Nat → Nat) (S : Nat) (Hold : Nat → Hist)
+    (htail : tailOkT 8 ts c Hold) :
+    histBytes (GF := GF) addr 8 (fun _ => DFrac.own (1 : Qp).half) Hold ⊢ ∀ Fz, pteCell addr c ts S Fz := by
+  iintro Hb %Fz
+  have hh : WordHist.hist ([] : WordHist 8) Hold = Hold := WordHist.hist_nil Hold
+  iapply pteCell_intro addr c ts S Fz c [] Hold htail ⟨pteVariant_refl _, by simp⟩ [] [] (fun e he => by simp at he)
+    (fun e he => by simp at he)
+  isplitl []
+  · iapply BigSepL.bigSepL_nil.2; itrivial
+  isplitl []
+  · iapply BigSepL.bigSepL_nil.2; itrivial
+  rw [hh]
+  iexact Hb
 
 /-- A FROZEN entry (a pointer or an empty slot): its histories, persistent
 (discarded), heads spelling `c` at the per-byte positions `ts`. -/
@@ -120,11 +179,12 @@ instance ptrCell_persistent (addr c : BitVec 64) (ts : Nat → Nat) :
 
 /-- The LEAVES of the table `t`, entry `i` at its own eight positions
 `fl i`, written only at or after `S`. -/
-def kptBody (t : PTree) (fl : Nat → Nat → Nat) (S : Nat) : IProp GF := iprop%
-  [∗list] i ↦ e ∈ t.entries 2, (⌜pteLeafB e.2 = true⌝ ∗ pteCell e.1 e.2 (fl i) S) ∨ ⌜pteLeafB e.2 = false⌝
+def kptBody (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) (S : Nat) : IProp GF := iprop%
+  [∗list] i ↦ e ∈ t.entries 2,
+    (⌜pteLeafB e.2 = true⌝ ∗ pteCell e.1 e.2 (fl i) S (kptFrozenOk t fl fr)) ∨ ⌜pteLeafB e.2 = false⌝
 
-instance kptBody_timeless (t : PTree) (fl : Nat → Nat → Nat) (S : Nat) :
-    Timeless (kptBody (GF := GF) t fl S) := by
+instance kptBody_timeless (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) (S : Nat) :
+    Timeless (kptBody (GF := GF) t fl fr S) := by
   unfold kptBody; infer_instance
 
 /-- The frozen entries of the table `t` (persistent). -/
@@ -160,6 +220,18 @@ def kptRootW (b : BitVec 44) (S : Nat) : IProp GF := iprop%
 instance kptRootW_persistent (b : BitVec 44) (S : Nat) : Persistent (kptRootW (GF := GF) b S) := by
   unfold kptRootW histBytes; infer_instance
 
+/-- **The root word's heads at their positions** (route P, design D13): the root word's history
+heads spell the root page at the per-byte positions `fr` (the positions the context's root keys,
+`kptKeys`, certify). -/
+def kptRootF (b : BitVec 44) (fr : Nat → Nat) : IProp GF := iprop%
+  ∃ (ra : PAddr) (Hr : Nat → Hist),
+    ⌜(⟨ra, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) ∧
+      ∀ j, j < 8 → ∃ e H, Hr j = e :: H ∧ e.v = nthByte (n := 8) (pteAddr b 0#9) j ∧ e.t = fr j⌝ ∗
+    histBytes ra 8 (fun _ => DFrac.discard) Hr
+
+instance kptRootF_persistent (b : BitVec 44) (fr : Nat → Nat) : Persistent (kptRootF (GF := GF) b fr) := by
+  unfold kptRootF histBytes; infer_instance
+
 /-- The leaves' registrations with the state interpretation (W8 (f3-ptek),
 `MachCSL.kslotReg`; persistent). -/
 def kptRegs (t : PTree) : IProp GF := iprop%
@@ -184,12 +256,13 @@ theorem kptRegs_acc (t : PTree) (addr c : BitVec 64) (hmem : (addr, c) ∈ t.ent
 a seal position `S` past every frozen position and the root word's
 (`topLb S`), the root word, the frozen entries, and (W8 (f3-ptek)) the
 leaves' registrations and the seal's certificate. -/
-def kptCore (t : PTree) (fl : Nat → Nat → Nat) : IProp GF := iprop%
-  ∃ S : Nat, inv kptN (kptBody t fl S) ∗
-    ⌜∀ i x, (t.entries 2)[i]? = some x → ∀ j, j < 8 → fl i j ≤ S⌝ ∗ topLb S ∗ kptRootW t.base S ∗
-    kptPtrs t fl ∗ kptRegs t ∗ kptSealed
+def kptCore (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) : IProp GF := iprop%
+  ∃ S : Nat, inv kptN (kptBody t fl fr S) ∗
+    ⌜∀ i x, (t.entries 2)[i]? = some x → ∀ j, j < 8 → fl i j ≤ S⌝ ∗ itopLb S ∗ kptRootW t.base S ∗
+    kptPtrs t fl ∗ kptRegs t ∗ kptSealed ∗ kptRootF t.base fr
 
-instance kptCore_persistent (t : PTree) (fl : Nat → Nat → Nat) : Persistent (kptCore (GF := GF) t fl) := by
+instance kptCore_persistent (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) :
+    Persistent (kptCore (GF := GF) t fl fr) := by
   unfold kptCore; infer_instance
 
 /-- The KEYS of the table's positions at the ambient context (persistent,
@@ -198,20 +271,111 @@ invariant is shared).  Whoever holds them may certify every byte of every
 entry as visible to its hart (`CtxLaws.ownCtx_keys_vis`), whether the
 position is under the context's bound or is one of the hart's own buffered
 stores. -/
-def kptKeys [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) : IProp GF := iprop%
-  [∗list] i ↦ _e ∈ t.entries 2, [∗list] j ∈ List.range 8, keyAt era curCtx (fl i j)
+def kptKeys [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) : IProp GF := iprop%
+  ([∗list] i ↦ _e ∈ t.entries 2, [∗list] j ∈ List.range 8, keyAt era curCtx (fl i j)) ∗
+    [∗list] j ∈ List.range 8, keyAt era curCtx (fr j)
 
-instance kptKeys_persistent [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) :
-    Persistent (kptKeys (GF := GF) t fl) := by
+instance kptKeys_persistent [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) :
+    Persistent (kptKeys (GF := GF) t fl fr) := by
   unfold kptKeys; infer_instance
 
-theorem kptKeys_acc [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) (i : Nat) (x : BitVec 64 × BitVec 64)
-    (hi : (t.entries 2)[i]? = some x) :
-    kptKeys (GF := GF) t fl ⊢ [∗list] j ∈ List.range 8, keyAt era curCtx (fl i j) := by
+theorem kptKeys_acc [CurCtx] (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) (i : Nat)
+    (x : BitVec 64 × BitVec 64) (hi : (t.entries 2)[i]? = some x) :
+    kptKeys (GF := GF) t fl fr ⊢ [∗list] j ∈ List.range 8, keyAt era curCtx (fl i j) := by
   unfold kptKeys
-  exact BigSepL.bigSepL_lookup
-    (Φ := fun i (_ : BitVec 64 × BitVec 64) => iprop([∗list] j ∈ List.range 8, keyAt era curCtx (fl i j)))
+  iintro ⟨#H, _⟩
+  iapply BigSepL.bigSepL_lookup
+    (Φ := fun i (_ : BitVec 64 × BitVec 64) => iprop([∗list] j ∈ List.range 8, keyAt (GF := GF) era curCtx (fl i j)))
     hi
+  iexact H
+
+/-- The keys of a list of entries license every position for the running hart (design D13). -/
+theorem KptInv.keysL_lic [CurCtx] (cpu : CPU) {α : Type} : ∀ (l : List α) (F : Nat → Nat → Nat),
+    ownCtx (GF := GF) cpu curCtx ∗ ([∗list] i ↦ _x ∈ l, [∗list] j ∈ List.range 8, keyAt era curCtx (F i j)) ⊢
+      ownCtx cpu curCtx ∗ ∃ (tsl : List (Nat × Agent)) (ls : List (Nat × Nat)),
+        ([∗list] q ∈ tsl, authoredBy q.1 q.2) ∗ landedAll ls ∗
+        ⌜∀ i, i < l.length → ∀ j, j < 8 → headLic tsl ls (hartAgent cpu) (F i j)⌝
+  | [], F => by
+    iintro ⟨Hctx, _⟩
+    iframe Hctx
+    iexists [], []
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    ipureintro
+    intro i hi
+    simp at hi
+  | x :: l, F => by
+    iintro ⟨Hctx, H⟩
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H0, Hl⟩
+    icases ownCtx_keys_vis cpu curCtx (F 0) 8 $$ [Hctx H0] with ⟨Hctx, %K, %ts1, %ls1, _, #Ht1, #Hl1, %h1⟩
+    · iframe Hctx H0
+    icases KptInv.keysL_lic cpu l (fun i => F (i + 1)) $$ [Hctx Hl] with ⟨Hctx, %ts2, %ls2, #Ht2, #Hl2, %h2⟩
+    · iframe Hctx Hl
+    iframe Hctx
+    iexists ts1 ++ ts2, ls1 ++ ls2
+    isplitl []
+    · iapply BigSepL.bigSepL_append.2; iframe Ht1 Ht2
+    isplitl []
+    · iapply BigSepL.bigSepL_append.2; iframe Hl1 Hl2
+    ipureintro
+    intro i hi j hj
+    cases i with
+    | zero =>
+      exact headLic_mono (fun q hq => List.mem_append_left _ hq) (fun q hq => List.mem_append_left _ hq)
+        (headLic_of_vis (h1 j hj))
+    | succ i =>
+      exact headLic_mono (fun q hq => List.mem_append_right _ hq) (fun q hq => List.mem_append_right _ hq)
+        (h2 i (by simp at hi; omega) j hj)
+
+/-- **The context's keys license every frozen position of the table** for the running hart (design
+D13): the image's, its own, or certified landed. -/
+theorem kptKeys_lic [CurCtx] (cpu : CPU) (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) :
+    ownCtx (GF := GF) cpu curCtx ∗ kptKeys t fl fr ⊢
+      ownCtx cpu curCtx ∗ ∃ (tsl : List (Nat × Agent)) (ls : List (Nat × Nat)),
+        ([∗list] q ∈ tsl, authoredBy q.1 q.2) ∗ landedAll ls ∗
+        ⌜kptFrozenOk t fl fr (headLic tsl ls (hartAgent cpu))⌝ := by
+  unfold kptKeys
+  iintro ⟨Hctx, Hent, Hroot⟩
+  icases ownCtx_keys_vis cpu curCtx fr 8 $$ [Hctx Hroot] with ⟨Hctx, %K, %ts1, %ls1, _, #Ht1, #Hl1, %h1⟩
+  · iframe Hctx Hroot
+  icases KptInv.keysL_lic cpu (t.entries 2) fl $$ [Hctx Hent] with ⟨Hctx, %ts2, %ls2, #Ht2, #Hl2, %h2⟩
+  · iframe Hctx Hent
+  iframe Hctx
+  iexists ts1 ++ ts2, ls1 ++ ls2
+  isplitl []
+  · iapply BigSepL.bigSepL_append.2; iframe Ht1 Ht2
+  isplitl []
+  · iapply BigSepL.bigSepL_append.2; iframe Hl1 Hl2
+  ipureintro
+  refine ⟨fun j hj => ?_, fun n x hx j hj => ?_⟩
+  · exact headLic_mono (fun q hq => List.mem_append_left _ hq) (fun q hq => List.mem_append_left _ hq)
+      (headLic_of_vis (h1 j hj))
+  · exact headLic_mono (fun q hq => List.mem_append_right _ hq) (fun q hq => List.mem_append_right _ hq)
+      (h2 n (List.getElem?_eq_some_iff.1 hx).1 j hj)
+
+/-- Two authorship lists agree on every stamp they share. -/
+theorem KptInv.auths_agree (ts ts' : List (Nat × Agent)) :
+    ([∗list] q ∈ ts, authoredBy (GF := GF) q.1 q.2) ∗ ([∗list] q ∈ ts', authoredBy (GF := GF) q.1 q.2) ⊢
+      ⌜∀ s g g', (s, g) ∈ ts → (s, g') ∈ ts' → g = g'⌝ := by
+  iintro ⟨#H1, #H2⟩
+  iapply BI.pure_forall.2
+  iintro %s
+  iapply BI.pure_forall.2
+  iintro %g
+  iapply BI.pure_forall.2
+  iintro %g'
+  iapply BI.pure_wand.1
+  iintro %h1
+  iapply BI.pure_wand.1
+  iintro %h2
+  obtain ⟨i1, hi1⟩ := List.getElem?_of_mem h1
+  obtain ⟨i2, hi2⟩ := List.getElem?_of_mem h2
+  ihave #A1 := BigSepL.bigSepL_lookup (Φ := fun _ (q : Nat × Agent) => authoredBy (GF := GF) q.1 q.2) hi1 $$ H1
+  ihave #A2 := BigSepL.bigSepL_lookup (Φ := fun _ (q : Nat × Agent) => authoredBy (GF := GF) q.1 q.2) hi2 $$ H2
+  iapply authoredBy_agree s g g'
+  iframe A1 A2
 
 /-- The pure facts of an installed table `t` with mapping `M`. -/
 def kptFacts (t : PTree) (M : RegMapF (BitVec 64)) : Prop :=
@@ -239,7 +403,7 @@ that the addresses are distinct. -/
 def kptOn [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) : IProp GF := iprop%
   ⌜kptFacts t M ∧ kptStackOff (hlc := hlc) (GF := GF) t⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
   (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗
-  ∃ fl : Nat → Nat → Nat, kptCore t fl ∗ kptKeys t fl
+  ∃ (fl : Nat → Nat → Nat) (fr : Nat → Nat), kptCore t fl fr ∗ kptKeys t fl fr
 
 instance kptOn_persistent [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
     Persistent (kptOn (GF := GF) t M) := by
@@ -250,7 +414,7 @@ the boot gate's publication store presents, `MachCSL.writeAUT`). -/
 theorem kptOn_sealed [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
     kptOn (GF := GF) t M ⊢ kptSealed := by
   unfold kptOn kptCore
-  iintro ⟨_, _, _, %fl, ⟨%S, _, _, _, _, _, _, #Hsl⟩, _⟩
+  iintro ⟨_, _, _, %fl, %fr, ⟨%S, _, _, _, _, _, _, #Hsl, _⟩, _⟩
   iexact Hsl
 
 /-- A mapping element is in the published mapping. -/
@@ -415,20 +579,21 @@ variant set, at the reader's view), and the exclusive read/conditional
 write pair of the A/D write-back on a LEAF (which pushes a variant). -/
 
 /-- A leaf of the table, at its index. -/
-theorem kptBody_acc (t : PTree) (fl : Nat → Nat → Nat) (S : Nat) (i : Nat) (addr c : BitVec 64)
+theorem kptBody_acc (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) (S : Nat) (i : Nat) (addr c : BitVec 64)
     (hi : (t.entries 2)[i]? = some (addr, c)) (hleaf : pteLeafB c = true) :
-    kptBody (GF := GF) t fl S ⊢ pteCell addr c (fl i) S ∗ (pteCell addr c (fl i) S -∗ kptBody t fl S) := by
+    kptBody (GF := GF) t fl fr S ⊢ pteCell addr c (fl i) S (kptFrozenOk t fl fr) ∗
+      (pteCell addr c (fl i) S (kptFrozenOk t fl fr) -∗ kptBody t fl fr S) := by
   unfold kptBody
   iintro H
   icases BigSepL.bigSepL_lookup_acc
-    (Φ := fun i e => iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl i) S) ∨ ⌜pteLeafB e.2 = false⌝))
+    (Φ := fun i e => iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl i) S (kptFrozenOk t fl fr)) ∨ ⌜pteLeafB e.2 = false⌝))
     hi $$ H with ⟨He, Hclose⟩
   icases He with ⟨⟨_, He⟩ | %hf⟩
   rotate_left
   · simp only at hf; rw [hleaf] at hf; cases hf
   iframe He
   iintro He
-  ihave He' : iprop((⌜pteLeafB (addr, c).2 = true⌝ ∗ pteCell (GF := GF) (addr, c).1 (addr, c).2 (fl i) S) ∨
+  ihave He' : iprop((⌜pteLeafB (addr, c).2 = true⌝ ∗ pteCell (GF := GF) (addr, c).1 (addr, c).2 (fl i) S (kptFrozenOk t fl fr)) ∨
       ⌜pteLeafB (addr, c).2 = false⌝) $$ [He]
   · ileft
     iframe He
@@ -440,9 +605,9 @@ theorem kptBody_acc (t : PTree) (fl : Nat → Nat → Nat) (S : Nat) (i : Nat) (
       have := (List.getElem?_eq_some_iff.mp hi).2; simpa using this
     rw [← hv]; exact @List.set_getElem_self _ (t.entries 2) i hl
   ihave H' := (show ([∗list] k ↦ e ∈ (t.entries 2).set i (addr, c),
-      iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl k) S) ∨ ⌜pteLeafB e.2 = false⌝)) ⊢
+      iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl k) S (kptFrozenOk t fl fr)) ∨ ⌜pteLeafB e.2 = false⌝)) ⊢
       [∗list] k ↦ e ∈ t.entries 2,
-        iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl k) S) ∨ ⌜pteLeafB e.2 = false⌝)
+        iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl k) S (kptFrozenOk t fl fr)) ∨ ⌜pteLeafB e.2 = false⌝)
       from by rw [hset]) $$ H
   iexact H'
 
@@ -456,6 +621,30 @@ theorem KptInv.root_ne_zero (t : PTree) (M : RegMapF (BitVec 64)) (hf : kptFacts
   unfold inRam ramBase at h
   simp at h
 
+/-- A key's licence, at a landing function agreeing with its certificates: landed under the view or
+the reader's own (route P). -/
+theorem KptInv.visP_of {ls : List (Nat × Nat)} {lp : LandPos} {K n : Nat} {tsl : List (Nat × Agent)}
+    {h : Agent} {f : Nat → Nat} (hla : lpAgree ls lp)
+    (hvis : ∀ j, j < n → f j = 0 ∨ (f j, h) ∈ tsl ∨ ∃ p, (f j, p) ∈ ls ∧ p ≤ K) :
+    ∀ j, j < n → (∃ p, lp (f j) = some p ∧ p ≤ K) ∨ (f j, h) ∈ tsl := by
+  intro j hj
+  rcases hvis j hj with h0 | hm | ⟨p, hp, hpK⟩
+  · exact .inl ⟨0, by rw [h0]; exact hla.1, Nat.zero_le _⟩
+  · exact .inr hm
+  · by_cases h0 : f j = 0
+    · exact .inl ⟨0, by rw [h0]; exact hla.1, Nat.zero_le _⟩
+    · exact .inl ⟨p, hla.2 _ hp h0, hpK⟩
+
+theorem KptInv.lpAgree_left {ls ls' : List (Nat × Nat)} {lp : LandPos} (h : lpAgree (ls ++ ls') lp) :
+    lpAgree ls lp :=
+  ⟨h.1, fun q hq => h.2 q (List.mem_append_left _ hq)⟩
+
+/-- A head certified landed is the head of its landed view, at its landing position. -/
+theorem KptInv.lview_head {lp : LandPos} {top : Nat} {H : Hist} {e : HEnt} {R : Hist} {q : Nat}
+    (hH : H = e :: R) (hq : lp e.t = some q) (hle : q ≤ top) :
+    ∃ e' R', Hist.lview lp H = e' :: R' ∧ e'.v = e.v ∧ e'.t ≤ top :=
+  ⟨⟨q, e.tid, e.v⟩, Hist.lview lp R, by rw [hH]; exact Hist.lview_cons_landed _ _ _ hq, rfl, hle⟩
+
 /-- The racy read of entry `addr` (canonical `c`) by `cpu`: some variant.
 The eight keys of the entry's positions are cashed against the hart's view
 receipt and an authorship bundle (`ownCtx_keys_vis`), so every byte's tail
@@ -463,21 +652,29 @@ head is visible to the reader -- whether the position is under the
 context's bound or is one of the hart's own buffered stores.  W8 (f2-ctx)
 S3: the tail heads are certified by the same keys (`srcCertAt_of_keys`);
 a leaf's A/D entries, written by any hart's walker at or after the seal,
-are EXEMPT -- page-table bytes, `KptInv.leaf_ptByteAt`, read off the root
-word and the two frozen pointers above the leaf, lent as companions. -/
+are certified as the reader's own or EXEMPT -- page-table bytes,
+`KptInv.leaf_ptByteAt`, read off the root word and the two frozen pointers
+above the leaf, lent as companions.  Route P ([OWN.126], design D13): the
+exemption reads the path in the LANDED view as of the landed top, so the
+companions' heads must be landed -- certified by the reader's own keys
+(`kptKeys_lic`), or, for a head the reader itself stored, by the entry's
+writer's licences recorded in the leaf's cell (the writer is another hart,
+whose key certified the head landed). -/
 theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (addr c : BitVec 64)
     (hmem : (addr, c) ∈ t.entries 2) :
     kptOn (GF := GF) t M ∗ ownCtx cpu curCtx ⊢
       ownCtx cpu curCtx ∗ ∃ (K : Nat) (tsl : List (Nat × Agent)), viewLb cpu K ∗
         readAU cpu addr 8 K tsl (fun w => iprop(⌜pteVariant c w⌝)) := by
   unfold kptOn kptCore
-  iintro ⟨⟨%⟨hf, hso⟩, _, _, %fl, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _⟩, #Hkeys⟩, Hctx⟩
+  iintro ⟨⟨%⟨hf, hso⟩, _, _, %fl, %fr, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _, _, #HrootF⟩, #Hkeys⟩, Hctx⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
-  ihave #Hk8 := kptKeys_acc t fl i (addr, c) hi $$ Hkeys
+  ihave #Hk8 := kptKeys_acc t fl fr i (addr, c) hi $$ Hkeys
   icases srcCertAt_of_keys cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, #Hkc⟩
   · iframe Hctx; iexact Hk8
-  icases ownCtx_keys_vis cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, %K, %tsl, #HK, #Hts, %hvis⟩
+  icases ownCtx_keys_vis cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, %K, %tsl, %ls, #HK, #Hts, #Hls, %hvis⟩
   · iframe Hctx; iexact Hk8
+  icases kptKeys_lic cpu t fl fr $$ [Hctx Hkeys] with ⟨Hctx, %tsR, %lsR, #HtsR, #HlsR, %hR⟩
+  · iframe Hctx; iexact Hkeys
   iframe Hctx
   iexists K, tsl
   isplit
@@ -485,6 +682,16 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
   unfold readAU
   isplitl []
   · iexact Hts
+  have hreadable : ∀ (Hs : Nat → Hist) (v0 : BitVec 64) (W : WordHist 8) (ls' : List (Nat × Nat)),
+      tailOkT 8 (fl i) v0 Hs → ∀ j, j < 8 → readableAt (hartAgent cpu) K (ls ++ ls') tsl (W.hist Hs j) := by
+    intro Hs v0 W ls' htail j hj
+    obtain ⟨x, H, hH, _, hxt⟩ := htail j hj
+    refine ⟨x, by unfold WordHist.hist; rw [hH]; exact List.mem_append_right _ List.mem_cons_self, ?_⟩
+    rw [hxt]
+    rcases hvis j hj with h | h | ⟨p, hp, hpK⟩
+    · exact Or.inl h
+    · exact Or.inr (Or.inr (Or.inr h))
+    · exact Or.inr (Or.inr (Or.inl ⟨p, List.mem_append_left _ hp, hpK⟩))
   cases hleaf : pteLeafB c with
   | false =>
     -- a frozen entry: only its heads are readable
@@ -494,36 +701,39 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
     have hHs : WordHist.hist ([] : WordHist 8) Hs = Hs := WordHist.hist_nil Hs
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.discard), Hs, []
+    iexists (fun _ => DFrac.discard), Hs, [], ls ++ []
+    isplitl []
+    · rw [List.append_nil]; iexact Hls
     iframe Hb
     isplit
     · ipureintro
       intro j hj
-      obtain ⟨e, H, h1, _⟩ := htail j hj
-      rw [h1]; exact List.cons_ne_nil e H
+      have := hreadable Hs c [] [] htail j hj
+      rw [hHs] at this
+      exact this
     isplitl []
     · iapply rdCompBytes_nil
     isplitl []
-    · iapply readCertsAt_of cpu addr 8 K tsl Hs [] (fun j e => e.t = fl i j)
-      · intro j e tvn hj hKt hau hr
+    · iapply readCertsAt_of cpu addr 8 K tsl (ls ++ []) Hs [] (fun j e => e.t = fl i j)
+      · intro j e tvn lp hj hKt hau hla hr
         obtain ⟨e0, H0, hH, _, he0⟩ := htail j hj
-        have hv := tailOkT_visible ([] : WordHist 8) (hartAgent cpu) tsl htail hKt hvis
-          (by rw [hHs]; exact hau) j hj e0 H0 hH
+        have hv := tailOkT_visibleP ([] : WordHist 8) lp (hartAgent cpu) tsl htail hKt
+          (KptInv.visP_of (KptInv.lpAgree_left hla) hvis) (by rw [hHs]; exact hau) j hj e0 H0 hH
         rw [hH] at hr
-        rw [Hist.readEnt_head _ _ e0 H0 hv e hr]
+        rw [Hist.readEntP_head lp _ _ e0 H0 hv e hr]
         exact he0
       · imodintro
         iintro %j %e %⟨hj, het⟩
         ileft
         iapply Hkc $$ %j %(addr + BitVec.ofNat 64 j) %e %⟨hj, het⟩
     inext
-    iintro %w %tvn %hKt %hrd %hauth _ _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth _ _
     imod Hmask
     imodintro
     ipureintro
     rw [← hHs] at hrd hauth
-    rcases WordHist.read_cases_visT ([] : WordHist 8) Hs (hartAgent cpu) tvn K (fl i) tsl c w (by decide)
-      htail hKt hvis hauth hrd with ⟨_, e, _, he, _⟩ | ⟨_, rfl⟩
+    rcases WordHist.read_cases_visTP ([] : WordHist 8) Hs lp (hartAgent cpu) tvn K (fl i) tsl c w htail hKt
+      (KptInv.visP_of (KptInv.lpAgree_left hla) hvis) hauth hrd with ⟨_, e, _, he, _⟩ | ⟨_, rfl⟩
     · simp at he
     · exact pteVariant_refl _
   | true =>
@@ -538,22 +748,28 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
     obtain ⟨n0, hn0⟩ := List.getElem?_of_mem hm0
     ihave #Hp1 := kptPtrs_acc t fl n1 _ _ hn1 (pteLeafB_kPtr _) $$ Hptrs
     ihave #Hp0 := kptPtrs_acc t fl n0 _ _ hn0 (pteLeafB_kPtr _) $$ Hptrs
-    unfold ptrCell kptRootW
+    unfold ptrCell kptRootF
     icases Hp1 with ⟨%Hs1, #Hb1, %ht1⟩
     icases Hp0 with ⟨%Hs0, #Hb0, %ht0⟩
-    icases Hroot with ⟨%ra, %Hr, %⟨hra, hrh⟩, #Hrb⟩
+    icases HrootF with ⟨%ra, %Hr, %⟨hra, hrh⟩, #Hrb⟩
     iinv Hinv with Hbody Hclose
     icases Hbody with >Hbody
-    icases kptBody_acc t fl S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
-    icases pteCell_cases addr c (fl i) S $$ Hcell with ⟨%v0, %W, %Hold, Hb, %htail, %hpin⟩
+    icases kptBody_acc t fl fr S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
+    icases pteCell_cases addr c (fl i) S _ $$ Hcell with
+      ⟨%v0, %W, %Hold, Hb, %htail, %hpin, %lsW, %tsH, #HlsW, #HtsH, %⟨hlsW, hfz⟩⟩
+    ihave %hag := KptInv.auths_agree tsR tsH $$ [HtsR HtsH]
+    · iframe HtsR HtsH
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     iexists (fun _ => DFrac.own (1 : Qp).half), W.hist Hold,
       [(ra, 8, DFrac.discard, Hr), (pteAddr t.base i1, 8, DFrac.discard, Hs1),
-        (pteAddr c1.base i0, 8, DFrac.discard, Hs0)]
+        (pteAddr c1.base i0, 8, DFrac.discard, Hs0)], ls ++ lsW
+    isplitl []
+    · iapply BigSepL.bigSepL_append.2
+      iframe Hls HlsW
     iframe Hb
     isplit
-    · ipureintro; exact fun j hj => WordHist.hist_ne_nilT W Hold htail j hj
+    · ipureintro; exact hreadable Hold v0 W lsW htail
     isplitl []
     · unfold rdCompBytes
       iapply BigSepL.bigSepL_cons.2
@@ -567,121 +783,304 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
       · iexact Hb0
       exact BigSepL.bigSepL_nil_intro
     isplitl []
-    · iapply readCertsAt_of cpu addr 8 K tsl (W.hist Hold) _ (fun j e => e.t = fl i j ∨ S ≤ e.t)
-      · intro j e tvn hj hKt hau hr
+    · iapply readCertsAt_of cpu addr 8 K tsl (ls ++ lsW) (W.hist Hold) _
+        (fun j e => e.t = fl i j ∨ ∃ x ∈ W, e = WEnt.proj j x)
+      · intro j e tvn lp hj hKt hau hla hr
         obtain ⟨e0, H0, hH, _, he0⟩ := htail j hj
-        have hv := tailOkT_visible W (hartAgent cpu) tsl htail hKt hvis hau j hj e0 H0 hH
-        rcases WordHist.readEnt_cases W Hold (hartAgent cpu) tvn j e0 H0 hH hv e hr with ⟨x, hx, rfl⟩ | rfl
-        · exact Or.inr (hpin.2 x hx).2
+        have hv := tailOkT_visibleP W lp (hartAgent cpu) tsl htail hKt
+          (KptInv.visP_of (KptInv.lpAgree_left hla) hvis) hau j hj e0 H0 hH
+        rcases WordHist.readEnt_casesP W Hold lp (hartAgent cpu) tvn j e0 H0 hH hv e hr with h | rfl
+        · exact Or.inr h
         · exact Or.inl he0
       · imodintro
         iintro %j %e %⟨hj, hP⟩
-        rcases hP with het | hSe
+        rcases hP with het | ⟨x, hx, rfl⟩
         · ileft
           iapply Hkc $$ %j %(addr + BitVec.ofNat 64 j) %e %⟨hj, het⟩
-        · iright
-          unfold exCertAt
-          iexists [], []
-          isplitl []
-          · exact BigSepL.bigSepL_nil_intro
-          isplitl []
-          · exact BigSepL.bigSepL_nil_intro
-          ipureintro
-          intro σ _ _ hcs _ _
-          have hr := hcs _ List.mem_cons_self
-          have h1 := hcs _ (List.mem_cons_of_mem _ List.mem_cons_self)
-          have h0 := hcs _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
-          have hpos : ∀ (n' : Nat) (x : BitVec 64 × BitVec 64), (t.entries 2)[n']? = some x →
-              ∀ j', j' < 8 → fl n' j' ≤ e.t := fun n' x hx j' hj' => Nat.le_trans (hfl n' x hx j' hj') hSe
-          refine Or.inr (Or.inr (Or.inl (Or.inl ⟨?_, hso (addr, c) hmem j hj⟩)))
-          rw [haddr]
-          refine KptInv.leaf_ptByteAt _ σ.mem t.base c1.base g.base (KptInv.root_ne_zero t M hf) i1 i0 k
-            S e.t hSe ra hra Hr hr hrh ?_ ?_ j hj
-          · exact KptInv.wordAsOf_heads σ.mem _ e.t _ Hs1 h1 (fun j' hj' => by
-              obtain ⟨x, H, h1', h2', h3'⟩ := ht1 j' hj'
-              exact ⟨x, H, h1', h2', by rw [h3']; exact hpos n1 _ hn1 j' hj'⟩)
-          · exact KptInv.wordAsOf_heads σ.mem _ e.t _ Hs0 h0 (fun j' hj' => by
-              obtain ⟨x, H, h1', h2', h3'⟩ := ht0 j' hj'
-              exact ⟨x, H, h1', h2', by rw [h3']; exact hpos n0 _ hn0 j' hj'⟩)
+        · by_cases hown : x.tid = hartAgent cpu
+          · -- the reader's own A/D entry
+            ileft
+            unfold srcCertAt
+            ileft
+            ipureintro
+            exact Or.inr (Or.inr (Or.inl hown))
+          · -- another hart's A/D entry: exempt, a page-table byte as of the landed top
+            iright
+            unfold exCertAt
+            iexists [], [], lsR ++ lsW, []
+            isplitl []
+            · exact BigSepL.bigSepL_nil_intro
+            isplitl []
+            · exact BigSepL.bigSepL_nil_intro
+            isplitl []
+            · iapply BigSepL.bigSepL_append.2
+              iframe HlsR HlsW
+            isplitl []
+            · exact BigSepL.bigSepL_nil_intro
+            ipureintro
+            intro σ _ _ hcs _ _ hlx _ p hp
+            have hfx := hfz x hx
+            -- every frozen head is landed
+            have hland : ∀ s, headLic tsR lsR (hartAgent cpu) s → headLic tsH lsW x.tid s →
+                ∃ q, σ.lp s = some q := by
+              intro s h1 h2
+              by_cases h0 : s = 0
+              · exact ⟨0, by rw [h0]; exact hlx.1⟩
+              rcases h1 with h1 | h1 | ⟨q, hq⟩
+              · exact absurd h1 h0
+              · rcases h2 with h2 | h2 | ⟨q, hq⟩
+                · exact absurd h2 h0
+                · exact absurd (hag s _ _ h1 h2).symm hown
+                · exact ⟨q, hlx.2 _ (List.mem_append_right _ hq) h0⟩
+              · exact ⟨q, hlx.2 _ (List.mem_append_left _ hq) h0⟩
+            have hr := hcs _ List.mem_cons_self
+            have h1 := hcs _ (List.mem_cons_of_mem _ List.mem_cons_self)
+            have h0 := hcs _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
+            have hpt : p ≤ σ.ltop := lpOf_le _ _ _ hp
+            refine Or.inr (Or.inr (Or.inl (Or.inl ⟨⟨σ.ltop, hpt, Nat.le_refl _, ?_⟩, hso (addr, c) hmem j hj⟩)))
+            rw [haddr]
+            refine KptInv.leaf_ptByteAt _ (σ.mem.lview σ.lp) t.base c1.base g.base (KptInv.root_ne_zero t M hf)
+              i1 i0 k σ.ltop σ.ltop (Nat.le_refl _) ra hra (fun j' => Hist.lview σ.lp (Hr j'))
+              (fun j' hj' => FlatMem.lview_get?_some (hr j' hj')) ?_ ?_ ?_ j hj
+            · intro j' hj'
+              obtain ⟨e', H', h1', h2', h3'⟩ := hrh j' hj'
+              obtain ⟨q, hq⟩ := hland _ (hR.1 j' hj') (hfx.1 j' hj')
+              obtain ⟨y, R', hy, hyv, hyt⟩ := KptInv.lview_head (top := σ.ltop) h1' (by rw [h3']; exact hq)
+                (lpOf_le _ _ _ hq)
+              exact ⟨y, R', hy, by rw [hyv, h2'], hyt⟩
+            · exact KptInv.wordAsOf_heads (σ.mem.lview σ.lp) _ σ.ltop _ (fun j' => Hist.lview σ.lp (Hs1 j'))
+                (fun j' hj' => FlatMem.lview_get?_some (h1 j' hj')) (fun j' hj' => by
+                  obtain ⟨y0, H, h1', h2', h3'⟩ := ht1 j' hj'
+                  obtain ⟨q, hq⟩ := hland _ (hR.2 n1 _ hn1 j' hj') (hfx.2 n1 _ hn1 j' hj')
+                  obtain ⟨y, R', hy, hyv, hyt⟩ := KptInv.lview_head (top := σ.ltop) h1' (by rw [h3']; exact hq)
+                    (lpOf_le _ _ _ hq)
+                  exact ⟨y, R', hy, by rw [hyv, h2'], hyt⟩)
+            · exact KptInv.wordAsOf_heads (σ.mem.lview σ.lp) _ σ.ltop _ (fun j' => Hist.lview σ.lp (Hs0 j'))
+                (fun j' hj' => FlatMem.lview_get?_some (h0 j' hj')) (fun j' hj' => by
+                  obtain ⟨y0, H, h1', h2', h3'⟩ := ht0 j' hj'
+                  obtain ⟨q, hq⟩ := hland _ (hR.2 n0 _ hn0 j' hj') (hfx.2 n0 _ hn0 j' hj')
+                  obtain ⟨y, R', hy, hyv, hyt⟩ := KptInv.lview_head (top := σ.ltop) h1' (by rw [h3']; exact hq)
+                    (lpOf_le _ _ _ hq)
+                  exact ⟨y, R', hy, by rw [hyv, h2'], hyt⟩)
     inext
-    iintro %w %tvn %hKt %hrd %hauth Hb _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth Hb _
     imod Hmask
-    ihave Hcell := pteCell_intro addr c (fl i) S v0 W Hold htail hpin $$ Hb
+    ihave Hcell := pteCell_intro addr c (fl i) S _ v0 W Hold htail hpin lsW tsH hlsW hfz $$ [Hb]
+    · iframe Hb HlsW HtsH
     ihave Hcl := Hclose $$ (Hback $$ Hcell)
     imod Hcl
     imodintro
     ipureintro
-    rcases WordHist.read_cases_visT W Hold (hartAgent cpu) tvn K (fl i) tsl v0 w (by decide) htail
-      hKt hvis hauth hrd with ⟨_, e, _, _, _, _, rfl⟩ | ⟨_, rfl⟩
+    rcases WordHist.read_cases_visTP W Hold lp (hartAgent cpu) tvn K (fl i) tsl v0 w htail
+      hKt (KptInv.visP_of (KptInv.lpAgree_left hla) hvis) hauth hrd with ⟨_, e, _, _, _, _, rfl⟩ | ⟨_, rfl⟩
     · exact (hpin.2 e (by simp_all)).1
     · exact hpin.1
 
-/-- The exclusive read of LEAF `addr`: the head of its history, a variant. -/
-theorem kpt_exclReadAU [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) (addr c : BitVec 64)
+/-- The exclusive read of LEAF `addr`: the head of its history, a variant (route P: the read half
+reads the LANDED heads; the post-seal entries are landed -- their certificates are in the cell --, and
+the tail heads are readable through the running token's keys: the image's, the hart's own, or landed
+under its view). -/
+theorem kpt_exclReadAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (addr c : BitVec 64)
     (hmem : (addr, c) ∈ t.entries 2) (hleaf : pteLeafB c = true) :
-    kptOn (GF := GF) t M ⊢ exclReadAU addr 8 (fun w0 => iprop(⌜pteVariant c w0⌝)) := by
+    kptOn (GF := GF) t M ∗ ownCtx cpu curCtx ⊢
+      ownCtx cpu curCtx ∗ exclReadAU cpu addr 8 (fun w0 => iprop(⌜pteVariant c w0⌝)) := by
   unfold kptOn kptCore
-  iintro ⟨%⟨hf, -⟩, _, _, %fl, ⟨%S, #Hinv, _⟩, #Hkeys⟩
+  iintro ⟨⟨%⟨hf, -⟩, _, _, %fl, %fr, ⟨%S, #Hinv, _⟩, #Hkeys⟩, Hctx⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
+  ihave #Hk8 := kptKeys_acc t fl fr i (addr, c) hi $$ Hkeys
+  icases ownCtx_keys_vis cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, %K, %tsl, %ls, #HK, #Hts, #Hls, %hvis⟩
+  · iframe Hctx; iexact Hk8
+  iframe Hctx
   unfold exclReadAU
   iinv Hinv with Hbody Hclose
   icases Hbody with >Hbody
-  icases kptBody_acc t fl S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
-  icases pteCell_cases addr c (fl i) S $$ Hcell with ⟨%v0, %W, %Hold, Hb, %htail, %hpin⟩
+  icases kptBody_acc t fl fr S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
+  icases pteCell_cases addr c (fl i) S _ $$ Hcell with
+    ⟨%v0, %W, %Hold, Hb, %htail, %hpin, %lsW, %tsH, #HlsW, #HtsH, %⟨hlsW, hfz⟩⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own (1 : Qp).half), W.hist Hold
-  iframe Hb
+  iexists (fun _ => DFrac.own (1 : Qp).half), W.hist Hold, ls ++ lsW, tsl
+  isplitl []
+  · iapply BigSepL.bigSepL_append.2
+    iframe Hls HlsW
+  iframe Hts Hb
   isplit
-  · ipureintro; exact fun j hj => WordHist.hist_ne_nilT W Hold htail j hj
+  · ipureintro
+    intro j hj
+    obtain ⟨x, H, hH, _, hxt⟩ := htail j hj
+    refine ⟨x, by unfold WordHist.hist; rw [hH]; exact List.mem_append_right _ List.mem_cons_self, ?_⟩
+    rw [hxt]
+    rcases hvis j hj with h | h | ⟨p, hp, _⟩
+    · exact Or.inl h
+    · exact Or.inr (Or.inr (Or.inr h))
+    · exact Or.inr (Or.inr (Or.inl ⟨p, List.mem_append_left _ hp⟩))
   inext
-  iintro %w0 %hheads Hb
+  iintro %w0 %es %ps %⟨lp, hla, hau, hown, hheads⟩ _ Hb
   imod Hmask
-  ihave Hcell := pteCell_intro addr c (fl i) S v0 W Hold htail hpin $$ Hb
+  ihave Hcell := pteCell_intro addr c (fl i) S _ v0 W Hold htail hpin lsW tsH hlsW hfz $$ [Hb]
+  · iframe Hb HlsW HtsH
   ihave Hcl := Hclose $$ (Hback $$ Hcell)
   imod Hcl
   imodintro
   ipureintro
-  rw [WordHist.heads_eqT W Hold v0 w0 htail hheads]
-  unfold curVal
+  -- every byte's head is landed: a post-seal entry (certified), or the tail head (keyed)
+  have hlsl : ∀ q ∈ ls ++ lsW, q.1 ≠ 0 → lp q.1 = some q.2 := hla.2
+  have hhead : ∀ j, j < 8 → ∀ x R, W.hist Hold j = x :: R → (lp x.t).isSome := by
+    intro j hj x R hx
+    cases W with
+    | cons y W' =>
+      simp only [WordHist.hist, List.map_cons, List.cons_append, List.cons.injEq] at hx
+      obtain ⟨rfl, -⟩ := hx
+      obtain ⟨p, hp⟩ := hlsW y List.mem_cons_self
+      show (lp y.t).isSome
+      by_cases h0 : y.t = 0
+      · rw [h0, hla.1]; rfl
+      · rw [hlsl _ (List.mem_append_right _ hp) h0]; rfl
+    | nil =>
+      simp only [WordHist.hist, List.map_nil, List.nil_append] at hx
+      obtain ⟨x', H, hH, _, hxt⟩ := htail j hj
+      rw [hH] at hx
+      obtain ⟨rfl, -⟩ := List.cons.inj hx
+      rcases hvis j hj with h | h | ⟨p, hp, _⟩
+      · rw [hxt, h, hla.1]; rfl
+      · exact hown j hj x' (by unfold WordHist.hist; rw [hH]; simp)
+          (hau _ h j hj x' (by unfold WordHist.hist; rw [hH]; simp) hxt)
+      · by_cases h0 : x'.t = 0
+        · rw [h0, hla.1]; rfl
+        · rw [hxt] at h0 ⊢; rw [hlsl _ (List.mem_append_left _ hp) h0]; rfl
+  -- so the landed heads ARE the heads: the word history's head, or the tails' heads
+  have hes : ∀ j, j < 8 → ∀ x R, W.hist Hold j = x :: R → es j = x := by
+    intro j hj x R hx
+    obtain ⟨-, -, P, Q, hPQ, hP⟩ := hheads j hj
+    rw [hx] at hPQ
+    cases P with
+    | nil => simp only [List.nil_append, List.cons.injEq] at hPQ; exact hPQ.1.symm
+    | cons y P =>
+      simp only [List.cons_append, List.cons.injEq] at hPQ
+      obtain ⟨rfl, -⟩ := hPQ
+      have := hP _ List.mem_cons_self
+      have := hhead j hj _ R hx
+      simp_all
   cases W with
-  | nil => exact hpin.1
-  | cons e W => exact (hpin.2 e (by simp)).1
+  | cons y W' =>
+    have : w0 = y.v := bv_eq_of_bytes _ _ (fun j hj => by
+      rw [← (hheads j hj).1, hes j hj (y.proj j) _ rfl]; rfl)
+    rw [this]; exact (hpin.2 y List.mem_cons_self).1
+  | nil =>
+    have : w0 = v0 := bv_eq_of_bytes _ _ (fun j hj => by
+      obtain ⟨x, H, hH, hxv, _⟩ := htail j hj
+      rw [← (hheads j hj).1, hes j hj x H (by simp only [WordHist.hist, List.map_nil, List.nil_append]; exact hH)]
+      exact hxv)
+    rw [this]; exact hpin.1
 
 /-- The conditional write of a variant `w'` to LEAF `addr` by `cpu`, after
 an exclusive read that saw `w0`: the entry stays in its variant set, and the
-write is at or after the seal. -/
+write is at or after the seal (route P: it lands at once ON TOP -- every head is landed, by the cell's
+certificates or the keys -- and its landing certificate joins the cell's). -/
 theorem kpt_exclWriteAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (addr c : BitVec 64)
     (hmem : (addr, c) ∈ t.entries 2) (hleaf : pteLeafB c = true) (w0 w' : BitVec 64)
     (hw' : pteVariant c w') :
-    kptOn (GF := GF) t M ⊢ exclWriteAU cpu addr 8 false w0 w' emp := by
+    kptOn (GF := GF) t M ∗ ownCtx cpu curCtx ⊢ ownCtx cpu curCtx ∗ exclWriteAU cpu addr 8 false w0 w' emp := by
   unfold kptOn kptCore
-  iintro ⟨%⟨hf, -⟩, _, _, %fl, ⟨%S, #Hinv, _, #HS, _, _, #Hregs, _⟩, #Hkeys⟩
+  iintro ⟨⟨%⟨hf, -⟩, _, _, %fl, %fr, ⟨%S, #Hinv, _, #HS, _, _, #Hregs, _⟩, #Hkeys⟩, Hctx⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
   ihave #Hreg := kptRegs_acc t addr c hmem hleaf $$ Hregs
+  ihave #Hk8 := kptKeys_acc t fl fr i (addr, c) hi $$ Hkeys
+  icases ownCtx_keys_vis cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, %K, %tsl, %ls, #HK, #Hts, #Hls, %hvis⟩
+  · iframe Hctx; iexact Hk8
+  -- the writer's licences for every frozen head (design D13): recorded with its entry
+  icases kptKeys_lic cpu t fl fr $$ [Hctx Hkeys] with ⟨Hctx, %tsF, %lsF, #HtsF, #HlsF, %hF⟩
+  · iframe Hctx; iexact Hkeys
+  iframe Hctx
   iapply exclWriteAU_of_kpt
   unfold exclWriteAUKpt
   iinv Hinv with Hbody Hclose
   icases Hbody with >Hbody
-  icases kptBody_acc t fl S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
-  icases pteCell_cases addr c (fl i) S $$ Hcell with ⟨%v0, %W, %Hold, Hb, %htail, %hpin⟩
+  icases kptBody_acc t fl fr S i addr c hi hleaf $$ Hbody with ⟨Hcell, Hback⟩
+  icases pteCell_cases addr c (fl i) S _ $$ Hcell with
+    ⟨%v0, %W, %Hold, Hb, %htail, %hpin, %lsW, %tsH, #HlsW, #HtsH, %⟨hlsW, hfz⟩⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists W.hist Hold, S, c
-  iframe Hb HS Hreg
+  iexists W.hist Hold, S, c, ls ++ lsW, tsl
+  isplitl []
+  · iapply BigSepL.bigSepL_append.2
+    iframe Hls HlsW
+  iframe Hts Hb HS Hreg
   isplit
   · ipureintro; exact ⟨rfl, w', hw', fun _ _ => rfl⟩
   inext
-  iintro %t' %hSt %_ _ Hb #_ #_
+  iintro %t' %p' %Hs' %lp %hSt %⟨hla, hau, hins⟩ _ #Hland Hb #_ #_
   imod Hmask
-  rw [WordHist.hist_push]
+  -- every head is landed, so the insert is a push
+  have hlsl : ∀ q ∈ ls ++ lsW, q.1 ≠ 0 → lp q.1 = some q.2 := hla.2
+  have hpush : ∀ j, j < 8 → Hs' j = (WordHist.hist ((⟨t', hartAgent cpu, w'⟩ : WEnt 8) :: W) Hold) j := by
+    intro j hj
+    obtain ⟨P, e, Q, h1, h2, -, hel, hP⟩ := hins j hj
+    cases P with
+    | nil =>
+      simp only [List.nil_append] at h1 h2
+      rw [h2, ← h1]; rfl
+    | cons y P =>
+      exfalso
+      have hyn := (hP y List.mem_cons_self)
+      -- the head `y` of the window's byte is pending and not the writer's: impossible
+      have hy : ∃ R, W.hist Hold j = y :: R := ⟨_, by rw [h1]; rfl⟩
+      obtain ⟨R, hR⟩ := hy
+      cases W with
+      | cons z W' =>
+        simp only [WordHist.hist, List.map_cons, List.cons_append, List.cons.injEq] at hR
+        obtain ⟨rfl, -⟩ := hR
+        obtain ⟨p, hp⟩ := hlsW z List.mem_cons_self
+        by_cases h0 : z.t = 0
+        · have := hla.1; simp only [WEnt.proj, h0] at hyn; rw [this] at hyn; exact absurd hyn.2 (by simp)
+        · have := hlsl _ (List.mem_append_right _ hp) h0
+          simp only [WEnt.proj] at hyn; rw [this] at hyn; exact absurd hyn.2 (by simp)
+      | nil =>
+        simp only [WordHist.hist, List.map_nil, List.nil_append] at hR
+        obtain ⟨x', H, hH, _, hxt⟩ := htail j hj
+        rw [hH] at hR
+        obtain ⟨rfl, -⟩ := List.cons.inj hR
+        rcases hvis j hj with h | h | ⟨p, hp, _⟩
+        · rw [hxt, h, hla.1] at hyn; exact absurd hyn.2 (by simp)
+        · -- the writer's own tail head is not in the pending prefix
+          exact hyn.1 (hau _ h j hj x' (by unfold WordHist.hist; rw [hH]; simp) hxt)
+        · by_cases h0 : x'.t = 0
+          · rw [h0, hla.1] at hyn; exact absurd hyn.2 (by simp)
+          · rw [hxt] at h0; rw [hxt, hlsl _ (List.mem_append_left _ hp) h0] at hyn; exact absurd hyn.2 (by simp)
+  have hbeq : histBytes (GF := GF) addr 8 (fun _ => DFrac.own (1 : Qp).half) Hs' =
+      histBytes addr 8 (fun _ => DFrac.own (1 : Qp).half)
+        (WordHist.hist ((⟨t', hartAgent cpu, w'⟩ : WEnt 8) :: W) Hold) := by
+    unfold histBytes
+    exact BigSepL.bigSepL_eq (fun {_ x} hx => by rw [hpush x (List.mem_range.1 (List.mem_of_getElem? hx))])
+  rw [hbeq]
   have hpin' : pteVariant c v0 ∧ ∀ e ∈ (⟨t', hartAgent cpu, w'⟩ :: W : WordHist 8), pteVariant c e.v ∧ S ≤ e.t := by
     refine ⟨hpin.1, fun e he => ?_⟩
     simp only [List.mem_cons] at he
     rcases he with rfl | he
     · exact ⟨hw', Nat.le_of_lt hSt⟩
     · exact hpin.2 e he
-  ihave Hcell := pteCell_intro addr c (fl i) S v0 _ Hold htail hpin' $$ Hb
+  ihave Hcell := pteCell_intro addr c (fl i) S _ v0 _ Hold htail hpin' ((t', p') :: (lsF ++ lsW)) (tsF ++ tsH)
+      (fun e he => by
+        simp only [List.mem_cons] at he
+        rcases he with rfl | he
+        · exact ⟨p', List.mem_cons_self⟩
+        · obtain ⟨p, hp⟩ := hlsW e he
+          exact ⟨p, List.mem_cons_of_mem _ (List.mem_append_right _ hp)⟩)
+      (fun e he => by
+        simp only [List.mem_cons] at he
+        rcases he with rfl | he
+        · exact kptFrozenOk_mono (fun s h => headLic_mono (fun q hq => List.mem_append_left _ hq)
+            (fun q hq => List.mem_cons_of_mem _ (List.mem_append_left _ hq)) h) hF
+        · exact kptFrozenOk_mono (fun s h => headLic_mono (fun q hq => List.mem_append_right _ hq)
+            (fun q hq => List.mem_cons_of_mem _ (List.mem_append_right _ hq)) h) (hfz e he)) $$ [Hb]
+  · iframe Hb
+    isplitl []
+    · iapply BigSepL.bigSepL_cons.2
+      iframe Hland
+      iapply BigSepL.bigSepL_append.2
+      iframe HlsF HlsW
+    · iapply BigSepL.bigSepL_append.2
+      iframe HtsF HtsH
   ihave Hcl := Hclose $$ (Hback $$ Hcell)
   imod Hcl
   imodintro
@@ -838,31 +1237,6 @@ theorem KptInv.ctxBytes_persist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
       ipureintro; exact hv)) $$ H
   iapply BigSepL.bigSepL_bupd $$ H'
 
-/-- A key's position is under the context's bound or one of its dirty keys. -/
-theorem KptInv.key_le (ξ : CtxId) (B : Nat) (D : RegMapF CPU) (t : Nat) :
-    ctxAt ξ 1 B D ∗ keyAt era ξ t ⊢@{IProp GF} ⌜t ≤ B ∨ ∃ h, get? D t = some h⌝ := by
-  iintro ⟨Hat, Hk⟩
-  icases keyAt_cases era ξ t $$ Hk with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, _⟩⟩
-  · ihave %h1 := ctxAt_floor ξ 1 B D t $$ [Hat Hfl]
-    · iframe Hat; iexact Hfl
-    ipureintro; exact Or.inl h1
-  · ihave %h1 := ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
-    · iframe Hat; iexact Hd
-    ipureintro; exact Or.inr ⟨h, h1⟩
-
-/-- A window's keys, likewise. -/
-theorem KptInv.keys_le (ξ : CtxId) (B : Nat) (D : RegMapF CPU) (f : Nat → Nat) (n : Nat) :
-    ctxAt ξ 1 B D ∗ ([∗list] j ∈ List.range n, keyAt era ξ (f j)) ⊢@{IProp GF}
-      ⌜∀ j, j < n → f j ≤ B ∨ ∃ h, get? D (f j) = some h⌝ := by
-  iintro ⟨Hat, #Hk⟩
-  iapply BI.pure_forall.2
-  iintro %j
-  iapply BI.pure_wand.1
-  iintro %hj
-  ihave #Hkj := BigSepL.bigSepL_lookup (Φ := fun _ (j : Nat) => keyAt (GF := GF) era ξ (f j))
-    (List.getElem?_range hj) $$ Hk
-  iapply KptInv.key_le ξ B D (f j) $$ [Hat Hkj]
-  iframe Hat; iexact Hkj
 
 /-! ### The seal's registration with the state interpretation (W8 (f3-ptek) [OWN.66])
 
@@ -1002,7 +1376,7 @@ theorem KptInv.kslotCell_frozen (S : Nat) (a : PAddr) (c : BitVec 64) (fz : Bool
 /-- Every entry of the memory is at or below the top (`mmOk`). -/
 theorem KptInv.mem_le_top {σ : MState} (hmm : mmOk σ) :
     ∀ (b : PAddr) (H : Hist), σ.mem[b]? = some H → ∀ e ∈ H, e.t ≤ σ.top :=
-  fun b H hH e he => by simp only [MState.top]; exact ((hmm.1 b H hH).2 e he).1
+  fun b H hH e he => mmOk_le_top hmm b H e hH he
 
 /-- **The built entries, sealed and shared**: each raw cell becomes the
 invariant's leaf (half) or a frozen cell, and the interpretation's share of
@@ -1013,8 +1387,11 @@ theorem KptInv.seal_cellsL (σ : MState) (hmm : mmOk σ) (S : Nat) :
       genHeapInterp σ.mem ∗ memModel σ ∗ ([∗list] i ↦ e ∈ l, wordCellT (GF := GF) e.1 8 (F i) e.2 []) ⊢ |==>
         (genHeapInterp σ.mem ∗ memModel σ ∗
           ⌜(∀ e ∈ l, ∀ j, j < 8 → e.1 + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))) ∧
-            ∀ i x, l[i]? = some x → ∀ j, j < 8 → F i j ≤ σ.top⌝ ∗
-          ([∗list] i ↦ e ∈ l, (⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (F i) S) ∨ ⌜pteLeafB e.2 = false⌝) ∗
+            (∀ i x, l[i]? = some x → ∀ j, j < 8 → F i j ≤ σ.top) ∧
+            ∀ i x, l[i]? = some x → ∀ j, j < 8 → ∃ (e : HEnt) (H : Hist),
+              σ.mem[x.1 + BitVec.ofNat 64 j]? = some (e :: H) ∧ e.t = F i j⌝ ∗
+          ([∗list] i ↦ e ∈ l, (⌜pteLeafB e.2 = true⌝ ∗ ∀ Fz, pteCell (GF := GF) e.1 e.2 (F i) S Fz) ∨
+            ⌜pteLeafB e.2 = false⌝) ∗
           ([∗list] i ↦ e ∈ l, ⌜pteLeafB e.2 = true⌝ ∨ (⌜pteLeafB e.2 = false⌝ ∗ ptrCell (GF := GF) e.1 e.2 (F i))) ∗
           ([∗list] e ∈ l, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩))
   | [], F => by
@@ -1023,7 +1400,7 @@ theorem KptInv.seal_cellsL (σ : MState) (hmm : mmOk σ) (S : Nat) :
     iframe Hmem Hmm
     isplitl []
     · ipureintro
-      exact ⟨(fun e he => by cases he), (fun i x hx => by simp at hx)⟩
+      exact ⟨(fun e he => by cases he), (fun i x hx => by simp at hx), (fun i x hx => by simp at hx)⟩
     isplitl []
     · exact BigSepL.bigSepL_nil_intro
     isplitl []
@@ -1033,7 +1410,7 @@ theorem KptInv.seal_cellsL (σ : MState) (hmm : mmOk σ) (S : Nat) :
     iintro ⟨Hmem, Hmm, Hc⟩
     icases BigSepL.bigSepL_cons.1 $$ Hc with ⟨H0, Hc⟩
     imod KptInv.seal_cellsL σ hmm S l (fun i => F (i + 1)) $$ [$Hmem $Hmm $Hc]
-      with ⟨Hmem, Hmm, %⟨hnr, hF⟩, Hb1, Hp1, Hk1⟩
+      with ⟨Hmem, Hmm, %⟨hnr, hF, hHd⟩, Hb1, Hp1, Hk1⟩
     icases wordCellT_cases x.1 8 (F 0) x.2 [] $$ H0 with ⟨%Hold, Hb, %htail⟩
     rw [WordHist.hist_nil]
     ihave %hget := histBytes_valid σ.mem x.1 8 _ Hold $$ [Hmem Hb]
@@ -1045,8 +1422,10 @@ theorem KptInv.seal_cellsL (σ : MState) (hmm : mmOk σ) (S : Nat) :
       obtain ⟨e, H, h1, h2, _⟩ := htail j hj
       exact ⟨e, H, h1, h2⟩
     have hpure : (∀ e ∈ x :: l, ∀ j, j < 8 → e.1 + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))) ∧
-        ∀ i y, (x :: l)[i]? = some y → ∀ j, j < 8 → F i j ≤ σ.top := by
-      refine ⟨fun e he => ?_, fun i y hy j hj => ?_⟩
+        (∀ i y, (x :: l)[i]? = some y → ∀ j, j < 8 → F i j ≤ σ.top) ∧
+        ∀ i y, (x :: l)[i]? = some y → ∀ j, j < 8 → ∃ (e : HEnt) (H : Hist),
+          σ.mem[y.1 + BitVec.ofNat 64 j]? = some (e :: H) ∧ e.t = F i j := by
+      refine ⟨fun e he => ?_, fun i y hy j hj => ?_, fun i y hy j hj => ?_⟩
       · rcases List.mem_cons.1 he with rfl | he
         · exact hnr0
         · exact hnr e he
@@ -1056,11 +1435,16 @@ theorem KptInv.seal_cellsL (σ : MState) (hmm : mmOk σ) (S : Nat) :
           rw [← h3]
           exact hall _ _ (hget j hj) e (by rw [h1]; exact List.mem_cons_self)
         | succ i => exact hF i y (by simpa using hy) j hj
+      · cases i with
+        | zero =>
+          obtain rfl : x = y := by simpa using hy
+          obtain ⟨e, H, h1, _, h3⟩ := htail j hj
+          exact ⟨e, H, by rw [hget j hj, h1], h3⟩
+        | succ i => exact hHd i y (by simpa using hy) j hj
     cases hl : pteLeafB x.2 with
     | true =>
       icases rsvSplitHalf x.1 8 Hold $$ Hb with ⟨Hb, Hh⟩
-      ihave Hcell := pteCell_intro x.1 x.2 (F 0) S x.2 [] Hold htail ⟨pteVariant_refl _, by simp⟩ $$ [Hb]
-      · rw [WordHist.hist_nil]; iexact Hb
+      ihave Hcell := pteCell_nil x.1 x.2 (F 0) S Hold htail $$ Hb
       ihave Hk := KptInv.kslotCell_leaf σ.top x.1 x.2 (!pteLeafB x.2) (by rw [hl]; rfl) Hold
         (KptInv.kslotHistOk_seal σ.mem σ.top x.1 x.2 _ Hold hall hget hh) $$ Hh
       imodintro
@@ -1225,6 +1609,159 @@ theorem KptInv.kptSealOk_of (rs : List RsvRegion) (m : FlatMem) (top : Nat) (t :
       obtain ⟨c, rfl, hc⟩ := KptInv.ptr_child 2 t hwf e.1 e.2 he p hp
       exact hpage c hc
 
+/-- A key's stamp, cashed against the machine (route P, DESIGN D17′ (R2)): the image's, the
+hart's own, or landed. -/
+def KptInv.keyOk (σ : MState) (c : CPU) (u : Nat) : Prop :=
+  u = 0 ∨ σ.log[u - 1]? = some (hartAgent c) ∨ ∃ p, σ.lp u = some p
+
+/-- **A key of the running context, cashed** against the machine. -/
+theorem KptInv.key_cash [CurCtx] (σ : MState) (cpu : CPU) (u : Nat) :
+    memModel σ ∗ ownCtx cpu curCtx ∗ keyAt era curCtx u ⊢@{IProp GF} ⌜KptInv.keyOk σ cpu u⌝ := by
+  iintro ⟨Hmm, Hctx, #Hk⟩
+  icases ownCtx_key_vis cpu curCtx u $$ [Hctx Hk] with ⟨Hctx, ⟨%K, %ts, %ls, _, #Hts, #Hls, %hv⟩⟩
+  · iframe Hctx; iexact Hk
+  rcases hv with h0 | hm | ⟨p, hp, _⟩
+  · ipureintro; exact .inl h0
+  · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+    ihave #Ha := BigSepL.bigSepL_lookup (Φ := fun _ p => authoredBy (GF := GF) p.1 p.2) hi $$ Hts
+    ihave %ha := memModel_authored _ σ u (hartAgent cpu) $$ [Hmm Ha]
+    · iframe Hmm; iexact Ha
+    ipureintro; exact .inr (.inl ha.2)
+  · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
+    ihave #Hl := BigSepL.bigSepL_lookup (Φ := fun _ q => landedAt (GF := GF) q.1 q.2) hi $$ Hls
+    ihave %hl := memModel_landedAt' _ σ u p $$ [Hmm Hl]
+    · iframe Hmm; iexact Hl
+    ipureintro; exact .inr (.inr ⟨p, hl.2⟩)
+
+/-- A window's keys, cashed. -/
+theorem KptInv.keys_cash [CurCtx] (σ : MState) (cpu : CPU) (f : Nat → Nat) : ∀ n : Nat,
+    memModel σ ∗ ownCtx cpu curCtx ∗ ([∗list] j ∈ List.range n, keyAt era curCtx (f j)) ⊢@{IProp GF}
+      ⌜∀ j, j < n → KptInv.keyOk σ cpu (f j)⌝
+  | 0 => by
+    iintro _
+    ipureintro
+    intro j hj; exact absurd hj (Nat.not_lt_zero _)
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hctx, #Hk⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hk with ⟨#Hk1, #Hk2⟩
+    ihave %h1 := KptInv.keys_cash σ cpu f n $$ [Hmm Hctx Hk1]
+    · iframe Hmm Hctx Hk1
+    ihave %h2 := KptInv.key_cash σ cpu (f n) $$ [Hmm Hctx Hk2]
+    · iframe Hmm Hctx Hk2
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with hj | rfl
+    · exact h1 j hj
+    · exact h2
+
+/-- A list of windows' keys, cashed. -/
+theorem KptInv.keysL_cash [CurCtx] {α : Type} (σ : MState) (cpu : CPU) : ∀ (l : List α) (F : Nat → Nat → Nat),
+    memModel σ ∗ ownCtx cpu curCtx ∗ ([∗list] i ↦ _x ∈ l, [∗list] j ∈ List.range 8, keyAt era curCtx (F i j))
+      ⊢@{IProp GF} ⌜∀ i x, l[i]? = some x → ∀ j, j < 8 → KptInv.keyOk σ cpu (F i j)⌝
+  | [], _ => by
+    iintro _
+    ipureintro
+    intro i x hx; simp at hx
+  | y :: l, F => by
+    iintro ⟨Hmm, Hctx, #Hk⟩
+    icases BigSepL.bigSepL_cons.1 $$ Hk with ⟨#Hk1, #Hk2⟩
+    ihave %h1 := KptInv.keys_cash σ cpu (F 0) 8 $$ [Hmm Hctx Hk1]
+    · iframe Hmm Hctx Hk1
+    ihave %h2 := KptInv.keysL_cash σ cpu l (fun i => F (i + 1)) $$ [Hmm Hctx Hk2]
+    · iframe Hmm Hctx Hk2
+    ipureintro
+    intro i x hx j hj
+    cases i with
+    | zero => exact h1 j hj
+    | succ i => exact h2 i x (by simpa using hx) j hj
+
+/-- **A context's bytes' heads, cashed** (route P, DESIGN D17′ (R2)): each head is the image's, the
+running hart's, or landed. -/
+theorem KptInv.ctxBytes_heads [CurCtx] (σ : MState) (cpu : CPU) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
+    ∀ n : Nat, genHeapInterp σ.mem ∗ memModel σ ∗ ownCtx cpu curCtx ∗
+      ([∗list] j ∈ List.range n, ctxByte curCtx (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
+      ⌜∀ j, j < n → ∃ (y : HEnt) (H : Hist), σ.mem[pa + BitVec.ofNat 64 j]? = some (y :: H) ∧
+        KptInv.keyOk σ cpu y.t⌝
+  | 0 => by
+    iintro _
+    ipureintro
+    intro j hj; exact absurd hj (Nat.not_lt_zero _)
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hm, Hmm, Hctx, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %h1 := KptInv.ctxBytes_heads σ cpu pa dq bs n $$ [Hm Hmm Hctx Hb1]
+    · iframe Hm Hmm Hctx Hb1
+    unfold ctxByte
+    icases Hb2 with ⟨%e, %H, Hpt, _, #Hk⟩
+    ihave %hg : ⌜σ.mem[pa + BitVec.ofNat 64 n]? = some (e :: H)⌝ $$ [Hm Hpt]
+    · icases genHeap_valid $$ [$Hm $Hpt] with >%_
+      itrivial
+    ihave %h2 := KptInv.key_cash σ cpu e.t $$ [Hmm Hctx Hk]
+    · iframe Hmm Hctx Hk
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with hj | rfl
+    · exact h1 j hj
+    · exact ⟨e, H, hg, h2⟩
+
+theorem KptInv.ctxBytes_heads' [CurCtx] (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (dq : DFrac)
+    (w : BitVec (8 * n)) :
+    genHeapInterp σ.mem ∗ memModel σ ∗ ownCtx cpu curCtx ∗ ctxBytes curCtx pa n dq w ⊢@{IProp GF}
+      ⌜∀ j, j < n → ∃ (y : HEnt) (H : Hist), σ.mem[pa + BitVec.ofNat 64 j]? = some (y :: H) ∧
+        KptInv.keyOk σ cpu y.t⌝ := by
+  unfold ctxBytes
+  exact KptInv.ctxBytes_heads σ cpu pa dq (nthByte w) n
+
+/-- **The seal's snapshot from cashed heads** (pure; DESIGN D17′ (R2)): every sealed slot byte's head
+is the image's, the sealer's, or landed (then in the landing log, at most the landing top); every
+disk entry is landed. -/
+theorem KptInv.sealSnap_of (σ : MState) (hmm : mmOk σ) (c0 : CPU) (dyn : List KSlot)
+    (hheads : ∀ d ∈ dyn, ∀ j, j < 8 → ∃ (y : HEnt) (H : Hist),
+      σ.mem[d.addr + BitVec.ofNat 64 j]? = some (y :: H) ∧ KptInv.keyOk σ c0 y.t)
+    (hpubw : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rsvList (hlc := hlc) (GF := GF) → w = c0) :
+    sealSnap (rsvList (hlc := hlc) (GF := GF)) c0 σ.ltop σ.llog σ.top dyn σ.mem := by
+  have hland : ∀ u p, u ≠ 0 → σ.lp u = some p → ∃ i, σ.llog[i]? = some u ∧ i + 1 ≤ σ.ltop := by
+    intro u p hu hp
+    have hg := lpOf_get σ.llog u p hp hu
+    have hle := lpOf_le σ.llog u p hp
+    exact ⟨p - 1, hg.2, by show p - 1 + 1 ≤ σ.llog.length; omega⟩
+  refine ⟨fun d hd j hj H x hH hx => ?_, fun a H e hH he hd heS => ?_, hpubw⟩
+  · obtain ⟨y, H0, hy, hk⟩ := hheads d hd j hj
+    rw [hy] at hH
+    obtain rfl := Option.some.inj hH
+    have hyt : y.t ≤ σ.top := (((mmOk_hist hmm _ _ hy).2) y List.mem_cons_self).1
+    rw [List.find?_cons_of_pos (by simpa using hyt)] at hx
+    obtain rfl := Option.some.inj hx
+    by_cases h0 : y.t = 0
+    · exact .inl h0
+    rcases hk with h0' | ha | ⟨p, hp⟩
+    · exact absurd h0' h0
+    · right; left
+      rcases ((mmOk_hist hmm _ _ hy).2 y List.mem_cons_self).2 with h0' | hl
+      · exact absurd h0' h0
+      · rw [hl] at ha; exact (Option.some.inj ha)
+    · exact .inr (.inr (hland y.t p h0 hp))
+  · by_cases h0 : e.t = 0
+    · exact .inl h0
+    right
+    have hok := mmOk_okP hmm
+    have hlog : σ.log[e.t - 1]? = some e.tid := by
+      rcases ((mmOk_hist hmm _ _ hH).2 e he).2 with h | h
+      · exact absurd h h0
+      · exact h
+    have hte : e.t ≤ σ.top := ((mmOk_hist hmm _ _ hH).2 e he).1
+    by_cases hin : e.t ∈ σ.llog
+    · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hin
+      have := (List.getElem?_eq_some_iff.1 hi).1
+      exact ⟨i, hi, by show i + 1 ≤ σ.llog.length; omega⟩
+    · obtain ⟨c, hc⟩ := hok.2.2.2.2.2.1 e.t (by omega) hte hin
+      rw [hlog] at hc
+      have hc' := Option.some.inj hc
+      have hlt : e.tid < NCPU := by rw [hc']; exact hartAgent_lt c
+      exact absurd hd (Nat.not_le.2 hlt)
+
 /-- **The registration**, inside the interpretation: a root word owned
 outright refutes an earlier seal (the record would hold its discarded
 fragment), so the record is empty; the root word is frozen, and the record
@@ -1235,15 +1772,22 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     (hseal : kptSealOk (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top σ.top (kptSlots ra t))
     (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t)) (stk : List PAddr)
     (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
-      kptHistsAt m top (kptSlots ra t) → ∀ p, p ∈ stk ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p) :
+      kptHistsAt m top (kptSlots ra t) → ∀ p, p ∈ stk ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p)
+    (c0 : CPU)
+    (hheads : ∀ d ∈ kptSlots ra t, ∀ j, j < 8 → ∃ (y : HEnt) (H : Hist),
+      σ.mem[d.addr + BitVec.ofNat 64 j]? = some (y :: H) ∧ KptInv.keyOk σ c0 y.t)
+    (hpubw : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rsvList (hlc := hlc) (GF := GF) → w = c0)
+    (hpubc : pubClean (rsvList (hlc := hlc) (GF := GF)) σ.mem) :
     genHeapInterp σ.mem ∗ memModel σ ∗ ctxBytes curCtx ra 8 (DFrac.own 1) (pteAddr t.base 0#9) ∗
       ([∗list] e ∈ t.entries 2, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩) ∗
-      ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q)
+      ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q) ∗
+      itopLb σ.top ∗ topLb σ.ltop ∗
+      ([∗list] i ↦ u ∈ σ.llog, landedAtE (MachGS.era (hlc := hlc) (GF := GF)) u (i + 1))
       ⊢@{IProp GF} |==> (genHeapInterp σ.mem ∗ memModel σ ∗
         ctxBytes curCtx ra 8 DFrac.discard (pteAddr t.base 0#9) ∗ kptRegs (GF := GF) t ∗ kptSealed) := by
   unfold memModel memModelAt rsvModelAt kptModelAt
   iintro ⟨Hmem, ⟨Htop, Hauth, Hviews, Hresv, %hmm', ⟨%reg, Hreg, %⟨hin, hex, hok⟩, %S0, %dyn0, %stk0,
-    %⟨hlk, hdma0, hseal0⟩, Hcells0, Hcarve0, _⟩, Hh, Hch⟩, Hrw, Hnew, Hcarve⟩
+    %⟨hlk, hdma0, hseal0⟩, Hcells0, Hcarve0, _, _⟩, Hh, Hch⟩, Hrw, Hnew, Hcarve, #HiT, #HtT, #Hll⟩
   -- the record is empty: an earlier seal would hold the root word's discarded byte
   rcases hseal0 with ⟨rfl, _, rfl, hpre⟩ | hs0
   rotate_left
@@ -1304,20 +1848,20 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     iexact Hnew
   ihave %hh := kptCells_hists (MachGS.era (hlc := hlc) (GF := GF)) σ.mem σ.top (kptSlots ra t) $$ [Hmem Hall]
   · iframe Hmem Hall
-  imod ghost_map_insert_persist kptSealKey 0 hsk $$ Hreg with ⟨Hreg, #Hsl⟩
+  imod ghost_map_insert_persist kptSealKey (kptSealEnc σ.top σ.ltop) hsk $$ Hreg with ⟨Hreg, #Hsl⟩
   imodintro
   iframe Hmem Htop Hauth Hviews Hresv Hh Hch Hbd
   isplitr []
   · isplit
     · ipureintro; exact hmm'
-    iexists (Iris.Std.PartialMap.insert reg' kptSealKey 0)
+    iexists (Iris.Std.PartialMap.insert reg' kptSealKey (kptSealEnc σ.top σ.ltop))
     iframe Hreg
-    have hlt : ∀ k, k < 2 ^ 64 → get? (Iris.Std.PartialMap.insert reg' kptSealKey (0 : Agent)) k = get? reg k :=
+    have hlt : ∀ k, k < 2 ^ 64 → get? (Iris.Std.PartialMap.insert reg' kptSealKey (kptSealEnc σ.top σ.ltop : Agent)) k = get? reg k :=
       fun k hk => by
         rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold kptSealKey; omega), h1 k hk]
-    have hin' : staticIn (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg' kptSealKey 0) :=
+    have hin' : staticIn (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg' kptSealKey (kptSealEnc σ.top σ.ltop)) :=
       fun i R hi => by rw [hlt _ R.base.isLt]; exact hin i R hi
-    have hex' : rsvExact (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg' kptSealKey 0) :=
+    have hex' : rsvExact (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg' kptSealKey (kptSealEnc σ.top σ.ltop)) :=
       fun k i hk hg => by rw [hlt k hk] at hg; exact hex k i hk hg
     isplit
     · ipureintro
@@ -1326,8 +1870,8 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     isplitl []
     · ipureintro
       refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩,
-        ⟨hdma0.1, fun _ a H e hH he _ hS => absurd ((hmm'.1 a H hH).2 e he).1
-          (by simp only [MState.top] at hS; omega)⟩,
+        ⟨hdma0.1, fun _ a H e hH he _ hS => absurd (mmOk_le_top hmm' a H e hH he)
+          (by simp only [MState.top] at hS ⊢; omega)⟩,
         Or.inr ⟨hseal, hkok, hstk σ.mem σ.top hseal hh, fun k v hv hk => ?_⟩⟩
       · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by omega)] at hv
         rcases h2 k v hv with h | ⟨e, he, hl, rfl, rfl⟩
@@ -1340,17 +1884,31 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
         · have := hpre k v h; omega
         · unfold kslotKey at hk; have := e.1.isLt; omega
     iframe Hall Hcarve
-    iapply ksRcptsAll_none
-    intro q hq
-    rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold kptSealKey ksKey; omega)] at hq
-    rcases h2 _ _ hq with h | ⟨e, _, _, hk, _⟩
-    · have := hpre _ _ h; unfold ksKey at this; omega
-    · unfold kslotKey ksKey at hk; have := e.1.isLt; omega
+    isplitl []
+    · iapply ksRcptsAll_none
+      intro q hq
+      rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold kptSealKey ksKey; omega)] at hq
+      rcases h2 _ _ hq with h | ⟨e, _, _, hk, _⟩
+      · have := hpre _ _ h; unfold ksKey at this; omega
+      · unfold kslotKey ksKey at hk; have := e.1.isLt; omega
+    · -- the seal's route-P record (DESIGN D17′ (R1)-(R3)): the snapshot, no deposit yet
+      unfold kptSnapAt
+      iright
+      iexists c0, σ.ltop, σ.llog, []
+      isplitl []
+      · ipureintro
+        refine ⟨List.cons_ne_nil _ _, Iris.Std.LawfulPartialMap.get?_insert_eq rfl,
+          KptInv.sealSnap_of σ hmm c0 (kptSlots ra t) hheads hpubw, fun r hr => (by cases hr),
+          fun f w hf a ha H hH e he he0 => absurd (hpubc f w hf a ha H hH e he) he0⟩
+      isplitl []
+      · iexact Hll
+      · exact BigSepL.bigSepL_nil_intro
   · isplitl []
     · unfold kptRegs
       iexact Hregs
     · unfold kptSealed kptSealedAt
-      iexact Hsl
+      iexists σ.top, σ.ltop
+      iframe Hsl HiT HtT
 
 /-- **The built kernel table is sealed into `kptOn`** (an update of the
 interpretation, run at an instruction boundary: `MachCSL.wpLoop_interpUpd`):
@@ -1374,6 +1932,8 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     (stk : List PAddr)
     (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
       kptHistsAt m top (kptSlots ra t) → ∀ p, p ∈ stk ↔ kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p)
+    (hpubw : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) →
+      w = cpu)
     (R : IProp GF) :
     ownCtx (GF := GF) cpu curCtx ∗
       ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q) ∗
@@ -1406,22 +1966,56 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
   · iframe
   -- the entries: the invariant's halves, the frozen cells, the interpretation's shares
   imod KptInv.seal_cellsL σ hmm σ.top (t.entries 2) fl $$ [$Hmem $Hmm $Hcells]
-    with ⟨Hmem, Hmm, %⟨hnrE, hfl⟩, Hbody, #Hptrs, Hks⟩
+    with ⟨Hmem, Hmm, %⟨hnrE, hfl, hhd⟩, Hbody, #Hptrs, Hks⟩
   have hseal := KptInv.kptSealOk_of (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top t hf.1 ra hroots hpub hnrR hnrE
+  -- the seal's snapshot (DESIGN D17′ (R2)): every slot's head cashed with the builder's context
+  ihave %hkE := KptInv.keysL_cash σ cpu (t.entries 2) fl $$ [Hmm Hctx Hkeys]
+  · iframe Hmm Hctx Hkeys
+  ihave %hroot := KptInv.ctxBytes_heads' σ cpu ra 8 (DFrac.own 1) (pteAddr t.base 0#9) $$ [Hmem Hmm Hctx Hb]
+  · iframe Hmem Hmm Hctx Hb
+  have hheads : ∀ d ∈ kptSlots ra t, ∀ j, j < 8 → ∃ (y : HEnt) (H : Hist),
+      σ.mem[d.addr + BitVec.ofNat 64 j]? = some (y :: H) ∧ KptInv.keyOk σ cpu y.t := by
+    intro d hd j hj
+    unfold kptSlots at hd
+    rcases List.mem_cons.1 hd with rfl | hd
+    · exact hroot j hj
+    · obtain ⟨e, he, rfl⟩ := List.mem_map.1 hd
+      obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 he
+      obtain ⟨y, H, hy, hyt⟩ := hhd i e hi j hj
+      exact ⟨y, H, hy, by rw [hyt]; exact hkE i e hi j hj⟩
+  ihave #HiT := memModel_itopLbGet _ σ $$ Hmm
+  ihave #HtT := memModel_topLbGet _ σ $$ Hmm
+  ihave #Hll := memModel_llogRcpts _ σ $$ Hmm
   -- the registration: the root word frozen, every slot shared, the leaves registered
-  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal hkok stk hstk
-    $$ [$Hmem $Hmm $Hb $Hks $Hcarve] with ⟨Hmem, Hmm, #Hbd, #Hregs, #Hsl⟩
+  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal hkok stk hstk cpu hheads
+    hpubw hpub $$ [$Hmem $Hmm $Hb $Hks $Hcarve $HiT $HtT $Hll] with ⟨Hmem, Hmm, #Hbd, #Hregs, #Hsl⟩
   icases histBytes_keys_of_wordBytes ra 8 DFrac.discard (pteAddr t.base 0#9) $$ Hbd
-    with ⟨%Hr, %fr, #Hrh, %hrt, _⟩
+    with ⟨%Hr, %fr, #Hrh, %hrt, #Hrk⟩
   ihave %hget := histBytes_valid σ.mem ra 8 _ Hr $$ [Hmem Hrh]
   · iframe Hmem Hrh
-  ihave #HS := memModel_topLbGet _ σ $$ Hmm
+  ihave #HS := memModel_itopLbGet _ σ $$ Hmm
   imod ghost_map_auth_persist _ _ M $$ Hauth with #Hauth
   imod ghost_var_update t.base _ _ $$ Hroot with Hroot
   imod ghost_var_persist _ _ _ $$ Hroot with #Hroot
-  imod inv_alloc kptN ⊤ (kptBody t fl σ.top) $$ [Hbody] with #Hinv
+  imod inv_alloc kptN ⊤ (kptBody t fl fr σ.top) $$ [Hbody] with #Hinv
   · inext
     unfold kptBody
+    iapply BigSepL.bigSepL_mono_of_forall (l := t.entries 2)
+      (Φ := fun i (e : BitVec 64 × BitVec 64) =>
+        iprop((⌜pteLeafB e.2 = true⌝ ∗ ∀ Fz, pteCell (GF := GF) e.1 e.2 (fl i) σ.top Fz) ∨ ⌜pteLeafB e.2 = false⌝))
+      (Ψ := fun i (e : BitVec 64 × BitVec 64) =>
+        iprop((⌜pteLeafB e.2 = true⌝ ∗ pteCell (GF := GF) e.1 e.2 (fl i) σ.top (kptFrozenOk t fl fr)) ∨
+          ⌜pteLeafB e.2 = false⌝))
+      (fun {_ _} => by
+        iintro H
+        icases H with (⟨%hl, H⟩ | %hl)
+        · ileft
+          isplitr
+          · ipureintro; exact hl
+          · ispecialize H $$ %(kptFrozenOk t fl fr)
+            iexact H
+        · iright
+          ipureintro; exact hl)
     iexact Hbody
   imodintro
   iframe Hmem Hmm Hctx HR
@@ -1433,7 +2027,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     · iexact Hauth
     isplit
     · iexact Hroot
-    iexists fl
+    iexists fl, fr
     isplit
     · unfold kptCore
       iexists σ.top
@@ -1448,10 +2042,16 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
         refine ⟨hra, fun j hj => ?_⟩
         obtain ⟨e, H, h1, h2, _⟩ := hrt j hj
         exact ⟨e, H, h1, h2, KptInv.mem_le_top hmm _ _ (hget j hj) e (by rw [h1]; exact List.mem_cons_self)⟩
+      isplitl []
       · unfold kptPtrs
         iexact Hptrs
+      · unfold kptRootF
+        iexists ra, Hr
+        iframe Hrh
+        ipureintro
+        exact ⟨hra, hrt⟩
     · unfold kptKeys
-      iexact Hkeys
+      iframe Hkeys Hrk
   · iapply pwordPointsTo_intro ra 8 DFrac.discard (pteAddr t.base 0#9) hram hal
     iexact Hbd
 
@@ -1482,7 +2082,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
   subst q'
   unfold memModel memModelAt rsvModelAt kptModelAt kptSealed kptSealedAt ksRcptsAll
   iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %⟨hin, hex, hrok, hrp⟩, %S, %dyn, %stk,
-    %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh, Hch⟩, Hb, #Hsl⟩
+    %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, #Hsnap⟩, Hh, Hch⟩, Hb, ⟨%S0, %L0, #Hsl, _, _⟩⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hsl
   have hne := hlk.2 _ hget
   rcases hseal with h0 | hok
@@ -1510,7 +2110,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
     isplit
     · ipureintro; exact ⟨hin, hex, hrok, hrp⟩
     iexists S, dyn, stk
-    iframe Hcells Hcarve Hrc
+    iframe Hcells Hcarve Hrc Hsnap
     ipureintro
     exact ⟨hlk, hdma, Or.inr hok⟩
   | none =>
@@ -1545,6 +2145,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
             exact ⟨(Option.some.inj hv).symm, q, hkq.symm, hal, hmem, hst⟩
           · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hkq] at hv
             exact hok.2.2.2 k v' hv hk1
+      isplitl []
       · imodintro
         iintro %q' %hq'
         by_cases hqq : ksKey q = ksKey q'
@@ -1553,6 +2154,7 @@ theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (h
           iexact Hnew
         · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hqq] at hq'
           iapply Hrc $$ %q' %hq'
+      · iapply kptSnapAt_reg (GF := GF) _ (Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey kptSealKey; omega)) $$ Hsnap
     · unfold ksRcptAt
       iexact Hnew
 

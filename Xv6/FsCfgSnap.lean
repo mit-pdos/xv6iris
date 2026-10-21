@@ -481,7 +481,7 @@ theorem fsCfgAllocSnap_of (mk : GName → GName → KmemNames → UartNames → 
     isplitl [Hstmp]
     · iapply (BigSepL.bigSepL_mono (l := List.range NINODE)
         (Φ := fun _ k => MonoNat.auth_own (GF := GF) (icfgIstmp k) (DFrac.own 1) (.ofNat 0))
-        (Ψ := fun _ k => istmpAuth (GF := GF) k 1 0) (fun _ => .rfl))
+        (Ψ := fun _ k => istmpAuth (GF := GF) k 1 0) (fun _ => istmpAuth_boot _))
       iexact Hstmp
     isplitl [Hisl]; · iexact Hisl
     isplitl [Hipool]; · iexact Hipool

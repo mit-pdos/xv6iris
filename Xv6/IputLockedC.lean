@@ -107,11 +107,11 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
       (PartialMap.singleton (some (icfgDev, inum), Tp) (⟨1⟩ : UFrac) : StampMap IcBid) ∗
     ifreezePre rg inum.toNat ∗ txPin icfgLog tid qp ∗ hpnH kk (some (tid, qp)) ⊢
     |={⊤}=> ownCtx c curCtx ∗ ∃ (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
-      (tst : Nat) (r : SlotReg IcBid IcX) (x0 : IcX),
+      (loS tst : Nat) (r : SlotReg IcBid IcX) (x0 : IcX),
       ⌜PartialMap.get? Mt kk = some (q, PosNat.one) ∧
         PartialMap.get? ci kk = some (icfgDev, inum) ∧ icMWf Mt ∧
         icCiWf Mt ci icfgNib icfgDev ∧ r.win = true ∧ (∃ T0, r.x = some (x0, T0))⌝ ∗
-      itableHalf Mt ∗ istmpAuth kk (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor curCtx tst ∗
+      itableHalf Mt ∗ istmpAuthL kk (1 : Qp).half loS tst ∗ itopLb tst ∗ visFloor curCtx tst ∗
       irefFrag kk q ∗ frzsel kk (1 : Qp).half true ∗ islSlot Mt kk ∗ ifreezePre rg inum.toNat ∗
       icntHalf inum.toNat 1 ∗ frzmH inum.toNat true ∗
       iputLkMid kk Mt ci r x0 inum tid qp := by
@@ -167,7 +167,7 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   unfold itableSlotLive icSlotRowFl icSlotRow
   rw [hcik]
   icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
-    ⟨%tst, Hstk, #Hllbk, #Hflk⟩⟩
+    ⟨%loS, %tst, Hstk, #Hllbk, #Hflk, -⟩⟩
   ihave Hc := iput_lk_ent_eq (show icCnt (GF := GF) kk PosNat.one.val = icCnt kk 1 from rfl) $$ Hc
   -- THE HOOKED (a): the header comes out FROZEN
   imod icEvictWithdrawFrz c fscIc fscFs fscIreg fscCov fscLogst kk r icfgDev inum tb K rg ⊤
@@ -195,7 +195,7 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   · iframe
   imodintro
   iframe Hrun
-  iexists Mt, ci, tst, ⟨r.td, true, some (icfgDev, inum), some (x0, T0), aW⟩, x0
+  iexists Mt, ci, loS, tst, ⟨r.td, true, some (icfgDev, inum), some (x0, T0), aW⟩, x0
   isplitr
   · ipureintro
     exact ⟨hMk, hcik, hwf, hciwf, rfl, T0, rfl⟩
@@ -224,7 +224,7 @@ def iputLkRetOut (cpu : CPU) (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (inum : Bi
     ∃ (Hs : Nat → Hist) (t : Nat),
       histBytes (iRef (ientry kk)) 4 (fun _ => DFrac.own 1)
         (pushed (n := 4) Hs t (hartAgent cpu) (0#32 : BitVec 32)) ∗
-      authoredBy t (hartAgent cpu) ∗ topLb t)
+      authoredBy t (hartAgent cpu) ∗ itopLb t)
 
 /-- THE RETIRE STORE's ACCESSOR (Rocq 3518--3594): the frozen last-close
 mover opens the table and the region, the rows' histories go out to the
@@ -256,7 +256,7 @@ theorem iput_lk_retire_au (cpu : CPU) (Mt : RegMapF (Qp × PosNat)) (kk : Nat) (
   imod Hcl $$ %(iprop(∃ (Hs : Nat → Hist) (t : Nat),
       histBytes (iRef (ientry kk)) 4 (fun _ => DFrac.own 1)
         (pushed (n := 4) Hs t (hartAgent cpu) (0#32 : BitVec 32)) ∗
-      authoredBy t (hartAgent cpu) ∗ topLb t)) [Hb] with ⟨Hhalf, Hisl, Hpost, Hcnt, Hmir, Hst, HP⟩
+      authoredBy t (hartAgent cpu) ∗ itopLb t)) [Hb] with ⟨Hhalf, Hisl, Hpost, Hcnt, Hmir, Hst, HP⟩
   · iexists Hs, t
     iframe Hb Hau Ht
   imodintro
@@ -269,7 +269,7 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
     (rg : Frzidx) (tst : Nat) (r : SlotReg IcBid IcX) (x0 : IcX) (T0 : Nat) (tid : Nat) (qp : Qp)
     (hw : r.win = true) (hx : r.x = some (x0, T0)) :
     icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst kk ∗ kmapId (iRef (ientry kk)) ∗
-    ownCtx c curCtx ∗ iputLkRetOut c kk Mt inum rg tst ∗ topLb tst ∗
+    ownCtx c curCtx ∗ iputLkRetOut c kk Mt inum rg tst ∗ itopLb tst ∗
     iputLkMid kk Mt ci r x0 inum tid qp ⊢
     |={⊤}=> ownCtx c curCtx ∗
       itableHalf (PartialMap.delete Mt kk) ∗
@@ -494,7 +494,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   iapply wpLoop_fupd
   imod iput_lk_c_open c kk hkk q inum hnib (rgb, (tid, qtx.half)) tid qtx.half.half Tp K hTpK
     $$ [Hrun HR Hfrg Hrident Href Hpre Htxq Hhpn]
-    with ⟨Hrun, %Mt, %ci, %tst, %r, %x0, %⟨hMk, hcik, hMwf, hciwf, hw, T0, hx⟩, Hhalf, Hst, #Hllbk,
+    with ⟨Hrun, %Mt, %ci, %loS, %tst, %r, %x0, %⟨hMk, hcik, hMwf, hciwf, hw, T0, hx⟩, Hhalf, Hst, #Hllbk,
       #Hflk, Hfrg, Hsel, Hisl, Hpre, Hicnt, Hmir, Hmid⟩
   · iframe Hit Hinv Hesc Hireg Hrun HR HflK Hfrg Hrident Href Hpre Htxq Hhpn
   ihave Hk := Hkback $$ Hrun
@@ -502,7 +502,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   -- +0x86 c.lw a5,8(s1): the exact read
   icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
   k_step (wp_s_lw_iref_locked c _ (KA.«iput» + 0x86#64) true 8#12 15#5 9#5 (by decide)
-      (by decide) kk hkk ?ha Mt ⟨_, hMk⟩ tst heqR)
+      (by decide) kk hkk ?ha Mt ⟨_, hMk⟩ loS tst heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $Hinv $Hflk $Hhalf $Hst]
   iintro %wv Hk Hpc %hwv Hhalf Hst
   case ha => k_norm [h9]; exact iRef_sext _
@@ -513,6 +513,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x8a c.sw a5,8(s1): THE FROZEN RETIRE
+  ihave Hst := istmpAuth_of_L kk _ loS tst $$ Hst
   ihave HAU := iput_lk_retire_au c Mt kk inum q bfl (rgb, (tid, qtx.half)) tst hMk hnib
     $$ [Hhalf Hfrg Hslh Hsel Hisl Hru Hpre Hicnt Hmir Hst]
   · iframe Hinv Hireg Hhalf Hfrg Hslh Hsel Hisl Hru Hpre Hicnt Hmir Hst

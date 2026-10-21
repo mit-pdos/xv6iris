@@ -1744,43 +1744,40 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
     wordPointsTo KA.«disk» 8 (DFrac.own 1) pd ∗
     wordPointsTo (KA.«disk» + 8#64) 8 (DFrac.own 1) pav ∗
     wordPointsTo (KA.«disk» + 16#64) 8 (DFrac.own 1) pu
-    ⊢ diskFlipIn γ pd pav pu := by
+    ⊢ diskFlipIn0 γ pd pav pu ∗ flipWins curCtx pav pu := by
   iintro ⟨#HS, #Hrc, HG, Hbd, Hba, Hbu, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7, Hui, Hops, Hinf,
     Hd, Ha, Hu⟩
   ihave Hdesc := vdi_carve_desc pd hpvd $$ HS Hbd
   icases vdi_carve_avail pav hpva $$ HS Hba with ⟨Hai, Hring⟩
   icases vdi_carve_used pu hpvu $$ HS Hbu with ⟨Hue, Helem⟩
-  have hpgu := pageRw_of_pageValid pu hpvu
-  ihave #Hcu : iprop(dmaCert (GF := GF) (usedIdxAt pu) 2) $$ [Hrc]
-  · unfold usedIdxAt
-    iapply dmaCert_page pu 2 2 ⟨hpgu.1, hpgu.2.1⟩ (by omega) $$ Hrc
-  ihave Hue := ctxBytes_usedIdxKey curCtx (usedIdxAt pu) $$ [Hcu Hue]
-  · iframe Hcu Hue
-  unfold diskInitGhosts diskFlipIn diskSlotIn
+  unfold diskInitGhosts diskFlipIn0 flipWins diskSlotIn
   simp only [vdi_range8, Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil,
     wordAtN_cur, vdi_aFree0, vdi_aFree1, vdi_aFree2, vdi_aFree3, vdi_aFree4, vdi_aFree5,
     vdi_aFree6, vdi_aFree7, vdi_aUsedIdx, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr,
     wrap16, ringInit]
-  isplitl []
-  · ipureintro
-    exact ⟨pageRw_of_pageValid pd hpvd, pageRw_of_pageValid pav hpva,
-      pageRw_of_pageValid pu hpvu⟩
-  iframe Hrc
-  icases HG with ⟨⟨⟨Hh0a, Hh0t⟩, ⟨Hh1a, Hh1t⟩, ⟨Hh2a, Hh2t⟩, ⟨Hh3a, Hh3t⟩, ⟨Hh4a, Hh4t⟩,
-    ⟨Hh5a, Hh5t⟩, ⟨Hh6a, Hh6t⟩, ⟨Hh7a, Hh7t⟩, _⟩, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc⟩
-  icases Hdesc with ⟨Hd0, Hd1, Hd2, Hd3, Hd4, Hd5, Hd6, Hd7, _⟩
   icases Hring with ⟨Hr0, Hr1, Hr2, Hr3, Hr4, Hr5, Hr6, Hr7, _⟩
   icases Helem with ⟨He0, He1, He2, He3, He4, He5, He6, He7, _⟩
-  icases Hops with ⟨Ho0, Ho1, Ho2, Ho3, Ho4, Ho5, Ho6, Ho7, _⟩
-  icases Hinf with ⟨Hi0, Hi1, Hi2, Hi3, Hi4, Hi5, Hi6, Hi7, _⟩
-  iframe Hh0a Hh0t Hf0 Hd0 Ho0 Hi0 Hh1a Hh1t Hf1 Hd1 Ho1 Hi1
-  iframe Hh2a Hh2t Hf2 Hd2 Ho2 Hi2
-  iframe Hh3a Hh3t Hf3 Hd3 Ho3 Hi3
-  iframe Hh4a Hh4t Hf4 Hd4 Ho4 Hi4 Hh5a Hh5t Hf5 Hd5 Ho5 Hi5
-  iframe Hh6a Hh6t Hf6 Hd6 Ho6 Hi6
-  iframe Hh7a Hh7t Hf7 Hd7 Ho7 Hi7
-  iframe Hpa Hpub Hnr Hrl Hstg Hnc Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7
-  iframe Hue He0 He1 He2 He3 He4 He5 He6 He7 Hui Hd Ha Hu
+  isplitr [Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7 Hue He0 He1 He2 He3 He4 He5 He6 He7]
+  · isplitl []
+    · ipureintro
+      exact ⟨pageRw_of_pageValid pd hpvd, pageRw_of_pageValid pav hpva,
+        pageRw_of_pageValid pu hpvu⟩
+    iframe Hrc
+    icases HG with ⟨⟨⟨Hh0a, Hh0t⟩, ⟨Hh1a, Hh1t⟩, ⟨Hh2a, Hh2t⟩, ⟨Hh3a, Hh3t⟩, ⟨Hh4a, Hh4t⟩,
+      ⟨Hh5a, Hh5t⟩, ⟨Hh6a, Hh6t⟩, ⟨Hh7a, Hh7t⟩, _⟩, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc⟩
+    icases Hdesc with ⟨Hd0, Hd1, Hd2, Hd3, Hd4, Hd5, Hd6, Hd7, _⟩
+    icases Hops with ⟨Ho0, Ho1, Ho2, Ho3, Ho4, Ho5, Ho6, Ho7, _⟩
+    icases Hinf with ⟨Hi0, Hi1, Hi2, Hi3, Hi4, Hi5, Hi6, Hi7, _⟩
+    iframe Hh0a Hh0t Hf0 Hd0 Ho0 Hi0 Hh1a Hh1t Hf1 Hd1 Ho1 Hi1
+    iframe Hh2a Hh2t Hf2 Hd2 Ho2 Hi2
+    iframe Hh3a Hh3t Hf3 Hd3 Ho3 Hi3
+    iframe Hh4a Hh4t Hf4 Hd4 Ho4 Hi4 Hh5a Hh5t Hf5 Hd5 Ho5 Hi5
+    iframe Hh6a Hh6t Hf6 Hd6 Ho6 Hi6
+    iframe Hh7a Hh7t Hf7 Hd7 Ho7 Hi7
+    iframe Hpa Hpub Hnr Hrl Hstg Hnc Hui Hd Ha Hu
+    all_goals try iempintro
+  · iframe Hai Hr0 Hr1 Hr2 Hr3 Hr4 Hr5 Hr6 Hr7
+    iframe Hue He0 He1 He2 He3 He4 He5 He6 He7
   all_goals try iempintro
 
 end
@@ -1814,19 +1811,51 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
-/-- **The live flip**, at the shape of the ladder. -/
-theorem vdi_flip_au (γ : DiskNames) (pd pav pu : BitVec 64) :
+/-- **The live flip**, at the shape of the ladder (route P, [OWN.131]: the GUARDED store's accessor;
+the windows' raw halves `ev` lent, the guard's certificates certify them). -/
+theorem vdi_flip_au (γ : DiskNames) (pd pav pu : BitVec 64) (ev : List (PAddr × DFrac × Hist))
+    (ts : List Nat) (hev : ∀ q ∈ ev, onPages pd pav pu q.1) :
     diskInv (GF := GF) γ ∗ diskCfgOwn γ (vdiCfg 11#32 8#32 true pd pav pu) ∗
-      diskFlipIn γ pd pav pu ⊢
-      devWriteAU .virtio Virtio.offStatus 4 15#32 (diskFlipOut γ pd pav pu) :=
+      diskFlipIn0 γ pd pav pu ∗
+      (∀ ls' : List (Nat × Nat),
+        ⌜∀ t ∈ ts, (∃ q ∈ ev, ∃ e ∈ q.2.2, e.t = t) → ∃ p, (t, p) ∈ ls'⌝ -∗ evPts ev -∗
+          landedAll ls' -∗ flipWinsL curCtx pav pu) ⊢
+      devWriteAUD Virtio.offStatus 4 15#32 ev ts (diskFlipOut γ pd pav pu) :=
   disk_driver_ok_write γ (vdiCfg 11#32 8#32 true pd pav pu) (vdiCfg 15#32 8#32 true pd pav pu)
-    15#32 (vdi_live_11 _ _ _ _) (vdi_live_15 _ _ _) (vdi_wce_15 _ _ _) (vdi_qnum_15 _ _ _)
-    (vdi_wr_driverOk 8#32 pd pav pu)
+    15#32 ev ts (vdi_live_11 _ _ _ _) (vdi_live_15 _ _ _) (vdi_wce_15 _ _ _) (vdi_qnum_15 _ _ _)
+    (vdi_wr_driverOk 8#32 pd pav pu) ⟨rfl, rfl, rfl⟩
+    (fun q hq => by have h := hev q hq; unfold onPages at h; unfold vqPageByte vqPageSize; exact h)
+
+/-- The `DRIVER_OK` store (`sw` to a virtio-mmio register at `drvOkPc`), GUARDED ([OWN.131], the one
+named assumption, xv6 weak-memory bug #1): `MachCSL.wp_s_sw_dev_drvOk` at the ladder's context. -/
+theorem vdi_sw_dev_drvOk [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU)
+    (hc : cpu.val = 0) (k : KCtx) (R : RegMap) (hsie : k.sie = false)
+    (pc : BitVec 64) (hpc0 : pc = drvOkPc) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
+    (hrs1 : rs1 ≠ 4#5) (hrs2 : rs2 ≠ 4#5) (off : Nat) (va : BitVec 64)
+    (haddr : ((k.pushed 4).withRegs R).rget cpu rs1 + BitVec.signExtend 64 imm = va)
+    (hdec : devDecode va = some (.virtio, off)) (hio : devWordOk va)
+    (hkm : kmapClass (vpnOf va).toNat = some .rw) (ev : List (PAddr × DFrac × Hist)) (ts : List Nat)
+    (Ψ : IProp GF) :
+    instr (GF := GF) pc is_rvc
+      (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
+    kctxL lent cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu pc ∗ kmapStatic ∗ evPts ev ∗
+    ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+    devWriteAUD off 4 (BitVec.extractLsb' 0 32 (((k.pushed 4).withRegs R).rget cpu rs2)) ev ts Ψ ∗
+    ▷ wpNext ((k.pushed 4).withRegs R).sie ((k.pushed 4).withRegs R).proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' ((k.pushed 4).withRegs R) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          Ψ -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨HI, Hk, Hpc, #HS, Hev, #Hts, HAU, HΦ⟩
+  ihave #Hid := kmapStatic_rw va hkm $$ HS
+  iapply (wp_s_sw_dev_drvOk cpu hc ((k.pushed 4).withRegs R) pc hpc0 hsie is_rvc imm rs1 rs2 hrs1
+    hrs2 off va haddr hdec hio ev ts Ψ)
+  iframe HI Hk Hpc Hev Hts HAU HΦ
+  iexact Hid
 
 set_option maxHeartbeats 4000000 in
 /-- **The last block**: `QUEUE_READY = 1`, `free[i] = 1` and the
 `DRIVER_OK` store that flips the invariant to its live arm. -/
-theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
+theorem vdi_finish (cpu : CPU) (hc0 : cpu.val = 0) (k : KCtx) (R : RegMap) (γ : DiskNames)
     (pd pav pu : BitVec 64) (v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 8)
     (hsie : k.sie = false) (htier : k.tier = KTier.kpt) (hR9 : R 9#5 = KA.«disk») (hR14 : R 14#5 = 0x10001000#64)
     (hR18 : R 18#5 = 11#64)
@@ -1916,15 +1945,23 @@ theorem vdi_finish (cpu : CPU) (k : KCtx) (R : RegMap) (γ : DiskNames)
     $$ [HS HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu]
   · iframe #
     iframe HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu
-  -- +0x16c  ori s2,s2,4 ; +0x170  sw s2,112(a4)   STATUS |= DRIVER_OK
+  icases HIn with ⟨HIn0, HW⟩
+  -- the device's windows: head keys cashed, raw halves packed for the guarded store
+  icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
+  icases flipWins_pre cpu curCtx pd pav pu $$ [Hctx HW] with ⟨Hctx, HP⟩
+  · iframe Hctx HW
+  ihave Hk := Hkback $$ Hctx
+  unfold prePkg lendPkg
+  icases HP with ⟨%ts, ⟨%ev, Hev, %hev, HK⟩, #Hts⟩
+  -- +0x16c  ori s2,s2,4 ; +0x170  sw s2,112(a4)   STATUS |= DRIVER_OK  (the GUARDED store)
   k_step (wp_s_ori cpu _ (KA.«virtio_disk_init» + 0x16c#64) false 4#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  ihave HAU := vdi_flip_au γ pd pav pu $$ [Hinv Htok HIn]
-  · iframe #; iframe Htok HIn
-  k_step (vdi_sw_dev cpu _ (KA.«virtio_disk_init» + 0x170#64) false 112#12 14#5 18#5
-      (by decide) (by decide) Virtio.offStatus 0x10001070#64 ?hb2 (by decide) (by decide)
-      (by decide) (diskFlipOut γ pd pav pu))
+  ihave HAU := vdi_flip_au γ pd pav pu ev ts hev $$ [Hinv Htok HIn0 HK]
+  · iframe #; iframe Htok HIn0 HK
+  k_step (vdi_sw_dev_drvOk cpu hc0 k _ hsie (KA.«virtio_disk_init» + 0x170#64) (by decide) false 112#12
+      14#5 18#5 (by decide) (by decide) Virtio.offStatus 0x10001070#64 ?hb2 (by decide) (by decide)
+      (by decide) ev ts (diskFlipOut γ pd pav pu))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR14, hR18]
   iintro Hk Hpc Hout
   case hb2 => k_norm [hR14]
@@ -1983,7 +2020,7 @@ set_option maxRecDepth 100000 in
 theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
     (MS : MEMSET) : VIRTIO_DISK_INIT :=
   ⟨fun {hlc GF} _ _ _ _ _ cpu k γ γkl γk nb c0 vlock vname vcpu pd0 pav0 pu0 free0
-      hsie hK hnoff hlk hnb hdead hp0 htier => by
+      hsie hK hnoff hlk hnb hdead hp0 htier hc0 => by
   unfold wp_virtio_disk_init_body diskInitCells
   simp only [virtioDiskInitAddr, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr, vdi_aUsedIdx]
   iintro ⟨Hk, Hpc, #Hlock, Hav, #Hinv, Htok, HG,
@@ -2066,7 +2103,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
     rw [h18_7, h18_6, h18_5, hp4 18#5 (by decide) (by decide)]
     exact hp3.2
   -- `QUEUE_READY`, `free[]` and the flip
-  iapply (vdi_finish cpu k _ γ pd pav pu v0 v1 v2 v3 v4 v5 v6 v7 hsie htier h9_7 h14_7 hR18
+  iapply (vdi_finish cpu hc0 k _ γ pd pav pu v0 v1 v2 v3 v4 v5 v6 v7 hsie htier h9_7 h14_7 hR18
     hpvd hpva hpvu)
   iframe Hinv Hk Hpc Htok HG Hbd Hba Hbu Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hui Hops Hinf Hd Ha Hu
   iintro %R8 Hk Hpc Hgeom Hres %hp8

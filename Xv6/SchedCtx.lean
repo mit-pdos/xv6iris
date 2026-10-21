@@ -172,8 +172,11 @@ instance instCtxMorphLocked (tier : KTier) (γ : GName) (i : CPU) :
   @instCtxMorphSep hlc GF _
     (fun ξ => @lockedCore hlc GF _ ⟨ξ, tier⟩ γ i) (fun ξ => @lockCtxHeld hlc GF _ ⟨ξ, tier⟩)
     (@instCtxMorphExists hlc GF _ _
-      (fun (B : Nat) ξ => iprop(lockHalf γ (some (i, true)) B ∗ ctxFloor ξ B))
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor _)))
+      (fun (B : Nat) ξ => iprop(∃ pB : Nat, lockHalf γ (some (i, true)) B ∗ landedAt B pB ∗ ctxFloor ξ pB))
+      (fun B => @instCtxMorphExists hlc GF _ _
+        (fun (pB : Nat) ξ => iprop(lockHalf γ (some (i, true)) B ∗ landedAt B pB ∗ ctxFloor ξ pB))
+        (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor _)))))
     (instCtxMorphLockCtxHeld tier)
 
 /-! ## The hart tag (Rocq `ProcGeom.hart_own`) -/

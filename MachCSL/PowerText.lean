@@ -461,7 +461,8 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
         exact fun c => (bootFacts_resetRegsRun hbf c).1 Register.cur_privilege Privilege.Machine rfl
       unfold eraInterp memModelAt devInterpAt
       iframe Hheap Hri Hresv Hda Huep
-      rw [show g₂.m.top = 0 by simp [MState.top, hlog0], hlog0, authMap_nil]
+      rw [show g₂.m.ltop = 0 by simp [MState.ltop, hbf.2.2.2.2.2.1], hlog0]
+      ihave Hauth := authAuthAt_boot (GF := GF) ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch, γlp, γep⟩ $$ Hauth
       iframe Htop Hauth
       rw [show g₂.m.llog = [] from hbf.2.2.2.2.2.1]
       isplitl [HlpG HepG]
@@ -505,16 +506,18 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
                 · exact BigSepL.bigSepL_nil_intro
                 isplit
                 · exact BigSepL.bigSepL_nil_intro
+                isplit
                 · iapply ksRcptsAll_none
                   intro q hq
                   have := rsvRegMap_ksPre _ _ _ hq
                   unfold ksKey at this
                   omega
+                · unfold kptSnapAt; ileft; ipureintro; exact ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf⟩
           · isplit
             · ipureintro
-              exact loadsChained_zero _ _ (fun j a => by
+              exact loadsChained_zero (chainEnv (hlc := hlc) (GF := GF) g₂.m) _ (fun j a => by
                 show (g₂.m.hr j).coh a = 0
-                rw [(hhart0 j).2.2.1]; rfl)
+                rw [(hhart0 j).2.2.1]; rfl) (fun _ h0 => lpOf_eq_zero h0)
             iexists ∅
             iframe HcG
             isplit

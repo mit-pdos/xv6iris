@@ -47,7 +47,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 section era
 variable [MachFixedGS hlc GF] (E : EraGS)
 
-/-- The store order has reached `K` (persistent; free at 0). -/
+/-- The store order has reached `K` (persistent; free at 0): route P (design D9), `K` is at or below
+the LANDED top -- a position of the global memory order (views, context bounds, stamps). -/
 def topLbAt (K : Nat) : IProp GF := iprop(⌜K = 0⌝ ∨ MonoNat.lb_own E.topName (.ofNat K))
 
 /-- Hart `cpu`'s floor has passed `K` (the prototype's `hart_view_lb`). -/
@@ -64,6 +65,24 @@ def rviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
 
 /-- The store at timestamp `t` is agent `h`'s (persistent). -/
 def authoredByAt (t : Nat) (h : Agent) : IProp GF := E.authName ↪◯MAP[t]{.discard} h
+
+/-- **An issue receipt** (route P, design D9; persistent): `t` is 0 or at or below the ISSUE
+stamp of a store, so at or below the issue top -- what an issue-stamp bound (a token's watermark, a
+chain vector's component) is justified by; NOT a position of the memory order. -/
+def itopLbAt (t : Nat) : IProp GF :=
+  iprop(topLbAt E t ∨ ∃ (t' : Nat) (a : Agent), ⌜t ≤ t'⌝ ∗ authoredByAt E t' a)
+
+/-- **THE LANDING COVER** (route P, design D9; persistent): every store of every OTHER hart
+`X ≠ cpu` issued at `1 ≤ u ≤ V X` has LANDED, at a position at or below `K` -- what makes a chain
+vector's entries visible on `cpu` once its view has passed `K`. -/
+def landCovAt (V : CPU → Nat) (cpu : CPU) (K : Nat) : IProp GF := iprop%
+  □ ∀ (X : CPU) (u : Nat), ⌜X ≠ cpu ∧ 1 ≤ u ∧ u ≤ V X⌝ -∗ authoredByAt E u (hartAgent X) -∗
+    ∃ q : Nat, landedAtE E u q ∗ ⌜q ≤ K⌝
+
+/-- The landing cover of a LIST of (author, issue bound) pairs (a hop request's form). -/
+def landCovLAt (L : List (CPU × Nat)) (cpu : CPU) (K : Nat) : IProp GF := iprop%
+  □ ∀ (X : CPU) (u : Nat), ⌜X ≠ cpu ∧ 1 ≤ u ∧ ∃ p ∈ L, p.1 = X ∧ u ≤ p.2⌝ -∗
+    authoredByAt E u (hartAgent X) -∗ ∃ q : Nat, landedAtE E u q ∗ ⌜q ≤ K⌝
 
 /-- Hart `cpu`'s reservation fragment: its reservation and pending acquire bit. -/
 def resvFragAt (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
@@ -145,6 +164,20 @@ instance (t : Nat) (h : Agent) : Persistent (PROP := IProp GF) (authoredByAt E t
   unfold authoredByAt; infer_instance
 instance (t : Nat) (h : Agent) : Timeless (PROP := IProp GF) (authoredByAt E t h) := by
   unfold authoredByAt; infer_instance
+instance (t : Nat) : Persistent (PROP := IProp GF) (itopLbAt E t) := by
+  unfold itopLbAt; infer_instance
+instance (t : Nat) : Timeless (PROP := IProp GF) (itopLbAt E t) := by
+  unfold itopLbAt; infer_instance
+instance (V : CPU → Nat) (cpu : CPU) (K : Nat) : Persistent (PROP := IProp GF) (landCovAt E V cpu K) := by
+  unfold landCovAt; infer_instance
+instance (L : List (CPU × Nat)) (cpu : CPU) (K : Nat) : Persistent (PROP := IProp GF) (landCovLAt E L cpu K) := by
+  unfold landCovLAt; infer_instance
+instance (t p : Nat) : Timeless (PROP := IProp GF) (landedAtE E t p) := by
+  unfold landedAtE; infer_instance
+instance (V : CPU → Nat) (cpu : CPU) (K : Nat) : Timeless (PROP := IProp GF) (landCovAt E V cpu K) := by
+  unfold landCovAt; infer_instance
+instance (L : List (CPU × Nat)) (cpu : CPU) (K : Nat) : Timeless (PROP := IProp GF) (landCovLAt E L cpu K) := by
+  unfold landCovLAt; infer_instance
 instance (cpu : CPU) (r : Option Resv) (b : Bool) : Timeless (PROP := IProp GF) (resvFragAt E cpu r b) := by
   unfold resvFragAt; infer_instance
 instance (cpu : CPU) (r : Option Resv) : Timeless (PROP := IProp GF) (resvFragAnyAt E cpu r) := by
@@ -237,6 +270,92 @@ theorem viewLbAt_le (cpu : CPU) (K K' : Nat) (h : K' ≤ K) :
   · iapply MonoNat.lb_own_le _ _ _ (by simp only [MaxNat.le_toNat]; omega) $$ Hv
   · iapply topLbAt_le E K K' h $$ Ht
 
+theorem itopLbAt_0 : ⊢@{IProp GF} itopLbAt E 0 := by
+  unfold itopLbAt; iintro; ileft; iapply topLbAt_0
+
+theorem itopLbAt_of_top (t : Nat) : topLbAt E t ⊢@{IProp GF} itopLbAt E t := by
+  unfold itopLbAt; iintro H; ileft; iexact H
+
+theorem itopLbAt_of_auth (t : Nat) (a : Agent) : authoredByAt E t a ⊢@{IProp GF} itopLbAt E t := by
+  unfold itopLbAt; iintro H; iright; iexists t, a; iframe H; ipureintro; exact Nat.le_refl _
+
+theorem itopLbAt_le (t t' : Nat) (h : t' ≤ t) : itopLbAt E t ⊢@{IProp GF} itopLbAt E t' := by
+  unfold itopLbAt
+  iintro H
+  icases H with ⟨#H | ⟨%u, %a, %hu, #Ha⟩⟩
+  · ileft; iapply topLbAt_le E t t' h $$ H
+  · iright; iexists u, a; iframe Ha; ipureintro; omega
+
+theorem itopLbAt_max (t t' : Nat) : itopLbAt E t ∗ itopLbAt E t' ⊢@{IProp GF} itopLbAt E (max t t') := by
+  iintro ⟨H, H'⟩
+  by_cases hle : t ≤ t'
+  · rw [Nat.max_eq_right hle]; iexact H'
+  · rw [Nat.max_eq_left (by omega)]; iexact H
+
+theorem landCovAt_zero (cpu : CPU) (K : Nat) : ⊢@{IProp GF} landCovAt E (fun _ => 0) cpu K := by
+  unfold landCovAt
+  iintro !> %X %u %h _
+  obtain ⟨_, h1, h2⟩ := h
+  simp only at h2
+  exfalso; omega
+
+/-- Fewer entries, a larger bound. -/
+theorem landCovAt_le (V V' : CPU → Nat) (cpu : CPU) (K K' : Nat) (hV : ∀ h, h ≠ cpu → V' h ≤ V h)
+    (hK : K ≤ K') : landCovAt E V cpu K ⊢@{IProp GF} landCovAt E V' cpu K' := by
+  unfold landCovAt
+  iintro #H !> %X %u %hu #Hau
+  icases H $$ %X %u %⟨hu.1, hu.2.1, Nat.le_trans hu.2.2 (hV X hu.1)⟩ Hau with ⟨%q, #Hq, %hq⟩
+  iexists q
+  iframe Hq
+  ipureintro; omega
+
+/-- Two covers join, at the larger bound. -/
+theorem landCovAt_max (V V' : CPU → Nat) (cpu : CPU) (K K' : Nat) :
+    landCovAt E V cpu K ∗ landCovAt E V' cpu K' ⊢@{IProp GF}
+      landCovAt E (fun h => max (V h) (V' h)) cpu (max K K') := by
+  unfold landCovAt
+  iintro ⟨#H, #H'⟩ !> %X %u %hu #Hau
+  by_cases hle : u ≤ V X
+  · icases H $$ %X %u %⟨hu.1, hu.2.1, hle⟩ Hau with ⟨%q, #Hq, %hq⟩
+    iexists q; iframe Hq; ipureintro; omega
+  · have hu' : u ≤ V' X := by have := hu.2.2; simp only at this; omega
+    icases H' $$ %X %u %⟨hu.1, hu.2.1, hu'⟩ Hau with ⟨%q, #Hq, %hq⟩
+    iexists q; iframe Hq; ipureintro; omega
+
+/-- The covered hart's own component is free. -/
+theorem landCovAt_of_L (V : CPU → Nat) (cpu : CPU) (K : Nat) :
+    landCovLAt E (cpus.map (fun h => (h, V h))) cpu K ⊢@{IProp GF} landCovAt E V cpu K := by
+  unfold landCovAt landCovLAt
+  iintro #H !> %X %u %hu #Hau
+  iapply H $$ %X %u %⟨hu.1, hu.2.1, (X, V X), List.mem_map.2 ⟨X, List.mem_of_getElem? (cpus_get? X), rfl⟩,
+    rfl, hu.2.2⟩ Hau
+
+theorem landCovLAt_of (V : CPU → Nat) (cpu : CPU) (K : Nat) :
+    landCovAt E V cpu K ⊢@{IProp GF} landCovLAt E (cpus.map (fun h => (h, V h))) cpu K := by
+  unfold landCovAt landCovLAt
+  iintro #H !> %X %u %⟨hne, hu1, p, hp, hpX, hpu⟩ #Hau
+  obtain ⟨h, _, rfl⟩ := List.mem_map.1 hp
+  simp only at hpX hpu
+  subst hpX
+  iapply H $$ %h %u %⟨hne, hu1, hpu⟩ Hau
+
+/-- A landing cover, applied. -/
+theorem landCovLAt_apply (L : List (CPU × Nat)) (c : CPU) (K : Nat) (X : CPU) (u : Nat)
+    (h : X ≠ c ∧ 1 ≤ u ∧ ∃ q ∈ L, q.1 = X ∧ u ≤ q.2) :
+    landCovLAt E L c K ∗ authoredByAt E u (hartAgent X) ⊢@{IProp GF} ∃ q : Nat, landedAtE E u q ∗ ⌜q ≤ K⌝ := by
+  unfold landCovLAt
+  iintro ⟨#H, #Ha⟩
+  iapply H $$ %X %u %h Ha
+
+theorem authoredByAt_frag (t : Nat) (a : Agent) :
+    authoredByAt E t a ⊢@{IProp GF} E.authName ↪◯MAP[t]{.discard} a := .rfl
+
+theorem landCovAt_own (V : CPU → Nat) (cpu : CPU) (K x : Nat) :
+    landCovAt E V cpu K ⊢@{IProp GF} landCovAt E (fun h => if h = cpu then max (V h) x else V h) cpu K := by
+  iintro #H
+  iapply landCovAt_le E V _ cpu K K (fun h hh => by simp only [hh, if_false]; exact Nat.le_refl _)
+    (Nat.le_refl _) $$ H
+
 end era
 
 /-! ## Contexts -/
@@ -290,17 +409,19 @@ def vecAt (ξ : CtxId) (q : Qp) (V : CPU → Nat) (g : Nat) : IProp GF := iprop%
   ([∗list] h ∈ cpus, MonoNat.auth_own (ξ.chain h) (.own q) (.ofNat (V h))) ∗
     MonoNat.auth_own ξ.gate (.own q) (.ofNat g)
 
-/-- **The chain half of a clean key** (W8 (f2-ctx)): `t` is the boot image,
-a DEVICE's entry (the device-key arm: DMA authors are exempt from chains), or
-an entry of a hart `h` under ξ's chain vector. -/
+/-- **A clean key** (W8 (f2-ctx); route P design D9): `t` is the boot image,
+a DEVICE's entry LANDED at a position under ξ's bound (the device-key arm: DMA
+authors are exempt from chains; a DMA write lands at once), or an entry of a
+hart `h` under ξ's chain vector (its visibility on the running hart is the
+token's landing cover, `vecCertsAt`). -/
 def chainKey [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
-  ⌜t = 0⌝ ∨ ∃ a : Agent, authoredByAt E t a ∗ (⌜NCPU ≤ a⌝ ∨ ∃ h : CPU, ⌜a = hartAgent h⌝ ∗ vecFloor ξ h t)
+  ⌜t = 0⌝ ∨ ∃ a : Agent, authoredByAt E t a ∗
+    ((⌜NCPU ≤ a⌝ ∗ ∃ p : Nat, landedAtE E t p ∗ ctxFloor ξ p) ∨ ∃ h : CPU, ⌜a = hartAgent h⌝ ∗ vecFloor ξ h t)
 
-/-- The justification of timestamp `t` at ξ: clean -- under the bound (TSO
-visibility) AND chain-covered (W8 (f2-ctx)) --, or dirty with the machine's
-authorship receipt. -/
+/-- The justification of timestamp `t` at ξ: clean (`chainKey`), or dirty
+with the machine's authorship receipt. -/
 def keyAt [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
-  (ctxFloor ξ t ∗ chainKey E ξ t) ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
+  chainKey E ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
 
 /-- ξ's authorities at fraction `q`: bound `B`, dirty set `D`. -/
 def ctxAt (ξ : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) : IProp GF := iprop%
@@ -341,7 +462,7 @@ instance (ξ : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) : Timeless (PROP := I
 
 theorem keyAt_cases (E : EraGS) (ξ : CtxId) (t : Nat) :
     keyAt E ξ t ⊢@{IProp GF}
-      (ctxFloor ξ t ∗ chainKey E ξ t) ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h) := by
+      chainKey E ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h) := by
   unfold keyAt; iintro H; iexact H
 
 theorem chainKey_0 (E : EraGS) (ξ : CtxId) : ⊢@{IProp GF} chainKey E ξ 0 := by
@@ -362,9 +483,7 @@ theorem keyAt_0 (E : EraGS) (ξ : CtxId) : ⊢@{IProp GF} keyAt E ξ 0 := by
   unfold keyAt
   iintro
   ileft
-  isplit
-  · iapply ctxFloor_0
-  · iapply chainKey_0
+  iapply chainKey_0
 
 theorem ctxFloor_le (ξ : CtxId) (t t' : Nat) (h : t' ≤ t) : ctxFloor ξ t ⊢@{IProp GF} ctxFloor ξ t' := by
   unfold ctxFloor
@@ -590,9 +709,10 @@ theorem vecAt_alloc :
   iframe Hc Hg
 
 /-- The dirty set is justified on hart `cpu` at bound `B` and watermark `W`:
-every key is at most `W`, and is under the bound or `cpu`'s own store. -/
-def dirtyOk (cpu : CPU) (B W : Nat) (D : RegMapF CPU) : Prop :=
-  ∀ k h, get? D k = some h → k ≤ W ∧ (k ≤ B ∨ h = cpu)
+every key is at most `W` (route P, design D9: issue stamps; a foreign key's
+visibility is the chain half's -- `chainDirtyOk` and the landing cover). -/
+def dirtyOk (_cpu : CPU) (_B W : Nat) (D : RegMapF CPU) : Prop :=
+  ∀ k h, get? D k = some h → k ≤ W
 
 /-- The persistent facts of every dirty key -- its membership and the
 machine's authorship receipt -- kept beside the authority so a domination
@@ -619,7 +739,8 @@ theorem dirtyElems_get (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) (k : Nat) (h :
 (persistent; W8 (f2-ctx)): every component's entries reach `cpu`, and a set
 gate means `cpu` has passed the boot gate. -/
 def vecCertsAt (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) : IProp GF := iprop%
-  ([∗list] h ∈ cpus, ∃ τ : Nat, chainLbAt E h (V h) cpu τ) ∗ (⌜g = 0⌝ ∨ gatePassedAt E cpu)
+  ([∗list] h ∈ cpus, ∃ τ : Nat, chainLbAt E h (V h) cpu τ) ∗ (⌜g = 0⌝ ∨ gatePassedAt E cpu) ∗
+    ∃ K : Nat, (⌜K = 0⌝ ∨ viewLbAt E cpu K) ∗ landCovAt E V cpu K
 
 instance (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) :
     Persistent (PROP := IProp GF) (vecCertsAt E V g cpu) := by
@@ -648,19 +769,25 @@ theorem vecCertsAt_zero (E : EraGS) (cpu : CPU) : ⊢@{IProp GF} vecCertsAt E (f
     iintro %k %c %_
     iexists 0
     iapply chainLbAt_0
+  isplit
   · ileft; ipureintro; rfl
+  · iexists 0
+    isplit
+    · ileft; ipureintro; rfl
+    · iapply landCovAt_zero
 
 /-- Fewer entries, an unset gate. -/
 theorem vecCertsAt_le (E : EraGS) (V V' : CPU → Nat) (g g' : Nat) (cpu : CPU) (hV : ∀ h, V' h ≤ V h)
     (hg : g' = 0 ∨ 1 ≤ g) : vecCertsAt E V g cpu ⊢@{IProp GF} vecCertsAt E V' g' cpu := by
   unfold vecCertsAt
-  iintro ⟨Hc, Hg⟩
+  iintro ⟨Hc, Hg, %K, #HK, #Hcov⟩
   isplitl [Hc]
   · iapply BigSepL.bigSepL_mono ?_ $$ Hc
     intro _ c _
     iintro ⟨%τ, #H⟩
     iexists τ
     iapply chainLbAt_le E c (V c) (V' c) cpu τ τ (hV c) (Nat.le_refl _) $$ H
+  isplitl [Hg]
   · icases Hg with ⟨%h0 | #Hg⟩
     · rcases hg with hg | hg
       · ileft; ipureintro; exact hg
@@ -668,13 +795,16 @@ theorem vecCertsAt_le (E : EraGS) (V V' : CPU → Nat) (g g' : Nat) (cpu : CPU) 
     · rcases hg with hg | _
       · ileft; ipureintro; exact hg
       · iright; iexact Hg
+  · iexists K
+    iframe HK
+    iapply landCovAt_le E V V' cpu K K (fun h _ => hV h) (Nat.le_refl _) $$ Hcov
 
 /-- Two certificate sets at one hart join componentwise. -/
 theorem vecCertsAt_max (E : EraGS) (V V' : CPU → Nat) (g g' : Nat) (cpu : CPU) :
     vecCertsAt E V g cpu ∗ vecCertsAt E V' g' cpu ⊢@{IProp GF}
       vecCertsAt E (fun h => max (V h) (V' h)) (max g g') cpu := by
   unfold vecCertsAt
-  iintro ⟨⟨Hc, Hg⟩, ⟨Hc', Hg'⟩⟩
+  iintro ⟨⟨Hc, Hg, %K, #HK, #Hcov⟩, ⟨Hc', Hg', %K', #HK', #Hcov'⟩⟩
   isplitl [Hc Hc']
   · ihave Hb := BigSepL.bigSepL_sep_eqv.2 $$ [Hc Hc']
     · iframe Hc Hc'
@@ -688,42 +818,62 @@ theorem vecCertsAt_max (E : EraGS) (V V' : CPU → Nat) (g g' : Nat) (cpu : CPU)
     · iexists τ
       simp only [Nat.max_eq_left (show V' c ≤ V c by omega)]
       iexact H
+  isplitl [Hg Hg']
   · icases Hg with ⟨%h0 | #Hg⟩
     · icases Hg' with ⟨%h0' | #Hg'⟩
       · ileft; ipureintro; omega
       · iright; iexact Hg'
     · iright; iexact Hg
+  · iexists (max K K')
+    isplit
+    · by_cases hle : K ≤ K'
+      · rw [Nat.max_eq_right hle]; iexact HK'
+      · rw [Nat.max_eq_left (by omega)]; iexact HK
+    · iapply landCovAt_max E V V' cpu K K'
+      iframe Hcov Hcov'
 
 /-- The running hart's own component rises freely (own entries). -/
 theorem vecCertsAt_own (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) (x : Nat) :
     vecCertsAt E V g cpu ⊢@{IProp GF}
       vecCertsAt E (fun h => if h = cpu then max (V h) x else V h) g cpu := by
   unfold vecCertsAt
-  iintro ⟨Hc, Hg⟩
-  iframe Hg
-  iapply BigSepL.bigSepL_mono ?_ $$ Hc
-  intro _ c _
-  iintro ⟨%τ, #H⟩
-  by_cases hc : c = cpu
-  · subst hc
-    simp only [if_true]
-    iexists (max (V c) x + 1)
-    iapply chainLbAt_own
-    omega
-  · simp only [hc, if_false]
-    iexists τ
-    iexact H
+  iintro ⟨Hc, Hg, %K, #HK, #Hcov⟩
+  isplitl [Hc]
+  · iapply BigSepL.bigSepL_mono ?_ $$ Hc
+    intro _ c _
+    iintro ⟨%τ, #H⟩
+    by_cases hc : c = cpu
+    · subst hc
+      simp only [if_true]
+      iexists (max (V c) x + 1)
+      iapply chainLbAt_own
+      omega
+    · simp only [hc, if_false]
+      iexists τ
+      iexact H
+  isplitl [Hg]
+  · iexact Hg
+  · iexists K
+    iframe HK
+    iapply landCovAt_own E V cpu K x $$ Hcov
+
+/-- The landing cover a certificate set carries (route P, design D9). -/
+theorem vecCertsAt_cover (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) :
+    vecCertsAt E V g cpu ⊢@{IProp GF} ∃ K : Nat, (⌜K = 0⌝ ∨ viewLbAt E cpu K) ∗ landCovAt E V cpu K := by
+  unfold vecCertsAt
+  iintro ⟨_, _, H⟩
+  iexact H
 
 /-- The running token of context ξ on hart `cpu` (the prototype's
 `own_context` at the ambient hart): ξ's authorities; a view receipt of `cpu`
-dominating the bound; a watermark bounding the dirty keys (a legal position,
-so the token can be stamped); every dirty key under the bound or `cpu`'s own
-store; the membership facts; and (W8 (f2-ctx)) the chain half
-(`chainTokAt`). -/
+dominating the bound; an ISSUE watermark bounding the dirty keys and the chain
+vector (route P, design D9: `itopLbAt`); the membership facts; and (W8
+(f2-ctx)) the chain half (`chainTokAt`, whose landing cover makes every
+foreign key visible on `cpu`). -/
 def ownCtxAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
   ∃ (B K W : Nat) (D : RegMapF CPU),
     ctxAt ξ 1 B D ∗ viewLbAt E cpu K ∗ ⌜B ≤ K⌝ ∗
-    topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D ∗ chainTokAt E cpu ξ W D
+    itopLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D ∗ chainTokAt E cpu ξ W D
 
 /-- The chain half survives a larger watermark and new OWN dirty keys. -/
 theorem chainTokAt_mono (E : EraGS) (cpu : CPU) (ξ : CtxId) (W W' : Nat) (D D' : RegMapF CPU)
@@ -776,6 +926,15 @@ abbrev entryAt (pa : PAddr) (e : HEnt) : IProp GF := entryAtE (MachGS.era (hlc :
 abbrev pcRcpt (t : Nat) (v : BitVec 64) : IProp GF := pcRcptE (MachGS.era (hlc := hlc) (GF := GF)) t v
 abbrev chainLb (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : IProp GF :=
   chainLbAt (MachGS.era (hlc := hlc) (GF := GF)) h t j τ
+/-- The store at issue stamp `t` has LANDED at position `p` (route P; persistent). -/
+abbrev landedAt (t p : Nat) : IProp GF := landedAtE (MachGS.era (hlc := hlc) (GF := GF)) t p
+/-- A lands-above receipt at the ambient era (route P): the store `t` lands strictly above `K`. -/
+abbrev landsAboveAt (t K : Nat) : IProp GF := landsAboveAtE (MachGS.era (hlc := hlc) (GF := GF)) t K
+/-- An issue receipt at the ambient era (route P, design D9). -/
+abbrev itopLb (t : Nat) : IProp GF := itopLbAt (MachGS.era (hlc := hlc) (GF := GF)) t
+/-- A list of landing certificates (route P): what a read accessor's client offers, so that its
+continuation knows the landing positions of the entries it reasons about. -/
+abbrev landedAll (ls : List (Nat × Nat)) : IProp GF := iprop([∗list] q ∈ ls, landedAt q.1 q.2)
 
 /-- The held set contains the locks of its elements. -/
 theorem lockSet_lkIn (cpu : CPU) (locks : List String) (s : String) :
@@ -831,14 +990,14 @@ theorem ownCtx_cases (cpu : CPU) (ξ : CtxId) :
     ownCtx cpu ξ ⊢@{IProp GF}
       ∃ (B K W : Nat) (D : RegMapF CPU),
         ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
-        topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
+        itopLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
         dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ∗
         chainTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ W D := by
   unfold ownCtx ownCtxAt; iintro H; iexact H
 
 theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
     ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
-      topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
+      itopLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
       dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ∗
       chainTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ W D ⊢@{IProp GF} ownCtx cpu ξ := by
   unfold ownCtx ownCtxAt
@@ -875,7 +1034,7 @@ theorem ownCtx_key_chain (cpu : CPU) (ξ : CtxId) (t : Nat) :
     icases vecCertsAt_get V g cpu h $$ Hc with ⟨%τ, #Hlb⟩
     iexists τ
     iapply chainLbAt_le (MachGS.era (hlc := hlc) (GF := GF)) h (V h) t cpu τ τ hle (Nat.le_refl _) $$ Hlb
-  icases keyAt_cases (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ Hkey with ⟨⟨_, #Hck⟩ | ⟨%h, #Hd, #Hau⟩⟩
+  icases keyAt_cases (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ Hkey with ⟨#Hck | ⟨%h, #Hd, #Hau⟩⟩
   · unfold chainKey
     icases Hck with ⟨%h0 | ⟨%a, #Hau, #Harm⟩⟩
     · isplitl [Hat Hv]
@@ -891,7 +1050,7 @@ theorem ownCtx_key_chain (cpu : CPU) (ξ : CtxId) (t : Nat) :
         iframe Hv Hc
         ipureintro; exact ⟨hd, hw⟩
       · ileft; ipureintro; exact h0
-    · icases Harm with ⟨%hdev | ⟨%h, %ha, #Hfl⟩⟩
+    · icases Harm with ⟨⟨%hdev, _⟩ | ⟨%h, %ha, #Hfl⟩⟩
       · isplitl [Hat Hv]
         · iapply ownCtx_intro cpu ξ B K W D
           iframe Hat
@@ -956,6 +1115,88 @@ theorem ownCtx_key_chain (cpu : CPU) (ξ : CtxId) (t : Nat) :
         iexists h
         isplit; · ipureintro; rfl
         iapply Hcert $$ %h %hle
+
+/-- **A key of the running context is VISIBLE on its hart** (route P, design D9): the keyed store
+is the boot image's, one of the hart's own (its authorship receipt: forwarded), or LANDED at a
+position at or below a view receipt of the hart -- a device key through its landing under the
+bound, a hart key and a foreign dirty key through the token's landing cover (`vecCertsAt`). -/
+theorem ownCtx_key_land (cpu : CPU) (ξ : CtxId) (t : Nat) :
+    ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢
+      ownCtx cpu ξ ∗ ∃ K : Nat, viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗
+        (⌜t = 0⌝ ∨ authoredBy t (hartAgent cpu) ∨ ∃ p : Nat, landedAt t p ∗ ⌜p ≤ K⌝) := by
+  iintro ⟨Hctx, #Hkey⟩
+  icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
+  unfold chainTokAt
+  icases Hch with ⟨%V, %g, Hv, %⟨hd, hw⟩, #Hc⟩
+  icases vecCertsAt_cover _ V g cpu $$ Hc with ⟨%Kc, #HKc, #Hcov⟩
+  -- the receipt covering both the token's bound and the cover's
+  ihave #HR : viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu (max K Kc) $$ []
+  · icases HKc with ⟨%h0 | #HKc⟩
+    · rw [h0, Nat.max_eq_left (Nat.zero_le _)]; iexact HK
+    · by_cases hle : K ≤ Kc
+      · rw [Nat.max_eq_right hle]; iexact HKc
+      · rw [Nat.max_eq_left (by omega)]; iexact HK
+  -- the cover, cashed for one foreign author
+  ihave #Hcv : (□ ∀ (h : CPU), ⌜h ≠ cpu ∧ t ≤ V h⌝ -∗ authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) t (hartAgent h) -∗
+      (⌜t = 0⌝ ∨ authoredBy t (hartAgent cpu) ∨ ∃ p : Nat, landedAt t p ∗ ⌜p ≤ max K Kc⌝)) $$ []
+  · imodintro
+    iintro %h %⟨hne, hle⟩ #Hau
+    by_cases ht0 : t = 0
+    · ileft; ipureintro; exact ht0
+    · unfold landCovAt
+      icases Hcov $$ %h %t %⟨hne, by omega, hle⟩ Hau with ⟨%q, #Hq, %hq⟩
+      iright; iright
+      iexists q
+      iframe Hq
+      ipureintro; omega
+  ihave #Hvis : (⌜t = 0⌝ ∨ authoredBy t (hartAgent cpu) ∨ ∃ p : Nat, landedAt t p ∗ ⌜p ≤ max K Kc⌝) $$ [Hat Hv]
+  · icases keyAt_cases (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ Hkey with ⟨#Hck | ⟨%h, #Hd, #Hau⟩⟩
+    · unfold chainKey
+      icases Hck with ⟨%h0 | ⟨%a, #Hau, #Harm⟩⟩
+      · ileft; ipureintro; exact h0
+      · icases Harm with ⟨⟨%hdev, %p, #Hp, #Hfl⟩ | ⟨%h, %ha, #Hfl⟩⟩
+        · ihave %hpB : ⌜p ≤ B⌝ $$ [Hat Hfl]
+          · iapply ctxAt_floor ξ 1 B D p $$ [Hat Hfl]
+            iframe Hat
+            iexact Hfl
+          iright; iright
+          iexists p
+          iframe Hp
+          ipureintro; omega
+        · subst ha
+          by_cases hh : h = cpu
+          · subst hh
+            iright; ileft; iexact Hau
+          · ihave %hle : ⌜t ≤ V h⌝ $$ [Hv Hfl]
+            · iapply vecAt_floor ξ 1 V g h t $$ [Hv Hfl]
+              iframe Hv
+              iexact Hfl
+            iapply Hcv $$ %h %⟨hh, hle⟩ Hau
+    · ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
+      · iapply ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
+        iframe Hat
+        iexact Hd
+      rcases hd t h hD with hh | hle
+      · subst hh
+        iright; ileft; iexact Hau
+      · by_cases hh : h = cpu
+        · subst hh
+          iright; ileft; iexact Hau
+        · iapply Hcv $$ %h %⟨hh, hle⟩ Hau
+  isplitl [Hat Hv]
+  · iapply ownCtx_intro cpu ξ B K W D
+    iframe Hat
+    isplit; · iexact HK
+    isplit; · ipureintro; exact hBK
+    isplit; · iexact HW
+    isplit; · ipureintro; exact hok
+    isplit; · iexact Hels
+    unfold chainTokAt
+    iexists V, g
+    iframe Hv Hc
+    ipureintro; exact ⟨hd, hw⟩
+  · iexists (max K Kc)
+    iframe HR Hvis
 
 /-- A fragment at a known acquire bit is one at any (Rocq `resv_frag_of_fragb`). -/
 theorem resvFragAny_of (cpu : CPU) (r : Option Resv) (b : Bool) :

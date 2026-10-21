@@ -175,12 +175,12 @@ def SbHoldX.NonHolderRd (σ : MState) (b : PAddr) (t : Nat) (c : CPU) (wd : BitV
       lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' →
       (∀ k, st ≠ some (c, k)) ∧ ∃ tvn v0, v0 ≠ cpuAddr c ∧ ReadCasesP σ.lp W' (hartAgent c) tvn v0 wd) ∧
   (xv6DynLockP σ b t →
-    ∀ (L : List (PAddr × HEnt)) (te p : Nat) (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool))
-      (B : Nat), slotWit xv6Rsv L b te → p ≤ te → te ≤ t →
-      (∀ j, j < 4 → ∃ H, (σ.mem.lview σ.lp)[b + BitVec.ofNat 64 j]? = some H ∧
-        H.filter (lkWinIn p t) = W.map (WEnt.proj j)) →
-      (∀ j, j < 8 → ∃ H, (σ.mem.lview σ.lp)[b + 16#64 + BitVec.ofNat 64 j]? = some H ∧
-        H.filter (lkWinIn p t) = W'.map (WEnt.proj j)) →
+    ∀ (L : List (PAddr × HEnt)) (te : Nat) (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool))
+      (B : Nat), slotWit xv6Rsv L b te → (∃ q, σ.lp te = some q) →
+      (∀ j, j < 4 → ∃ H, σ.mem[b + BitVec.ofNat 64 j]? = some H ∧
+        Hist.winA σ.lp te t H = W.map (WEnt.proj j)) →
+      (∀ j, j < 8 → ∃ H, σ.mem[b + 16#64 + BitVec.ofNat 64 j]? = some H ∧
+        Hist.winA σ.lp te t H = W'.map (WEnt.proj j)) →
       lockDiscWin (cpuPtrAt KernelGeom.cpusBase) st B W W' →
       (∀ k, st ≠ some (c, k)) ∧ ∃ tvn v0, v0 ≠ cpuAddr c ∧ ReadCases W' (hartAgent c) tvn v0 wd)
 
@@ -195,9 +195,9 @@ theorem SbHoldX.cpuNeOfRd (σ : MState) (b : PAddr) (t : Nat) (c : CPU) (wd : Bi
   · obtain ⟨W, W', Hold, Hold', st, B, h1, h2, h3, h4⟩ := hs hst
     obtain ⟨hnh, tvn, v0, hv0, hrc⟩ := hN.1 hst W W' Hold Hold' st B h1 h2 h3
     exact h4 c hnh tvn v0 wd hv0 hrc
-  · obtain ⟨L, te, p, W, W', st, B, h1, h2, h3, h4, h5, h6, h7⟩ := hd hdyn
-    obtain ⟨hnh, tvn, v0, hv0, hrc⟩ := hN.2 hdyn L te p W W' st B h1 h2 h3 h4 h5 h6
-    exact h7 c hnh tvn v0 wd hv0 hrc
+  · obtain ⟨L, te, W, W', st, B, h1, h2, h3, h4, h5, h6⟩ := hd hdyn
+    obtain ⟨hnh, tvn, v0, hv0, hrc⟩ := hN.2 hdyn L te W W' st B h1 h2 h3 h4 h5
+    exact h6 c hnh tvn v0 wd hv0 hrc
 
 /-- `&cpus[c]`'s word from `cpuB` is `cpuAddr c`. -/
 theorem SbHoldX.cpuBWord : ∀ c : CPU, wordOfBytes 8 (cpuB c.val) = cpuAddr c := by decide +kernel

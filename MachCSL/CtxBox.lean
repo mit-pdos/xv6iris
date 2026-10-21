@@ -311,7 +311,7 @@ theorem ctxAbsorbLb (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξ' : 
   iintro ⟨Hrun, #HK, #Hvg, Hst, HR⟩
   unfold vgFloors
   icases Hvg with ⟨#Hvf, #Hgf⟩
-  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, %Ws, Hat, #HT, #HWs, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
   imod ctx_absorb cpu ξ' K $$ [$Hrun $HK] with ⟨Hrun, #Hfl'⟩
   icases (ctxAt_halves ξ T D).1 $$ Hat with ⟨Hat1, Hat2⟩
   icases (vecAt_halves ξ V g).1 $$ Hv with ⟨Hv1, Hv2⟩
@@ -327,21 +327,18 @@ theorem ctxAbsorbLb (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξ' : 
       iintro %k %h %hk
       unfold keyAt
       ileft
+      ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
+      icases He with ⟨_, #Hau⟩
+      unfold chainKey
+      iright
+      iexists (hartAgent h)
+      iframe Hau
+      iright
+      iexists h
       isplit
-      · iapply ctxFloor_le ξ' K k (by have := hD k h hk; omega)
-        iexact Hfl'
-      · ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
-        icases He with ⟨_, #Hau⟩
-        unfold chainKey
-        iright
-        iexists (hartAgent h)
-        iframe Hau
-        iright
-        iexists h
-        isplit
-        · ipureintro; rfl
-        · iapply vecFloor_le ξ' h (V h) k (hDV k h hk)
-          iapply vecFloors_get ξ' V h $$ Hvf
+      · ipureintro; rfl
+      · iapply vecFloor_le ξ' h (V h) k (hDV k h hk)
+        iapply vecFloors_get ξ' V h $$ Hvf
     isplit
     · iexact Hvf
     · iexact Hgf
@@ -353,8 +350,8 @@ theorem ctxAbsorbLb (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξ' : 
   · iframe
   imodintro
   iframe Hrun HR
-  iapply ctxStamped_intro ξ T V g D
-  iframe Hat Hv
+  iapply ctxStamped_intro ξ T V g D Ws
+  iframe Hat Hv HWs
   isplit
   · iexact HT
   isplit
@@ -400,12 +397,12 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
   ihave #Hcx' : vecCertsAt _ Vy gx cpu $$ []
   · rw [hVy]; iapply vecCertsAt_own _ Vx gx cpu W $$ Hcx
   -- the new bound: the join of the stamped context's and the depositor's
-  icases ctxStamped_cases ξc T V g $$ Hst with ⟨%Dc, Hatc, #HTc, %hDc, #Helsc, Hvc, %⟨hDVc, hVTc⟩⟩
+  icases ctxStamped_cases ξc T V g $$ Hst with ⟨%Dc, %Wc, Hatc, #HTc, #HWc, %hDc, #Helsc, Hvc, %⟨hDVc, hVTc⟩⟩
   have hVx : ∀ h, Vy h ≤ W := by
     intro h; have := hvw h; rw [hVy]; dsimp only; split <;> omega
   -- the bound the box will carry
   obtain ⟨Vn, hVn⟩ : ∃ Vn : CPU → Nat, Vn = fun h => max (V h) (Vy h) := ⟨_, rfl⟩
-  imod ctxAt_raise ξc T (max T (max K W)) Dc (by omega) $$ Hatc with ⟨Hatc, #HflcT⟩
+  imod ctxAt_raise ξc T (max T K) Dc (by omega) $$ Hatc with ⟨Hatc, #HflcT⟩
   imod vecAt_update ξc V g Vn (max g gx) (fun h => by rw [hVn]; exact Nat.le_max_left _ _) (Nat.le_max_left _ _) $$ Hvc with Hvc
   icases vecAt_get ξc 1 Vn (max g gx) $$ Hvc with ⟨Hvc, #Hvcf⟩
   ihave #Hgc : ⌜gx = 0⌝ ∨ gateFloor ξc $$ [Hvc]
@@ -419,7 +416,7 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
   · iapply ctxDomAt_intro ξ ξc _ B D Vy gx
     iframe Hat1 Hvx1
     isplit
-    · iapply ctxFloor_le ξc (max T (max K W)) B (by omega); iexact HflcT
+    · iapply ctxFloor_le ξc (max T K) B (by omega); iexact HflcT
     isplit
     · iexact Hels
     isplit
@@ -427,28 +424,25 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
       iintro %k %h %hk
       unfold keyAt
       ileft
+      ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
+      icases He with ⟨_, #Hau⟩
+      unfold chainKey
+      iright
+      iexists (hartAgent h)
+      iframe Hau
+      iright
+      iexists h
       isplit
-      · iapply ctxFloor_le ξc (max T (max K W)) k (by have := (hok k h hk).1; omega)
-        iexact HflcT
-      · ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
-        icases He with ⟨_, #Hau⟩
-        unfold chainKey
-        iright
-        iexists (hartAgent h)
-        iframe Hau
-        iright
-        iexists h
-        isplit
-        · ipureintro; rfl
-        · have hkV : k ≤ Vn h := by
-            have hkW := (hok k h hk).1
-            rw [hVn, hVy]
-            show k ≤ max (V h) (if h = cpu then max (Vx h) W else Vx h)
-            rcases hcd k h hk with h1 | h1
-            · subst h1; simp only [if_true]; omega
-            · split <;> omega
-          iapply vecFloor_le ξc h (Vn h) k hkV
-          iapply vecFloors_get ξc Vn h $$ Hvcf
+      · ipureintro; rfl
+      · have hkV : k ≤ Vn h := by
+          have hkW := hok k h hk
+          rw [hVn, hVy]
+          show k ≤ max (V h) (if h = cpu then max (Vx h) W else Vx h)
+          rcases hcd k h hk with h1 | h1
+          · subst h1; simp only [if_true]; omega
+          · split <;> omega
+        iapply vecFloor_le ξc h (Vn h) k hkV
+        iapply vecFloors_get ξc Vn h $$ Hvcf
     isplit
     · iapply vecFloors_le ξc Vn Vy (fun h => by rw [hVn]; exact Nat.le_max_right _ _) $$ Hvcf
     · iexact Hgc
@@ -486,7 +480,7 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
       rcases hcd k h hk with h1 | h1
       · exact Or.inl h1
       · right; rw [hVy]; dsimp only; split <;> omega
-  iexists (max T (max K W)), (Vn, max g gx)
+  iexists (max T K), (Vn, max g gx)
   isplit
   · ipureintro; omega
   isplit
@@ -496,18 +490,20 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
     · exact Or.inl hg
     · exact Or.inr (by show 1 ≤ max g gx; omega)
   isplitl [Hatc Hvc]
-  · iapply ctxStamped_intro ξc (max T (max K W)) Vn (max g gx) Dc
+  · iapply ctxStamped_intro ξc (max T K) Vn (max g gx) Dc (max Wc W)
     iframe Hatc Hvc
     isplit
-    · iapply topLb_max T (max K W)
+    · iapply topLb_max T K
       isplit
       · iexact HTc
-      iapply topLb_max K W
-      isplit
       · iapply viewLb_topLb cpu K; iexact HK
+    isplit
+    · iapply itopLb_max Wc W
+      isplit
+      · iexact HWc
       · iexact HW
     isplit
-    · ipureintro; intro k h hk; have := hDc k h hk; omega
+    · ipureintro; intro k h hk; have := hDc k h hk; show k ≤ max Wc W; omega
     isplit
     · iexact Helsc
     · ipureintro
@@ -515,7 +511,7 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
       have h1 := hVTc h
       have h2 := hVx h
       rw [hVn]
-      show max (V h) (Vy h) ≤ max T (max K W)
+      show max (V h) (Vy h) ≤ max Wc W
       omega
   isplitr [HR]
   · unfold vgFloors
@@ -2878,19 +2874,19 @@ theorem box_born (P : BoxPay GF Id X) [BoxPayOk P] (cpu : CPU) (ξ : CtxId) (i0 
   imod ownCtx_new cpu ξ $$ Hrun with ⟨Hrun, ⟨%ξb, Hξb⟩⟩
   imod ctx_move (inArm P i0) cpu ξ ξb $$ [$Hrun $Hξb $Hin] with ⟨Hrun, Hξb, Hin⟩
   imod ctx_stamp cpu ξb $$ Hξb with ⟨%Tb, %V, %g, Hpk, -, #Hc⟩
-  icases ctxStamped_cases ξb Tb V g $$ Hpk with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
-  imod ctx_vecAbsorb cpu ξ V g Tb hVT $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
+  icases ctxStamped_cases ξb Tb V g $$ Hpk with ⟨%D, %Ws, Hat, #HT, #HWs, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  imod ctx_vecAbsorb cpu ξ V g Ws hVT $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
   · iframe Hrun
     isplit
     · iexact Hc
-    · iexact HT
+    · iexact HWs
   imodintro
   iframe Hrun
   iexists ξb, Tb, (V, g)
   iframe Hin HT
   isplitl [Hat Hv]
-  · iapply ctxStamped_intro ξb Tb V g D
-    iframe Hat Hv
+  · iapply ctxStamped_intro ξb Tb V g D Ws
+    iframe Hat Hv HWs
     isplit
     · iexact HT
     isplit

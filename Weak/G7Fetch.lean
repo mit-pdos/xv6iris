@@ -136,12 +136,20 @@ def fetchReplayOk (G : Gexec) (i k : Nat) (base : Int) (tvs : List (Nat × BitVe
       gwix G w' ≤ gfcut G i k →
       ∃ (σ : MState) (h : CPU) (r : BitVec 44) (a : PAddr) (vs : BitVec 64) (jj : Nat) (H : Hist)
         (tvn : Nat) (e e' : HEnt),
-        h.val = i ∧ Xv6.AccessDiscipline.xv6AccessDisc σ ∧
+        h.val = i ∧ Xv6.AccessDiscipline.xv6AccessDisc σ ∧ σ.mem.eagerOn σ.lp ∧
         σ.regs h Register.cur_privilege = Privilege.User ∧
         satpTable (σ.regs h Register.satp) = some r ∧ uSlotNow σ.mem r a vs ∧ uepTextB vs = true ∧
         jj < 4096 ∧ σ.mem[uepLeafPA vs + BitVec.ofNat 64 jj]? = some H ∧
         H.Pairwise (fun x y => y.t < x.t) ∧ σ.itv h ≤ tvn ∧
         Hist.readEnt (ifetchAgent h) tvn H = some e ∧ e' ∈ H ∧ e.t < e'.t
+
+/-- **O1 under eager landing** (route P, D5): every entry has landed at its own stamp, so the
+export's landed-view O1 (`uTextDiscAtP`) is the stamp form. -/
+theorem G7Fetch.uTextDisc_ofP (σ : MState) (heo : σ.mem.eagerOn σ.lp) (h : uTextDiscAtP σ) : uTextDiscAt σ := by
+  intro hc r hu hs a v hsl htx j hj H hH e he
+  have := h hc r hu hs a v hsl htx j hj H hH e he
+  rw [HEnt.landedLe_eager _ _ e (heo _ H hH e he)] at this
+  exact of_decide_eq_true this
 
 /-- **THE BEFORE-DIRECTION REFUTATION**: an E2/E3 edge whose target is realized at the fetch's cut
 does not exist (O1, at the replay state). -/
@@ -152,10 +160,10 @@ theorem g7EarlyRefuted (G : Gexec) (C : Geid → Prop) (i k : Nat) (base : Int)
   obtain ⟨j, t, v, v', hj, hy, ht, -⟩ := he
   rcases hrep j t v hj with hnw | hrp
   · exact hnw y v' hy
-  · obtain ⟨σ, h, r, a, vs, jj, H, tvn, e, e', -, hD, hu, hs, hslot, htx, hjj, hH, hdesc, hitv, hrd,
+  · obtain ⟨σ, h, r, a, vs, jj, H, tvn, e, e', -, hD, heo, hu, hs, hslot, htx, hjj, hH, hdesc, hitv, hrd,
       he', hlt⟩ := hrp y v' hy ht hcut
-    have := G7Fetch.utextLatest σ h r a vs jj H tvn e e' hD.2.2.2.2.2.1 hu hs hslot htx hjj hH hdesc
-      hitv hrd he'
+    have := G7Fetch.utextLatest σ h r a vs jj H tvn e e' (G7Fetch.uTextDisc_ofP σ heo hD.2.2.2.2.2.1) hu hs
+      hslot htx hjj hH hdesc hitv hrd he'
     omega
 
 /-! # 4. E2/E3 after the fetch — the named premise ([OWN.101]) -/

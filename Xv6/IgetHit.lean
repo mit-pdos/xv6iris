@@ -24,7 +24,7 @@ carries (dev, inum).
 * the close: the slot's rows at `(qt + qn, n + 1)`, the identity share
   split (the minted reference takes `qn = qr / 2` of the table's retained
   `qr`), the reference packaged with the payload's floor as its read
-  credential (`credFloor_of_ctx`).
+  credential: the generation's key the row carries (`visFloor ξ lo`, D12‴ (a″)).
 
 ## DEVIATIONS from Rocq
 
@@ -73,6 +73,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- What the hit's store hands back (route P, D12‴): the new head's stamp, its authorship and issue
+receipt, and the close, which waits for the head's KEY (`visFloor curCtx tstn`, minted with the
+running token after the step: `ctx_key_mint`). -/
+def igHitPost [Fscfg] [Icfg] [CurCtx] (c : CPU) (j : Nat) (qn : Qp) (inum : BitVec 32) (l : Ilic) :
+    IProp GF :=
+  iprop(∃ tstn : Nat, authoredBy tstn (hartAgent c) ∗ itopLb tstn ∗
+    (visFloor curCtx tstn -∗ igRin curCtx ∗ inodeRefb (isClaim l) j qn icfgDev inum ∗
+      iname fscIreg fscFs icfgIst inum l))
+
 set_option maxHeartbeats 8000000 in
 /-- THE HIT's GHOST MOVES AND ITS STORE's ACCESSOR (Rocq 2098--2380;
 deviation 1). -/
@@ -82,8 +91,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
     (hwf : icMWf M) (hciwf : icCiWf M ci icfgNib icfgDev) (hnib : inum.toNat < 16 * icfgNib) :
     igEnv (GF := GF) ∗ igTab M ci ∗ irefSlot ∗ iname fscIreg fscFs icfgIst inum l ⊢
     |={⊤}=> ∃ qn : Qp, writeAU c (iRef (ientry j)) 4 (BitVec.ofNat 32 (nj.val + 1))
-      iprop(igRin curCtx ∗ inodeRefb (isClaim l) j qn icfgDev inum ∗
-        iname fscIreg fscFs icfgIst inum l) := by
+      (igHitPost c j qn inum l) := by
   have hnib' : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
   iintro ⟨#Henv, Htab, Hislot, Hlic⟩
   ihave #Hit := igEnv_it $$ Henv
@@ -118,7 +126,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   rw [itableSlotRes_some curCtx M ci j qj nj hMj, hcij]
   unfold icSlotRowFl icSlotRow itableSlotLive
   icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
-    ⟨%tst, Hst, #Hllbt, #Hflt⟩⟩
+    ⟨%lo, %tst, Hst, #Hllbt, #Hflt, #Hflo⟩⟩
   -- (c): the box mints the new reference's stamps
   obtain ⟨c0, hc0⟩ : ∃ c0, nj.val = c0 + 1 := ⟨nj.val - 1, by have := nj.pos; omega⟩
   ihave Hc := (show icCnt (GF := GF) j nj.val ⊢ icCnt j (c0 + 1) by rw [hc0]) $$ Hc
@@ -131,30 +139,35 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   imodintro
   iexists qj'.half
   -- the store's accessor
-  iapply writeAU_of_own
-  unfold writeAUOwn
+  iapply writeAU_of_ownT
+  unfold writeAUOwnT
   imod iref_incr_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M j inum l qj qj'.half nj
-      tst CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' hMj
+      lo tst (hartAgent c) CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' hMj
       (ig_frac_lt qj qj' hq) hno'
-    $$ Hinv Hrinv Hhalf Hisl Hsel Hlic Hicnt Hst Hllbt with ⟨%g, %lo, %hlot, Hpin, Hcl⟩
+    $$ Hinv Hrinv Hhalf Hisl Hsel Hlic Hicnt Hst Hllbt with ⟨%g, %hlot, Hpin, Hcl⟩
   icases irefPinRows_push j (irefWord M j) (BitVec.ofNat 32 nj.succ.val) lo tst
       (irefSet_count nj.succ hno') $$ Hpin with ⟨%Hs, Hb, Hpush⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists Hs
+  iexists Hs, tst, 0
   rw [PosNat.succ_val]
-  iframe Hb
+  iframe Hb Hllbt
+  isplitl []
+  · iapply topLbAt_0
   inext
-  iintro %t Hb #Hau #Ht
+  iintro %t %htt Hb #Hau #Ht _
   imod Hmask
-  ihave Hpin := Hpush $$ %t %(hartAgent c) Hb
-  imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Htok, Hsel, Hlic, Hicnt, Hru, ⟨%tstn, %hlon, Hstn, #Hllbn⟩⟩
+  ihave Hpin := Hpush $$ %t %(hartAgent c) %htt Hb
+  imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Htok, Hsel, Hlic, Hicnt, Hru, ⟨%tstn, Hstn, #Hllbn, #Hautn⟩⟩
   · unfold pinwStorePost
-    iexists (max tst t)
-    iframe Hpin
-    iapply topLb_max tst t
-    iframe Hllbt Ht
+    iexists t
+    iframe Hpin Ht Hau
+    ipureintro; exact htt
+  unfold igHitPost
   imodintro
+  iexists tstn
+  iframe Hautn Hllbn
+  iintro #Hvfn
   iframe Hlic
   -- the close: the slot's rows at the new count
   have hoff : ∀ i, i ≠ j → PartialMap.get? (PartialMap.insert M j (qj + qj'.half, nj.succ)) i =
@@ -182,8 +195,8 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
       iexists r
       iframe Hrd Hllbr Hc Hvd
       ipureintro; exact ⟨hw, hx, hid, hle⟩
-    · iexists tstn
-      iframe Hstn Hllbn
+    · iexists lo, tstn
+      iframe Hstn Hllbn Hvfn Hflo
   isplitl [Hhalf Hrows Hiauth Hipool Hslots Hpool]
   · iapply itableRes2Llb_intro curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev _ ci
       (icMWf_insert M j _ _ hwf hj hno')
@@ -198,8 +211,8 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   iframe Hlv
   isplitr
   · ipureintro; exact hlot
-  iapply credFloor_of_ctx
-  iexact Hflt
+  unfold credFloor
+  iexact Hflo
 
 set_option maxHeartbeats 16000000 in
 /-- THE CACHE HIT's walk, `+0x56 .. +0x8c` (Rocq 2083--2462). -/
@@ -237,11 +250,22 @@ theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (h
   iintro Hk Hpc
   -- +0x58 c.sw a5,8(s1) : the count store, through the accessor
   k_step (wp_s_sw_au c _ ?hs (KA.«iget» + 0x58#64) true 8#12 9#5 15#5 (iRef (ientry j)) ?ha hram hal
-      iprop(igRin curCtx ∗ inodeRefb (isClaim l) j qn icfgDev inum ∗
-        iname fscIreg fscFs icfgIst inum l))
+      (igHitPost c j qn inum l))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [Xv6.bc_incr']
   case ha => k_norm [h9]; rfl
-  iintro Hk Hpc ⟨HRin, Href, Hlic⟩
+  iintro Hk Hpc Hpost
+  unfold igHitPost
+  icases Hpost with ⟨%tstn, #Hautn, #Hllbn, Hcw⟩
+  -- the new head's KEY (route P, D12‴): minted with the running token, after the store
+  iapply wpLoop_fupd
+  icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
+  imod ctx_key_mint c curCtx tstn $$ [Hctx Hautn Hllbn] with ⟨Hctx, #Hkey⟩
+  · iframe Hctx Hautn Hllbn
+  ihave Hk := Hkback $$ Hctx
+  ihave Hcl := Hcw $$ [Hkey]
+  · unfold visFloor; ileft; iexact Hkey
+  icases Hcl with ⟨HRin, Href, Hlic⟩
+  imodintro
   -- +0x5a auipc a0 ; +0x5e addi a0 ; +0x62 jal release
   k_step (wp_s_auipc c _ (KA.«iget» + 0x5a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

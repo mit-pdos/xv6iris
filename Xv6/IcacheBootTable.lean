@@ -492,7 +492,7 @@ theorem itableSlotResBare_boot [Icfg] [CurCtx] (tl k : Nat) :
     · iexact Hl
   · iexists 0
     iframe Hcell Hst
-    iapply topLbAt_0
+    iapply itopLbAt_0
 
 /-- THE BARE TABLE at the ALL-EMPTY boot state `M = ci = ∅` (Rocq
 1545--1571): fifty dead rows under one `tl`, the two wf facts, the slots'

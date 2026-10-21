@@ -212,7 +212,7 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
   iintro Hk Hpc
   -- THE MINT, the regeneration and the FROZEN PARK
   unfold iputEntCom
-  icases Hcom with ⟨Hhalf, Hsb, ⟨%tst, Hst, #Hllbk, -⟩, Hback, Hrst, Hiu, Hgid, Hicnt, Hmir, Hsel,
+  icases Hcom with ⟨Hhalf, Hsb, Hst, Hback, Hrst, Hiu, Hgid, Hicnt, Hmir, Hsel,
     Hhpn, Htxh, Htxf, Hfrag, Hlv, -, -, Hslh, Hiauth, Hipool, Hpool⟩
   ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
     by unfold iputEnv; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H) $$ Henv
@@ -229,9 +229,9 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
   icases Hrest with ⟨Hru, Hnlz, #Hcrd, Hop, Hpid, Hsbb, Hsi, Hsl, Hpost⟩
   ihave Hru := (show runitAny (GF := GF) inum.toNat ⊢ runit false inum.toNat from .rfl) $$ Hru
   have e10 : iLock (ientry kk) = ientry kk + 16#64 := rfl
-  ihave Hst : iprop(∃ tst : Nat, istmpAuth (GF := GF) kk (1 : Qp).half tst ∗ topLb tst) $$ [Hst]
-  · iexists tst
-    iframe Hst Hllbk
+  ihave Hst : iprop(itableSlotLiveLlb (GF := GF) curCtx kk) $$ [Hst]
+  · unfold itableSlotLive itableSlotLiveLlb
+    iexact Hst
   iapply (HL Γ c k γl pd pav pu j γil γisl kk q inum dn bm ga g2 Mt ci n Sb crb cru crz e0
     tid qtx pidv dqp dqb dqs rgb false td T0 Kw a
     (((R.set 15#5 (ientry kk + 16#64)).set 19#5 (ientry kk + 16#64)).set 10#5 (ientry kk + 16#64))

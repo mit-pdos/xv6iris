@@ -42,9 +42,14 @@ it), so that the state interpretation can carry it MachCSL-generically
   ghost map (`MachCSL.certsOk`, in `MachCSL.Resources`; `ChainCert.key` is
   injective, `chainPair`).
 
-Everything here is STABLE under the machine's steps: a step only pushes
-newer entries on top of histories (`memExt`), and a hop is about two
-adjacent OLD entries (`ChainCert.valid_mono`).
+Everything here is STABLE under the machine's steps.  Route P (design D6,
+`PROGRESS-W11F.md` §11): the hops are read over the LANDED-ONLY memory
+(`FlatMem.landedOnly`: each history's landed suffix, issue stamps kept), which
+every step only grows on top (`memExt`) -- a landing puts the lowest pending
+entry on top of it, a write that lands at once lands on top of it -- and a hop
+is about two adjacent OLD landed entries (`ChainCert.valid_mono`); the entry
+receipts are read over the merged memory, whose entries are never dropped
+(`memIncl`); a coherence floor is a LANDING position.
 
 Spec, for the record: RVWMO orders a release (`fence rw,w; sw` / `.rl`)
 before every later access of the releasing hart's that it follows, and an
@@ -120,6 +125,207 @@ theorem ChainDefs.writeBytes_mem {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVe
     {j : Nat} (hj : j < n) :
     ∃ H, (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? = some H ∧ (⟨t, h, nthByte w j⟩ : HEnt) ∈ H :=
   ChainDefs.foldl_mem pa w t h j _ m (List.mem_range.2 hj)
+
+/-! ## Route P: the landed-only memory and membership (design D6) -/
+
+/-- **The LANDED-ONLY memory** (route P): each history's landed entries, in their (co) order,
+issue stamps kept -- the pending prefix dropped.  What the hops of a sync chain are read over. -/
+def FlatMem.landedOnly (m : FlatMem) (lp : LandPos) : FlatMem :=
+  m.map (fun _ H => H.filter (fun e => (lp e.t).isSome))
+
+theorem FlatMem.landedOnly_get? (m : FlatMem) (lp : LandPos) (a : PAddr) :
+    (m.landedOnly lp)[a]? = m[a]?.map (fun H => H.filter (fun e => (lp e.t).isSome)) := by
+  unfold FlatMem.landedOnly
+  exact Std.ExtTreeMap.getElem?_map
+
+/-- A landed-only entry is a landed entry of the memory. -/
+theorem FlatMem.mem_landedOnly {m : FlatMem} {lp : LandPos} {a : PAddr} {L : Hist} {e : HEnt}
+    (hL : (m.landedOnly lp)[a]? = some L) (he : e ∈ L) :
+    ∃ H, m[a]? = some H ∧ e ∈ H ∧ (lp e.t).isSome := by
+  rw [FlatMem.landedOnly_get?] at hL
+  cases hm : m[a]? with
+  | none => rw [hm] at hL; cases hL
+  | some H =>
+    rw [hm] at hL
+    cases (Option.some.inj hL)
+    obtain ⟨he1, he2⟩ := List.mem_filter.1 he
+    exact ⟨H, rfl, he1, he2⟩
+
+/-- A landed entry of the memory is a landed-only entry. -/
+theorem FlatMem.landedOnly_of_mem {m : FlatMem} {lp : LandPos} {a : PAddr} {H : Hist} {e : HEnt}
+    (hH : m[a]? = some H) (he : e ∈ H) (hl : (lp e.t).isSome) :
+    ∃ L, (m.landedOnly lp)[a]? = some L ∧ e ∈ L :=
+  ⟨_, by rw [FlatMem.landedOnly_get?, hH]; rfl, List.mem_filter.2 ⟨he, hl⟩⟩
+
+/-- `m'` keeps every entry of `m` (route P: every step; a write that lands at once INSERTS below
+a pending prefix, so the merged memory is not extended on top, but no entry is ever dropped). -/
+def memIncl (m m' : FlatMem) : Prop :=
+  ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ H', m'[a]? = some H' ∧ ∀ e ∈ H, e ∈ H'
+
+theorem memIncl_refl (m : FlatMem) : memIncl m m := fun _ H h => ⟨H, h, fun _ he => he⟩
+
+theorem memIncl_trans {m m' m'' : FlatMem} (h1 : memIncl m m') (h2 : memIncl m' m'') : memIncl m m'' := by
+  intro a H hH
+  obtain ⟨H', hH', h1'⟩ := h1 a H hH
+  obtain ⟨H'', hH'', h2'⟩ := h2 a H' hH'
+  exact ⟨H'', hH'', fun e he => h2' e (h1' e he)⟩
+
+theorem memIncl_of_memExt {m m' : FlatMem} (h : memExt m m') : memIncl m m' := by
+  intro a H hH
+  obtain ⟨N, hN⟩ := h a H hH
+  exact ⟨N ++ H, hN, fun e he => List.mem_append_right _ he⟩
+
+/-- `m'` extends `m` on top by entries satisfying `P` (route P: the landed-only memory under a
+step -- `P` names the new entries' stamps). -/
+def memExtP (m m' : FlatMem) (P : HEnt → Prop) : Prop :=
+  ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ N : Hist, m'[a]? = some (N ++ H) ∧ ∀ e ∈ N, P e
+
+theorem memExtP_refl (m : FlatMem) (P : HEnt → Prop) : memExtP m m P :=
+  fun _ H h => ⟨[], by simpa using h, fun _ he => by simp at he⟩
+
+theorem memExtP_trans {m m' m'' : FlatMem} {P : HEnt → Prop} (h1 : memExtP m m' P) (h2 : memExtP m' m'' P) :
+    memExtP m m'' P := by
+  intro a H hH
+  obtain ⟨N1, h1', hN1⟩ := h1 a H hH
+  obtain ⟨N2, h2', hN2⟩ := h2 a _ h1'
+  refine ⟨N2 ++ N1, by rw [h2', List.append_assoc], fun e he => ?_⟩
+  rcases List.mem_append.1 he with he | he
+  · exact hN2 e he
+  · exact hN1 e he
+
+theorem memExtP_mono {m m' : FlatMem} {P Q : HEnt → Prop} (h : memExtP m m' P) (hPQ : ∀ e, P e → Q e) :
+    memExtP m m' Q := fun a H hH => let ⟨N, hN, hP⟩ := h a H hH; ⟨N, hN, fun e he => hPQ e (hP e he)⟩
+
+theorem memExt_of_memExtP {m m' : FlatMem} {P : HEnt → Prop} (h : memExtP m m' P) : memExt m m' :=
+  fun a H hH => let ⟨N, hN, _⟩ := h a H hH; ⟨N, hN⟩
+
+theorem memExtP_of_eq {m m' : FlatMem} (P : HEnt → Prop) (h : ∀ a : PAddr, m'[a]? = m[a]?) : memExtP m m' P :=
+  fun a H hH => ⟨[], by rw [h a, hH]; rfl, fun _ he => by simp at he⟩
+
+/-- **An issue leaves the landed-only memory unchanged on every old byte** (its entries are
+pending). -/
+theorem FlatMem.landedOnly_push_pending (m : FlatMem) (lp : LandPos) (a : PAddr) (x : HEnt)
+    (hx : lp x.t = none) : memExtP (m.landedOnly lp) ((m.push a x).landedOnly lp) (fun _ => False) := by
+  intro a' L hL
+  refine ⟨[], ?_, fun _ he => by simp at he⟩
+  rw [FlatMem.landedOnly_get?] at hL ⊢
+  by_cases ha : a' = a
+  · subst ha
+    rw [FlatMem.push_get?_eq]
+    cases hm : m[a']? with
+    | none => rw [hm] at hL; cases hL
+    | some H =>
+      rw [hm] at hL
+      rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm]
+      simp only [Option.getD_some, Option.map_some, List.nil_append]
+      rw [List.filter_cons_of_neg (by simp [hx])]
+      exact hL
+  · rw [FlatMem.push_get?_ne _ _ _ _ ha]; simpa using hL
+
+theorem FlatMem.landedOnly_writeBytes_pending {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr)
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (ht : lp t = none) :
+    memExtP (m.landedOnly lp) ((m.writeBytes pa n w t h).landedOnly lp) (fun _ => False) := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), memExtP (m.landedOnly lp)
+      ((l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m :
+        FlatMem).landedOnly lp) (fun _ => False) := by
+    intro l
+    induction l with
+    | nil => intro m; exact memExtP_refl _ _
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      exact memExtP_trans (FlatMem.landedOnly_push_pending m lp _ _ ht) (ih _)
+  exact key _ m
+
+/-- **A write that lands at once** puts its entry on top of the landed-only history. -/
+theorem FlatMem.landedOnly_pushLanded (m : FlatMem) (lp : LandPos) (a : PAddr) (x : HEnt)
+    (hx : (lp x.t).isSome) :
+    memExtP (m.landedOnly lp) ((m.pushLanded lp a x).landedOnly lp) (fun e => e = x) := by
+  intro a' L hL
+  rw [FlatMem.landedOnly_get?] at hL ⊢
+  by_cases ha : a' = a
+  · subst ha
+    refine ⟨[x], ?_, fun e he => by simpa using he⟩
+    rw [FlatMem.pushLanded_get?_eq]
+    cases hm : m[a']? with
+    | none => rw [hm] at hL; cases hL
+    | some H =>
+      rw [hm] at hL
+      rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm]
+      simp only [Option.getD_some, Option.map_some, Option.some.injEq] at hL ⊢
+      subst hL
+      unfold Hist.insLanded
+      rw [List.filter_append, List.filter_cons_of_pos (p := fun e : HEnt => (lp e.t).isSome) hx]
+      have h1 : (H.takeWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp e.t).isSome) = [] := by
+        rw [List.filter_eq_nil_iff]
+        intro e he
+        have := List.all_eq_true.1 List.all_takeWhile e he
+        simp only [Option.isNone_iff_eq_none] at this
+        simp [this]
+      have h2 : H.filter (fun e => (lp e.t).isSome) =
+          (H.dropWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp e.t).isSome) := by
+        have e1 : H.filter (fun e => (lp e.t).isSome) =
+            (H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone)).filter
+              (fun e => (lp e.t).isSome) := by rw [List.takeWhile_append_dropWhile]
+        rw [e1, List.filter_append, h1, List.nil_append]
+      rw [h1, h2]; rfl
+  · refine ⟨[], ?_, fun _ he => by simp at he⟩
+    rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha]; simpa using hL
+
+theorem FlatMem.landedOnly_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr)
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (ht : (lp t).isSome) :
+    memExtP (m.landedOnly lp) ((m.landBytes lp pa n w t h).landedOnly lp) (fun e => e.t = t) := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), memExtP (m.landedOnly lp)
+      ((l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m :
+        FlatMem).landedOnly lp) (fun e => e.t = t) := by
+    intro l
+    induction l with
+    | nil => intro m; exact memExtP_refl _ _
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      exact memExtP_trans (memExtP_mono (FlatMem.landedOnly_pushLanded m lp _ _ ht)
+        (fun e he => by rw [he])) (ih _)
+  exact key _ m
+
+/-- **Relabelling to grown landing positions** grows each landed-only history on top by the
+entries that land: given co order (pending prefix over a landed suffix), every entry landed
+before stays landed, and the newly landed ones are in the pending prefix. -/
+theorem FlatMem.landedOnly_relabel (m : FlatMem) (lp lp' : LandPos) (log : List Agent)
+    (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp log H)
+    (hkeep : ∀ t, (lp t).isSome → (lp' t).isSome) :
+    memExtP (m.landedOnly lp) (m.landedOnly lp') (fun e => (lp e.t).isNone) := by
+  intro a L hL
+  rw [FlatMem.landedOnly_get?] at hL ⊢
+  cases hma : m[a]? with
+  | none => rw [hma] at hL; cases hL
+  | some H =>
+    rw [hma] at hL
+    simp only [Option.map_some, Option.some.injEq] at hL ⊢
+    subst hL
+    have hD := histOkP_dropWhile_landed lp log H (hm a H hma)
+    refine ⟨(H.takeWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp' e.t).isSome), ?_, ?_⟩
+    · have e1 : ∀ q : HEnt → Bool, H.filter q =
+          (H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone)).filter q := by
+        intro q; rw [List.takeWhile_append_dropWhile]
+      rw [e1 (fun e => (lp' e.t).isSome), e1 (fun e => (lp e.t).isSome), List.filter_append, List.filter_append]
+      have h1 : (H.takeWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp e.t).isSome) = [] := by
+        rw [List.filter_eq_nil_iff]
+        intro e he
+        have := List.all_eq_true.1 List.all_takeWhile e he
+        simp only [Option.isNone_iff_eq_none] at this
+        simp [this]
+      have h2 : (H.dropWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp' e.t).isSome) =
+          (H.dropWhile (fun x => (lp x.t).isNone)) := by
+        rw [List.filter_eq_self]; intro e he; exact hkeep _ (hD e he)
+      have h3 : (H.dropWhile (fun x => (lp x.t).isNone)).filter (fun e => (lp e.t).isSome) =
+          (H.dropWhile (fun x => (lp x.t).isNone)) := by
+        rw [List.filter_eq_self]; intro e he; exact hD e he
+      rw [h1, h2, h3, List.nil_append]
+    · intro e he
+      exact List.all_eq_true.1 List.all_takeWhile e (List.mem_filter.1 he).1
 
 /-! ## Growth above a position (the dynamic registry's stability) -/
 
@@ -399,10 +605,15 @@ theorem relPcOk_step {rs : List RsvRegion} {ps : List Int} {σ σ' : MState}
       · exact h.2 f w H' e hf hH' he' h0
     · exact hnewP f w H e hf hH he (Nat.lt_of_not_le ht)
 
-/-- A store keeps the old positions' pcs. -/
-theorem relPc_storeOld (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
-    ∀ t, t ≤ σ.top → (σ.store cpu pa n w excl).pcAt t = σ.pcAt t := by
-  intro t ht; simp only [MState.store]; rw [if_neg (by omega)]
+/-- A plain store's issue keeps the old positions' pcs. -/
+theorem relPc_issueOld (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ∀ t, t ≤ σ.top → (σ.issue cpu pa n w).pcAt t = σ.pcAt t := by
+  intro t ht; simp only [MState.issue]; rw [if_neg (by omega)]
+
+/-- An exclusive write keeps the old positions' pcs. -/
+theorem relPc_storeLOld (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ∀ t, t ≤ σ.top → (σ.storeL cpu pa n w).pcAt t = σ.pcAt t := by
+  intro t ht; simp only [MState.storeL]; rw [if_neg (by omega)]
 
 /-- A DMA write keeps the old positions' pcs. -/
 theorem relPc_dmaOld (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -413,40 +624,63 @@ theorem relPc_dmaOld (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
   · simp only [MState.storeDma, if_neg hn]; rw [if_neg (by omega)]
 
 /-- **The release under an acquire was issued at a release pc** (mcslrec (2)
-[OWN.82] (a1), Q-MCSL2-DYN ruled (i)): in `b`'s history, every entry at `r`
+[OWN.82] (a1), Q-MCSL2-DYN ruled (i); route P: over the LANDED-ONLY history,
+where the acquire at `a` has landed, design D6): in `b`'s history, every entry at `r`
 of value 0 directly below an entry at `a` of nonzero value, itself over a
 nonzero entry (a `syncHop`'s release, its word-sizes left out), was issued
 (`MState.pcAt`) at a pc of `ps`.  The pc clause a DYNAMIC lock's hop carries
 (`MachCSL.chainEnvAt`'s hop registry): the winning AMO's hop request shows
 the release's pc receipt (`MachCSL.pcRcpt`). -/
 def relBelowOk (ps : List Int) (σ : MState) (b : PAddr) (a : Nat) : Prop :=
+  (∃ (H : Hist) (e : HEnt), (σ.mem.landedOnly σ.lp)[b]? = some H ∧ e ∈ H ∧ e.t = a) ∧
   ∀ (H1 H2 : Hist) (B A : Agent) (va : BitVec 8) (r : Nat) (e0 : HEnt),
-    σ.mem[b]? = some (H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2) → va ≠ 0 → e0.v ≠ 0 → σ.pcAt r ∈ ps
+    (σ.mem.landedOnly σ.lp)[b]? = some (H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2) → va ≠ 0 → e0.v ≠ 0 →
+      σ.pcAt r ∈ ps
 
-/-- The pc clause survives a step at top `top` past the acquire: the
-acquire's entry and everything below it are old, and old positions keep
-their pc. -/
-theorem relBelowOk_grow {ps : List Int} {σ σ' : MState} {top : Nat} {b : PAddr} {a : Nat}
-    (hg : memGrow σ.mem top σ'.mem) (hgr : memGrowR σ.mem top σ'.mem)
-    (hle : ∀ (x : PAddr) (H : Hist) (e : HEnt), σ.mem[x]? = some H → e ∈ H → e.t ≤ top)
-    (hpc : ∀ t, t ≤ top → σ'.pcAt t = σ.pcAt t) (ha : a ≤ top)
+/-- The pc clause survives a step whose landed-only history at `b` grows on top by entries
+PENDING before it (a landing: the landing stamp; a write that lands at once: the fresh stamp),
+and that keeps the pcs of the old landed stamps. -/
+theorem relBelowOk_grow {ps : List Int} {σ σ' : MState} {b : PAddr} {a : Nat}
+    (hg : ∀ H, (σ.mem.landedOnly σ.lp)[b]? = some H →
+      ∃ N, (σ'.mem.landedOnly σ'.lp)[b]? = some (N ++ H) ∧ ∀ e ∈ N, σ.lp e.t = none)
+    (hpc : ∀ (H : Hist) (e : HEnt), (σ.mem.landedOnly σ.lp)[b]? = some H → e ∈ H → σ'.pcAt e.t = σ.pcAt e.t)
     (h : relBelowOk ps σ b a) : relBelowOk ps σ' b a := by
-  intro H1 H2 B A va r e0 hb hva he0
-  have hx : (⟨a, B, va⟩ : HEnt) ∈ H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2 := by simp
-  rcases hgr b _ hb _ hx with hlt | ⟨H, hH, -⟩
-  · exact absurd ha (Nat.not_le.2 hlt)
-  obtain ⟨N, hN, hNt⟩ := hg b H hH
-  rw [hb] at hN
-  obtain ⟨H1', hH1'⟩ := relPc_split_old N H H1 _ _ hNt ha (Option.some.inj hN).symm
-  have hr : r ≤ top := hle b H ⟨r, A, 0⟩ hH (by rw [hH1']; simp)
-  rw [hpc r hr]
-  exact h H1' H2 B A va r e0 (by rw [hH, hH1']) hva he0
+  obtain ⟨⟨H, x, hH, hx, hxa⟩, hpat⟩ := h
+  obtain ⟨N, hN, hNp⟩ := hg H hH
+  have hxl : (σ.lp a).isSome := by
+    obtain ⟨-, -, -, hl⟩ := FlatMem.mem_landedOnly hH hx; rw [← hxa]; exact hl
+  have hNa : ∀ e ∈ N, e.t ≠ a := fun e he hea => by rw [← hea, hNp e he] at hxl; cases hxl
+  refine ⟨⟨N ++ H, x, hN, List.mem_append_right _ hx, hxa⟩, fun H1 H2 B A va r e0 hb hva he0 => ?_⟩
+  rw [hN] at hb
+  have hb' := Option.some.inj hb
+  -- the acquire entry is old: split the new history at it
+  have key : ∀ (N H1 : Hist), (∀ e ∈ N, e.t ≠ a) → N ++ H = H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2 →
+      ∃ H1', H = H1' ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2 := by
+    intro N
+    induction N with
+    | nil => intro H1 _ h; exact ⟨H1, by simpa using h⟩
+    | cons y N ih =>
+      intro H1 hNa' h
+      cases H1 with
+      | nil =>
+        simp only [List.cons_append, List.nil_append, List.cons.injEq] at h
+        exact absurd (by rw [h.1]) (hNa' y List.mem_cons_self)
+      | cons z H1 =>
+        simp only [List.cons_append, List.cons.injEq] at h
+        exact ih H1 (fun e he => hNa' e (List.mem_cons_of_mem _ he)) h.2
+  obtain ⟨H1', hH1'⟩ := key N H1 hNa hb'
+  have hrH : (⟨r, A, 0⟩ : HEnt) ∈ H := by rw [hH1']; simp
+  rw [hpc H _ hH hrH]
+  exact hpat H1' H2 B A va r e0 (by rw [hH, hH1']) hva he0
+
 
 /-- The pc clause at the acquire's own entry, the newest of the history:
 the release directly below it. -/
 theorem relBelowOk_head {ps : List Int} {σ : MState} {b : PAddr} {a r : Nat} {B A : Agent} {va : BitVec 8}
-    {e0 : HEnt} {H2 : Hist} (hb : σ.mem[b]? = some (⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2))
+    {e0 : HEnt} {H2 : Hist}
+    (hb : (σ.mem.landedOnly σ.lp)[b]? = some (⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2))
     (hlt : ∀ e ∈ (⟨r, A, 0⟩ :: e0 :: H2 : Hist), e.t < a) (hpc : σ.pcAt r ∈ ps) : relBelowOk ps σ b a := by
+  refine ⟨⟨_, ⟨a, B, va⟩, hb, List.mem_cons_self, rfl⟩, ?_⟩
   intro H1 H2' B' A' va' r' e0' hb' _ _
   rw [hb] at hb'
   have hb'' := Option.some.inj hb'
@@ -464,6 +698,20 @@ theorem relBelowOk_head {ps : List Int} {σ : MState} {b : PAddr} {a r : Nat} {B
     simp only at this
     omega
 
+theorem lockByteIn_rsvBytes {rs : List RsvRegion} {b : PAddr} (h : lockByteIn rs b) : b ∈ rsvBytes rs := by
+  obtain ⟨cb, hR⟩ := h
+  refine List.mem_flatMap.2 ⟨_, hR, ?_⟩
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
+    List.mem_map, List.mem_range]
+  exact Or.inl ⟨0, by decide, by simp⟩
+
+theorem pubByte_rsvBytes {rs : List RsvRegion} {f : PAddr} {w : CPU} (h : (⟨f, .pub w⟩ : RsvRegion) ∈ rs) :
+    f ∈ rsvBytes rs := by
+  refine List.mem_flatMap.2 ⟨_, h, ?_⟩
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
+    List.mem_map, List.mem_range]
+  exact Or.inl ⟨0, by decide, by simp⟩
+
 /-- **What a store owes the release sites' provenance**: it is a PLAIN store
 issued at a release pc, or it makes no release entry (on a static lock's byte
 a nonzero byte or one over a zero head) and writes no publication word. -/
@@ -473,6 +721,57 @@ def storeRelOk (rs : List RsvRegion) (ps : List Int) (σ : MState) (cpu : CPU) (
   ∀ j, j < n → (lockByteIn rs (pa + BitVec.ofNat 64 j) →
       nthByte w j ≠ 0 ∨ ∀ (e0 : HEnt) (H : Hist), σ.mem[pa + BitVec.ofNat 64 j]? = some (e0 :: H) → e0.v = 0) ∧
     ∀ w', (⟨pa + BitVec.ofNat 64 j, .pub w'⟩ : RsvRegion) ∉ rs
+
+/-- **What a LANDED write owes the release sites' provenance at one byte** `b` (route P, finding
+F-11.2, coordinator ruling 2026-10-19): the write's byte `v` goes directly BELOW the byte's pending
+prefix (`Hist.insLanded`, over the landing positions `lp` after it), so (i) a ZERO byte goes over a
+zero LANDED head (no pattern `new :: head`), and (ii) a NONZERO byte goes under a lowest pending
+entry that is not a zero over a zero: if it is a zero, it sits over a word-sized nonzero landed
+entry, i.e. it was already a release pattern (no NEW pattern `lowest :: new`). -/
+def relInsOkM (m : FlatMem) (lp : LandPos) (b : PAddr) (v : BitVec 8) : Prop :=
+  (v ≠ 0 ∨ ∀ (d : HEnt) (D : Hist), (m.getD b []).dropWhile (fun x => (lp x.t).isNone) = d :: D → d.v = 0) ∧
+  (v = 0 ∨ ∀ x : HEnt, ((m.getD b []).takeWhile (fun x => (lp x.t).isNone)).getLast? = some x → x.v = 0 →
+    ∃ (d : HEnt) (D : Hist), (m.getD b []).dropWhile (fun x => (lp x.t).isNone) = d :: D ∧ d.v ≠ 0 ∧
+      wordEntAt m b d.t d.tid)
+
+/-- **What an EXCLUSIVE write owes the release sites' provenance** (route P, F-11.2): it lands at
+once (over the landing positions `lp` after it), so on a static lock's byte `relInsOkM`; it writes
+no publication word. -/
+def exclRelOk (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → (lockByteIn rs (pa + BitVec.ofNat 64 j) → relInsOkM m lp (pa + BitVec.ofNat 64 j) (nthByte w j)) ∧
+    ∀ w', (⟨pa + BitVec.ofNat 64 j, .pub w'⟩ : RsvRegion) ∉ rs
+
+/-- `relInsOkM` over a window's histories `Hs` (the client's form, F-11.2): byte `j`'s word-sized
+entry is spelled by the window's bytes `j .. j+3`. -/
+def relInsOk (lp : LandPos) (n : Nat) (w : BitVec (8 * n)) (Hs : Nat → Hist) (j : Nat) : Prop :=
+  (nthByte w j ≠ 0 ∨ ∀ (d : HEnt) (D : Hist), (Hs j).dropWhile (fun x => (lp x.t).isNone) = d :: D → d.v = 0) ∧
+  (nthByte w j = 0 ∨ ∀ x : HEnt, ((Hs j).takeWhile (fun x => (lp x.t).isNone)).getLast? = some x → x.v = 0 →
+    ∃ (d : HEnt) (D : Hist), (Hs j).dropWhile (fun x => (lp x.t).isNone) = d :: D ∧ d.v ≠ 0 ∧
+      ∀ i, i < 4 → j + i < n ∧ ∃ y ∈ Hs (j + i), y.t = d.t ∧ y.tid = d.tid)
+
+/-- The client's form gives the machine's, at a memory holding the window's histories. -/
+theorem relInsOkM_of {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {Hs : Nat → Hist}
+    (hget : ∀ j, j < n → m[pa + BitVec.ofNat 64 j]? = some (Hs j)) {j : Nat} (hj : j < n)
+    (h : relInsOk lp n w Hs j) : relInsOkM m lp (pa + BitVec.ofNat 64 j) (nthByte w j) := by
+  have hG : m.getD (pa + BitVec.ofNat 64 j) [] = Hs j := by
+    rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hget j hj]; rfl
+  rw [relInsOkM, hG]
+  refine ⟨h.1, ?_⟩
+  rcases h.2 with h2 | h2
+  · exact Or.inl h2
+  · refine Or.inr fun x hx hx0 => ?_
+    obtain ⟨d, D, hd, hdv, hw⟩ := h2 x hx hx0
+    refine ⟨d, D, hd, hdv, fun i hi => ?_⟩
+    obtain ⟨hji, y, hy, hyt, hyg⟩ := hw i hi
+    refine ⟨Hs (j + i), y, ?_, hy, hyt, hyg⟩
+    rw [BitVec.add_assoc, ← BitVec.ofNat_add]
+    exact hget (j + i) hji
+
+/-- An exclusive write off the reserved bytes owes nothing. -/
+theorem exclRelOk_off {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    {w : BitVec (8 * n)} (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) : exclRelOk rs m lp pa n w :=
+  fun j hj => ⟨fun hb => absurd (lockByteIn_rsvBytes hb) (hnr j hj), fun w' hp => hnr j hj (pubByte_rsvBytes hp)⟩
 
 /-- A written byte's history, after the store, from its history before. -/
 theorem relPc_written {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent)
@@ -490,23 +789,24 @@ theorem relPc_getD {m : FlatMem} {a : PAddr} {e : HEnt} {H : Hist} (h : m.getD a
   | none => rw [ha] at h; cases h
   | some H' => rw [ha] at h; simp only [Option.getD_some] at h; rw [h]
 
-/-- **A store keeps the release sites' provenance**, given what it owes. -/
-theorem relPcOk_store {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
-    (w : BitVec (8 * n)) (excl : Bool) (hn : n ≤ 2 ^ 64)
+/-- **A plain store's issue keeps the release sites' provenance**, given what it owes (route P:
+its entries are pushed on top of the footprint's histories, as the eager store's were). -/
+theorem relPcOk_issue {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (hn : n ≤ 2 ^ 64)
     (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
-    (hok : storeRelOk rs ps σ cpu pa n w excl) (h : relPcOk rs ps σ) :
-    relPcOk rs ps (σ.store cpu pa n w excl) := by
-  have htop : (σ.store cpu pa n w excl).top = σ.top + 1 := by
+    (hok : storeRelOk rs ps σ cpu pa n w false) (h : relPcOk rs ps σ) :
+    relPcOk rs ps (σ.issue cpu pa n w) := by
+  have htop : (σ.issue cpu pa n w).top = σ.top + 1 := by
     simp only [MState.top, List.length_append, List.length_singleton]
   -- a new entry is the written byte's new head
-  have hnewE : ∀ (a : PAddr) (H : Hist) (e : HEnt), (σ.store cpu pa n w excl).mem[a]? = some H → e ∈ H →
+  have hnewE : ∀ (a : PAddr) (H : Hist) (e : HEnt), (σ.issue cpu pa n w).mem[a]? = some H → e ∈ H →
       σ.top < e.t → ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j ∧
         H = ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩ :: σ.mem.getD a [] ∧ e = ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩ := by
     intro a H e hH he hlt
     by_cases hw : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
     · obtain ⟨j, hj, rfl⟩ := hw
       have hH' := relPc_written σ.mem pa w (σ.top + 1) (hartAgent cpu) hn hj
-      rw [show (σ.store cpu pa n w excl).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
+      rw [show (σ.issue cpu pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
         hH'] at hH
       obtain rfl := Option.some.inj hH
       refine ⟨j, hj, rfl, rfl, ?_⟩
@@ -522,16 +822,16 @@ theorem relPcOk_store {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu :
         omega
     · exfalso
       have hna : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := fun j hj he => hw ⟨j, hj, he⟩
-      rw [show (σ.store cpu pa n w excl).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
+      rw [show (σ.issue cpu pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
         FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hna] at hH
       have := hle a H e hH he
       omega
-  have hpcNew : (σ.store cpu pa n w excl).pcAt (σ.top + 1) =
-      (if excl then -1 else ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int)) := by
-    simp only [MState.store, if_pos]
+  have hpcNew : (σ.issue cpu pa n w).pcAt (σ.top + 1) =
+      ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int) := by
+    simp only [MState.issue, if_pos]
   refine relPcOk_step (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
     (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
-    (fun t ht => by simp only [MState.store]; rw [if_neg (by omega)]) ?_ ?_ h
+    (fun t ht => by simp only [MState.issue]; rw [if_neg (by omega)]) ?_ ?_ h
   · intro b r A hb hp hr
     obtain ⟨H1, H2, e0, hbH, hv, -, -⟩ := hp
     obtain ⟨j, hj, rfl, hH, hx⟩ := hnewE _ _ ⟨r, hartAgent A, 0⟩ hbH (by simp) hr
@@ -539,7 +839,7 @@ theorem relPcOk_store {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu :
     subst hrt
     rw [hpcNew]
     rcases hok with ⟨hex, hpc⟩ | hfree
-    · rw [hex]; simpa using hpc
+    · simpa using hpc
     · exfalso
       -- the pattern's entry is the new head, `e0` the old head
       cases H1 with
@@ -568,22 +868,55 @@ theorem relPcOk_store {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu :
     obtain ⟨j, hj, rfl, -, rfl⟩ := hnewE _ _ e hH he het
     rw [hpcNew]
     rcases hok with ⟨hex, hpc⟩ | hfree
-    · rw [hex]; simpa using hpc
+    · simpa using hpc
     · exact absurd hf ((hfree j hj).2 wv)
 
-theorem lockByteIn_rsvBytes {rs : List RsvRegion} {b : PAddr} (h : lockByteIn rs b) : b ∈ rsvBytes rs := by
-  obtain ⟨cb, hR⟩ := h
-  refine List.mem_flatMap.2 ⟨_, hR, ?_⟩
-  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
-    List.mem_map, List.mem_range]
-  exact Or.inl ⟨0, by decide, by simp⟩
 
-theorem pubByte_rsvBytes {rs : List RsvRegion} {f : PAddr} {w : CPU} (h : (⟨f, .pub w⟩ : RsvRegion) ∈ rs) :
-    f ∈ rsvBytes rs := by
-  refine List.mem_flatMap.2 ⟨_, h, ?_⟩
-  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
-    List.mem_map, List.mem_range]
-  exact Or.inl ⟨0, by decide, by simp⟩
+/-- A landed write's bytes, after it (the `landBytes` twin of `writeBytes_at`). -/
+theorem FlatMem.foldl_pushLanded_at {n : Nat} (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    ∀ (l : List Nat), (∀ j ∈ l, j < 2 ^ 64) → l.Nodup → ∀ (m : FlatMem) (j : Nat), j ∈ l →
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)[pa + BitVec.ofNat 64 j]? =
+        some (Hist.insLanded lp ⟨t, h, nthByte w j⟩ (m.getD (pa + BitVec.ofNat 64 j) []))
+  | [], _, _, _, _, hj => by simp at hj
+  | j0 :: l, hb, hnd, m, j, hj => by
+    simp only [List.foldl_cons]
+    rw [List.nodup_cons] at hnd
+    have hb' : ∀ x ∈ l, x < 2 ^ 64 := fun x hx => hb x (List.mem_cons_of_mem _ hx)
+    rcases List.mem_cons.1 hj with rfl | hj
+    · have hj64 : j < 2 ^ 64 := hb j List.mem_cons_self
+      have key : ∀ (l : List Nat), (∀ x ∈ l, x < 2 ^ 64) → j ∉ l → ∀ m' : FlatMem,
+          (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m')[pa + BitVec.ofNat 64 j]? =
+            m'[pa + BitVec.ofNat 64 j]? := by
+        intro l
+        induction l with
+        | nil => intros; rfl
+        | cons x l ih =>
+          intro hb hn m'
+          simp only [List.foldl_cons]
+          rw [ih (fun y hy => hb y (List.mem_cons_of_mem _ hy)) (fun h' => hn (List.mem_cons_of_mem _ h'))]
+          apply FlatMem.pushLanded_get?_ne
+          intro he
+          have := rsvAddr_inj (pa := pa) hj64 (hb x List.mem_cons_self) he
+          exact hn (this ▸ List.mem_cons_self)
+      rw [key l hb' hnd.1 _, FlatMem.pushLanded_get?_eq]
+    · rw [FlatMem.foldl_pushLanded_at lp pa w t h l hb' hnd.2 _ j hj]
+      congr 2
+      unfold FlatMem.pushLanded
+      rw [Std.ExtTreeMap.getD_insert]
+      have hne : ¬ (compare (pa + BitVec.ofNat 64 j0) (pa + BitVec.ofNat 64 j) = .eq) := by
+        intro he
+        have := Std.LawfulEqCmp.eq_of_compare he
+        exact hnd.1 (rsvAddr_inj (hb j0 List.mem_cons_self) (hb' j hj) this ▸ hj)
+      simp [hne]
+
+theorem FlatMem.landBytes_at {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) (H : Hist) (hH : m[pa + BitVec.ofNat 64 j]? = some H) :
+    (m.landBytes lp pa n w t h)[pa + BitVec.ofNat 64 j]? = some (Hist.insLanded lp ⟨t, h, nthByte w j⟩ H) := by
+  unfold FlatMem.landBytes
+  rw [FlatMem.foldl_pushLanded_at lp pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
+    List.nodup_range m j (List.mem_range.2 hj)]
+  rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
+  rfl
 
 /-- A store off the reserved bytes owes nothing. -/
 theorem storeRelOk_off {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
@@ -592,7 +925,40 @@ theorem storeRelOk_off {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu 
   Or.inr fun j hj => ⟨fun hb => absurd (lockByteIn_rsvBytes hb) (hnr j hj),
     fun w' hp => hnr j hj (pubByte_rsvBytes hp)⟩
 
-/-- **A DMA write off the reserved bytes keeps the release sites' provenance.** -/
+/-- The lock word's bytes are reserved bytes. -/
+theorem lockByteIn_word_rsvBytes {rs : List RsvRegion} {b : PAddr} (h : lockByteIn rs b) {i : Nat} (hi : i < 4) :
+    b + BitVec.ofNat 64 i ∈ rsvBytes rs := by
+  obtain ⟨cb, hR⟩ := h
+  refine List.mem_flatMap.2 ⟨_, hR, ?_⟩
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
+    List.mem_map, List.mem_range]
+  exact Or.inl ⟨i, hi, rfl⟩
+
+/-- **The release sites' provenance reads only the reserved bytes** (and the pcs of their
+entries): a step that moves no reserved byte's history and no old pc keeps it. -/
+theorem relPcOk_congr {rs : List RsvRegion} {ps : List Int} {σ σ' : MState}
+    (hm : ∀ b, b ∈ rsvBytes rs → σ'.mem[b]? = σ.mem[b]?)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hpc : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t) (h : relPcOk rs ps σ) : relPcOk rs ps σ' := by
+  have hw : ∀ (b : PAddr) (t : Nat) (g : Agent), lockByteIn rs b → wordEntAt σ'.mem b t g →
+      wordEntAt σ.mem b t g := by
+    intro b t g hb hwd i hi
+    obtain ⟨H, e, hH, he, het, heg⟩ := hwd i hi
+    rw [hm _ (lockByteIn_word_rsvBytes hb hi)] at hH
+    exact ⟨H, e, hH, he, het, heg⟩
+  refine ⟨fun b r A hb hp => ?_, fun f w H e hf hH he h0 => ?_⟩
+  · obtain ⟨H1, H2, e0, hbH, hv, hw1, hw2⟩ := hp
+    have hbH' : σ.mem[b]? = some (H1 ++ ⟨r, hartAgent A, 0⟩ :: e0 :: H2) := by
+      rw [← hm b (lockByteIn_rsvBytes hb)]; exact hbH
+    have hr : r ≤ σ.top := hle b _ ⟨r, hartAgent A, 0⟩ hbH' (by simp)
+    rw [hpc r hr]
+    exact h.1 b r A hb ⟨H1, H2, e0, hbH', hv, hw b r _ hb hw1, hw b e0.t e0.tid hb hw2⟩
+  · have hH' : σ.mem[f]? = some H := by rw [← hm f (pubByte_rsvBytes hf)]; exact hH
+    rw [hpc e.t (hle f H e hH' he)]
+    exact h.2 f w H e hf hH' he h0
+
+/-- **A DMA write off the reserved bytes keeps the release sites' provenance** (route P: it
+lands at once, below the footprint's pending prefix; no reserved byte is touched). -/
 theorem relPcOk_storeDma {rs : List RsvRegion} {ps : List Int} (σ : MState) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (hn : n ≤ 2 ^ 64)
     (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
@@ -600,29 +966,10 @@ theorem relPcOk_storeDma {rs : List RsvRegion} {ps : List Int} (σ : MState) (pa
     relPcOk rs ps (σ.storeDma pa n w) := by
   by_cases hn0 : n = 0
   · rw [MState.storeDma_zero σ pa n w hn0]; exact h
-  rw [MState.storeDma_of_ne σ pa n w hn0]
-  have hnewE : ∀ (a : PAddr) (H : Hist) (e : HEnt),
-      (σ.mem.writeBytes pa n w (σ.top + 1) diskAgent)[a]? = some H → e ∈ H → σ.top < e.t →
-      ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
-    intro a H e hH he hlt
-    by_cases hw : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
-    · exact hw
-    · exfalso
-      have hna : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := fun j hj he => hw ⟨j, hj, he⟩
-      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hna] at hH
-      have := hle a H e hH he
-      omega
-  refine relPcOk_step
-    (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
-    (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
-    (fun t ht => by simp only; rw [if_neg (by omega)]) ?_ ?_ h
-  · intro b r A hb hp hr
-    obtain ⟨H1, H2, e0, hbH, -, -, -⟩ := hp
-    obtain ⟨j, hj, rfl⟩ := hnewE _ _ ⟨r, hartAgent A, 0⟩ hbH (by simp) hr
-    exact absurd (lockByteIn_rsvBytes hb) (hnr j hj)
-  · intro f wv H e hf hH he het
-    obtain ⟨j, hj, rfl⟩ := hnewE _ _ e hH he het
-    exact absurd (pubByte_rsvBytes hf) (hnr j hj)
+  refine relPcOk_congr (fun b hb => ?_) hle (fun t ht => ?_) h
+  · rw [MState.storeDma_mem_of_ne σ pa n w hn0]
+    exact FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ (fun j hj he => hnr j hj (he ▸ hb))
+  · simp only [MState.storeDma, if_neg hn0]; rw [if_neg (by omega)]
 
 /-- A DRAM footprint is at most the address space (address 0 is not DRAM). -/
 theorem ramBytes_le {pa : PAddr} {n : Nat} (h : ramBytes pa n) : n ≤ 2 ^ 64 := by
@@ -638,8 +985,8 @@ theorem ramBytes_le {pa : PAddr} {n : Nat} (h : ramBytes pa n) : n ≤ 2 ^ 64 :=
   have : (0 : Nat) < ramBase := by decide
   omega
 
-/-- Every history entry is at or below the top (`mmOk`'s `histOk`). -/
-theorem relPc_le_top {σ : MState} (h : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) :
+/-- Every history entry is at or below the top (`mmOk`'s `histOkP`). -/
+theorem relPc_le_top {σ : MState} (h : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOkP σ.lp σ.log H) :
     ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top :=
   fun a H e hH he => ((h a H hH).2 e he).1
 
@@ -666,6 +1013,49 @@ theorem relPcOk_img {rs : List RsvRegion} {ps : List Int} (σ : MState) (img : M
     simp at he
     rw [he] at h0
     exact absurd rfl h0
+
+/-- **A static lock's byte inside a reserved word** is the lock word's first byte. -/
+theorem rsvWord_lockByte {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) {i k : Nat} {R : RsvRegion}
+    {pa : PAddr} {n : Nat} (hi : rs[i]? = some R) (hk : R.words[k]? = some (pa, n)) {j : Nat} (hj : j < n)
+    (hb : lockByteIn rs (pa + BitVec.ofNat 64 j)) : (∃ cb, R.kind = .lock cb) ∧ k = 0 ∧ j = 0 := by
+  have hbR : pa + BitVec.ofNat 64 j ∈ R.bytes := mem_regionBytes (List.mem_of_getElem? hk) hj
+  obtain ⟨cb, hR'⟩ := hb
+  have hm := RsvRegion.base_mem (⟨pa + BitVec.ofNat 64 j, .lock cb⟩ : RsvRegion) rfl
+  have heq := rsvByte_region hnd hi hR' hbR hm
+  subst heq
+  simp only [RsvRegion.words] at hk
+  cases k with
+  | zero =>
+    simp only [List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at hk
+    obtain ⟨hpa, rfl⟩ := hk
+    have hj0 : j = 0 := by
+      have := congrArg BitVec.toNat hpa
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+      have := pa.isLt
+      omega
+    exact ⟨⟨cb, rfl⟩, rfl, hj0⟩
+  | succ k =>
+    cases k with
+    | zero =>
+      exfalso
+      simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at hk
+      obtain ⟨hpa, rfl⟩ := hk
+      have := congrArg BitVec.toNat hpa
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+      have := pa.isLt
+      omega
+    | succ k => simp at hk
+
+/-- **No publication word inside a reserved word of a non-publication region.** -/
+theorem rsvWord_notPub {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) {i k : Nat} {R : RsvRegion}
+    {pa : PAddr} {n : Nat} (hi : rs[i]? = some R) (hk : R.words[k]? = some (pa, n))
+    (hpub : ∀ w, R.kind ≠ .pub w) {j : Nat} (hj : j < n) (w : CPU) :
+    (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) ∉ rs := by
+  intro hR'
+  have hbR : pa + BitVec.ofNat 64 j ∈ R.bytes := mem_regionBytes (List.mem_of_getElem? hk) hj
+  have hm := RsvRegion.base_mem (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) rfl
+  have heq := rsvByte_region hnd hi hR' hbR hm
+  exact hpub w (by rw [← heq])
 
 /-- **A store into a word of a reserved region makes no release entry** unless
 it is the lock word's first byte (the caller then shows a nonzero byte or a
@@ -720,8 +1110,8 @@ def dynLkAt (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem
     (a : Nat) : Prop :=
   a ≤ top ∧ ∃ (L : List (PAddr × HEnt)) (te : Nat), wit L b te ∧
     (∀ p ∈ L, ∃ H, m[p.1]? = some H ∧ p.2 ∈ H) ∧ te ≤ a ∧
-    ∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧ ∀ e ∈ H, te < e.t → e.t ≤ a →
-      wordEntAt m b e.t e.tid
+    ∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧
+      ∀ e ∈ H.takeWhile (fun e => decide (te < e.t)), e.t ≤ a → wordEntAt m b e.t e.tid
 
 theorem dynLkAt_mono {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m m' : FlatMem} {t t' : Nat}
     {b : PAddr} {a : Nat} (hg : memGrow m t m') (ht : t ≤ t') (h : dynLkAt wit m t b a) :
@@ -736,10 +1126,13 @@ theorem dynLkAt_mono {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m 
     exact ⟨N ++ H, hN, List.mem_append_right _ hpe⟩
   · obtain ⟨H0, hH0, hw0⟩ := hwd i hi
     obtain ⟨N, hN, hNt⟩ := hg _ H0 hH0
-    refine ⟨N ++ H0, hN, fun e he hte' hea => ?_⟩
+    refine ⟨N ++ H0, hN, fun e he hea => ?_⟩
+    have hN' : ∀ x ∈ N, decide (te < x.t) = true := fun x hx => by
+      have := hNt x hx; exact decide_eq_true (by omega)
+    rw [List.takeWhile_append_of_pos hN'] at he
     rcases List.mem_append.1 he with he | he
     · have := hNt e he; omega
-    · exact wordEntAt_mono hx (hw0 e he hte' hea)
+    · exact wordEntAt_mono hx (hw0 e he hea)
 
 /-- **A live, DISCIPLINED dynamic lock** (W8 (f3-pipelk) [OWN.65]): `dynLkAt`'s
 live window -- a slot store naming `b` at `te` (the client's witness, its
@@ -764,7 +1157,10 @@ def dynLkDiscAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → 
 theorem dynLkAt_of_disc {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m : FlatMem}
     {top : Nat} {b : PAddr} {a : Nat} (h : dynLkDiscAt rs wit m top b a) : dynLkAt wit m top b a :=
   let ⟨hat, L, te, _, _, _, hw, hL, hte, hwd, _⟩ := h
-  ⟨hat, L, te, hw, hL, hte, hwd⟩
+  ⟨hat, L, te, hw, hL, hte, fun i hi =>
+    let ⟨H, hH, hH'⟩ := hwd i hi
+    ⟨H, hH, fun e he hea => hH' e (Reserved.mem_takeWhile he).1
+      (of_decide_eq_true (Reserved.mem_takeWhile he).2) hea⟩⟩
 
 theorem dynLkDiscAt_mono {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m m' : FlatMem} {t t' : Nat} {b : PAddr} {a : Nat} (hg : memGrow m t m') (ht : t ≤ t')
@@ -814,9 +1210,9 @@ theorem relPat_of_syncHop {m : FlatMem} {b : PAddr} {A B : CPU} {r a : Nat} (h :
 
 /-- A hop's release, under a pc-checked dynamic lock byte (mcslrec (2)). -/
 theorem relBelowOk_syncHop {ps : List Int} {σ : MState} {b : PAddr} {A B : CPU} {r a : Nat}
-    (h : syncHop σ.mem b A r B a) (hb : relBelowOk ps σ b a) : σ.pcAt r ∈ ps := by
+    (h : syncHop (σ.mem.landedOnly σ.lp) b A r B a) (hb : relBelowOk ps σ b a) : σ.pcAt r ∈ ps := by
   obtain ⟨H1, H2, e0, va, hm, hva, he0, -⟩ := h
-  exact hb H1 H2 _ _ va r e0 hm hva he0
+  exact hb.2 H1 H2 _ _ va r e0 hm hva he0
 
 /-- **A sync chain** from the entries of author `A` at or below `t` to hart
 `B`, whose last acquire is at `a`. -/
@@ -914,22 +1310,31 @@ structure ChainEnv where
   coh : CPU → PAddr → Nat
   isLk : PAddr → Nat → Prop
   isPub : PAddr → CPU → Prop
+  /-- the landing positions (route P): `m`'s landed entries, and the positions the coherence
+  floors are -/
+  lp : LandPos
 
-/-- `Y` extends `X`: histories grew on top, the lock registry grew (a PAST
-registration never changes: `isLk b r` stays true), the publication registry
-is the same, and no hart's coherence floor at a publication byte of another
-writer went down (a load only raises it; the region discipline keeps every
-other hart's store off the byte). -/
+/-- The environment's LANDED-ONLY memory (route P, design D6): what the hops are read over. -/
+abbrev ChainEnv.lm (X : ChainEnv) : FlatMem := X.m.landedOnly X.lp
+
+/-- `Y` extends `X`: the LANDED-ONLY histories grew on top (route P, D6), the lock registry
+grew (a PAST registration never changes: `isLk b r` stays true), the publication registry is
+the same, no hart's coherence floor at a publication byte of another writer went down (a load
+only raises it; the region discipline keeps every other hart's store off the byte), the merged
+memory kept every entry, and every landed stamp kept its position. -/
 def ChainEnv.ext (X Y : ChainEnv) : Prop :=
-  memExt X.m Y.m ∧ (∀ b r, X.isLk b r → Y.isLk b r) ∧ (∀ f w, X.isPub f w ↔ Y.isPub f w) ∧
-    (∀ (j : CPU) (f : PAddr) (w : CPU), X.isPub f w → j ≠ w → X.coh j f ≤ Y.coh j f)
+  memExt X.lm Y.lm ∧ (∀ b r, X.isLk b r → Y.isLk b r) ∧ (∀ f w, X.isPub f w ↔ Y.isPub f w) ∧
+    (∀ (j : CPU) (f : PAddr) (w : CPU), X.isPub f w → j ≠ w → X.coh j f ≤ Y.coh j f) ∧
+    memIncl X.m Y.m ∧ (∀ t p, X.lp t = some p → Y.lp t = some p)
 
 theorem ChainEnv.ext_refl (X : ChainEnv) : X.ext X :=
-  ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
+  ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _, memIncl_refl _,
+    fun _ _ h => h⟩
 
 theorem ChainEnv.ext_trans {X Y Z : ChainEnv} (h1 : X.ext Y) (h2 : Y.ext Z) : X.ext Z :=
   ⟨memExt_trans h1.1 h2.1, fun b r h => h2.2.1 b r (h1.2.1 b r h), fun f w => (h1.2.2.1 f w).trans (h2.2.2.1 f w),
-    fun j f w hp hj => Nat.le_trans (h1.2.2.2 j f w hp hj) (h2.2.2.2 j f w ((h1.2.2.1 f w).1 hp) hj)⟩
+    fun j f w hp hj => Nat.le_trans (h1.2.2.2.1 j f w hp hj) (h2.2.2.2.1 j f w ((h1.2.2.1 f w).1 hp) hj),
+    memIncl_trans h1.2.2.2.2.1 h2.2.2.2.2.1, fun t p h => h2.2.2.2.2.2 t p (h1.2.2.2.2.2 t p h)⟩
 
 /-- **The boot hop's cover** (W8 (f2-ctx), F-B adopted [R36.1]): hart `j`
 has read (its coherence floor reached) a store at `r` of the publication
@@ -942,15 +1347,16 @@ AFTER lock hops -- `h`'s release, the hops, `w`'s acquire at `a`, `w`'s
 coherence clause of `ChainEnv.ext` is about. -/
 def pubCover (X : ChainEnv) (h : CPU) (t : Nat) (j : CPU) : Prop :=
   ∃ (f : PAddr) (w : CPU) (r : Nat) (v : BitVec 8) (H : Hist),
-    j ≠ w ∧ X.isPub f w ∧ X.m[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H ∧ r ≤ X.coh j f ∧
-    ((h = w ∧ t < r) ∨ ∃ a, a < r ∧ hopChain X.m X.isLk h t w a)
+    j ≠ w ∧ X.isPub f w ∧ X.lm[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H ∧
+    (∃ p, X.lp r = some p ∧ p ≤ X.coh j f) ∧
+    ((h = w ∧ t < r) ∨ ∃ a, a < r ∧ hopChain X.lm X.isLk h t w a)
 
 theorem pubCover_mono {X Y : ChainEnv} (hx : X.ext Y) {h : CPU} {t : Nat} {j : CPU}
     (hc : pubCover X h t j) : pubCover Y h t j := by
-  obtain ⟨f, w, r, v, H, hne, hp, hf, he, hr, harm⟩ := hc
+  obtain ⟨f, w, r, v, H, hne, hp, hf, he, ⟨p, hrp, hr⟩, harm⟩ := hc
   obtain ⟨N, hN⟩ := hx.1 f H hf
   refine ⟨f, w, r, v, N ++ H, hne, (hx.2.2.1 f w).1 hp, hN, List.mem_append_right _ he,
-    Nat.le_trans hr (hx.2.2.2 j f w hp hne), ?_⟩
+    ⟨p, hx.2.2.2.2.2 r p hrp, Nat.le_trans hr (hx.2.2.2.1 j f w hp hne)⟩, ?_⟩
   rcases harm with h1 | ⟨a, ha, hc⟩
   · exact .inl h1
   · exact .inr ⟨a, ha, hopChain_mono hx.1 hx.2.1 hc⟩
@@ -959,13 +1365,15 @@ theorem pubCover_mono {X Y : ChainEnv} (hx : X.ext Y) {h : CPU} {t : Nat} {j : C
 publication byte it does not write. -/
 def gateOk (X : ChainEnv) (j : CPU) : Prop :=
   ∀ (f : PAddr) (w : CPU), X.isPub f w → j ≠ w →
-    ∃ (r : Nat) (v : BitVec 8) (H : Hist), X.m[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H ∧ 0 < r ∧ r ≤ X.coh j f
+    ∃ (r : Nat) (v : BitVec 8) (H : Hist), X.lm[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H ∧ 0 < r ∧
+      ∃ p, X.lp r = some p ∧ p ≤ X.coh j f
 
 theorem gateOk_mono {X Y : ChainEnv} (hx : X.ext Y) {j : CPU} (hg : gateOk X j) : gateOk Y j := by
   intro f w hp hj
-  obtain ⟨r, v, H, hf, he, hr0, hr⟩ := hg f w ((hx.2.2.1 f w).2 hp) hj
+  obtain ⟨r, v, H, hf, he, hr0, p, hrp, hr⟩ := hg f w ((hx.2.2.1 f w).2 hp) hj
   obtain ⟨N, hN⟩ := hx.1 f H hf
-  exact ⟨r, v, N ++ H, hN, List.mem_append_right _ he, hr0, Nat.le_trans hr (hx.2.2.2 j f w ((hx.2.2.1 f w).2 hp) hj)⟩
+  exact ⟨r, v, N ++ H, hN, List.mem_append_right _ he, hr0, p, hx.2.2.2.2.2 r p hrp,
+    Nat.le_trans hr (hx.2.2.2.1 j f w ((hx.2.2.1 f w).2 hp) hj)⟩
 
 /-! ## Certificates -/
 
@@ -1060,7 +1468,7 @@ theorem pcKey_ne_ent (t : Nat) (v : BitVec 64) (pa : PAddr) (e : HEnt) : pcKey t
 /-- What a certificate says: own entries before `τ`, or a chain whose last
 acquire is below `τ`, or the boot hop. -/
 def ChainCert.valid (X : ChainEnv) (c : ChainCert) : Prop :=
-  (c.h = c.j ∧ c.t < c.τ) ∨ (∃ a, a < c.τ ∧ hopChain X.m X.isLk c.h c.t c.j a) ∨ pubCover X c.h c.t c.j
+  (c.h = c.j ∧ c.t < c.τ) ∨ (∃ a, a < c.τ ∧ hopChain X.lm X.isLk c.h c.t c.j a) ∨ pubCover X c.h c.t c.j
 
 theorem ChainCert.valid_mono {X Y : ChainEnv} (hx : X.ext Y) {c : ChainCert} (h : c.valid X) : c.valid Y := by
   rcases h with h | ⟨a, ha, hc⟩ | hp
@@ -1089,14 +1497,15 @@ theorem ChainCert.valid_retime {X : ChainEnv} {h j : CPU} {t τ r : Nat}
     (hown : h = j → t < r) : ChainCert.valid X ⟨h, t, j, r⟩ := by
   rcases hv with ⟨h1, _⟩ | ⟨a, _, hc⟩ | hp
   · exact .inl ⟨h1, hown h1⟩
-  · obtain ⟨b, H, e, hb, he, het⟩ := hopChain_acq_ent hc
-    exact .inr (.inl ⟨a, by rw [← het]; exact hall b H e hb he, hc⟩)
+  · obtain ⟨b, L, e, hb, he, het⟩ := hopChain_acq_ent hc
+    obtain ⟨H, hH, he', -⟩ := FlatMem.mem_landedOnly hb he
+    exact .inr (.inl ⟨a, by rw [← het]; exact hall b H e hH he', hc⟩)
   · exact .inr (.inr hp)
 
 /-- A publication byte is ONE-SHOT in `X`: all its post-power-on entries are
 at one timestamp (the region discipline of `MachCSL.RsvKind.pub`). -/
 def pubOneShot (X : ChainEnv) : Prop :=
-  ∀ (f : PAddr) (w : CPU) (H : Hist) (e e' : HEnt), X.isPub f w → X.m[f]? = some H → e ∈ H → e' ∈ H →
+  ∀ (f : PAddr) (w : CPU) (H : Hist) (e e' : HEnt), X.isPub f w → X.lm[f]? = some H → e ∈ H → e' ∈ H →
     e.t ≠ 0 → e'.t ≠ 0 → e.t = e'.t
 
 /-- **The acquire's extension**: a certificate to the releaser before its
@@ -1104,7 +1513,7 @@ release `r`, and the hop from that release to `B`'s acquire at `a`, give a
 certificate to `B` past `a` -- by the chain, or (a boot-hop cover of the
 releaser) by `B`'s own gate, the publication byte being one-shot. -/
 theorem ChainCert.valid_hop {X : ChainEnv} {h A B : CPU} {t r a : Nat} {b : PAddr}
-    (hv : ChainCert.valid X ⟨h, t, A, r⟩) (hb : X.isLk b a) (hh : syncHop X.m b A r B a)
+    (hv : ChainCert.valid X ⟨h, t, A, r⟩) (hb : X.isLk b a) (hh : syncHop X.lm b A r B a)
     (hall : ∀ (b' : PAddr) (H : Hist) (e : HEnt), X.m[b']? = some H → e ∈ H → e.t ≤ a)
     (hone : pubOneShot X) (hgate : gateOk X B) : ChainCert.valid X ⟨h, t, B, a + 1⟩ := by
   rcases hv with ⟨h1, h2⟩ | ⟨a1, ha1, hc⟩ | ⟨f, w, r', v, H, hne, hp, hf, he, hr, harm⟩
@@ -1113,7 +1522,9 @@ theorem ChainCert.valid_hop {X : ChainEnv} {h A B : CPU} {t r a : Nat} {b : PAdd
     exact .inr (.inl ⟨a, Nat.lt_succ_self a, .base b hb hh h2⟩)
   · exact .inr (.inl ⟨a, Nat.lt_succ_self a, .step b hc hb hh ha1⟩)
   · simp only at hne hr harm
-    have hle : r' ≤ a := hall f H _ hf he
+    have hle : r' ≤ a := by
+      obtain ⟨H0, hH0, he0, -⟩ := FlatMem.mem_landedOnly hf he
+      exact hall f H0 _ hH0 he0
     by_cases hBw : B = w
     · -- the writer itself acquires: its own entries, or the chain, before its store
       subst hBw
@@ -1182,25 +1593,378 @@ theorem memAbove_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 
     (ht : top < t) : memAbove m top (m.writeBytes pa n w t h) :=
   memAbove_foldlPush pa w top t h ht _ m
 
+/-- `m'` keeps `m`'s entries at or below stamp `t`, in order, and adds only entries above `t`
+(route P, design D6: every step at issue top `t` -- an issue pushes its pending entries on top,
+a write that lands at once inserts its entries BELOW the pending prefix, a landing moves no
+history). -/
+def memIns (m : FlatMem) (t : Nat) (m' : FlatMem) : Prop :=
+  (∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ H', m'[a]? = some H' ∧
+      H'.filter (fun e => decide (e.t ≤ t)) = H.filter (fun e => decide (e.t ≤ t)) ∧ ∀ e ∈ H, e ∈ H') ∧
+  memAbove m t m'
+
+theorem memIns_refl (m : FlatMem) (t : Nat) : memIns m t m :=
+  ⟨fun _ H h => ⟨H, h, rfl, fun _ he => he⟩, memAbove_refl m t⟩
+
+theorem memIns_trans {m m' m'' : FlatMem} {t : Nat} (h1 : memIns m t m') (h2 : memIns m' t m'') :
+    memIns m t m'' := by
+  refine ⟨fun a H hH => ?_, memAbove_trans h1.2 h2.2⟩
+  obtain ⟨H', hH', hf1, hm1⟩ := h1.1 a H hH
+  obtain ⟨H'', hH'', hf2, hm2⟩ := h2.1 a H' hH'
+  exact ⟨H'', hH'', hf2.trans hf1, fun e he => hm2 e (hm1 e he)⟩
+
+/-- Prefix growth above `t` (with nothing new at or below `t`) is an insertion growth. -/
+theorem memIns_of_grow {m m' : FlatMem} {t : Nat} (hg : memGrow m t m') (ha : memAbove m t m') :
+    memIns m t m' := by
+  refine ⟨fun a H hH => ?_, ha⟩
+  obtain ⟨N, hN, hNt⟩ := hg a H hH
+  refine ⟨N ++ H, hN, ?_, fun e he => List.mem_append_right _ he⟩
+  rw [List.filter_append]
+  have : N.filter (fun e => decide (e.t ≤ t)) = [] := by
+    rw [List.filter_eq_nil_iff]; intro e he; have := hNt e he; simp; omega
+  rw [this, List.nil_append]
+
+theorem memIncl_of_memIns {m m' : FlatMem} {t : Nat} (h : memIns m t m') : memIncl m m' :=
+  fun a H hH => let ⟨H', hH', _, hm⟩ := h.1 a H hH; ⟨H', hH', hm⟩
+
+theorem wordEntAt_memIncl {m m' : FlatMem} (hx : memIncl m m') {b : PAddr} {t : Nat} {g : Agent}
+    (h : wordEntAt m b t g) : wordEntAt m' b t g := by
+  intro i hi
+  obtain ⟨H, e, hH, he, het, heg⟩ := h i hi
+  obtain ⟨H', hH', hm⟩ := hx _ H hH
+  exact ⟨H', e, hH', hm e he, het, heg⟩
+
+/-- A landed insert keeps every entry. -/
+theorem memIncl_pushLanded (m : FlatMem) (lp : LandPos) (a : PAddr) (x : HEnt) :
+    memIncl m (m.pushLanded lp a x) := by
+  intro a' H hH
+  by_cases ha : a' = a
+  · subst ha
+    refine ⟨Hist.insLanded lp x H, by rw [FlatMem.pushLanded_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hH]; rfl,
+      fun e he => ?_⟩
+    unfold Hist.insLanded
+    have he' : e ∈ H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone) := by
+      rw [List.takeWhile_append_dropWhile]; exact he
+    rcases List.mem_append.1 he' with he | he
+    · exact List.mem_append_left _ he
+    · exact List.mem_append_right _ (List.mem_cons_of_mem _ he)
+  · exact ⟨H, by rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha]; exact hH, fun _ he => he⟩
+
+/-- A landed insert keeps every entry, adds one above `t`. -/
+theorem memIns_pushLanded (m : FlatMem) (lp : LandPos) (a : PAddr) (x : HEnt) (t : Nat) (ht : t < x.t) :
+    memIns m t (m.pushLanded lp a x) := by
+  refine ⟨fun a' H hH => ?_, fun a' H' hH e he het => ?_⟩
+  · obtain ⟨H', hH', hm⟩ := memIncl_pushLanded m lp a x a' H hH
+    refine ⟨H', hH', ?_, hm⟩
+    by_cases ha : a' = a
+    · subst ha
+      rw [FlatMem.pushLanded_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hH] at hH'
+      obtain rfl := Option.some.inj hH'
+      unfold Hist.insLanded
+      rw [List.filter_append, List.filter_cons_of_neg (by simp; omega), ← List.filter_append,
+        List.takeWhile_append_dropWhile]
+      rfl
+    · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha, hH] at hH'
+      obtain rfl := Option.some.inj hH'
+      rfl
+  · by_cases ha : a' = a
+    · subst ha
+      rw [FlatMem.pushLanded_get?_eq] at hH
+      obtain rfl := Option.some.inj hH
+      unfold Hist.insLanded at he
+      rcases List.mem_append.1 he with he | he
+      · cases hm : m[a']? with
+        | none => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm] at he; simp at he
+        | some H => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm] at he; exact ⟨H, rfl, List.takeWhile_subset _ he⟩
+      · rcases List.mem_cons.1 he with rfl | he
+        · omega
+        · cases hm : m[a']? with
+          | none => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm] at he; simp at he
+          | some H => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hm] at he; exact ⟨H, rfl, List.dropWhile_subset _ he⟩
+    · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha] at hH
+      exact ⟨H', hH, he⟩
+
+theorem memIncl_foldPushLanded {n : Nat} (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    ∀ (l : List Nat) (m : FlatMem), memIncl m
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memIncl_refl _
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    exact memIncl_trans (memIncl_pushLanded m lp _ _) (memIncl_foldPushLanded lp pa w t h l _)
+
+theorem memIns_foldPushLanded {n : Nat} (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (top t : Nat) (h : Agent)
+    (ht : top < t) : ∀ (l : List Nat) (m : FlatMem), memIns m top
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memIns_refl _ _
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    exact memIns_trans (memIns_pushLanded m lp _ _ top ht) (memIns_foldPushLanded lp pa w top t h ht l _)
+
+/-- **A write that lands at once** keeps every entry and adds its own, above the issue top. -/
+theorem memIns_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (top t : Nat)
+    (h : Agent) (ht : top < t) : memIns m top (m.landBytes lp pa n w t h) :=
+  memIns_foldPushLanded lp pa w top t h ht _ m
+
+theorem memIncl_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) : memIncl m (m.landBytes lp pa n w t h) :=
+  memIncl_foldPushLanded lp pa w t h _ m
+
+/-- An issue (a push of entries at a fresh stamp) is an insertion growth. -/
+theorem memIns_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (top t : Nat) (h : Agent)
+    (ht : top < t) : memIns m top (m.writeBytes pa n w t h) :=
+  memIns_of_grow (memGrow_writeBytes m pa w top t h ht) (memAbove_writeBytes m pa w top t h ht)
+
+/-- The landed entry is in the new memory at each footprint byte. -/
+theorem ChainDefs.foldPushLanded_mem {n : Nat} (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) (j : Nat) : ∀ (l : List Nat) (m : FlatMem), j ∈ l →
+      ∃ H, (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)[pa + BitVec.ofNat 64 j]? =
+        some H ∧ (⟨t, h, nthByte w j⟩ : HEnt) ∈ H
+  | [], _, hj => by simp at hj
+  | j0 :: l, m, hj => by
+    simp only [List.foldl_cons]
+    by_cases hl : j ∈ l
+    · exact ChainDefs.foldPushLanded_mem lp pa w t h j l _ hl
+    · have hj0 : j = j0 := by
+        rcases List.mem_cons.1 hj with h' | h'
+        · exact h'
+        · exact absurd h' hl
+      subst hj0
+      have h1 : (m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩)[pa + BitVec.ofNat 64 j]? =
+          some (Hist.insLanded lp ⟨t, h, nthByte w j⟩ (m.getD (pa + BitVec.ofNat 64 j) [])) :=
+        FlatMem.pushLanded_get?_eq _ _ _ _
+      have hin : (⟨t, h, nthByte w j⟩ : HEnt) ∈
+          Hist.insLanded lp ⟨t, h, nthByte w j⟩ (m.getD (pa + BitVec.ofNat 64 j) []) := by
+        unfold Hist.insLanded; simp
+      obtain ⟨H', hH', hm⟩ := memIncl_foldPushLanded lp pa w t h l _ _ _ h1
+      exact ⟨H', hH', hm _ hin⟩
+
+theorem ChainDefs.landBytes_mem {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) {j : Nat} (hj : j < n) :
+    ∃ H, (m.landBytes lp pa n w t h)[pa + BitVec.ofNat 64 j]? = some H ∧ (⟨t, h, nthByte w j⟩ : HEnt) ∈ H :=
+  ChainDefs.foldPushLanded_mem lp pa w t h j _ m (List.mem_range.2 hj)
+
+/-- The adjacent pairs of a list with an entry inserted: an old pair, or the insert with a
+neighbour. -/
+theorem ChainDefs.adj_insert {α : Type} : ∀ (P D H1 H2 : List α) (e z y : α), P ++ e :: D = H1 ++ z :: y :: H2 →
+    (∃ H1' H2', P ++ D = H1' ++ z :: y :: H2') ∨ (P.getLast? = some z ∧ y = e) ∨ (z = e ∧ D.head? = some y)
+  | [], D, [], H2, e, z, y, h => by
+    simp only [List.nil_append, List.cons.injEq] at h
+    obtain ⟨rfl, rfl⟩ := h
+    exact Or.inr (Or.inr ⟨rfl, rfl⟩)
+  | [], D, h1 :: H1, H2, e, z, y, h => by
+    simp only [List.nil_append, List.cons_append, List.cons.injEq] at h
+    exact Or.inl ⟨H1, H2, by rw [List.nil_append]; exact h.2⟩
+  | [p], D, [], H2, e, z, y, h => by
+    simp only [List.cons_append, List.nil_append, List.cons.injEq] at h
+    obtain ⟨rfl, rfl, -⟩ := h
+    exact Or.inr (Or.inl ⟨rfl, rfl⟩)
+  | p :: p' :: P, D, [], H2, e, z, y, h => by
+    simp only [List.cons_append, List.nil_append, List.cons.injEq] at h
+    obtain ⟨rfl, rfl, -⟩ := h
+    exact Or.inl ⟨[], P ++ D, by simp⟩
+  | p :: P, D, h1 :: H1, H2, e, z, y, h => by
+    simp only [List.cons_append, List.cons.injEq] at h
+    rcases ChainDefs.adj_insert P D H1 H2 e z y h.2 with ⟨H1', H2', h'⟩ | ⟨hl, rfl⟩ | hr
+    · exact Or.inl ⟨p :: H1', H2', by rw [List.cons_append, h', List.cons_append]⟩
+    · refine Or.inr (Or.inl ⟨?_, rfl⟩)
+      cases P with
+      | nil => simp at hl
+      | cons q P => simpa [List.getLast?_cons_cons] using hl
+    · exact Or.inr (Or.inr hr)
+
+/-- A landed write's byte, after it (over `getD`). -/
+theorem FlatMem.landBytes_atD {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) :
+    (m.landBytes lp pa n w t h)[pa + BitVec.ofNat 64 j]? =
+      some (Hist.insLanded lp ⟨t, h, nthByte w j⟩ (m.getD (pa + BitVec.ofNat 64 j) [])) := by
+  unfold FlatMem.landBytes
+  exact FlatMem.foldl_pushLanded_at lp pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
+    List.nodup_range m j (List.mem_range.2 hj)
+
+/-- **An exclusive write keeps the release sites' provenance** (route P: it lands at once,
+INSERTED BELOW the footprint's pending prefix), given what it owes (`exclRelOk`, F-11.2): a new
+pattern would be the insert over the landed head (a zero over a nonzero: excluded) or the lowest
+pending zero over the insert (it sat over a word-sized nonzero entry: an old pattern). -/
+theorem relPcOk_storeL {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (hn : n ≤ 2 ^ 64)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hok : exclRelOk rs σ.mem (lpOf (σ.llog ++ [σ.top + 1])) pa n w) (h : relPcOk rs ps σ) :
+    relPcOk rs ps (σ.storeL cpu pa n w) := by
+  have hmem : (σ.storeL cpu pa n w).mem =
+      σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) (hartAgent cpu) := rfl
+  have hins := memIns_landBytes σ.mem (lpOf (σ.llog ++ [σ.top + 1])) pa w σ.top (σ.top + 1) (hartAgent cpu)
+    (Nat.lt_succ_self _)
+  have hpc := relPc_storeLOld σ cpu pa n w
+  have hwOld : ∀ (b : PAddr) (t : Nat) (g : Agent), t ≤ σ.top → wordEntAt (σ.storeL cpu pa n w).mem b t g →
+      wordEntAt σ.mem b t g := by
+    intro b t g ht hw i hi
+    obtain ⟨H', e, hH', he, het, heg⟩ := hw i hi
+    rw [hmem] at hH'
+    obtain ⟨H, hH, heH⟩ := hins.2 _ H' hH' e he (het ▸ ht)
+    exact ⟨H, e, hH, heH, het, heg⟩
+  have hold : ∀ (b : PAddr) (x : HEnt), x ∈ σ.mem.getD b [] → σ.mem[b]? = some (σ.mem.getD b []) := by
+    intro b x hx
+    rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at hx ⊢
+    cases hb : σ.mem[b]? with
+    | none => rw [hb] at hx; simp at hx
+    | some H0 => rfl
+  have hnot : ∀ (b : PAddr), (¬ ∃ j, j < n ∧ b = pa + BitVec.ofNat 64 j) →
+      (σ.storeL cpu pa n w).mem[b]? = σ.mem[b]? := by
+    intro b hb
+    rw [hmem]
+    exact FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ (fun j hj he => hb ⟨j, hj, he⟩)
+  refine ⟨fun b r A hb hp => ?_, fun f wv H e hf hH he h0 => ?_⟩
+  · obtain ⟨H1, H2, e0, hbH, hv, hw1, hw2⟩ := hp
+    suffices hpat : r ≤ σ.top ∧ relPat σ.mem b r A by
+      rw [hpc r hpat.1]; exact h.1 b r A hb hpat.2
+    by_cases hfoot : ∃ j, j < n ∧ b = pa + BitVec.ofNat 64 j
+    · obtain ⟨j, hj, rfl⟩ := hfoot
+      have hrel := (hok j hj).1 hb
+      rw [hmem, FlatMem.landBytes_atD _ _ _ _ _ _ hn hj] at hbH
+      have hbH' := Option.some.inj hbH
+      unfold Hist.insLanded at hbH'
+      unfold relInsOkM at hrel
+      have holdG : ∀ x, x ∈ σ.mem.getD (pa + BitVec.ofNat 64 j) [] →
+          σ.mem[pa + BitVec.ofNat 64 j]? = some (σ.mem.getD (pa + BitVec.ofNat 64 j) []) :=
+        fun x hx => hold _ x hx
+      generalize σ.mem.getD (pa + BitVec.ofNat 64 j) [] = G at hbH' hrel holdG
+      have hTD := List.takeWhile_append_dropWhile
+        (p := fun x : HEnt => (lpOf (σ.llog ++ [σ.top + 1]) x.t).isNone) (l := G)
+      rcases ChainDefs.adj_insert _ _ H1 H2 _ _ _ hbH' with ⟨H1', H2', h'⟩ | ⟨hl, rfl⟩ | ⟨hz, hd⟩
+      · -- an old adjacent pair
+        rw [hTD] at h'
+        have hxG : (⟨r, hartAgent A, 0⟩ : HEnt) ∈ G := by rw [h']; simp
+        have hr : r ≤ σ.top := hle _ _ _ (holdG _ hxG) hxG
+        have he0G : e0 ∈ G := by rw [h']; simp
+        have he0 : e0.t ≤ σ.top := hle _ _ _ (holdG _ hxG) he0G
+        exact ⟨hr, H1', H2', e0, by rw [holdG _ hxG, h'], hv, hwOld _ _ _ hr hw1, hwOld _ _ _ he0 hw2⟩
+      · -- the lowest pending zero over the new (nonzero) entry: it sat over a word-sized nonzero entry
+        rcases hrel.2 with hz | hlow
+        · exact absurd hz hv
+        obtain ⟨d, D, hdD, hdv, hwd⟩ := hlow _ hl rfl
+        obtain ⟨T', hT'⟩ := List.getLast?_eq_some_iff.1 hl
+        have hGe : G = T' ++ ⟨r, hartAgent A, 0⟩ :: d :: D := by
+          rw [← hTD, hT', hdD]; simp
+        have hxG : (⟨r, hartAgent A, 0⟩ : HEnt) ∈ G := by rw [hGe]; simp
+        have hr : r ≤ σ.top := hle _ _ _ (holdG _ hxG) hxG
+        exact ⟨hr, T', D, d, by rw [holdG _ hxG, hGe], hdv, hwOld _ _ _ hr hw1, hwd⟩
+      · -- the new entry, a zero, over the landed head: excluded
+        exfalso
+        have hz0 : nthByte w j = 0 := (congrArg HEnt.v hz).symm
+        rcases hrel.1 with hnz | hhead
+        · exact hnz hz0
+        · cases hDr : G.dropWhile (fun x : HEnt => (lpOf (σ.llog ++ [σ.top + 1]) x.t).isNone) with
+          | nil => simp only [hDr, List.head?_nil] at hd; cases hd
+          | cons d D =>
+            simp only [hDr, List.head?_cons, Option.some.injEq] at hd
+            subst hd
+            exact hv (hhead _ D hDr)
+    · rw [hnot b hfoot] at hbH
+      have hxG : (⟨r, hartAgent A, 0⟩ : HEnt) ∈ H1 ++ ⟨r, hartAgent A, 0⟩ :: e0 :: H2 := by simp
+      have hr : r ≤ σ.top := hle _ _ _ hbH hxG
+      have he0 : e0.t ≤ σ.top := hle _ _ _ hbH (by simp)
+      exact ⟨hr, H1, H2, e0, hbH, hv, hwOld _ _ _ hr hw1, hwOld _ _ _ he0 hw2⟩
+  · have hfoot : ¬ ∃ j, j < n ∧ f = pa + BitVec.ofNat 64 j := by
+      rintro ⟨j, hj, rfl⟩
+      exact (hok j hj).2 wv hf
+    rw [hnot f hfoot] at hH
+    rw [hpc e.t (hle f H e hH he)]
+    exact h.2 f wv H e hf hH he h0
+
+/-- An entry of a `takeWhile` over `P ++ M`: in `P`'s, or every entry of `P` passed and it is in `M`'s. -/
+theorem ChainDefs.mem_takeWhile_append_cases {p : HEnt → Bool} {x : HEnt} :
+    ∀ {P M : Hist}, x ∈ (P ++ M).takeWhile p → x ∈ P.takeWhile p ∨ ((∀ y ∈ P, p y = true) ∧ x ∈ M.takeWhile p)
+  | [], _, h => .inr ⟨(fun _ hy => absurd hy List.not_mem_nil), by simpa using h⟩
+  | y :: P, M, h => by
+    simp only [List.cons_append, List.takeWhile_cons] at h
+    by_cases hy : p y = true
+    · rw [if_pos hy] at h
+      rcases List.mem_cons.1 h with rfl | h
+      · exact .inl (by simp [List.takeWhile_cons, hy])
+      · rcases ChainDefs.mem_takeWhile_append_cases h with h | ⟨hall, h⟩
+        · exact .inl (by simp only [List.takeWhile_cons, hy, if_true]; exact List.mem_cons_of_mem _ h)
+        · exact .inr ⟨fun z hz => by
+            rcases List.mem_cons.1 hz with rfl | hz
+            · exact hy
+            · exact hall z hz, h⟩
+    · rw [if_neg hy] at h; cases h
+
+theorem ChainDefs.mem_takeWhile_append_left {p : HEnt → Bool} {x : HEnt} :
+    ∀ {P R : Hist}, x ∈ P.takeWhile p → x ∈ (P ++ R).takeWhile p
+  | [], _, h => by cases h
+  | y :: P, R, h => by
+    simp only [List.takeWhile_cons] at h
+    simp only [List.cons_append, List.takeWhile_cons]
+    split at h
+    · rename_i hy
+      rw [if_pos hy]
+      rcases List.mem_cons.1 h with rfl | h
+      · exact List.mem_cons_self
+      · exact List.mem_cons_of_mem _ (ChainDefs.mem_takeWhile_append_left h)
+    · cases h
+
+theorem ChainDefs.mem_takeWhile_append_right {p : HEnt → Bool} {x : HEnt} {P R : Hist}
+    (hall : ∀ y ∈ P, p y = true) (h : x ∈ R.takeWhile p) : x ∈ (P ++ R).takeWhile p := by
+  rw [List.takeWhile_append_of_pos hall]
+  exact List.mem_append_right _ h
+
+/-- An entry of the `takeWhile (te < ·.t)` of `P ++ Q` whose `Q` is headed at or below `te` lies in
+`P`. -/
+theorem ChainDefs.mem_takeWhile_append_le {P Q : Hist} {te : Nat} {e : HEnt}
+    (he : e ∈ (P ++ Q).takeWhile (fun e => decide (te < e.t))) (hQ : ∀ q ∈ Q.head?, q.t ≤ te) :
+    e ∈ P ∨ e ∈ ([] : Hist) := by
+  rcases ChainDefs.mem_takeWhile_append_cases he with h | ⟨_, h⟩
+  · exact .inl (Reserved.mem_takeWhile h).1
+  · right
+    cases Q with
+    | nil => simpa using h
+    | cons q Q' =>
+      have hq := hQ q rfl
+      have : decide (te < q.t) = false := decide_eq_false (by omega)
+      simp [List.takeWhile_cons, this] at h
+
+/-- **The dynamic hop registry is stable under an insertion growth** (route P: every step). -/
+theorem dynLkAt_monoI {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m m' : FlatMem} {t t' : Nat}
+    {b : PAddr} {a : Nat} (hg : memIns m t m') (ht : t ≤ t') (h : dynLkAt wit m t b a) :
+    dynLkAt wit m' t' b a := by
+  obtain ⟨hat, L, te, hw, hL, hte, hwd⟩ := h
+  have hx := memIncl_of_memIns hg
+  refine ⟨Nat.le_trans hat ht, L, te, hw, fun p hp => ?_, hte, fun i hi => ?_⟩
+  · obtain ⟨H, hH, hpe⟩ := hL p hp
+    obtain ⟨H', hH', hm⟩ := hx _ H hH
+    exact ⟨H', hH', hm _ hpe⟩
+  · obtain ⟨H0, hH0, hw0⟩ := hwd i hi
+    obtain ⟨H', hH', hf, -⟩ := hg.1 _ H0 hH0
+    refine ⟨H', hH', fun e he hea => ?_⟩
+    have hp : ∀ x : HEnt, decide (te < x.t) = false → decide (x.t ≤ t) = true := fun x h => by
+      simp only [decide_eq_false_iff_not, Nat.not_lt] at h; exact decide_eq_true (by omega)
+    have hq : ∀ x : HEnt, decide (x.t ≤ a) = true → decide (x.t ≤ t) = true := fun x h =>
+      decide_eq_true (Nat.le_trans (of_decide_eq_true h) hat)
+    have hmem : e ∈ (H'.takeWhile (fun e => decide (te < e.t))).filter (fun x => decide (x.t ≤ a)) :=
+      List.mem_filter.2 ⟨he, decide_eq_true hea⟩
+    rw [Reserved.takeWhile_filter_eq _ _ _ hp hq H', hf, ← Reserved.takeWhile_filter_eq _ _ _ hp hq H0] at hmem
+    exact wordEntAt_memIncl hx (hw0 e (List.mem_filter.1 hmem).1 hea)
+
 /-- **Every observed foreign hart entry is chained** (W8 (f2-ctx) S3; plan
 §C W8 (iii+)): hart `j`'s coherence floor at byte `a` is the timestamp of the
 latest FOREIGN entry a load of `j` read there since `j` last stored to it
 (`HRead.afterLoad`, `HRead.resetCoh`); when the entry at that timestamp is a
 HART's (DMA authors are exempt: the device-key arm), not `j`'s own, and the
-byte is not exempt as of the entry (`ex a t`: the client's registry -- the
-lock layer's words, PTE bytes of both tables), some certificate of it to `j`
-is VALID.  A pure fact of `X`. -/
+byte is not exempt as of the entry (`ex a p` at the entry's LANDING position
+`p = coh j a`, route P: the client's registry -- the lock layer's words, PTE
+bytes of both tables), some certificate of it to `j` is VALID.  A pure fact
+of `X`. -/
 def loadsChained (X : ChainEnv) (ex : PAddr → Nat → Prop) : Prop :=
   ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), X.m[a]? = some H → e ∈ H → e.t ≠ 0 →
-    e.t = X.coh j a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex a e.t →
+    X.lp e.t = some (X.coh j a) → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex a (X.coh j a) →
       ∃ τ, ChainCert.valid X ⟨⟨e.tid, hA⟩, e.t, j, τ⟩
 
-/-- The power-on state: every coherence floor is 0. -/
-theorem loadsChained_zero (X : ChainEnv) (ex : PAddr → Nat → Prop) (h0 : ∀ j a, X.coh j a = 0) :
-    loadsChained X ex := by
+
+/-- The power-on state: every coherence floor is 0 (and only the boot image lands at 0). -/
+theorem loadsChained_zero (X : ChainEnv) (ex : PAddr → Nat → Prop) (h0 : ∀ j a, X.coh j a = 0)
+    (hlp0 : ∀ t, X.lp t = some 0 → t = 0) : loadsChained X ex := by
   intro j a H e _ _ het hc
   rw [h0 j a] at hc
-  exact absurd hc het
+  exact absurd (hlp0 _ hc) het
 
 /-- **The invariant's step law**: a step at top `top` (every coherence floor
 at or below it) that extends the environment, adds only entries above `top`,
@@ -1209,32 +1973,42 @@ exemption read off the memory AS OF a position, `MachCSL.chainExAt`, is fixed
 only up to the top) keeps the invariant at every floor it leaves
 alone or resets to 0; a floor it moves (a load's foreign source) needs the
 step's own certificates (`hnew`). -/
-theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
-    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
-    (hex : ∀ a t, t ≤ top → ex a t → ex' a t)
+theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top L : Nat}
+    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hlp : LandPos.grow X.lp L Y.lp)
+    (hlt : ∀ t p, X.lp t = some p → t ≤ top) (hle : ∀ j a, X.coh j a ≤ L)
+    (hex : ∀ a p, p ≤ L → ex a p → ex' a p)
     (hnew : ∀ (j : CPU) (a : PAddr), Y.coh j a ≠ X.coh j a → ∀ (H : Hist) (e : HEnt), Y.m[a]? = some H →
-      e ∈ H → e.t ≠ 0 → e.t = Y.coh j a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex' a e.t →
-        ∃ τ, ChainCert.valid Y ⟨⟨e.tid, hA⟩, e.t, j, τ⟩)
+      e ∈ H → e.t ≠ 0 → Y.lp e.t = some (Y.coh j a) → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j →
+        ¬ ex' a (Y.coh j a) → ∃ τ, ChainCert.valid Y ⟨⟨e.tid, hA⟩, e.t, j, τ⟩)
     (h : loadsChained X ex) : loadsChained Y ex' := by
   intro j a H e hH he het hc hA hne hnex
   by_cases hcj : Y.coh j a = X.coh j a
-  · have hle' : e.t ≤ top := by rw [hc, hcj]; exact hle j a
+  · rw [hcj] at hc hnex
+    have hXl : X.lp e.t = some (X.coh j a) := by
+      cases hX : X.lp e.t with
+      | none => exact absurd (hlp.2 _ _ hc hX) (Nat.not_lt.2 (hle j a))
+      | some q => rw [hlp.1 _ _ hX] at hc; rw [hc]
+    have hle' : e.t ≤ top := hlt _ _ hXl
     obtain ⟨H0, hH0, he0⟩ := hm a H hH e he hle'
-    obtain ⟨τ, hv⟩ := h j a H0 e hH0 he0 het (by rw [hc, hcj]) hA hne (fun hx' => hnex (hex a e.t hle' hx'))
+    obtain ⟨τ, hv⟩ := h j a H0 e hH0 he0 het hXl hA hne (fun hx' => hnex (hex a _ (hle j a) hx'))
     exact ⟨τ, ChainCert.valid_mono hx hv⟩
   · exact hnew j a hcj H e hH he het hc hA hne hnex
 
+
 /-- A step that resets or keeps every floor (a store, a device step, an
 exclusive access) keeps the invariant. -/
-theorem loadsChained_keep {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
-    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
-    (hex : ∀ a t, t ≤ top → ex a t → ex' a t) (hcoh : ∀ j a, Y.coh j a = X.coh j a ∨ Y.coh j a = 0)
+theorem loadsChained_keep {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top L : Nat}
+    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hlp : LandPos.grow X.lp L Y.lp)
+    (hlt : ∀ t p, X.lp t = some p → t ≤ top) (hle : ∀ j a, X.coh j a ≤ L)
+    (hlp0 : ∀ t, Y.lp t = some 0 → t = 0)
+    (hex : ∀ a p, p ≤ L → ex a p → ex' a p) (hcoh : ∀ j a, Y.coh j a = X.coh j a ∨ Y.coh j a = 0)
     (h : loadsChained X ex) : loadsChained Y ex' := by
-  refine loadsChained_step hx hm hle hex (fun j a hne' H e _ _ het hc => ?_) h
+  refine loadsChained_step hx hm hlp hlt hle hex (fun j a hne' H e _ _ het hc => ?_) h
   rcases hcoh j a with h1 | h1
   · exact absurd h1 hne'
   · rw [h1] at hc
-    exact absurd hc het
+    exact absurd (hlp0 _ hc) het
+
 
 /-! ## The exemption (W8 (f2-ctx) S3; design (A′), `PROGRESS-W8f2.md`)
 
@@ -1566,6 +2340,53 @@ theorem ptByteExAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg
   simp only [ptByteExAt, ptByteAt_grow hg hm ht, ksByteAt_grow hg hm ht, ptURootAt, ptLivePageAt, ptLiveChildAt,
     wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht, ptFreedSince_grow hg hm ht]
 
+/-! ### The as-of readings under an INSERTION growth (route P: a write that lands at once inserts
+below a pending prefix; every reading as of a position at or below the issue top is unchanged) -/
+
+theorem ChainDefs.find?_filter_of_imp {α : Type} (p q : α → Bool) (hqp : ∀ x, q x = true → p x = true) :
+    ∀ l : List α, (l.filter p).find? q = l.find? q
+  | [] => rfl
+  | x :: l => by
+    by_cases hx : p x = true
+    · rw [List.filter_cons_of_pos hx, List.find?_cons, List.find?_cons, ChainDefs.find?_filter_of_imp p q hqp l]
+    · have hq : q x = false := by
+        cases h : q x
+        · rfl
+        · exact absurd (hqp x h) hx
+      rw [List.filter_cons_of_neg hx, List.find?_cons, hq, ChainDefs.find?_filter_of_imp p q hqp l]
+
+theorem FlatMem.entAsOf_ins {m m' : FlatMem} {top t : Nat} (hg : memIns m top m') (ht : t ≤ top) (a : PAddr) :
+    m'.entAsOf a t = m.entAsOf a t := by
+  unfold FlatMem.entAsOf
+  have himp : ∀ e : HEnt, decide (e.t ≤ t) = true → decide (e.t ≤ top) = true := by
+    intro e he; simp only [decide_eq_true_eq] at he ⊢; omega
+  cases hH : m[a]? with
+  | some H =>
+    obtain ⟨H', hH', hf, -⟩ := hg.1 a H hH
+    rw [hH']
+    simp only [Option.bind_some]
+    rw [← ChainDefs.find?_filter_of_imp _ _ himp H', hf, ChainDefs.find?_filter_of_imp _ _ himp H]
+  | none =>
+    cases hH' : m'[a]? with
+    | none => rfl
+    | some H' =>
+      simp only [Option.bind_some, Option.bind_none]
+      rw [List.find?_eq_none]
+      intro e he hle
+      simp only [decide_eq_true_eq] at hle
+      obtain ⟨H, hH2, _⟩ := hg.2 a H' hH' e he (Nat.le_trans hle ht)
+      rw [hH] at hH2
+      cases hH2
+
+theorem wordAsOf_ins {m m' : FlatMem} {top t : Nat} (hg : memIns m top m') (ht : t ≤ top) (a : PAddr)
+    (v : BitVec 64) : wordAsOf m' a t v ↔ wordAsOf m a t v := by
+  unfold wordAsOf
+  simp only [FlatMem.entAsOf_ins hg ht]
+
+theorem kstkPageAt_ins {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memIns m top m')
+    (ht : t ≤ top) (p : PAddr) : kstkPageAt rs m' t p ↔ kstkPageAt rs m t p := by
+  simp only [kstkPageAt, ptRootAt, ptLeafAt, wordAsOf_ins hg ht]
+
 /-- A permanent-table byte is a live page-table byte (the kernel side: the
 kernel table is never freed, so its walk needs no freed-check). -/
 theorem ptByteLiveAt_of_ptByteAt {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr}
@@ -1627,6 +2448,67 @@ theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAdd
   · exact .inr (.inr (.inl h))
   · exact .inr (.inr (.inr h))
 
+
+/-! ### Route P, [OWN.126] (F-11.3 (i), design D13): the permanent table read as of the top
+
+Under route P a hart's walker forwards its own PENDING pointer stores and its A/D write lands at
+once, so a leaf's A/D entry can land BEFORE the pointers above it: as of that entry's position the
+leaf is not yet a page-table byte of the landed view.  The permanent table's words never change
+after its seal, so its arm reads the path as of a position between the entry's and the top --
+the step-stable form of "as of the top" (`ptByteExAtR_grow`).  The freeable tables keep "as of
+`t`" (a later re-use of a page must not exempt earlier junk). -/
+
+/-- **The exempt page-table bytes, route P** ([OWN.126]): the PERMANENT table's walk as of some
+position `q` with `t ≤ q ≤ top`, off the static stacks; a FREEABLE table's live walk as of `t`,
+off every kernel-stack byte. -/
+def ptByteExAtR (rs : List RsvRegion) (m : FlatMem) (top t : Nat) (a : PAddr) : Prop :=
+  ((∃ q, t ≤ q ∧ q ≤ top ∧ ptByteAt rs m q a) ∧ ¬ stackByteIn rs a) ∨
+    ((∃ r p : PAddr, ptURootAt rs m t r ∧ ptLivePageAt rs m t r p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096) ∧
+      ¬ ksByteAt rs m t a)
+
+/-- The as-of-`t` exemption's page-table arm is the route-P one's at `q := t`. -/
+theorem ptByteExAtR_of {rs : List RsvRegion} {m : FlatMem} {top t : Nat} {a : PAddr} (ht : t ≤ top)
+    (h : ptByteExAt rs m t a) : ptByteExAtR rs m top t a := by
+  rcases h with ⟨h, hs⟩ | h
+  · exact .inl ⟨⟨t, Nat.le_refl _, ht, h⟩, hs⟩
+  · exact .inr h
+
+theorem ptByteExAtR_grow {rs : List RsvRegion} {m m' : FlatMem} {top top' t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (htop : top ≤ top') (ht : t ≤ top) (a : PAddr)
+    (h : ptByteExAtR rs m top t a) : ptByteExAtR rs m' top' t a := by
+  rcases h with ⟨⟨q, hq1, hq2, hq⟩, hs⟩ | ⟨h, hk⟩
+  · exact .inl ⟨⟨q, hq1, Nat.le_trans hq2 htop, (ptByteAt_grow hg hm hq2 a).2 hq⟩, hs⟩
+  · refine .inr ⟨?_, fun h' => hk ((ksByteAt_grow hg hm ht a).1 h')⟩
+    simp only [ptURootAt, ptLivePageAt, ptLiveChildAt, wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht,
+      ptFreedSince_grow hg hm ht]
+    simp only [ptURootAt, ptLivePageAt, ptLiveChildAt] at h
+    exact h
+
+/-- **The exemption of the load-side invariant, route P**: `chainExAt` with the page-table arm of
+`ptByteExAtR` ([OWN.126]). -/
+def chainExAtR (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+    (top : Nat) (a : PAddr) (t : Nat) : Prop :=
+  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a ∧ ¬ ksByteAt rs m t a) ∨
+    ptByteExAtR rs m top t a ∨ racyValAt rs m t a
+
+theorem chainExAtR_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {m m' : FlatMem} {top top' : Nat} (hg : memGrow m top m') (hm : memAbove m top m') (htop : top ≤ top')
+    (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAtR rs wit m top a t) : chainExAtR rs wit m' top' a t := by
+  rcases h with h | ⟨b, hb, hw, hk⟩ | h | h
+  · exact .inl h
+  · exact .inr (.inl ⟨b, dynLkDiscAt_mono hg htop hb, hw, fun h' => hk ((ksByteAt_grow hg hm ht a).1 h')⟩)
+  · exact .inr (.inr (.inl (ptByteExAtR_grow hg hm htop ht a h)))
+  · exact .inr (.inr (.inr ((racyValAt_grow hg hm ht a).2 h)))
+
+/-- The as-of-`t` exemption implies the route-P one. -/
+theorem chainExAtR_of {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {m : FlatMem} {top : Nat} (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAt rs wit m top a t) :
+    chainExAtR rs wit m top a t := by
+  rcases h with h | h | h | h
+  · exact .inl h
+  · exact .inr (.inl h)
+  · exact .inr (.inr (.inl (ptByteExAtR_of ht h)))
+  · exact .inr (.inr (.inr h))
 
 /-! ## Route P, increment P-M4a: the landed view's growth under every route-P step
 
@@ -1820,9 +2702,9 @@ theorem memNew_mono {m m' : FlatMem} {P Q : PAddr → HEnt → Prop} (h : memNew
 
 /-- A write that lands at once adds only entries at its stamp. -/
 theorem memNew_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n))
-    (t : Nat) (h : Agent) : memNew m (fun _ e => e.t = t) (m.landBytes lp pa n w t h) := by
+    (t : Nat) (h : Agent) : memNew m (fun _ e => e.t = t ∧ e.tid = h) (m.landBytes lp pa n w t h) := by
   unfold FlatMem.landBytes
-  have key : ∀ (l : List Nat) (m : FlatMem), memNew m (fun _ e => e.t = t)
+  have key : ∀ (l : List Nat) (m : FlatMem), memNew m (fun _ e => e.t = t ∧ e.tid = h)
       (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m) := by
     intro l
     induction l with
@@ -1842,7 +2724,7 @@ theorem memNew_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w 
           | none => rw [hm] at hx; simp at hx
           | some H => rw [hm] at hx; exact .inl ⟨H, rfl, List.takeWhile_subset _ hx⟩
         · rcases List.mem_cons.1 hx with rfl | hx
-          · exact .inr rfl
+          · exact .inr ⟨rfl, rfl⟩
           · cases hm : m[pa + BitVec.ofNat 64 j]? with
             | none => rw [hm] at hx; simp at hx
             | some H => rw [hm] at hx; exact .inl ⟨H, rfl, List.dropWhile_subset _ hx⟩
@@ -1939,54 +2821,24 @@ theorem MState.stepGrowP_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
       (Nat.lt_succ_self _)), lpOf_snoc_grow σ.llog (σ.top + 1), by simp [MState.ltop], ?_⟩
   refine memNew_mono (memNew_landBytes σ.mem _ pa w (σ.top + 1) (hartAgent cpu)) (fun a e he => ?_)
   show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.ltop = false
-  rw [HEnt.landedLe, he, hs]
+  rw [HEnt.landedLe, he.1, hs]
   simp
 
 /-- **A DMA write** (route P): it lands at once (a zero-byte one is the identity). -/
-theorem MState.stepGrowP_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (h : σ.okP) : σ.stepGrowP (σ.storeDmaL pa n w) := by
-  by_cases hn : n = 0
-  · exact σ.stepGrowP_of_eq _ (by simp [hn]) (by simp [hn])
-  have hs := σ.okP_snoc_self h
-  have hm : (σ.storeDmaL pa n w).mem = σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1)
-      diskAgent := by simp [hn]
-  have hl : (σ.storeDmaL pa n w).llog = σ.llog ++ [σ.top + 1] := by simp [hn]
-  rw [MState.stepGrowP_iff_fields, hm, hl]
-  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_landBytes _ σ.ltop σ.mem pa w (σ.top + 1) diskAgent hs
-      (Nat.lt_succ_self _)), lpOf_snoc_grow σ.llog (σ.top + 1), by simp, ?_⟩
-  refine memNew_mono (memNew_landBytes σ.mem _ pa w (σ.top + 1) diskAgent) (fun a e he => ?_)
-  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.llog.length = false
-  rw [HEnt.landedLe, he, hs]
-  simp
-
-/-- **The P-M2 machine's EAGER store** (issued and landed in one step): it lands at the new
-landing top, on top of the history. -/
-theorem MState.stepGrowP_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) (h : σ.okP) : σ.stepGrowP (σ.store cpu pa n w excl) := by
-  have hs := σ.okP_snoc_self h
-  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_writeBytes _ σ.ltop σ.mem pa w (σ.top + 1) (hartAgent cpu)
-      (fun q hq => by rw [hs] at hq; obtain rfl := Option.some.inj hq; exact Nat.lt_succ_self _)),
-    lpOf_snoc_grow σ.llog (σ.top + 1), by simp [MState.ltop], ?_⟩
-  refine memNew_mono (memNew_writeBytes σ.mem pa w (σ.top + 1) (hartAgent cpu)) (fun a e he => ?_)
-  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.ltop = false
-  rw [HEnt.landedLe, he.2.1, hs]
-  simp
-
-/-- The P-M2 machine's eager DMA write. -/
 theorem MState.stepGrowP_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (h : σ.okP) : σ.stepGrowP (σ.storeDma pa n w) := by
   by_cases hn : n = 0
   · exact σ.stepGrowP_of_eq _ (by simp [hn]) (by simp [hn])
   have hs := σ.okP_snoc_self h
-  have hm : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := by simp [hn]
+  have hm : (σ.storeDma pa n w).mem = σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1)
+      diskAgent := by simp [hn]
   have hl : (σ.storeDma pa n w).llog = σ.llog ++ [σ.top + 1] := by simp [hn]
   rw [MState.stepGrowP_iff_fields, hm, hl]
-  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_writeBytes _ σ.ltop σ.mem pa w (σ.top + 1) diskAgent
-      (fun q hq => by rw [hs] at hq; obtain rfl := Option.some.inj hq; exact Nat.lt_succ_self _)),
-    lpOf_snoc_grow σ.llog (σ.top + 1), by simp, ?_⟩
-  refine memNew_mono (memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent) (fun a e he => ?_)
+  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_landBytes _ σ.ltop σ.mem pa w (σ.top + 1) diskAgent hs
+      (Nat.lt_succ_self _)), lpOf_snoc_grow σ.llog (σ.top + 1), by simp, ?_⟩
+  refine memNew_mono (memNew_landBytes σ.mem _ pa w (σ.top + 1) diskAgent) (fun a e he => ?_)
   show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.llog.length = false
-  rw [HEnt.landedLe, he.2.1, hs]
+  rw [HEnt.landedLe, he.1, hs]
   simp
 
 /-- Steps compose (at a landing top that does not drop). -/
@@ -2079,8 +2931,8 @@ abbrev ptByteAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a
   ptByteAt rs (m.lview lp) p a
 abbrev ptByteLiveAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
   ptByteLiveAt rs (m.lview lp) p a
-abbrev ptByteExAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
-  ptByteExAt rs (m.lview lp) p a
+abbrev ptByteExAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (ltop p : Nat) (a : PAddr) : Prop :=
+  ptByteExAtR rs (m.lview lp) ltop p a
 abbrev kstkPageAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (q : PAddr) : Prop :=
   kstkPageAt rs (m.lview lp) p q
 abbrev ksByteAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
@@ -2090,12 +2942,33 @@ abbrev racyValAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (
 abbrev dynLkAtP (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem) (lp : LandPos) (ltop : Nat)
     (b : PAddr) (a : Nat) : Prop :=
   dynLkAt wit (m.lview lp) ltop b a
-abbrev dynLkDiscAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+/-- **A live, DISCIPLINED dynamic lock, route P** ([OWN.128] (A), [OWN.125], design D16): the
+registration -- a slot store naming `b` at ISSUE stamp `te` (the client's witness, its receipts in
+the MERGED memory) -- has LANDED ("registered by now"), the two words' (A) window up to landing
+position `a` (the entries issued after `te`, co-above the tail, landed by `a`, relabeled) is a lock
+history from free over a registered `cpus` array (`lockWinA`), and the lock word reads 0 at the
+registration (`zeroAtReg`).  Kept by every route-P step (`MState.stepGrowP_dynLkDiscAtP`). -/
+def dynLkDiscAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (lp : LandPos) (ltop : Nat) (b : PAddr) (a : Nat) : Prop :=
-  dynLkDiscAt rs wit (m.lview lp) ltop b a
-abbrev chainExAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+  a ≤ ltop ∧ ∃ (L : List (PAddr × HEnt)) (te : Nat) (cb : BitVec 64) (c : CPU), wit L b te ∧
+    (∀ q ∈ L, ∃ H, m[q.1]? = some H ∧ q.2 ∈ H) ∧ (∃ q, lp te = some q) ∧
+    (⟨cpuPtrAt cb c, .cpu c⟩ : RsvRegion) ∈ rs ∧ lockWinA (cpuPtrAt cb) m lp b te a ∧ zeroAtReg m b te
+
+/-- **The exemption of the load-side invariant, route P** (as of LANDING position `p`): `chainExAtR`
+over the landed view, its dynamic-lock arm the (A) window over the merged memory and the landing
+positions (`dynLkDiscAtP`, [OWN.128]). -/
+def chainExAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (lp : LandPos) (ltop : Nat) (a : PAddr) (p : Nat) : Prop :=
-  chainExAt rs wit (m.lview lp) ltop a p
+  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAtP rs wit m lp ltop b p ∧ lockWordsByte b a ∧ ¬ ksByteAtP rs m lp p a) ∨
+    ptByteExAtP rs m lp ltop p a ∨ racyValAtP rs m lp p a
+
+/-- Every landed stamp is issued (route P). -/
+theorem MState.okP_lp_le_top (σ : MState) (h : σ.okP) : ∀ t p, σ.lp t = some p → t ≤ σ.top := by
+  intro t p hp
+  by_cases ht : t = 0
+  · omega
+  · have hm := (lpOf_isSome_iff σ.llog t ht).1 (by rw [show lpOf σ.llog t = σ.lp t from rfl, hp]; rfl)
+    exact (h.2.2.2.2.1 t hm).2
 
 section stepP
 variable {σ σ' : MState} (hs : σ.stepGrowP σ')
@@ -2117,9 +2990,9 @@ theorem MState.stepGrowP_ptByteLiveAtP {rs : List RsvRegion} {p : Nat} (hp : p �
     ptByteLiveAtP rs σ'.mem σ'.lp p a ↔ ptByteLiveAtP rs σ.mem σ.lp p a :=
   ptByteLiveAt_grow hs.1.grow hs.1.above hp a
 
-theorem MState.stepGrowP_ptByteExAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
-    ptByteExAtP rs σ'.mem σ'.lp p a ↔ ptByteExAtP rs σ.mem σ.lp p a :=
-  ptByteExAt_grow hs.1.grow hs.1.above hp a
+theorem MState.stepGrowP_ptByteExAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr)
+    (h : ptByteExAtP rs σ.mem σ.lp σ.ltop p a) : ptByteExAtP rs σ'.mem σ'.lp σ'.ltop p a :=
+  ptByteExAtR_grow hs.1.grow hs.1.above hs.2.2.1 hp a h
 
 theorem MState.stepGrowP_kstkPageAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (q : PAddr) :
     kstkPageAtP rs σ'.mem σ'.lp p q ↔ kstkPageAtP rs σ.mem σ.lp p q :=
@@ -2137,15 +3010,55 @@ theorem MState.stepGrowP_dynLkAtP {wit : List (PAddr × HEnt) → PAddr → Nat 
     (h : dynLkAtP wit σ.mem σ.lp σ.ltop b a) : dynLkAtP wit σ'.mem σ'.lp σ'.ltop b a :=
   dynLkAt_mono hs.1.grow hs.2.2.1 h
 
+/-- **A live disciplined dynamic lock stays one** under a route-P step that keeps the merged
+histories' entries up to the issue top in order (`memIns`). -/
 theorem MState.stepGrowP_dynLkDiscAtP {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    (hi : memIns σ.mem σ.top σ'.mem) (hok : σ.okP)
     {b : PAddr} {a : Nat} (h : dynLkDiscAtP rs wit σ.mem σ.lp σ.ltop b a) :
-    dynLkDiscAtP rs wit σ'.mem σ'.lp σ'.ltop b a :=
-  dynLkDiscAt_mono hs.1.grow hs.2.2.1 h
+    dynLkDiscAtP rs wit σ'.mem σ'.lp σ'.ltop b a := by
+  obtain ⟨hat, L, te, cb, c, hw, hL, ⟨q, hq⟩, hR, ⟨W, W', st, B, h4, h8, hd⟩, hz⟩ := h
+  have hte : te ≤ σ.top := σ.okP_lp_le_top hok te q hq
+  have hT : ∀ t q, σ'.lp t = some q → q ≤ a → t ≤ σ.top := fun t q h' hqa => by
+    cases h0 : σ.lp t with
+    | some q0 => exact σ.okP_lp_le_top hok t q0 h0
+    | none => have := hs.2.1.2 t q h' h0; omega
+  have h2 : ∀ t q, σ'.lp t = some q → q ≤ a → σ.lp t = some q := fun t q h' hqa => by
+    cases h0 : σ.lp t with
+    | some q0 => rw [hs.2.1.1 t q0 h0] at h'; exact h'
+    | none => have := hs.2.1.2 t q h' h0; omega
+  have hkeep : ∀ (x : PAddr) (H : Hist), σ.mem[x]? = some H →
+      ∃ H', σ'.mem[x]? = some H' ∧ Hist.winA σ'.lp te a H' = Hist.winA σ.lp te a H ∧
+        H'.find? (fun e => decide (e.t ≤ te)) = H.find? (fun e => decide (e.t ≤ te)) := fun x H hH => by
+    obtain ⟨H', hH', hf, _⟩ := hi.1 x H hH
+    refine ⟨H', hH', Hist.winA_keep hte hf hT hs.2.1.1 h2, ?_⟩
+    have hp : ∀ e : HEnt, decide (e.t ≤ te) = true → decide (e.t ≤ σ.top) = true := fun e he =>
+      decide_eq_true (Nat.le_trans (of_decide_eq_true he) hte)
+    rw [Reserved.find?_filter_eq _ _ hp H', hf, ← Reserved.find?_filter_eq _ _ hp H]
+  refine ⟨Nat.le_trans hat hs.2.2.1, L, te, cb, c, hw, fun x hx => ?_, ⟨q, hs.2.1.1 te q hq⟩, hR,
+    ⟨W, W', st, B, fun j hj => ?_, fun j hj => ?_, hd⟩, fun i hi' => ?_⟩
+  · obtain ⟨H, hH, hm⟩ := hL x hx
+    obtain ⟨H', hH', _, hall⟩ := hi.1 _ H hH
+    exact ⟨H', hH', hall _ hm⟩
+  · obtain ⟨H, hH, he⟩ := h4 j hj
+    obtain ⟨H', hH', hwe, _⟩ := hkeep _ H hH
+    exact ⟨H', hH', hwe.trans he⟩
+  · obtain ⟨H, hH, he⟩ := h8 j hj
+    obtain ⟨H', hH', hwe, _⟩ := hkeep _ H hH
+    exact ⟨H', hH', hwe.trans he⟩
+  · obtain ⟨H, hH, he⟩ := hz i hi'
+    obtain ⟨H', hH', _, hfe⟩ := hkeep _ H hH
+    exact ⟨H', hH', by rw [hfe]; exact he⟩
 
 theorem MState.stepGrowP_chainExAtP {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    (hi : memIns σ.mem σ.top σ'.mem) (hok : σ.okP)
     (a : PAddr) {p : Nat} (hp : p ≤ σ.ltop) (h : chainExAtP rs wit σ.mem σ.lp σ.ltop a p) :
-    chainExAtP rs wit σ'.mem σ'.lp σ'.ltop a p :=
-  chainExAt_grow hs.1.grow hs.1.above hs.2.2.1 a p hp h
+    chainExAtP rs wit σ'.mem σ'.lp σ'.ltop a p := by
+  rcases h with h | ⟨b, hb, hw, hk⟩ | h | h
+  · exact .inl h
+  · exact .inr (.inl ⟨b, MState.stepGrowP_dynLkDiscAtP hs hi hok hb, hw,
+      fun h' => hk ((MState.stepGrowP_ksByteAtP hs hp a).1 h')⟩)
+  · exact .inr (.inr (.inl (MState.stepGrowP_ptByteExAtP hs hp a h)))
+  · exact .inr (.inr (.inr ((MState.stepGrowP_racyValAtP hs hp a).2 h)))
 
 theorem MState.stepGrowP_lockWinAtP {ptr : CPU → BitVec 64} {lk : PAddr} {p a : Nat} (ha : a ≤ σ.ltop)
     (h : lockWinAtP ptr σ.mem σ.lp lk p a) : lockWinAtP ptr σ'.mem σ'.lp lk p a :=

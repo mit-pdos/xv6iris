@@ -238,6 +238,16 @@ theorem xv6Roots_only (base : PAddr) (cnt stride : Nat)
   have := List.all_eq_true.1 hall _ h
   simpa using this
 
+/-- `started` is the list's only publication word, hart 0's (DESIGN D17′ (R2): the seal's
+snapshot names the sealer as every publication word's hart). -/
+theorem xv6Pub_hart0 (f : PAddr) (w : CPU)
+    (h : (⟨f, .pub w⟩ : RsvRegion) ∈ xv6RsvStatic) : w.val = 0 := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .pub c => decide (c.val = 0)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
 
 /-- `stack0` is the list's only static kernel stack (mcslrec (3) X1). -/

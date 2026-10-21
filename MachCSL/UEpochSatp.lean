@@ -90,7 +90,7 @@ theorem kptOn_root [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
     kptOn (GF := GF) t M ⊢
       (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗ ∃ S, kptRootW t.base S := by
   unfold kptOn kptCore
-  iintro ⟨_, _, #Hr, %fl, ⟨%S, _, _, _, #Hw, _, _, _⟩, _⟩
+  iintro ⟨_, _, #Hr, %fl, %fr, ⟨%S, _, _, _, #Hw, _⟩, _⟩
   iframe Hr
   iexists S
   iexact Hw
@@ -158,9 +158,11 @@ interpretation. -/
 /-- One slot's deposit: its eight bytes' histories, headed at or below `K` by
 the bytes of its value. -/
 abbrev uslotPreCell (K : Nat) (p : Nat × KSlot) : IProp GF := iprop%
+  ∃ L : List (Nat × Nat), landedAll L ∗
   [∗list] j ∈ List.range 8, ∃ (x : HEnt) (H : Hist),
     pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) (p.2.addr + BitVec.ofNat 64 j)
-      (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ K ∧ x.v = nthByte (n := 8) p.2.c j⌝
+      (DFrac.own Qp.quarter) (x :: H) ∗
+      ⌜(x.t = 0 ∨ ∃ q, (x.t, q) ∈ L ∧ q ≤ K) ∧ x.v = nthByte (n := 8) p.2.c j⌝
 
 /-- **The opening deposit** of an epoch: `uepCellsE` with each slot's
 discipline still to be read off its histories. -/
@@ -168,7 +170,7 @@ def uepPreE (h : CPU) (e : UEp) : IProp GF :=
   iprop(⌜uepFacts e⌝ ∗ MonoNat.lb_own ((MachGS.era (hlc := hlc) (GF := GF)).iviewName h) (.ofNat e.K) ∗
       ([∗list] a ∈ e.text, ∃ (x : HEnt) (H : Hist),
         pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗
-          ⌜x.t ≤ e.K⌝) ∗
+          (⌜x.t = 0⌝ ∨ ∃ q : Nat, landedAt x.t q ∗ ⌜q ≤ e.K⌝)) ∗
       [∗list] p ∈ e.slots, uslotPreCell e.K p)
 
 /-- Per-byte headed histories as one history map. -/
@@ -210,6 +212,20 @@ theorem preBytes_hist (pa : PAddr) (dq : DFrac) (P : Nat → HEnt → Prop) : �
       · subst hjn; exact ⟨x, H, by simp, hx⟩
       · simp only [hjn, if_false]; exact h1 j (by omega)
 
+/-- **A slot's certified discipline at the opening** (route P, D11): headed by its value, the head
+the image's or landed at or below `K` (certified); nothing above it yet. -/
+theorem uslotHistOkL_of_pre (K : Nat) (d : KSlot) (Hs : Nat → Hist) (L : List (Nat × Nat))
+    (hp : ∀ j, j < 8 → ∃ x H, Hs j = x :: H ∧ (x.t = 0 ∨ ∃ q, (x.t, q) ∈ L ∧ q ≤ K) ∧
+      x.v = nthByte (n := 8) d.c j) : uslotHistOkL K d Hs L := by
+  refine ⟨⟨d.c, fun j hj => ?_, ?_⟩, fun j hj => ?_⟩
+  · obtain ⟨x, H, hx, -, hxv⟩ := hp j hj
+    rw [hx]; simp [hxv]
+  · split
+    · rfl
+    · exact pteAD_refl d.c
+  · obtain ⟨x, H, hx, hxc, hxv⟩ := hp j hj
+    exact ⟨[], x, H, by rw [hx]; rfl, hxv, hxc, fun e he => by cases he⟩
+
 /-- **A slot's discipline at the opening**: headed at or below `K` by its
 value, newest first. -/
 theorem uslotHistOk_of_pre (K : Nat) (d : KSlot) (Hs : Nat → Hist)
@@ -234,12 +250,11 @@ theorem uslotHistOk_of_pre (K : Nat) (d : KSlot) (Hs : Nat → Hist)
       omega
 
 /-- The deposit's slots, their discipline read off the heap. -/
-theorem uslotPre_cells (m : FlatMem) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H →
-      H.Pairwise (fun e e' => e'.t ≤ e.t)) (K : Nat) : ∀ sl : List (Nat × KSlot),
+theorem uslotPre_cells (m : FlatMem) (K : Nat) : ∀ sl : List (Nat × KSlot),
     genHeapInterp m ∗ ([∗list] p ∈ sl, uslotPreCell K p) ⊢@{IProp GF}
-      genHeapInterp m ∗ [∗list] p ∈ sl, ∃ Hs : Nat → Hist,
+      genHeapInterp m ∗ [∗list] p ∈ sl, ∃ (Hs : Nat → Hist) (L : List (Nat × Nat)),
         ([∗list] j ∈ List.range 8, pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem)
-          (p.2.addr + BitVec.ofNat 64 j) (DFrac.own Qp.quarter) (Hs j)) ∗ ⌜uslotHistOk K p.2 Hs⌝
+          (p.2.addr + BitVec.ofNat 64 j) (DFrac.own Qp.quarter) (Hs j)) ∗ landedAll L ∗ ⌜uslotHistOkL K p.2 Hs L⌝
   | [] => by
     iintro ⟨Hm, _⟩
     iframe Hm
@@ -247,21 +262,19 @@ theorem uslotPre_cells (m : FlatMem) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = s
   | p :: sl => by
     iintro ⟨Hm, Hl⟩
     icases BigSepL.bigSepL_cons.1 $$ Hl with ⟨Hp, Hl⟩
-    icases uslotPre_cells m hm K sl $$ [Hm Hl] with ⟨Hm, Hl⟩
+    icases uslotPre_cells m K sl $$ [Hm Hl] with ⟨Hm, Hl⟩
     · iframe
+    icases Hp with ⟨%L, #HL, Hp⟩
     icases preBytes_hist (GF := GF) p.2.addr (DFrac.own Qp.quarter)
-      (fun j x => x.t ≤ K ∧ x.v = nthByte (n := 8) p.2.c j) 8 $$ Hp with ⟨%Hs, Hh, %hh⟩
-    ihave %hget := histBytes_valid m p.2.addr 8 (fun _ => DFrac.own Qp.quarter) Hs $$ [Hm Hh]
-    · unfold histBytes; iframe
+      (fun j x => (x.t = 0 ∨ ∃ q, (x.t, q) ∈ L ∧ q ≤ K) ∧ x.v = nthByte (n := 8) p.2.c j) 8 $$ Hp with ⟨%Hs, Hh, %hh⟩
     iframe Hm
     iapply BigSepL.bigSepL_cons.2
     iframe Hl
-    iexists Hs
-    iframe Hh
+    iexists Hs, L
+    iframe Hh HL
     ipureintro
-    exact uslotHistOk_of_pre K p.2 Hs (fun j hj => by
+    exact uslotHistOkL_of_pre K p.2 Hs L (fun j hj => by
       obtain ⟨x, H, h1, h2, h3⟩ := hh j hj; exact ⟨x, H, h1, h2, h3⟩)
-      (fun j hj => hm _ _ (hget j hj))
 
 /-- **Installing a user table over the kernel's** (`userret`): the hart's
 epoch opens at the user root, the interpretation taking the epoch's custody
@@ -303,7 +316,7 @@ theorem satpStep_open (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot : BitVec 
   ihave %hmm := memModel_mmOk _ σ $$ Hmm
   unfold uepPreE
   icases Hdep with ⟨%hf, #Hiv, Htext, Hslots⟩
-  icases uslotPre_cells σ.mem (fun a H h => (hmm.1 a H h).1) e.K e.slots $$ [Hmem Hslots] with ⟨Hmem, Hslots⟩
+  icases uslotPre_cells σ.mem e.K e.slots $$ [Hmem Hslots] with ⟨Hmem, Hslots⟩
   · iframe
   imodintro
   iframe Hregs Hmem Hmm Hp

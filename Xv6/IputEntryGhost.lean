@@ -58,7 +58,7 @@ def iputEntCom (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32
       ⌜∀ j, j ≠ kk → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       itableSlotResLlb curCtx M' ci' kk -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
-    (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor curCtx tst) ∗
+    itableSlotLive curCtx kk ∗
     (∀ (M' : RegMapF (Qp × PosNat)) (ci' : RegMapF (BitVec 32 × BitVec 32)),
       ⌜∀ j, j ≠ kk → PartialMap.get? M' j = PartialMap.get? Mt j⌝ -∗
       ⌜∀ j, j ≠ kk → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
@@ -154,8 +154,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
     iframe Hhalf Hstampsback Hback Hrest Hiu Hgid Hicnt Hmir Hsel Hhpn Htxh Htxf Hfrag Hlv Hslh
       Hiauth Hipool Hpool Hfl
     isplitl [Hlive]
-    · unfold itableSlotLive
-      iexact Hlive
+    · iexact Hlive
     ipureintro; exact hlotl
   iframe Hid Hrd Hllbr Hc Hhdr Hva
   rcases hmax with h | h <;> rw [h]

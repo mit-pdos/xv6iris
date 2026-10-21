@@ -207,52 +207,101 @@ theorem uepOf_facts (P : UPtd) (t : PTree) (K : Nat) (hb : t.base = P.root) (hre
 section dep
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
+/-- A byte's head certified landed at or below `K` (route P, design D11; persistent). -/
+abbrev headLandedLe (x : HEnt) (K : Nat) : IProp GF := iprop(⌜x.t = 0⌝ ∨ ∃ p : Nat, landedAt x.t p ∗ ⌜p ≤ K⌝)
+
 /-- **One stamped byte, split**: the user tier's share, stamped, and the
-record's quarter, headed at or below the stamp. -/
+record's quarter, headed by an entry landed at or below the stamp (route P). -/
 theorem ctxByteX_custody (ξ : CtxId) (K : Nat) (a : PAddr) (v : BitVec 8) :
     ctxByteX (GF := GF) ξ K a (DFrac.own 1) v ⊢ ctxByteX ξ K a uCustQ v ∗
-      ∃ (x : HEnt) (H : Hist), a ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ ⌜x.t ≤ K ∧ x.v = v⌝ := by
+      ∃ (x : HEnt) (H : Hist), a ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ headLandedLe x K ∗ ⌜x.v = v⌝ := by
   unfold ctxByteX
-  iintro ⟨%e, %He, Hpt, %hev, #Hkey, %hK⟩
+  iintro ⟨%e, %He, Hpt, %hev, #Hkey, #HK⟩
   have h := (Fractional.fractional (Φ := fun q => iprop(a ↦ₕ{DFrac.own q} (e :: He)))
     Qp.threeQuarters Qp.quarter)
   rw [qp_tq_add_q] at h
   icases h.1 $$ Hpt with ⟨H1, H2⟩
   isplitl [H1]
-  · iexists e, He; iframe H1 Hkey; ipureintro; exact ⟨hev, hK⟩
-  · iexists e, He; iframe H2; ipureintro; exact ⟨hK, hev⟩
+  · iexists e, He; iframe H1 Hkey HK; ipureintro; exact hev
+  · iexists e, He; iframe H2 HK; ipureintro; exact hev
+
+/-- **Gathering the heads' certificates into one list** (route P): what a slot's deposit cell
+(`MachCSL.uslotPreCell`) carries. -/
+theorem certs_gather (K : Nat) (P : Nat → PAddr) (Q : Nat → HEnt → Prop) : ∀ l : List Nat,
+    ([∗list] k ∈ l, ∃ (x : HEnt) (H : Hist),
+        pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) (P k) (DFrac.own Qp.quarter) (x :: H) ∗
+        headLandedLe x K ∗ ⌜Q k x⌝) ⊢@{IProp GF}
+      ∃ L : List (Nat × Nat), landedAll L ∗ [∗list] k ∈ l, ∃ (x : HEnt) (H : Hist),
+        pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) (P k) (DFrac.own Qp.quarter) (x :: H) ∗
+        ⌜(x.t = 0 ∨ ∃ q, (x.t, q) ∈ L ∧ q ≤ K) ∧ Q k x⌝
+  | [] => by
+    iintro _
+    iexists []
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+  | k :: l => by
+    iintro H
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨⟨%x, %H0, Hp, #Hx, %hq⟩, H⟩
+    icases certs_gather K P Q l $$ H with ⟨%L, #HL, H⟩
+    icases Hx with (%h0 | ⟨%p, #Hl, %hpK⟩)
+    · iexists L
+      iframe HL
+      iapply BigSepL.bigSepL_cons.2
+      isplitl [Hp]
+      · iexists x, H0; iframe Hp; ipureintro; exact ⟨Or.inl h0, hq⟩
+      · iexact H
+    · iexists (x.t, p) :: L
+      isplitl []
+      · iapply BigSepL.bigSepL_cons.2; iframe Hl HL
+      iapply BigSepL.bigSepL_cons.2
+      isplitl [Hp]
+      · iexists x, H0; iframe Hp; ipureintro; exact ⟨Or.inr ⟨p, List.mem_cons_self, hpK⟩, hq⟩
+      · iapply BigSepL.bigSepL_mono ?_ $$ H
+        intro _ k' _
+        iintro ⟨%y, %Hy, Hpy, %⟨hy, hq'⟩⟩
+        iexists y, Hy
+        iframe Hpy
+        ipureintro
+        refine ⟨?_, hq'⟩
+        rcases hy with hy | ⟨q, hq, hqK⟩
+        · exact Or.inl hy
+        · exact Or.inr ⟨q, List.mem_cons_of_mem _ hq, hqK⟩
 
 /-- A stamped list, split byte by byte. -/
 theorem ukOwnX_custody (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) :
     ukOwnX (GF := GF) ξ K (DFrac.own 1) A ⊢ ukOwnX ξ K uCustQ A ∗
-      [∗list] p ∈ A, ∃ (x : HEnt) (H : Hist), p.1 ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ ⌜x.t ≤ K ∧ x.v = p.2⌝ := by
+      [∗list] p ∈ A, ∃ (x : HEnt) (H : Hist), p.1 ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ headLandedLe x K ∗ ⌜x.v = p.2⌝ := by
   unfold ukOwnX
   refine .trans (BigSepL.bigSepL_mono fun {_ p} _ => ctxByteX_custody ξ K p.1 p.2) BigSepL.bigSepL_sep_eqv.1
 
 /-- The text's quarters, at the text's addresses. -/
 theorem textDep_addrs (K : Nat) (A : List (PAddr × BitVec 8)) (D : List PAddr) (hA : A.map Prod.fst = D) :
-    ([∗list] p ∈ A, ∃ (x : HEnt) (H : Hist), p.1 ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ ⌜x.t ≤ K ∧ x.v = p.2⌝) ⊢@{IProp GF}
+    ([∗list] p ∈ A, ∃ (x : HEnt) (H : Hist), p.1 ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗ headLandedLe x K ∗
+      ⌜x.v = p.2⌝) ⊢@{IProp GF}
       [∗list] a ∈ D, ∃ (x : HEnt) (H : Hist),
-        pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ K⌝ := by
+        pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗
+          (⌜x.t = 0⌝ ∨ ∃ q : Nat, landedAt x.t q ∗ ⌜q ≤ K⌝) := by
   rw [← hA, BigSepL.bigSepL_map]
   apply BigSepL.bigSepL_mono
   intro k p _
-  iintro ⟨%x, %H, Hp, %⟨hK, -⟩⟩
+  iintro ⟨%x, %H, Hp, #HK, %-⟩
   iexists x, H
-  iframe Hp
-  ipureintro; exact hK
+  iframe Hp HK
 
 set_option maxRecDepth 10000 in
 /-- The table's quarters, slot by slot. -/
 theorem treeDep_slots (K : Nat) (t : PTree) :
     ([∗list] p ∈ ubTreeBytes 2 t, ∃ (x : HEnt) (H : Hist), p.1 ↦ₕ{DFrac.own Qp.quarter} (x :: H) ∗
-      ⌜x.t ≤ K ∧ x.v = p.2⌝) ⊢@{IProp GF} [∗list] p ∈ uptSlots t, uslotPreCell K p := by
+      headLandedLe x K ∗ ⌜x.v = p.2⌝) ⊢@{IProp GF} [∗list] p ∈ uptSlots t, uslotPreCell K p := by
   unfold ubTreeBytes uptSlots
   rw [← lentries_snd, List.flatMap_map, BigSepL.bigSepL_flatMap, BigSepL.bigSepL_map]
   apply BigSepL.bigSepL_mono
   intro k x _
   unfold ubWordBytes uslotPreCell
   rw [BigSepL.bigSepL_map]
+  exact certs_gather K (fun j => x.2.1 + BitVec.ofNat 64 j) (fun j y => y.v = nthByte (n := 8) x.2.2 j)
+    (List.range 8)
 
 set_option maxRecDepth 10000 in
 /-- **The deposit at `userret`'s `csrw satp`**: the stamped text and table

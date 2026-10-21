@@ -229,7 +229,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) :
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢
       ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
-      diskPub γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+      diskPub γ np ∗ diskPubLb γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
       diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
@@ -242,8 +242,8 @@ theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Na
 
 theorem diskResA_close (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool)
     (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat) :
-    diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
-      diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
+    diskPub (GF := GF) γ np ∗ diskPubLb γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗
+      diskStage γ stg ∗ diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -272,17 +272,17 @@ new values. -/
 theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) :
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢
       ∃ (np x : Nat) (stg : Option Nat),
-        diskPub γ np ∗ diskStage γ stg ∗
+        diskPub γ np ∗ diskPubLb γ np ∗ diskStage γ stg ∗
         ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
         ctxBytes ξ (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 x) ∗
-        (∀ (np' y : Nat) (stg' : Option Nat), diskPub γ np' -∗ diskStage γ stg' -∗
+        (∀ (np' y : Nat) (stg' : Option Nat), diskPub γ np' -∗ diskPubLb γ np' -∗ diskStage γ stg' -∗
           ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np') -∗
           ctxBytes ξ (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half)
             (BitVec.ofNat 16 y) -∗
           diskResA γ pd pav pu ξ tk) := by
   iintro HR
   icases diskResA_open γ pd pav pu ξ tk $$ HR
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, #Hplb, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   icases bigSepL_upd_acc (GF := GF) (List.range NUM) (np % NUM) (np % NUM)
       (by rw [List.getElem?_range (mod_NUM_lt np)])
       (fun k => ctxBytes ξ (availRingAt pav k) 2 (DFrac.own (1 : Qp).half)
@@ -297,15 +297,15 @@ theorem diskResA_pub_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk 
           · rw [List.getElem?_eq_none (by simp; omega)] at hjj; cases hjj
         rw [updN_ne ring (np % NUM) y jj this]) $$ Hring with ⟨Hc, Hback⟩
   iexists np, (ring (np % NUM)), stg
-  iframe Hp Hs Hidx Hc
-  iintro %np' %y %stg' Hp' Hs' Hidx' Hc'
+  iframe Hp Hplb Hs Hidx Hc
+  iintro %np' %y %stg' Hp' #Hplb' Hs' Hidx' Hc'
   ihave Hc' := (show ctxBytes (GF := GF) ξ (availRingAt pav (np % NUM)) 2
       (DFrac.own (1 : Qp).half) (BitVec.ofNat 16 y) ⊢
       ctxBytes ξ (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half)
         (BitVec.ofNat 16 (updN ring (np % NUM) y (np % NUM))) from by rw [updN_self]) $$ Hc'
   ihave Hring := Hback $$ %y Hc'
   iapply diskResA_close γ pd pav pu ξ tk np' nr stg' (updN ring (np % NUM) y)
-  iframe Hp' Hr Hrl Hs' Hlb Hwmp Hu Hidx' Hring Hsl
+  iframe Hp' Hplb' Hr Hrl Hs' Hlb Hwmp Hu Hidx' Hring Hsl
 
 /-- **Putting a TAKEN slot back at a new receipt.**  The byte is already
 `0` in the payload (`Xv6.slotAlloc _ _ _ _ true`), so all that comes back
@@ -780,16 +780,18 @@ driver's half of the cell at the raw tier. -/
 def ringWritePost (γ : DiskNames) (pav : PAddr) (cpu : CPU) (np i : Nat) : IProp GF := iprop%
   diskPub γ np ∗ diskStage γ (some i) ∗ headTok γ i .inactive ∗
   ∃ (t : Nat) (Hs : Nat → Hist),
-    authoredBy t (hartAgent cpu) ∗ topLb t ∗
+    authoredBy t (hartAgent cpu) ∗ itopLb t ∗
     histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
       (pushed (n := 2) Hs t (hartAgent cpu) (BitVec.ofNat 16 i))
 
 /-- ... and what the `avail->idx` bump returns. -/
-def availIdxWritePost (γ : DiskNames) (pav : PAddr) (cpu : CPU) (np i : Nat) (c : Chain) :
-    IProp GF := iprop%
+def availIdxWritePost (γ : DiskNames) (pav : PAddr) (cpu : CPU) (np i : Nat) (c : Chain)
+    (tr : Nat) (Hr : Nat → Hist) (hv : BitVec 16) : IProp GF := iprop%
   diskPub γ (np + 1) ∗ diskStage γ none ∗ headTok γ i (.active c) ∗
+  histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
+    (pushed (n := 2) Hr tr (hartAgent cpu) hv) ∗
   ∃ (t : Nat) (Hs : Nat → Hist),
-    authoredBy t (hartAgent cpu) ∗ topLb t ∗
+    authoredBy t (hartAgent cpu) ∗ itopLb t ∗
     histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
       (pushed (n := 2) Hs t (hartAgent cpu) (wrap16 (np + 1)))
 
@@ -811,14 +813,115 @@ theorem vdrw4_ring_write (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (np : 
 
 /-- `Xv6.disk_avail_idx_write` with its postcondition named. -/
 theorem vdrw4_idx_write (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU) (np i : Nat)
-    (c : Chain) :
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗ diskStage γ (some i) ∗
-      headTok γ i (.active c) ∗
+    (c : Chain) (tr pr : Nat) (Hr : Nat → Hist) (hv : BitVec 16) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗ diskPubLb γ np ∗
+      diskStage γ (some i) ∗ headTok γ i (.active c) ∗
+      histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
+        (pushed (n := 2) Hr tr (hartAgent cpu) hv) ∗ landedAt tr pr ∗
       ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ⊢
       writeAU cpu (availIdxAt pav) 2 (wrap16 (np + 1))
-        (availIdxWritePost γ pav cpu np i c) := by
+        (availIdxWritePost γ pav cpu np i c tr Hr hv) := by
   unfold availIdxWritePost
-  exact disk_avail_idx_write γ pd pav pu cpu np i c
+  exact disk_avail_idx_write γ pd pav pu cpu np i c tr pr Hr hv
+
+/-! ## The chain's DMA windows across the `+0x186` drain (route P, D14 (c)) -/
+
+/-- The six windows the device will read, BEFORE the drain: each a raw half beside the context
+half, its heads the image's, landed, or among the hart's receipts `ts`. -/
+def vdrwChainPre (pd : PAddr) (c : Chain) (bw : BitVec (8 * BSIZE)) (ts : List Nat) : IProp GF := iprop%
+  ctxBytesPre curCtx (descAt pd c.hd) 16 c.d0 ts ∗ ctxBytesPre curCtx (descAt pd c.md) 16 c.d1 ts ∗
+  ctxBytesPre curCtx (descAt pd c.tl) 16 c.d2 ts ∗ ctxBytesPre curCtx c.hdrAddr 16 c.hdr ts ∗
+  ctxBytesPre curCtx c.status 1 0xff#8 ts ∗ ctxBytesPre curCtx c.data BSIZE bw ts
+
+/-- ... and AFTER it: certified. -/
+def vdrwChainL (pd : PAddr) (c : Chain) (bw : BitVec (8 * BSIZE)) : IProp GF := iprop%
+  ctxBytesL curCtx (descAt pd c.hd) 16 c.d0 ∗ ctxBytesL curCtx (descAt pd c.md) 16 c.d1 ∗
+  ctxBytesL curCtx (descAt pd c.tl) 16 c.d2 ∗ ctxBytesL curCtx c.hdrAddr 16 c.hdr ∗
+  ctxBytesL curCtx c.status 1 0xff#8 ∗ ctxBytesL curCtx c.data BSIZE bw
+
+theorem vdrw_pre_app {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (ts ts' : List Nat)
+    (h : ∀ t, t ∈ ts → t ∈ ts') :
+    ctxBytesPre (GF := GF) curCtx pa n w ts ⊢ ctxBytesPre curCtx pa n w ts' :=
+  ctxBytesPre_mono curCtx pa n w ts ts' h
+
+set_option maxRecDepth 40000 in
+set_option maxHeartbeats 2000000 in
+/-- **Before the drain**: the six windows' head keys cashed against the hart's `ownCtx`, the
+receipts gathered into one list. -/
+theorem vdrw_chain_pre (cpu : CPU) (pd : PAddr) (c : Chain) (data : List (BitVec 8))
+    (hlen : data.length = BSIZE)
+    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw)
+    (hst : kmapClass (vpnOf c.status).toNat = some .rw) :
+    ownCtx (GF := GF) cpu curCtx ∗ kmapStatic ∗
+      ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
+      ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
+      ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
+      ctxBytes curCtx c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
+      wordAtN curCtx c.status 1 (DFrac.own 1) 0xff#8 ∗
+      byteBuf c.data (DFrac.own 1) data ⊢
+      ownCtx cpu curCtx ∗ ∃ ts : List Nat, vdrwChainPre pd c (bvOfBytes BSIZE data) ts ∗
+        [∗list] t ∈ ts, authoredBy t (hartAgent cpu) := by
+  iintro ⟨Hctx, #HS, Hd0, Hd1, Hd2, Hh, Hst, Hdat⟩
+  isimp only [wordAtN_cur] at Hst
+  ihave Hst := wordPointsTo_ctxBytes c.status 1 (DFrac.own 1) 0xff#8 hst $$ HS Hst
+  ihave Hdat := byteBuf_ctxBytes c.data data BSIZE hlen hkm $$ HS Hdat
+  icases ctxBytes_pre cpu curCtx _ 16 c.d0 $$ [Hctx Hd0] with ⟨Hctx, %t1, P1, A1⟩
+  · iframe
+  icases ctxBytes_pre cpu curCtx _ 16 c.d1 $$ [Hctx Hd1] with ⟨Hctx, %t2, P2, A2⟩
+  · iframe
+  icases ctxBytes_pre cpu curCtx _ 16 c.d2 $$ [Hctx Hd2] with ⟨Hctx, %t3, P3, A3⟩
+  · iframe
+  icases ctxBytes_pre cpu curCtx _ 16 c.hdr $$ [Hctx Hh] with ⟨Hctx, %t4, P4, A4⟩
+  · iframe
+  icases ctxBytes_pre cpu curCtx _ 1 0xff#8 $$ [Hctx Hst] with ⟨Hctx, %t5, P5, A5⟩
+  · iframe
+  icases ctxBytes_pre cpu curCtx _ BSIZE (bvOfBytes BSIZE data) $$ [Hctx Hdat] with ⟨Hctx, %t6, P6, A6⟩
+  · iframe
+  iframe Hctx
+  iexists t1 ++ (t2 ++ (t3 ++ (t4 ++ (t5 ++ t6))))
+  isplitl [P1 P2 P3 P4 P5 P6]
+  · unfold vdrwChainPre
+    isplitl [P1]
+    · iapply vdrw_pre_app _ _ t1 _ (fun t ht => by simp [ht]); iexact P1
+    isplitl [P2]
+    · iapply vdrw_pre_app _ _ t2 _ (fun t ht => by simp [ht]); iexact P2
+    isplitl [P3]
+    · iapply vdrw_pre_app _ _ t3 _ (fun t ht => by simp [ht]); iexact P3
+    isplitl [P4]
+    · iapply vdrw_pre_app _ _ t4 _ (fun t ht => by simp [ht]); iexact P4
+    isplitl [P5]
+    · iapply vdrw_pre_app _ _ t5 _ (fun t ht => by simp [ht]); iexact P5
+    · iapply vdrw_pre_app _ _ t6 _ (fun t ht => by simp [ht]); iexact P6
+  · iapply BigSepL.bigSepL_append.2; iframe A1
+    iapply BigSepL.bigSepL_append.2; iframe A2
+    iapply BigSepL.bigSepL_append.2; iframe A3
+    iapply BigSepL.bigSepL_append.2; iframe A4
+    iapply BigSepL.bigSepL_append.2; iframe A5 A6
+
+/-- **After the drain**: the fence's certificates complete the six windows. -/
+theorem vdrw_chain_fin (pd : PAddr) (c : Chain) (bw : BitVec (8 * BSIZE)) (ts : List Nat)
+    (ls : List (Nat × Nat)) (hts : ∀ t, t ∈ ts → ∃ p, (t, p) ∈ ls) :
+    vdrwChainPre (GF := GF) pd c bw ts ∗ landedAll ls ⊢ vdrwChainL pd c bw := by
+  unfold vdrwChainPre vdrwChainL
+  iintro ⟨⟨P1, P2, P3, P4, P5, P6⟩, #Hls⟩
+  isplitl [P1]
+  · iapply ctxBytesPre_fin curCtx _ 16 c.d0 ts ls hts; iframe P1 Hls
+  isplitl [P2]
+  · iapply ctxBytesPre_fin curCtx _ 16 c.d1 ts ls hts; iframe P2 Hls
+  isplitl [P3]
+  · iapply ctxBytesPre_fin curCtx _ 16 c.d2 ts ls hts; iframe P3 Hls
+  isplitl [P4]
+  · iapply ctxBytesPre_fin curCtx _ 16 c.hdr ts ls hts; iframe P4 Hls
+  isplitl [P5]
+  · iapply ctxBytesPre_fin curCtx _ 1 0xff#8 ts ls hts; iframe P5 Hls
+  · iapply ctxBytesPre_fin curCtx _ BSIZE bw ts ls hts; iframe P6 Hls
+
+/-- A receipt in the drained list has its certificate. -/
+theorem vdrw_ls_mem (ts : List Nat) (ls : List (Nat × Nat)) (h : ls.map Prod.fst = ts) (t : Nat)
+    (ht : t ∈ ts) : ∃ p, (t, p) ∈ ls := by
+  rw [← h] at ht
+  obtain ⟨q, hq, rfl⟩ := List.mem_map.1 ht
+  exact ⟨q.2, hq⟩
 
 end ring
 

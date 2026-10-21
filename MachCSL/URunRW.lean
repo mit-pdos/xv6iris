@@ -829,8 +829,9 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     iapply swp_bind
     iapply swp_sail_mem_read_excl_au cpu req (akAcq req.access_kind) hex rfl hn r (fun v => swp cpu (k v) Φ)
     iframe Hfrag
-    ihave Hau := ctxBytes_exclReadAU ξ req.pa n dq w $$ Hb
-    iapply exclReadAU_wand req.pa n _ _ $$ Hau
+    icases ctxBytes_exclReadAU cpu ξ req.pa n dq w $$ [Hc Hb] with ⟨Hc, Hau⟩
+    · iframe Hc Hb
+    iapply exclReadAU_wand cpu req.pa n _ _ $$ Hau
     inext
     iintro %w1 ⟨%hw1, Hb⟩ Hfrag
     subst hw1

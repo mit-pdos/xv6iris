@@ -46,10 +46,15 @@ position's top receipt. -/
 def dmaWriteLease (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF) : IProp GF := iprop%
   ∃ (Hs : Nat → Hist) (Kb : Nat),
     histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗ ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
-    (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
-        authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P)
+    ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ∗
+    (∀ (t p : Nat), histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
+        authoredBy t diskAgent -∗ itopLb t -∗ landedAt t p -∗ topLb p -∗ ⌜Kb < p⌝ -∗ ⌜0 < t⌝ -∗ P)
 
-/-- **The ORDERING RECEIPT.**  The lease carries a position `Kb` the
+/-- (Route P, design §2.4: the lease's bytes' heads are LANDED -- their landing certificates, or the
+boot image -- so the disk's landed insert is a push; xv6 discharges it after `fence iorw,iorw`.)
+
+**The ORDERING RECEIPT.**  The lease carries a position `Kb` the
 client already holds a `MachCSL.topLb` for -- typically the position of an
 EARLIER write of the same device task -- and the continuation learns
 `Kb < t`: the store's position is the machine's next, so it dominates
@@ -63,8 +68,10 @@ theorem dmaWriteLease_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IPr
     dmaWriteLease pa n w P ⊢@{IProp GF}
       ∃ (Hs : Nat → Hist) (Kb : Nat),
         histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb Kb ∗ ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
-        (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
-            authoredBy t diskAgent -∗ topLb t -∗ ⌜Kb < t⌝ -∗ P) := by
+        ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+            (⌜e.t = 0⌝ ∨ landedAt e.t p)) ∗
+        (∀ (t p : Nat), histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t diskAgent w) -∗
+            authoredBy t diskAgent -∗ itopLb t -∗ landedAt t p -∗ topLb p -∗ ⌜Kb < p⌝ -∗ ⌜0 < t⌝ -∗ P) := by
   unfold dmaWriteLease; iintro H; iexact H
 
 /-- What a DMA READ obligation looks like: either every answer satisfies `Q`
@@ -75,14 +82,18 @@ the whole footprint is required. -/
 def dmaReadPin (pa : PAddr) (n : Nat) (Q : BitVec (8 * n) → Prop) (P : IProp GF) : IProp GF := iprop%
   (⌜∀ v, Q v⌝ ∗ P) ∨
   (∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (w : BitVec (8 * n)),
-     histBytes pa n dqs Hs ∗ ⌜headsAre Hs n w⌝ ∗ ⌜Q w⌝ ∗ (histBytes pa n dqs Hs -∗ P))
+     histBytes pa n dqs Hs ∗ ⌜headsAre Hs n w⌝ ∗ ⌜Q w⌝ ∗
+     ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ∗ (histBytes pa n dqs Hs -∗ P))
 
 /-- `dmaView_pinned` against the whole interpretation. -/
 theorem dmaView_pinned_mach (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → DFrac)
     (Hs : Nat → Hist) (w : BitVec (8 * n)) (hh : headsAre Hs n w) :
-    machInterp σ ∗ histBytes pa n dqs Hs ⊢@{IProp GF} ⌜∀ v, dmaView σ pa n v → v = w⌝ := by
-  iintro ⟨⟨_, Hmem, _, _⟩, Hb⟩
-  iapply dmaView_pinned σ pa n dqs Hs w hh $$ [Hmem Hb]
+    machInterp σ ∗ histBytes pa n dqs Hs ∗
+      ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ⊢@{IProp GF} ⌜∀ v, dmaView σ pa n v → v = w⌝ := by
+  iintro ⟨⟨_, Hmem, Hmm, _, _⟩, Hb, Hl⟩
+  iapply dmaView_pinned σ pa n dqs Hs w hh $$ [Hmem Hmm Hb Hl]
   iframe
 
 /-- Cashing a read pin against the interpretation: the answer of any DMA
@@ -93,13 +104,13 @@ theorem dmaReadPin_view (σ : MState) (pa : PAddr) (n : Nat) (Q : BitVec (8 * n)
       ⌜∀ v, dmaView σ pa n v → Q v⌝ ∗ machInterp σ ∗ P := by
   unfold dmaReadPin
   iintro ⟨Hσ, Hpin⟩
-  icases Hpin with ⟨⟨%hall, HP⟩ | ⟨%dqs, %Hs, %w, Hb, %hh, %hQ, Hback⟩⟩
+  icases Hpin with ⟨⟨%hall, HP⟩ | ⟨%dqs, %Hs, %w, Hb, %hh, %hQ, #Hl, Hback⟩⟩
   · iframe Hσ HP
     ipureintro
     exact fun v _ => hall v
   · ihave %hpin : ⌜∀ v, dmaView σ pa n v → v = w⌝ $$ [Hσ Hb]
     · iapply dmaView_pinned_mach σ pa n dqs Hs w hh $$ [Hσ Hb]
-      iframe
+      iframe Hσ Hb Hl
     isplit
     · ipureintro
       intro v hv

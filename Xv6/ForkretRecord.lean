@@ -54,7 +54,7 @@ theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu �
   isplit
   · ipureintro; omega
   isplit
-  · unfold topLbAt; ileft; ipureintro; rfl
+  · iapply itopLbAt_0
   isplit
   · ipureintro
     intro k h hk

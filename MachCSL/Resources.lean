@@ -801,6 +801,37 @@ theorem ramBytes_of_readBytes {m : FlatMem} (hm : memRam m) {ag : Agent} {tv : N
   | none => rw [hg] at hr; simp at hr
   | some H => exact ⟨H, rfl⟩
 
+/-- A read footprint has histories. -/
+theorem present_of_readBytesP {m : FlatMem} {lp : LandPos} {ag : Agent} {tv : Nat} {pa : PAddr} {n : Nat}
+    {w : BitVec (8 * n)} (h : m.readBytesP lp ag tv pa n w) :
+    ∀ j, j < n → ∃ H, m[pa + BitVec.ofNat 64 j]? = some H := by
+  intro j hj
+  have hr := h j hj
+  unfold FlatMem.readP at hr
+  cases hg : m[pa + BitVec.ofNat 64 j]? with
+  | none => rw [hg] at hr; simp at hr
+  | some H => exact ⟨H, rfl⟩
+
+/-- What an agent reads over landing positions (route P), it reads from DRAM. -/
+theorem ramBytes_of_readBytesP {m : FlatMem} (hm : memRam m) {lp : LandPos} {ag : Agent} {tv : Nat}
+    {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} (h : m.readBytesP lp ag tv pa n w) : ramBytes pa n := by
+  refine ramBytes_of_cells hm (fun j hj => ?_)
+  have hr := h j hj
+  unfold FlatMem.readP at hr
+  cases hg : m[pa + BitVec.ofNat 64 j]? with
+  | none => rw [hg] at hr; simp at hr
+  | some H => exact ⟨H, rfl⟩
+
+/-- An authored entry of a co-ordered history is visible to its author at every view (route P:
+forwarding). -/
+theorem histOkP_author_visible (lp : LandPos) (log : List Agent) (H : Hist) (e : HEnt) (hH : histOkP lp log H)
+    (he : e ∈ H) (h : Agent) (tv : Nat) (ht : 1 ≤ e.t) (hl : log[e.t - 1]? = some h) :
+    e.visibleP lp h tv = true := by
+  rcases (hH.2 e he).2 with h0 | h0
+  · omega
+  · rw [hl] at h0
+    exact HEnt.visibleP_of_own lp h tv e (Option.some.inj h0).symm
+
 /-- A store into a DRAM footprint keeps the histories inside DRAM. -/
 theorem memRam_writeBytes {m : FlatMem} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {t : Nat}
     {h : Agent} (hram : ramBytes pa n) (hm : memRam m) : memRam (m.writeBytes pa n w t h) := by
@@ -849,12 +880,12 @@ theorem inRam_of_top {m : FlatMem} (hm : memRam m) {a : PAddr} {v : BitVec 8}
 reserved byte mirrors the memory, and the memory is DRAM. -/
 theorem not_devBytes_of_othersReserve {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
     (hres : ∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
-             (σ.mem[a]?).bind Hist.top = some v)
+             (σ.mem[a]?).bind (Hist.topL σ.lp) = some v)
     (hram : memRam σ.mem) (h : othersReserve σ.resv cpu pa n) : ¬ devBytes pa n := by
   obtain ⟨c, _, r, hr, j, hj, hsome⟩ := h
   intro hd
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hsome
-  have hin := inRam_of_top hram (hres c r hr _ v hv)
+  have hin := inRam_of_topL hram (hres c r hr _ v hv)
   have hdj := hd j hj
   rw [devAddr_false_of_inRam hin] at hdj
   exact absurd hdj (by decide)
@@ -867,140 +898,161 @@ is the only one that may hold a resource across the iterations of its loop
 task is not the root. -/
 def devRtOk (σ : MState) : Prop := ∀ d : DevId, 0 < (σ.devrt d).next
 
-/-- The memory-model step invariant (the Rocq prototype's `mm_ok`, `itv_ok`,
-`hr_ok` and `resv_ok`): every history is well formed against the author log,
-every view and read-side position is at or below the top, every outstanding
-reservation still agrees with the top of memory, and every history sits at a
-DRAM address.  Route P (increment P-M2, design §2.3): the ROUTE-P INVARIANT
-`MState.okP` (co-ordered histories over the landing positions, reservations at
-the LANDED top, views at landing positions, the landing log, the store buffers
-with their epochs), beside the staging conjunct `MState.sbNil` (every store
-buffer empty) that increment P-M3 deletes with the switch of plain stores to
-`issue`.  The first three conjuncts are today's readings over issue stamps;
-under `sbNil` they agree with `okP`'s (`MState.okP_ltop`, `MState.okP_topL`). -/
-def mmOk (σ : MState) : Prop :=
-  (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) ∧
-  (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
-  (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
-    (σ.mem[a]?).bind Hist.top = some v) ∧
-  memRam σ.mem ∧
-  devRtOk σ ∧
-  (σ.sbNil ∧ σ.okP)
+/-- **Every history keeps a boot-image entry** (route P): stores only add entries, and only to
+bytes that have a history (the writer's points-to). -/
+def memImg (m : FlatMem) : Prop := ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ e ∈ H, e.t = 0
 
-/-- Under the P-M2 machine every store buffer is empty (the staging conjunct). -/
-theorem mmOk_sbNil {σ : MState} (h : mmOk σ) (c : CPU) : σ.sb c = [] := h.2.2.2.2.2.1 c
+/-- The memory-model step invariant (the Rocq prototype's `mm_ok`, `itv_ok`,
+`hr_ok` and `resv_ok`), route P (design §2.1/§2.3): every history sits at a
+DRAM address, every device's next task id is positive, and THE ROUTE-P
+INVARIANT `MState.okP` -- every history in CO order over the landing positions
+(`histOkP`: a pending prefix over a landed suffix, authors the log's),
+reservations at the LANDED top, every view and read-side position at or below
+the LANDING top, the landing log a list of distinct issued stamps, and the
+store buffers holding exactly each hart's issued, unlanded stamps with their
+epochs. -/
+def mmOk (σ : MState) : Prop :=
+  memRam σ.mem ∧ devRtOk σ ∧ σ.okP ∧ memImg σ.mem
 
 /-- The route-P invariant. -/
-theorem mmOk_okP {σ : MState} (h : mmOk σ) : σ.okP := h.2.2.2.2.2.2
+theorem mmOk_okP {σ : MState} (h : mmOk σ) : σ.okP := h.2.2.1
 
-/-- **A LANDING KEEPS THE STEP INVARIANT** (route P, the pure half of
-`interp_land`): the route-P invariant by `MState.okP_land` (no staging premise),
-the staging conjunct on its own (`MState.sbNil_land`), and the rest because a
-landing moves no history, log, view, reservation or device. -/
+/-- Every history keeps its boot-image entry (route P: so every byte has a LANDED entry, what
+the fetch agent -- which never forwards -- reads). -/
+theorem mmOk_img {σ : MState} (h : mmOk σ) : memImg σ.mem := h.2.2.2
+
+/-- Every history is in co order over the landing positions. -/
+theorem mmOk_hist {σ : MState} (h : mmOk σ) :
+    ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOkP σ.lp σ.log H := (mmOk_okP h).1
+
+/-- Every history entry is at or below the issue top. -/
+theorem mmOk_le_top {σ : MState} (h : mmOk σ) :
+    ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top :=
+  fun a H e hH he => (((mmOk_okP h).1 a H hH).2 e he).1
+
+/-- Every view is at or below the landing top. -/
+theorem mmOk_views {σ : MState} (h : mmOk σ) (c : CPU) :
+    σ.tv c ≤ σ.ltop ∧ σ.itv c ≤ σ.ltop ∧ (σ.hr c).bound σ.ltop := (mmOk_okP h).2.2.1 c
+
+/-- Every reservation agrees with the landed top. -/
+theorem mmOk_resv {σ : MState} (h : mmOk σ) :
+    ∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+      (σ.mem[a]?).bind (Hist.topL σ.lp) = some v := (mmOk_okP h).2.1
+
+/-- The landing top is at most the issue top (the landing log is a list of distinct issued
+stamps). -/
+theorem MState.okP_ltop_le (σ : MState) (h : σ.okP) : σ.ltop ≤ σ.top := by
+  have := nodup_length_le σ.llog (List.range' 1 σ.top) h.2.2.2.1 (fun x hx => by
+    have := h.2.2.2.2.1 x hx; rw [List.mem_range'_1]; omega)
+  simpa using this
+
+theorem mmOk_ltop_le {σ : MState} (h : mmOk σ) : σ.ltop ≤ σ.top := σ.okP_ltop_le (mmOk_okP h)
+
+/-- A write that lands at once into a DRAM footprint keeps the histories inside DRAM. -/
+theorem memRam_landBytes {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
+    {t : Nat} {h : Agent} (hram : ramBytes pa n) (hm : memRam m) : memRam (m.landBytes lp pa n w t h) := by
+  intro a H hget
+  by_cases hin : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j
+  · rw [FlatMem.landBytes_get?_notin m lp pa w t h a hin] at hget
+    exact hm a H hget
+  · have hex : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j :=
+      Classical.byContradiction fun hc => hin (fun j hj heq => hc ⟨j, hj, heq⟩)
+    obtain ⟨j, hj, rfl⟩ := hex
+    exact hram j hj
+
+theorem memImg_writeBytes {m : FlatMem} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {t : Nat}
+    {h : Agent} (hn : n ≤ 2 ^ 64) (hpres : ∀ j, j < n → ∃ H, m[pa + BitVec.ofNat 64 j]? = some H)
+    (hm : memImg m) : memImg (m.writeBytes pa n w t h) := by
+  intro a H hget
+  by_cases hin : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j
+  · rw [FlatMem.writeBytes_get?_notin m pa w t h a hin] at hget
+    exact hm a H hget
+  · have hex : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j :=
+      Classical.byContradiction fun hc => hin (fun j hj heq => hc ⟨j, hj, heq⟩)
+    obtain ⟨j, hj, rfl⟩ := hex
+    obtain ⟨H0, hH0⟩ := hpres j hj
+    rw [relPc_written m pa w t h hn hj, Std.ExtTreeMap.getD_eq_getD_getElem?, hH0, Option.getD_some] at hget
+    obtain ⟨e, he, he0⟩ := hm _ H0 hH0
+    obtain rfl := Option.some.inj hget
+    exact ⟨e, List.mem_cons_of_mem _ he, he0⟩
+
+theorem memImg_landBytes {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
+    {t : Nat} {h : Agent} (hn : n ≤ 2 ^ 64) (hpres : ∀ j, j < n → ∃ H, m[pa + BitVec.ofNat 64 j]? = some H)
+    (hm : memImg m) : memImg (m.landBytes lp pa n w t h) := by
+  intro a H hget
+  by_cases hin : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j
+  · rw [FlatMem.landBytes_get?_notin m lp pa w t h a hin] at hget
+    exact hm a H hget
+  · have hex : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j :=
+      Classical.byContradiction fun hc => hin (fun j hj heq => hc ⟨j, hj, heq⟩)
+    obtain ⟨j, hj, rfl⟩ := hex
+    obtain ⟨H0, hH0⟩ := hpres j hj
+    rw [FlatMem.landBytes_at m lp pa w t h hn hj H0 hH0] at hget
+    obtain rfl := Option.some.inj hget
+    obtain ⟨e, he, he0⟩ := hm _ H0 hH0
+    exact ⟨e, (Hist.mem_insLanded lp _ _ e).2 (Or.inr he), he0⟩
+
+/-- Every byte with a history has a LANDED entry (its boot-image entry, landed at 0). -/
+theorem mmOk_landedEnt {σ : MState} (h : mmOk σ) {a : PAddr} {H : Hist} (hH : σ.mem[a]? = some H) :
+    ∃ e ∈ H, σ.lp e.t = some 0 := by
+  obtain ⟨e, he, he0⟩ := mmOk_img h a H hH
+  exact ⟨e, he, by rw [he0]; rfl⟩
+
+/-- **A LANDING KEEPS THE STEP INVARIANT** (route P, the pure half of `interp_land`): the
+route-P invariant by `MState.okP_land`, the rest because a landing moves no history and no
+device. -/
 theorem mmOk_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) (h : mmOk σ) :
-    mmOk (σ.land cpu t) := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  exact ⟨h1, h2, h3, h4, h5, σ.sbNil_land cpu t h6, σ.okP_land cpu t hok h7⟩
+    mmOk (σ.land cpu t) :=
+  ⟨h.1, h.2.1, σ.okP_land cpu t hok h.2.2.1, h.2.2.2⟩
 
+theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
+    (h : mmOk σ) : mmOk (σ.afterLoad cpu pa n tvn) :=
+  ⟨h.1, h.2.1, σ.okP_afterLoad cpu pa n tvn htv h.2.2.1, h.2.2.2⟩
 
-theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
-    (h : mmOk σ) : mmOk (σ.afterLoad cpu pa n tvn) := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4, h5, h6,
-    σ.okP_afterLoad cpu pa n tvn (by rw [σ.okP_ltop h7 h6]; exact htv) h7⟩
-  obtain ⟨a1, a2, a3, a4⟩ := h2 c
-  simp only [MState.top] at *
-  by_cases hc : c = cpu
-  · subst hc
-    simp only [updCpu, if_true]
-    refine ⟨a1, a2, ?_, ?_⟩
-    · simp only [HRead.afterLoad]; omega
-    · intro a
-      simp only [HRead.afterLoad]
-      have hs := LoadSrcs.stamp_le _ (hartAgent c) pa n a tvn
-        (fun j _ => FlatMem.loadSrcs_stampAt_le σ.mem (hartAgent c) tvn pa n j)
-      have := a4 a
-      omega
-  · simp only [updCpu, hc, if_false]
-    exact ⟨a1, a2, a3, a4⟩
+theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) :=
+  ⟨h.1, h.2.1, σ.okP_fence cpu b h.2.2.1, h.2.2.2⟩
 
-theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4, h5, h6, σ.okP_fence cpu b h7 h6⟩
-  obtain ⟨a1, a2, a3, a4⟩ := h2 c
-  obtain ⟨b1, b2, b3, b4⟩ := h2 cpu
-  have hpub := ownPub_le (hartAgent cpu) σ.log
-  simp only [MState.top] at *
-  by_cases hc : c = cpu
-  · subst hc
-    simp only [updCpu, if_true]
-    refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 hpub, ?_, a3, a4⟩
-    split
-    · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 hpub⟩
-    · exact b2
-  · simp only [updCpu, hc, if_false]
-    exact ⟨a1, a2, a3, a4⟩
+theorem mmOk_dropResv (σ : MState) (cpu : CPU) (h : mmOk σ) : mmOk (σ.dropResv cpu) :=
+  ⟨h.1, h.2.1, σ.okP_dropResv cpu h.2.2.1, h.2.2.2⟩
 
-theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
-    (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
-    mmOk (σ.store cpu pa n w excl) := by
-  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6.1, σ.okP_store cpu pa n w excl hno h6.2 h6.1⟩
-  · intro a H hget
-    exact FlatMem.writeBytes_histOk σ.mem σ.log pa w (hartAgent cpu) h1 a H hget
-  · intro c
-    obtain ⟨a1, a2, a3, a4⟩ := h2 c
-    simp only [MState.top] at *
-    by_cases hc : c = cpu
-    · subst hc
-      simp only [updCpu, if_true, List.length_append, List.length_singleton]
-      refine ⟨?_, by omega, ?_, ?_⟩
-      · split <;> omega
-      · simp only [HRead.resetCoh, HRead.clearAcq]; omega
-      · intro a; simp only [HRead.resetCoh, HRead.clearAcq]; have := a4 a; split <;> omega
-    · simp only [updCpu, hc, if_false, List.length_append, List.length_singleton]
-      exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
-  · intro c r hr a v hav
-    simp only [updCpu] at hr ⊢
-    by_cases hc : c = cpu
-    · subst hc
-      simp at hr
-    · simp only [hc, if_false] at hr
-      have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
-        intro j hj heq
-        apply hno
-        refine ⟨c, hc, r, hr, j, hj, ?_⟩
-        rw [← heq, hav]; rfl
-      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
-      exact h3 c r hr a v hav
+/-- **A plain store's issue** (route P): no guard (the footprint's histories exist: the
+writer's points-to). -/
+theorem mmOk_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hram : ramBytes pa n) (hpres : ∀ j, j < n → ∃ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H)
+    (h : mmOk σ) : mmOk (σ.issue cpu pa n w) :=
+  ⟨memRam_writeBytes hram h.1, h.2.1, σ.okP_issue cpu pa n w h.2.2.1,
+    memImg_writeBytes (ramBytes_le hram) hpres h.2.2.2⟩
 
-/-- The disk's DMA write: the bytes' histories grow and the author log grows
-exactly as for a hart store (the disk agent is pinned to the top of the
-order), and no hart's views move.  The footprint must be DRAM, and no hart
-may reserve a byte of it.  A zero-byte write is the identity
-(`MState.storeDma_zero`). -/
+/-- **An exclusive write** (route P): it lands at once; no other hart reserves its footprint. -/
+theorem mmOk_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hpres : ∀ j, j < n → ∃ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H) (h : mmOk σ) :
+    mmOk (σ.storeL cpu pa n w) :=
+  ⟨memRam_landBytes hram h.1, h.2.1, σ.okP_storeL cpu pa n w hno h.2.2.1,
+    memImg_landBytes (ramBytes_le hram) hpres h.2.2.2⟩
+
+/-- An exclusive read (route P): its reservation is the landed top's snapshot. -/
+theorem mmOk_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (acq : Bool) (h : mmOk σ)
+    (hres : ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
+      r[a]? = some v → (σ.mem[a]?).bind (Hist.topL σ.lp) = some v) :
+    mmOk (σ.afterExcl cpu pa n w acq) :=
+  ⟨h.1, h.2.1, σ.okP_afterExcl cpu pa n w acq h.2.2.1 hres, h.2.2.2⟩
+
+/-- The disk's DMA write (route P): it lands at once, below every pending entry of its bytes;
+the footprint must be DRAM, and no hart may reserve a byte of it.  A zero-byte write is the
+identity (`MState.storeDma_zero`). -/
 theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (h : mmOk σ) :
+    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n)
+    (hpres : ∀ j, j < n → ∃ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H) (h : mmOk σ) :
     mmOk (σ.storeDma pa n w) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  have h6' := σ.okP_storeDma pa n w hno h.2.2.2.2.2.2 h.2.2.2.2.2.1
-  rw [MState.storeDma_of_ne σ pa n w hn] at h6' ⊢
-  obtain ⟨h1, h2, h3, h4, h5, h6, -⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6, h6'⟩
-  · intro a H hget
-    exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
-  · intro c
-    obtain ⟨a1, a2, a3, a4⟩ := h2 c
-    simp only [MState.top, List.length_append, List.length_singleton] at *
-    exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
-  · intro c r hr a v hav
-    simp only [] at hr ⊢
-    have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
-      intro j hj heq
-      exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
-    rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
-    exact h3 c r hr a v hav
+  refine ⟨?_, h.2.1, σ.okP_storeDma pa n w hno h.2.2.1, ?_⟩
+  · rw [MState.storeDma_mem_of_ne σ pa n w hn]
+    exact memRam_landBytes hram h.1
+  · rw [MState.storeDma_mem_of_ne σ pa n w hn]
+    exact memImg_landBytes (ramBytes_le hram) hpres h.2.2.2
 
 /-- The task bookkeeping: everything but `devRtOk` is untouched, and the new
 entry's `next` is positive whenever the old one was (the two moves the
@@ -1008,8 +1060,8 @@ language makes -- recording a finished task and handing out the next id --
 both satisfy that). -/
 theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
     (hnext : 0 < (σ.devrt d).next → 0 < rt.next) (h : mmOk σ) : mmOk (σ.setRt d rt) := by
-  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
-  refine ⟨h1, h2, h3, h4, fun d' => ?_, h6⟩
+  obtain ⟨h4, h5, h6, h7⟩ := h
+  refine ⟨h4, fun d' => ?_, h6, h7⟩
   simp only [updCpu']
   by_cases hd : d' = d
   · subst hd; simp only [if_true]; exact hnext (h5 d')
@@ -1018,34 +1070,22 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
   have hP := σ.okP_boot h
-  obtain ⟨hmem, hlog, hhart, _, hrt, _, hsb⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one,
-    fun c => (hsb c).1, hP⟩
-  · intro a H hget
-    rw [hmem, imgFlat_get?] at hget
-    split at hget
-    case isFalse => simp at hget
-    cases hi : bootImage[a]? with
-    | none => rw [hi] at hget; simp at hget
-    | some v =>
-      rw [hi] at hget
-      simp only [Option.map_some, Option.some.injEq] at hget
-      subst hget
-      refine ⟨List.pairwise_singleton _ _, fun e he => ?_⟩
-      simp only [List.mem_singleton] at he
-      subst he
-      exact ⟨Nat.zero_le _, Or.inl rfl⟩
-  · intro c
-    obtain ⟨h1, h2, h3, _⟩ := hhart c
-    rw [h1, h2, h3]
-    exact ⟨Nat.zero_le _, Nat.zero_le _, Nat.zero_le _, fun _ => Nat.zero_le _⟩
-  · intro c r hr
-    rw [(hhart c).2.2.2] at hr
-    cases hr
+  obtain ⟨hmem, -, -, -, hrt, -, -⟩ := h
+  refine ⟨?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one, hP, ?_⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
     split at hget
     · assumption
+    · simp at hget
+  · intro a H hget
+    rw [hmem, imgFlat_get?] at hget
+    split at hget
+    · cases hv : bootImage[a]? with
+      | none => rw [hv] at hget; cases hget
+      | some v =>
+        rw [hv] at hget
+        obtain rfl := Option.some.inj hget
+        exact ⟨_, List.mem_cons_self, rfl⟩
     · simp at hget
 
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
@@ -1133,7 +1173,7 @@ a live dynamic lock whose witness `wit` the state's memory holds
 def chainEnvAt (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     (σ : MState) : ChainEnv :=
   ⟨σ.mem, fun j => (σ.hr j).coh,
-    fun b a => lockByteIn rs b ∨ (dynLkAt wit σ.mem σ.top b a ∧ relBelowOk ps σ b a), pubByteIn rs⟩
+    fun b a => lockByteIn rs b ∨ (dynLkAt wit σ.mem σ.top b a ∧ relBelowOk ps σ b a), pubByteIn rs, σ.lp⟩
 
 /-- **The certificate map's invariant**: every certificate key names a valid
 certificate, every gate key a hart past the gate, every entry key (W8
@@ -1153,8 +1193,8 @@ theorem certsOk_mono {X Y : ChainEnv} {Z : RegMapF Agent} (hx : X.ext Y) (h : ce
   ⟨fun c hc => ChainCert.valid_mono hx (h.1 c hc), fun j hj => gateOk_mono hx (h.2.1 j hj),
     fun pa e he => by
       obtain ⟨H, hH, hm⟩ := h.2.2 pa e he
-      obtain ⟨N, hN⟩ := hx.1 pa H hH
-      exact ⟨N ++ H, hN, List.mem_append_right _ hm⟩⟩
+      obtain ⟨H', hH', hm'⟩ := hx.2.2.2.2.1 pa H hH
+      exact ⟨H', hH', hm' e hm⟩⟩
 
 theorem certsOk_insert {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z)
     (c : ChainCert) (hc : c.valid X) (v : Agent) :
@@ -1215,13 +1255,15 @@ theorem certsOk_insertPc {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z) (t
 unchanged has the same certificate environment. -/
 theorem chainEnvAt_congr (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) {σ σ' : MState}
     (h : σ'.mem = σ.mem) (hl : σ'.log = σ.log)
-    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) (hp : σ'.pcAt = σ.pcAt) :
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) (hp : σ'.pcAt = σ.pcAt)
+    (hll : σ'.llog = σ.llog) :
     chainEnvAt rs ps wit σ' = chainEnvAt rs ps wit σ := by
   have ht : σ'.top = σ.top := by simp only [MState.top, hl]
+  have hlp : σ'.lp = σ.lp := by simp only [MState.lp, hll]
   have hb : ∀ b a, relBelowOk ps σ' b a = relBelowOk ps σ b a := by
-    intro b a; unfold relBelowOk; rw [h, hp]
+    intro b a; unfold relBelowOk; rw [h, hp, hlp]
   unfold chainEnvAt
-  rw [h, ht]
+  rw [h, ht, hlp]
   simp only [hb]
   congr 1
   funext j a
@@ -1231,31 +1273,42 @@ theorem chainEnvAt_congr (rs : List RsvRegion) (ps : List Int) (wit : List (PAdd
 theorem chainEnvAt_ext_load (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
     (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.afterLoad cpu pa n tvn)) := by
-  refine ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_⟩
+  refine ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_, memIncl_refl _,
+    fun _ _ h => h⟩
   simp only [chainEnvAt, updCpu]
   split
   · rename_i hj; subst hj; simp only [HRead.afterLoad]; exact Nat.le_max_left _ _
   · exact Nat.le_refl _
 
-/-- **A store keeps the environment growing**: its memory extends, and it
-cannot reset another writer's publication byte's floor -- the publication
-region's discipline at the new memory makes the storing hart its writer. -/
-theorem chainEnvAt_ext_store (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
-    (w : BitVec (8 * n)) (excl : Bool)
+/-- **A step keeps the environment growing** (route P, design D6), given what each step does:
+the landed-only histories grow on top by entries pending before; the merged memory grows by
+insertion above the issue top; landing positions are kept; old pcs are kept; and no hart's floor
+at another writer's publication byte goes down. -/
+theorem chainEnvAt_ext_of (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    {σ σ' : MState}
+    (hlm : memExtP (σ.mem.landedOnly σ.lp) (σ'.mem.landedOnly σ'.lp) (fun e => σ.lp e.t = none))
+    (hins : memIns σ.mem σ.top σ'.mem) (htop : σ.top ≤ σ'.top)
+    (hlp : ∀ t p, σ.lp t = some p → σ'.lp t = some p)
+    (hpc : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t)
     (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
-    (hnew : rsvAllOk rs (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
-    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.store cpu pa n w excl)) := by
-  refine ⟨memExt_writeBytes _ _ _ _ _, fun b r h => ?_, fun _ _ => Iff.rfl, fun j f w' hp hj => ?_⟩
-  · rcases h with h | ⟨h, hr⟩
-    · exact Or.inl h
-    · refine Or.inr ⟨dynLkAt_mono (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ h, ?_⟩
-      · simp only [MState.top, List.length_append, List.length_singleton]
-        omega
-      · exact relBelowOk_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
-          (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
-          (fun t ht => by simp only [MState.store]; rw [if_neg (by omega)]) h.1 hr
-  simp only [chainEnvAt, updCpu]
+    (hcoh : ∀ (j : CPU) (f : PAddr) (w : CPU), pubByteIn rs f w → j ≠ w → (σ.hr j).coh f ≤ (σ'.hr j).coh f) :
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit σ') := by
+  refine ⟨memExt_of_memExtP hlm, fun b r h => ?_, fun _ _ => Iff.rfl, hcoh, memIncl_of_memIns hins, hlp⟩
+  rcases h with h | ⟨h, hr⟩
+  · exact Or.inl h
+  · refine Or.inr ⟨dynLkAt_monoI hins htop h, relBelowOk_grow (fun H hH => hlm b H hH) (fun H e hH he => ?_) hr⟩
+    obtain ⟨H0, hH0, he0, -⟩ := FlatMem.mem_landedOnly hH he
+    exact hpc _ (hle _ _ _ hH0 he0)
+
+/-- The footprint's floors reset by a hart's write cannot be another writer's publication byte's
+(the publication region's discipline at the new memory makes the writing hart its writer). -/
+theorem chainEnv_coh_write (rs : List RsvRegion) {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    {m' : FlatMem} (hnew : rsvAllOk rs m')
+    (hmem : ∀ j, j < n → ∃ H, m'[pa + BitVec.ofNat 64 j]? = some H ∧ ∃ e ∈ H, e.t ≠ 0 ∧ e.tid = hartAgent cpu) :
+    ∀ (j : CPU) (f : PAddr) (w : CPU), pubByteIn rs f w → j ≠ w →
+      (σ.hr j).coh f ≤ (updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n) j).coh f := by
+  intro j f w' hp hj
+  simp only [updCpu]
   split
   · rename_i hjc
     subst j
@@ -1270,44 +1323,99 @@ theorem chainEnvAt_ext_store (rs : List RsvRegion) (ps : List Int) (wit : List (
       have hR := hnew i _ hi
       unfold regionOk at hR
       simp only at hR
-      obtain ⟨H, hH, he⟩ := ChainDefs.writeBytes_mem σ.mem pa w (σ.top + 1) (hartAgent cpu) hj'
+      obtain ⟨H, hH, e, he, he0, het⟩ := hmem j' hj'
       rw [← heq] at hH
-      have := hR.1 f (RsvRegion.base_mem _ rfl) H hH _ he (by simp)
+      have := hR.1 f (RsvRegion.base_mem _ rfl) H hH _ he he0
+      rw [het] at this
       exact hj (Fin.ext this)
     · exact Nat.le_refl _
   · exact Nat.le_refl _
 
-/-- A DMA write extends the memory and moves no hart's floor. -/
+/-- **A plain store's issue keeps the environment growing** (its entries are pending: the
+landed-only memory does not move). -/
+theorem chainEnvAt_ext_issue (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hP : σ.okP)
+    (hnew : rsvAllOk rs (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.issue cpu pa n w)) :=
+  chainEnvAt_ext_of rs ps wit
+    (memExtP_mono (FlatMem.landedOnly_writeBytes_pending σ.mem σ.lp pa w (σ.top + 1) _ (σ.okP_fresh hP))
+      (fun _ h => h.elim))
+    (memIns_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (by simp only [MState.top, List.length_append, List.length_singleton]; omega)
+    (fun _ _ h => h) (relPc_issueOld σ cpu pa n w) (fun a H e hH he => σ.okP_le_top hP a H hH e he)
+    (chainEnv_coh_write rs hnew (fun j hj => by
+      obtain ⟨H, hH, he⟩ := ChainDefs.writeBytes_mem σ.mem pa w (σ.top + 1) (hartAgent cpu) hj
+      exact ⟨H, hH, ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩, he, Nat.succ_ne_zero _, rfl⟩))
+
+/-- The landed-only memory under a write that lands at once (route P): relabel to the grown
+positions, then the landed inserts on top. -/
+theorem MState.landedOnly_landNow (σ : MState) (hP : σ.okP) {n : Nat} (pa : PAddr) (w : BitVec (8 * n))
+    (g : Agent) :
+    memExtP (σ.mem.landedOnly σ.lp)
+      ((σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) g).landedOnly
+        (lpOf (σ.llog ++ [σ.top + 1]))) (fun e => σ.lp e.t = none) := by
+  have hs := σ.okP_snoc_self hP
+  refine memExtP_trans (memExtP_mono (FlatMem.landedOnly_relabel σ.mem σ.lp _ σ.log hP.1
+      (fun t ht => by
+        obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 ht
+        rw [lpOf_snoc_of_some σ.llog _ t p hp]; rfl)) (fun e he => by simpa using he))
+    (memExtP_mono (FlatMem.landedOnly_landBytes σ.mem _ pa w (σ.top + 1) g (by rw [hs]; rfl))
+      (fun e he => by rw [he]; exact σ.okP_fresh hP))
+
+/-- **An exclusive write keeps the environment growing** (it lands at once, on top of the
+landed-only histories). -/
+theorem chainEnvAt_ext_storeL (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hP : σ.okP)
+    (hnew : rsvAllOk rs (σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) (hartAgent cpu))) :
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.storeL cpu pa n w)) :=
+  chainEnvAt_ext_of rs ps wit (σ.landedOnly_landNow hP pa w _)
+    (memIns_landBytes _ _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (by simp only [MState.top, List.length_append, List.length_singleton]; omega)
+    (fun t p h => lpOf_snoc_of_some σ.llog _ t p h) (relPc_storeLOld σ cpu pa n w)
+    (fun a H e hH he => σ.okP_le_top hP a H hH e he)
+    (chainEnv_coh_write rs hnew (fun j hj => by
+      obtain ⟨H, hH, he⟩ := ChainDefs.landBytes_mem σ.mem _ pa w (σ.top + 1) (hartAgent cpu) hj
+      exact ⟨H, hH, ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩, he, Nat.succ_ne_zero _, rfl⟩))
+
+/-- **A DMA write keeps the environment growing** (it lands at once; no hart's floor moves). -/
 theorem chainEnvAt_ext_dma (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top) :
+    (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hP : σ.okP) :
     (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.storeDma pa n w)) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact ChainEnv.ext_refl _
-  refine ⟨?_, fun b r h => ?_, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
-  · show memExt σ.mem (σ.storeDma pa n w).mem
-    rw [MState.storeDma_mem_of_ne σ pa n w hn]; exact memExt_writeBytes _ _ _ _ _
-  · rcases h with h | ⟨h, hr⟩
-    · exact Or.inl h
-    · have hg : memGrow σ.mem σ.top (σ.storeDma pa n w).mem := by
-        rw [MState.storeDma_mem_of_ne σ pa n w hn]
-        exact memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
-      have hgr : memGrowR σ.mem σ.top (σ.storeDma pa n w).mem := by
-        rw [MState.storeDma_mem_of_ne σ pa n w hn]
-        exact memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
-      refine Or.inr ⟨dynLkAt_mono (t := σ.top) hg ?_ h, relBelowOk_grow hg hgr hle
-        (fun t ht => by simp only [MState.storeDma, if_neg hn]; rw [if_neg (by omega)]) h.1 hr⟩
-      simp only [MState.top, if_neg hn, List.length_append, List.length_singleton]
-      omega
+  rw [MState.storeDma_of_ne σ pa n w hn]
+  exact chainEnvAt_ext_of rs ps wit (σ.landedOnly_landNow hP pa w _)
+    (memIns_landBytes _ _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (by simp only [MState.top, List.length_append, List.length_singleton]; omega)
+    (fun t p h => lpOf_snoc_of_some σ.llog _ t p h) (fun t ht => by simp only; rw [if_neg (by omega)])
+    (fun a H e hH he => σ.okP_le_top hP a H hH e he) (fun _ _ _ _ _ => Nat.le_refl _)
+
+/-- **A landing keeps the environment growing** (the landed store goes on top of its bytes'
+landed-only histories; the merged memory does not move). -/
+theorem chainEnvAt_ext_land (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    (σ : MState) (c : CPU) (t : Nat) (hP : σ.okP) :
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.land c t)) :=
+  chainEnvAt_ext_of rs ps wit
+    (memExtP_mono (FlatMem.landedOnly_relabel σ.mem σ.lp (σ.land c t).lp σ.log hP.1
+      (fun s hs => by
+        obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 hs
+        show (lpOf (σ.llog ++ [t]) s).isSome
+        rw [lpOf_snoc_of_some σ.llog t s p hp]; rfl)) (fun e he => by simpa using he))
+    (memIns_refl _ _) (Nat.le_refl _) (fun s p h => lpOf_snoc_of_some σ.llog t s p h) (fun _ _ => rfl)
+    (fun a H e hH he => σ.okP_le_top hP a H hH e he) (fun _ _ _ _ _ => Nat.le_refl _)
 
 /-- The publication words of a list whose disciplines hold are one-shot. -/
 theorem pubOneShot_of_rsv {rs : List RsvRegion} {ps : List Int} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {σ : MState}
     (h : rsvAllOk rs σ.mem) : pubOneShot (chainEnvAt rs ps wit σ) := by
-  intro f w H e e' hp hf he he' ht ht'
+  intro f w L e e' hp hf he he' ht ht'
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
   have hR := h i _ hi
   unfold regionOk at hR
-  exact hR.2 f (RsvRegion.base_mem _ rfl) H hf e he e' he' ht ht'
+  obtain ⟨H, hH, he1, -⟩ := FlatMem.mem_landedOnly hf he
+  obtain ⟨H', hH', he1', -⟩ := FlatMem.mem_landedOnly hf he'
+  rw [hH] at hH'
+  cases hH'
+  exact hR.2 f (RsvRegion.base_mem _ rfl) H hH e he1 e' he1' ht ht'
 
 /-! ### The load-side invariant across the machine's steps (W8 (f2-ctx) S3,
 STATED: `MachCSL.loadsChained`; wired when `memModel_load` takes the load's
@@ -1324,17 +1432,68 @@ theorem Resources.foldrMax_mem : ∀ (l : List Nat), l.foldr max 0 ≠ 0 → l.f
       rw [Nat.max_eq_right (by omega)]
       exact List.mem_cons_of_mem _ (Resources.foldrMax_mem l hl)
 
-/-- **A store keeps the load-side invariant** (its footprint's floors reset,
-every other floor stays; its entries are above the top). -/
-theorem loadsChained_store (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hx : (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.store cpu pa n w excl)))
-    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
-    loadsChained (chainEnvAt rs ps wit (σ.store cpu pa n w excl)) ex' := by
-  refine loadsChained_keep hx (memAbove_writeBytes _ _ _ σ.top (σ.top + 1) _ (Nat.lt_succ_self _)) hle hex
-    (fun j a => ?_) h
-  simp only [chainEnvAt, updCpu]
+/-- Only the boot image lands at position 0. -/
+theorem lpOf_eq_zero {llog : List Nat} {t : Nat} (h : lpOf llog t = some 0) : t = 0 :=
+  Classical.byContradiction fun ht => by have := (lpOf_get llog t 0 h ht).1; omega
+
+/-- Landing positions identify their store (route P). -/
+theorem lpOf_inj {llog : List Nat} {x y p : Nat} (hx : lpOf llog x = some p) (hy : lpOf llog y = some p)
+    (hx0 : x ≠ 0) (hy0 : y ≠ 0) : x = y := by
+  have g1 := (lpOf_get llog x p hx hx0).2
+  have g2 := (lpOf_get llog y p hy hy0).2
+  rw [g1] at g2
+  exact Option.some.inj g2
+
+/-- The source a read names is its entry's (route P): an entry at the source's nonzero landing
+position is the read entry's store. -/
+theorem Hist.readSrcP_ent {llog : List Nat} (h : Agent) (tv : Nat) (H : Hist) (tid p : Nat)
+    (hs : Hist.readSrcP (lpOf llog) h tv H = some (tid, p)) :
+    ∃ e0, Hist.readEntP (lpOf llog) h tv H = some e0 ∧ e0.tid = tid ∧
+      ∀ e : HEnt, lpOf llog e.t = some p → e.t ≠ 0 → e.t = e0.t := by
+  unfold Hist.readSrcP at hs
+  cases hr : Hist.readEntP (lpOf llog) h tv H with
+  | none => rw [hr] at hs; cases hs
+  | some e0 =>
+    rw [hr] at hs
+    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hs
+    obtain ⟨h1, h2⟩ := hs
+    refine ⟨e0, rfl, h1, fun e hp he0 => ?_⟩
+    cases hle : lpOf llog e0.t with
+    | none =>
+      rw [hle] at h2
+      simp only [Option.getD_none] at h2
+      subst h2
+      exact absurd (lpOf_eq_zero hp) he0
+    | some q =>
+      rw [hle] at h2
+      simp only [Option.getD_some] at h2
+      subst h2
+      have hq0 : e0.t ≠ 0 := fun h => by
+        have : lpOf llog e0.t = some 0 := by rw [h]; rfl
+        rw [this] at hle; cases hle; exact he0 (lpOf_eq_zero hp)
+      exact lpOf_inj hp hle he0 hq0
+
+
+/-- **The load-side invariant's step law at the machine** (route P): a step that extends the
+environment, adds only entries above the issue top, grows the landing positions above the
+landing top, keeps or resets every floor, and only grows the exemption at positions at or below
+the landing top. -/
+theorem loadsChained_stepKeep (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    {ex ex' : PAddr → Nat → Prop} {σ σ' : MState} (hP : σ.okP)
+    (hx : (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit σ'))
+    (hm : memAbove σ.mem σ.top σ'.mem) (hlp : LandPos.grow σ.lp σ.ltop σ'.lp)
+    (hex : ∀ a p, p ≤ σ.ltop → ex a p → ex' a p)
+    (hcoh : ∀ j a, (σ'.hr j).coh a = (σ.hr j).coh a ∨ (σ'.hr j).coh a = 0)
+    (h : loadsChained (chainEnvAt rs ps wit σ) ex) : loadsChained (chainEnvAt rs ps wit σ') ex' :=
+  loadsChained_keep hx hm hlp (σ.okP_lp_le_top hP) (fun j a => ((hP.2.2.1 j).2.2).2 a)
+    (fun _ h0 => lpOf_eq_zero h0) hex hcoh h
+
+/-- A hart's write resets the footprint's floors only. -/
+theorem chainEnv_coh_reset (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) :
+    ∀ j a, (updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n) j).coh a = (σ.hr j).coh a ∨
+      (updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n) j).coh a = 0 := by
+  intro j a
+  simp only [updCpu]
   split
   · rename_i hj
     subst hj
@@ -1344,30 +1503,14 @@ theorem loadsChained_store (rs : List RsvRegion) (ps : List Int) (wit : List (PA
     · exact Or.inl rfl
   · exact Or.inl rfl
 
-/-- **A DMA write keeps the load-side invariant** (no hart's floor moves). -/
-theorem loadsChained_dma (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    {ex ex' : PAddr → Nat → Prop} (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hleM : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
-    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
-    loadsChained (chainEnvAt rs ps wit (σ.storeDma pa n w)) ex' := by
-  by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]
-    exact loadsChained_keep (ChainEnv.ext_refl _) (memAbove_refl _ σ.top) hle hex (fun _ _ => Or.inl rfl) h
-  refine loadsChained_keep (chainEnvAt_ext_dma rs ps wit σ pa n w hleM) ?_ hle hex (fun _ _ => Or.inl rfl) h
-  show memAbove σ.mem σ.top (σ.storeDma pa n w).mem
-  rw [MState.storeDma_mem_of_ne σ pa n w hn]
-  exact memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
-
-/-- **One byte's chain obligation of a load** by `cpu` at view `tvn` (W8
-(f2-ctx) S3): when the byte's source is FOREIGN, every hart entry at the
-source's timestamp that is not the loader's and not exempt has a valid
-certificate to the loader. -/
+/-- **One byte's chain obligation of a load** by `cpu` at (landing) view `tvn` (W8 (f2-ctx) S3;
+route P): when the byte's source is FOREIGN, landed at `p`, every hart entry landed at `p` that is
+not the loader's and not exempt as of `p` has a valid certificate to the loader. -/
 def byteSrcOk (X : ChainEnv) (ex : PAddr → Nat → Prop) (m : FlatMem) (cpu : CPU) (tvn : Nat) (a : PAddr) :
     Prop :=
-  ∀ (tid : Agent) (t : Nat), (m[a]?).bind (Hist.readSrc (hartAgent cpu) tvn) = some (tid, t) →
-    tid ≠ hartAgent cpu → ∀ (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → e.t = t → e.t ≠ 0 →
-      ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent cpu → ¬ ex a e.t →
+  ∀ (tid : Agent) (p : Nat), (m[a]?).bind (Hist.readSrcP X.lp (hartAgent cpu) tvn) = some (tid, p) →
+    tid ≠ hartAgent cpu → ∀ (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → X.lp e.t = some p → e.t ≠ 0 →
+      ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent cpu → ¬ ex a p →
         ∃ τ, ChainCert.valid X ⟨⟨e.tid, hA⟩, e.t, cpu, τ⟩
 
 /-- **A load's chain obligation**: every footprint byte's (`byteSrcOk`). -/
@@ -1375,58 +1518,53 @@ def loadSrcOk (X : ChainEnv) (ex : PAddr → Nat → Prop) (m : FlatMem) (cpu : 
     Prop :=
   ∀ k, k < n → byteSrcOk X ex m cpu tvn (pa + BitVec.ofNat 64 k)
 
-/-- A load's per-byte sources are the bytes' read sources. -/
-theorem FlatMem.loadSrcs_get? (m : FlatMem) (h : Agent) (tvn : Nat) (pa : PAddr) (n k : Nat) (hk : k < n) :
-    (m.loadSrcs h tvn pa n)[k]? = some ((m[pa + BitVec.ofNat 64 k]?).bind (Hist.readSrc h tvn)) := by
-  unfold FlatMem.loadSrcs
-  rw [List.getElem?_map, List.getElem?_range hk]
-  rfl
-
 /-- **A load keeps the load-side invariant, given its certificates** (the
 obligation S3's load rules discharge INSIDE the load's step [R35.s5],
 `loadSrcOk`).  Only the loader's floors move, each to its old value or a
-foreign source's timestamp. -/
+foreign source's landing position. -/
 theorem loadsChained_load (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
-    (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t)
+    {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (hP : σ.okP)
+    (hex : ∀ a p, p ≤ σ.ltop → ex a p → ex' a p)
     (hsrc : loadSrcOk (chainEnvAt rs ps wit σ) ex' σ.mem cpu pa n tvn)
     (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
     loadsChained (chainEnvAt rs ps wit (σ.afterLoad cpu pa n tvn)) ex' := by
   have hx := chainEnvAt_ext_load rs ps wit σ cpu pa n tvn
-  refine loadsChained_step hx (memAbove_refl _ σ.top) hle hex
+  refine loadsChained_step hx (memAbove_refl _ σ.top) (LandPos.grow_refl σ.lp σ.ltop) (σ.okP_lp_le_top hP)
+    (fun j a => ((hP.2.2.1 j).2.2).2 a) hex
     (fun j a hne H e hH he het hc hA hne' hnex => ?_) h
-  simp only [chainEnvAt, updCpu] at hne hc
+  simp only [chainEnvAt, updCpu] at hne hc hnex
   split at hne
   · rename_i hj
     subst hj
-    simp only [if_true, HRead.afterLoad] at hc hne
-    have hst : (σ.hr j).coh a < (σ.mem.loadSrcs (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a := by
+    simp only [if_true, HRead.afterLoad] at hc hne hnex
+    have hst : (σ.hr j).coh a < (σ.mem.loadSrcsP σ.lp (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a := by
       rcases Nat.lt_or_ge ((σ.hr j).coh a)
-        ((σ.mem.loadSrcs (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a) with h1 | h1
+        ((σ.mem.loadSrcsP σ.lp (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a) with h1 | h1
       · exact h1
       · exact absurd (Nat.max_eq_left h1) hne
-    rw [Nat.max_eq_right (Nat.le_of_lt hst)] at hc
-    have hnz : (σ.mem.loadSrcs (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a ≠ 0 := by omega
+    rw [Nat.max_eq_right (Nat.le_of_lt hst)] at hc hnex
+    have hnz : (σ.mem.loadSrcsP σ.lp (hartAgent j) tvn pa n).stamp (hartAgent j) pa n a ≠ 0 := by omega
     have hmem := Resources.foldrMax_mem _ hnz
-    unfold LoadSrcs.stamp at hc hmem
+    unfold LoadSrcs.stamp at hc hmem hnex
     obtain ⟨k, hk, hkx⟩ := List.mem_map.1 hmem
-    rw [← hkx] at hc
+    rw [← hkx] at hc hnex
     have hk' := List.mem_range.1 hk
     by_cases ha : a = pa + BitVec.ofNat 64 k
-    · rw [if_pos ha] at hc
-      unfold LoadSrcs.stampAt at hc
-      split at hc
-      · rename_i tid t hs
+    · rw [if_pos ha] at hc hnex
+      subst ha
+      unfold LoadSrcs.stampAt at hc hnex
+      rw [FlatMem.loadSrcsP_get? _ _ _ _ _ _ _ hk'] at hc hnex
+      cases hs : (σ.mem[pa + BitVec.ofNat 64 k]?).bind (Hist.readSrcP σ.lp (hartAgent j) tvn) with
+      | none => simp only [hs] at hc; exact absurd (lpOf_eq_zero hc) het
+      | some src =>
+        obtain ⟨tid, p⟩ := src
+        simp only [hs] at hc hnex
         by_cases htid : tid = hartAgent j
-        · rw [if_pos htid] at hc; exact absurd hc het
-        · rw [if_neg htid] at hc
-          subst ha
-          rw [FlatMem.loadSrcs_get? _ _ _ _ _ _ hk'] at hs
-          obtain ⟨τ, hv⟩ := hsrc k hk' tid t (Option.some.inj hs) htid H e hH he hc het hA hne' hnex
+        · rw [if_pos htid] at hc; exact absurd (lpOf_eq_zero hc) het
+        · rw [if_neg htid] at hc hnex
+          obtain ⟨τ, hv⟩ := hsrc k hk' tid p hs htid H e hH he hc het hA hne' hnex
           exact ⟨τ, ChainCert.valid_mono hx hv⟩
-      · exact absurd hc het
-    · rw [if_neg ha] at hc; exact absurd hc het
+    · rw [if_neg ha] at hc; exact absurd (lpOf_eq_zero hc) het
   · exact absurd rfl hne
 
 /-- The lock bytes of the ambient record's static reserved spinlocks: hops the
@@ -1440,14 +1578,15 @@ abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
     (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
 
 /-- The ambient record's load-side exemption at `σ` (W8 (f2-ctx) S3,
-`MachCSL.chainExAt`), as of a position: the lock layer's bytes (static
-spinlocks, publication words, and -- W8 (f3-pipelk) [OWN.65] -- live dynamic
-locks inside a DISCIPLINED window, `MachCSL.dynLkDiscAt`), the LIVE
-page-table bytes (W8 (pte-ghost) [OWN.57]), and the audited racy words'
-bytes whose value is in the registry's value set (W8 (f3-racy) [OWN.63]). -/
+`MachCSL.chainExAt`), as of a LANDING position over the landed view (route P,
+`MachCSL.chainExAtP`): the lock layer's bytes (static spinlocks, publication
+words, and -- W8 (f3-pipelk) [OWN.65] -- live dynamic locks inside a
+DISCIPLINED window), the LIVE page-table bytes (W8 (pte-ghost) [OWN.57]), and
+the audited racy words' bytes whose value is in the registry's value set (W8
+(f3-racy) [OWN.63]). -/
 abbrev chainEx [MachFixedGS hlc GF] (σ : MState) : PAddr → Nat → Prop :=
-  chainExAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
-    σ.mem σ.top
+  chainExAtP (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
+    σ.mem σ.lp σ.ltop
 
 /-- A static lock byte is a hop byte at every position. -/
 theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Nat)
@@ -1456,27 +1595,46 @@ theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Na
 
 /-! ### The load-side invariant at the ambient record, step by step (W8
 (f2-ctx) S3-c1: what `chainModelAt`'s first conjunct needs of each machine
-step) -/
+step; route P) -/
 
-/-- The coherence floors are at or below the top (`mmOk`). -/
-theorem mmOk_coh_le {σ : MState} (h : mmOk σ) (j : CPU) (a : PAddr) : (σ.hr j).coh a ≤ σ.top :=
-  (h.2.1 j).2.2.2 a
+/-- The coherence floors are at or below the landing top (`mmOk`). -/
+theorem mmOk_coh_le {σ : MState} (h : mmOk σ) (j : CPU) (a : PAddr) : (σ.hr j).coh a ≤ σ.ltop :=
+  ((mmOk_views h j).2.2).2 a
 
-/-- **A hart's store keeps the load-side invariant** (the footprint's floors
-reset; the exemption, read as of positions at or below the old top, only
-grows). -/
-theorem chainLoads_store [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
-    (w : BitVec (8 * n)) (excl : Bool) (hmm : mmOk σ)
+/-- **A step keeps the load-side invariant at the ambient record**, given that it extends the
+environment, grows the landed views (`MState.stepGrowP`), and keeps or resets every floor. -/
+theorem chainLoads_keep [MachFixedGS hlc GF] {σ σ' : MState} (hmm : mmOk σ)
+    (hx : (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ'))
+    (hi : memIns σ.mem σ.top σ'.mem) (hs : σ.stepGrowP σ')
+    (hcoh : ∀ j a, (σ'.hr j).coh a = (σ.hr j).coh a ∨ (σ'.hr j).coh a = 0)
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ') :=
+  loadsChained_stepKeep _ _ _ (mmOk_okP hmm) hx hi.2 hs.2.1
+    (fun a p hp hx => MState.stepGrowP_chainExAtP hs hi (mmOk_okP hmm) a hp hx) hcoh h
+
+/-- **A plain store's issue keeps the load-side invariant.** -/
+theorem chainLoads_issue [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (hmm : mmOk σ)
     (hnew : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
       (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu)))
     (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
-    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl))
-      (chainEx (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl)) :=
-  loadsChained_store _ _ _ σ cpu pa n w excl (mmOk_coh_le hmm)
-    (chainEnvAt_ext_store _ _ _ σ cpu pa n w excl (relPc_le_top hmm.1) hnew)
-    (fun a t ht hx => chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
-      (memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
-      (by simp only [MState.top, List.length_append, List.length_singleton]; omega) a t ht hx) h
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.issue cpu pa n w))
+      (chainEx (hlc := hlc) (GF := GF) (σ.issue cpu pa n w)) :=
+  chainLoads_keep hmm (chainEnvAt_ext_issue _ _ _ σ cpu pa n w (mmOk_okP hmm) hnew)
+    (memIns_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) (σ.stepGrowP_issue cpu pa n w (mmOk_okP hmm))
+    (chainEnv_coh_reset σ cpu pa n) h
+
+/-- **An exclusive write keeps the load-side invariant.** -/
+theorem chainLoads_storeL [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (hmm : mmOk σ)
+    (hnew : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+      (σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) (hartAgent cpu)))
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.storeL cpu pa n w))
+      (chainEx (hlc := hlc) (GF := GF) (σ.storeL cpu pa n w)) :=
+  chainLoads_keep hmm (chainEnvAt_ext_storeL _ _ _ σ cpu pa n w (mmOk_okP hmm) hnew)
+    (memIns_landBytes _ _ _ _ _ _ _ (Nat.lt_succ_self _)) (σ.stepGrowP_storeL cpu pa n w (mmOk_okP hmm))
+    (chainEnv_coh_reset σ cpu pa n) h
 
 /-- **A DMA write keeps the load-side invariant.** -/
 theorem chainLoads_dma [MachFixedGS hlc GF] (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
@@ -1484,16 +1642,22 @@ theorem chainLoads_dma [MachFixedGS hlc GF] (σ : MState) (pa : PAddr) (n : Nat)
     (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
     loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.storeDma pa n w))
       (chainEx (hlc := hlc) (GF := GF) (σ.storeDma pa n w)) := by
+  refine chainLoads_keep hmm (chainEnvAt_ext_dma _ _ _ σ pa n w (mmOk_okP hmm)) ?_
+    (σ.stepGrowP_storeDma pa n w (mmOk_okP hmm)) (fun _ _ => Or.inl rfl) h
   by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  refine loadsChained_dma _ _ _ σ pa n w (mmOk_coh_le hmm) (relPc_le_top hmm.1) (fun a t ht hx => ?_) h
-  show chainExAt _ _ (σ.storeDma pa n w).mem (σ.storeDma pa n w).top a t
+  · rw [MState.storeDma_zero σ pa n w hn]; exact memIns_refl _ _
   rw [MState.storeDma_mem_of_ne σ pa n w hn]
-  refine chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
-    (memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ a t ht hx
-  show σ.log.length ≤ (if n = 0 then σ.log else σ.log ++ [diskAgent]).length
-  rw [if_neg hn, List.length_append]
-  exact Nat.le_add_right _ _
+  exact memIns_landBytes _ _ _ _ _ _ _ (Nat.lt_succ_self _)
+
+/-- **A landing keeps the load-side invariant** (no floor moves; the exemption is read as of
+positions at or below the landing top, which a landing does not touch). -/
+theorem chainLoads_land [MachFixedGS hlc GF] (σ : MState) (c : CPU) (t : Nat) (hmm : mmOk σ)
+    (hok : σ.landOk c t)
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.land c t))
+      (chainEx (hlc := hlc) (GF := GF) (σ.land c t)) :=
+  chainLoads_keep hmm (chainEnvAt_ext_land _ _ _ σ c t (mmOk_okP hmm)) (memIns_refl _ _)
+    (σ.stepGrowP_land c t (mmOk_okP hmm) hok) (fun _ _ => Or.inl rfl) h
 
 /-- **A plain load keeps the load-side invariant, given its chain obligation**
 (`loadSrcOk`, discharged by the load rule's caller). -/
@@ -1503,7 +1667,7 @@ theorem chainLoads_load [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAd
     (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
     loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn))
       (chainEx (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn)) :=
-  loadsChained_load _ _ _ σ cpu pa n tvn (mmOk_coh_le hmm) (fun _ _ _ hx => hx) hsrc h
+  loadsChained_load _ _ _ σ cpu pa n tvn (mmOk_okP hmm) (fun _ _ _ hx => hx) hsrc h
 
 /-- **The pc receipts of a certificate map are valid** (mcslrec (2) [OWN.82]
 (a1)): each names an issued position and its issuing pc. -/
@@ -1643,6 +1807,11 @@ receipt gives. -/
 def ksFreePg (rs : List RsvRegion) (m : FlatMem) (q : PAddr) : Prop :=
   ∀ t j, j < 4096 → ¬ ksByteAt rs m t (q + BitVec.ofNat 64 j)
 
+/-- **No byte of the page at `q` is a kernel-stack byte of the LANDED view** (route P), as of any
+landing position: what a valid receipt gives at the landed view (`MachCSL.memModel_ksValidP`). -/
+def ksFreePgP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (q : PAddr) : Prop :=
+  ∀ p j, j < 4096 → ¬ ksByteAtP rs m lp p (q + BitVec.ofNat 64 j)
+
 /-- **A stack-free receipt** for the page at `q` (persistent): its registry element. -/
 def ksRcptAt [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : IProp GF := E.rsvName ↪◯MAP[ksKey q]{.discard} 0
 
@@ -1704,6 +1873,161 @@ def kslotCellAt [MachFixedGS hlc GF] (E : EraGS) (S : Nat) (d : KSlot) : IProp G
   ∃ Hs : Nat → Hist, ([∗list] j ∈ List.range 8, pointsTo (G := E.mem) (d.addr + BitVec.ofNat 64 j) (kslotFrac d) (Hs j)) ∗
     ⌜kslotHistOk S d Hs⌝
 
+/-! ### The landing and epoch receipts (route P; used by the sealed table's record, D17′) -/
+
+/-- The key of hart `c`'s `k`-th store epoch (EVEN keys; the odd ones are the
+lands-above records', `laKey`). -/
+def epKey (c : CPU) (k : Nat) : Nat := 2 * (k * NCPU + c.val)
+
+/-- The key of the lands-above record of the store with issue stamp `t` (route P, coordinator
+decision (b) at the CP-6d resume; ODD keys of the epoch records' map). -/
+def laKey (t : Nat) : Nat := 2 * t + 1
+
+/-- THE LANDING CERTIFICATE (design §2.3 `landedAt`, persistent): the store with
+issue stamp `t` landed at position `p`. -/
+def landedAtE [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : IProp GF := E.lpName ↪◯MAP[p]{.discard} t
+
+/-- THE FENCE-EPOCH TOKEN (design §2.3 `epochAt`, [OWN.113], persistent): hart
+`c`'s `k`-th epoch-opening fence happened at issue top `s`. -/
+def epochAtE [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) : IProp GF :=
+  E.epName ↪◯MAP[epKey c k]{.discard} s
+
+/-- **THE LANDS-ABOVE RECEIPT** (persistent): the store with issue stamp `t`, whenever it lands,
+lands strictly above position `K` (minted at its issue, `K` a position reached then). -/
+def landsAboveAtE [MachFixedGS hlc GF] (E : EraGS) (t K : Nat) : IProp GF := iprop%
+  ∃ L : Nat, ⌜K ≤ L⌝ ∗ E.epName ↪◯MAP[laKey t]{.discard} L
+
+instance [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : Persistent (PROP := IProp GF) (landedAtE E t p) := by
+  unfold landedAtE; infer_instance
+instance [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) :
+    Persistent (PROP := IProp GF) (epochAtE E c k s) := by
+  unfold epochAtE; infer_instance
+instance [MachFixedGS hlc GF] (E : EraGS) (t K : Nat) : Persistent (PROP := IProp GF) (landsAboveAtE E t K) := by
+  unfold landsAboveAtE; infer_instance
+instance [MachFixedGS hlc GF] (E : EraGS) (t K : Nat) : Timeless (PROP := IProp GF) (landsAboveAtE E t K) := by
+  unfold landsAboveAtE; infer_instance
+
+/-- **A publication store's deposit** (route P, DESIGN D17′ (R3)): the storing hart `c`'s epoch
+token `(k, s)` -- every own store issued up to `s` lands before the store `t` -- and the store's
+lands-above receipt over `L`. -/
+structure PubDep where
+  c : CPU
+  k : Nat
+  s : Nat
+  t : Nat
+  L : Nat
+
+/-- A deposit's receipts. -/
+def pubDepAt [MachFixedGS hlc GF] (E : EraGS) (r : PubDep) : IProp GF := iprop%
+  epochAtE E r.c r.k r.s ∗ landsAboveAtE E r.t r.L
+
+/-- The seal certificate's value: the seal stamp `S` and the landing top `L` at the seal. -/
+def kptSealEnc (S L : Nat) : Nat := 2 ^ S * (2 * L + 1)
+
+theorem kptSealEnc_inj : ∀ {a a' b b' : Nat}, kptSealEnc a b = kptSealEnc a' b' → a = a' ∧ b = b'
+  | 0, 0, b, b', h => by simp only [kptSealEnc, Nat.pow_zero, Nat.one_mul] at h; exact ⟨rfl, by omega⟩
+  | 0, a' + 1, b, b', h => by
+    simp only [kptSealEnc, Nat.pow_zero, Nat.one_mul, Nat.pow_succ, Nat.mul_comm (2 ^ a') 2, Nat.mul_assoc] at h
+    omega
+  | a + 1, 0, b, b', h => by
+    simp only [kptSealEnc, Nat.pow_zero, Nat.one_mul, Nat.pow_succ, Nat.mul_comm (2 ^ a) 2, Nat.mul_assoc] at h
+    omega
+  | a + 1, a' + 1, b, b', h => by
+    have h' : kptSealEnc a b = kptSealEnc a' b' := by
+      simp only [kptSealEnc, Nat.pow_succ, Nat.mul_comm _ 2, Nat.mul_assoc] at h ⊢
+      omega
+    obtain ⟨h1, h2⟩ := kptSealEnc_inj h'
+    exact ⟨by rw [h1], h2⟩
+
+/-- **The seal's snapshot** (route P, DESIGN D17′ (R2)): as of the seal `S`, every sealed slot
+byte's co-latest entry issued at or before `S` (`find?`, kept by every later step: old entries keep
+their order) is the image's, the sealer `c0`'s, or landed (the landing log `ll` of the seal,
+its receipts kept) at or below the landing top `L0` of the seal; so is every disk entry issued at or before `S`; every publication word
+is `c0`'s. -/
+def sealSnap (rs : List RsvRegion) (c0 : CPU) (L0 : Nat) (ll : List Nat) (S : Nat) (dyn : List KSlot)
+    (m : FlatMem) : Prop :=
+  (∀ d ∈ dyn, ∀ j, j < 8 → ∀ (H : Hist) (x : HEnt), m[d.addr + BitVec.ofNat 64 j]? = some H →
+      H.find? (fun e => decide (e.t ≤ S)) = some x →
+      x.t = 0 ∨ x.tid = hartAgent c0 ∨ ∃ i, ll[i]? = some x.t ∧ i + 1 ≤ L0) ∧
+  (∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → NCPU ≤ e.tid → e.t ≤ S →
+      e.t = 0 ∨ ∃ i, ll[i]? = some e.t ∧ i + 1 ≤ L0) ∧
+  (∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → w = c0)
+
+/-- **The publication deposits' facts** (route P, DESIGN D17′ (R3)): every deposit's epoch is past
+the seal and before its store, its lands-above position past the seal's landing top; every
+post-power-on publication entry has a deposit, by its author. -/
+def pubDepsOk (rs : List RsvRegion) (S L0 : Nat) (R : List PubDep) (m : FlatMem) : Prop :=
+  (∀ r ∈ R, S ≤ r.s ∧ r.s < r.t ∧ L0 ≤ r.L) ∧
+  ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+    ∀ H, m[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → ∃ r ∈ R, r.t = e.t ∧ e.tid = hartAgent r.c
+
+/-- **The seal's route-P record** (DESIGN D17′ (R1)-(R3)): before the seal nothing; from the seal
+on, the certificate's value, the snapshot with its landing receipts, the publication deposits. -/
+def kptSnapAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) (S : Nat) (dyn : List KSlot) :
+    IProp GF := iprop%
+  ⌜dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem⌝ ∨
+  ∃ (c0 : CPU) (L0 : Nat) (ll : List Nat) (R : List PubDep),
+    ⌜dyn ≠ [] ∧ get? reg kptSealKey = some (kptSealEnc S L0) ∧
+      sealSnap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) c0 L0 ll S dyn σ.mem ∧
+      pubDepsOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) S L0 R σ.mem⌝ ∗
+    ([∗list] i ↦ t ∈ ll, landedAtE E t (i + 1)) ∗ [∗list] r ∈ R, pubDepAt E r
+
+instance [MachFixedGS hlc GF] (E : EraGS) (r : PubDep) : Persistent (PROP := IProp GF) (pubDepAt E r) := by
+  unfold pubDepAt; infer_instance
+
+instance [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) (S : Nat) (dyn : List KSlot) :
+    Persistent (PROP := IProp GF) (kptSnapAt E σ reg S dyn) := by
+  unfold kptSnapAt; infer_instance
+
+/-- An insertion above `t` keeps every history's co-latest entry issued at or before `S ≤ t`. -/
+theorem memIns_find_le {m m' : FlatMem} {t S : Nat} (hi : memIns m t m') (hS : S ≤ t) {a : PAddr} {H' : Hist}
+    (hH' : m'[a]? = some H') {x : HEnt} (hx : H'.find? (fun e => decide (e.t ≤ S)) = some x) :
+    ∃ H, m[a]? = some H ∧ H.find? (fun e => decide (e.t ≤ S)) = some x := by
+  have hxm := List.mem_of_find?_eq_some hx
+  have hxS : x.t ≤ S := by simpa using List.find?_some hx
+  obtain ⟨H, hH, _⟩ := hi.2 a H' hH' x hxm (by omega)
+  obtain ⟨H'', hH'', hf, _⟩ := hi.1 a H hH
+  rw [hH'] at hH''
+  obtain rfl := Option.some.inj hH''
+  refine ⟨H, hH, ?_⟩
+  have hc : ∀ e : HEnt, decide (e.t ≤ S) = true → decide (e.t ≤ t) = true := fun e he => by
+    simp only [decide_eq_true_eq] at he ⊢; omega
+  rw [Reserved.find?_filter_eq _ _ hc H, ← hf, ← Reserved.find?_filter_eq _ _ hc H']
+  exact hx
+
+/-- The seal's snapshot moves with an insertion above the top. -/
+theorem sealSnap_mono {rs : List RsvRegion} {c0 : CPU} {L0 : Nat} {ls : List Nat} {S : Nat}
+    {dyn : List KSlot} {m m' : FlatMem} {t : Nat} (hi : memIns m t m') (hS : S ≤ t)
+    (h : sealSnap rs c0 L0 ls S dyn m) : sealSnap rs c0 L0 ls S dyn m' := by
+  obtain ⟨h1, h2, h3⟩ := h
+  refine ⟨fun d hd j hj H' x hH' hx => ?_, fun a H' e hH' he hd heS => ?_, h3⟩
+  · obtain ⟨H, hH, hx'⟩ := memIns_find_le hi hS hH' hx
+    exact h1 d hd j hj H x hH hx'
+  · obtain ⟨H, hH, he'⟩ := hi.2 a H' hH' e he (by omega)
+    exact h2 a H e hH he' hd heS
+
+/-- The deposits' facts move with a step that leaves the publication words alone. -/
+theorem pubDepsOk_mono {rs : List RsvRegion} {S L0 : Nat} {R : List PubDep} {m m' : FlatMem}
+    (hp : pubSame rs m m') (h : pubDepsOk rs S L0 R m) : pubDepsOk rs S L0 R m' := by
+  refine ⟨h.1, fun f w hf a ha H hH e he he0 => ?_⟩
+  rw [hp f w hf a ha] at hH
+  exact h.2 f w hf a ha H hH e he he0
+
+/-- A publication store's step, with its deposit: every new publication entry is the store's. -/
+theorem pubDepsOk_push {rs : List RsvRegion} {S L0 : Nat} {R : List PubDep} {m m' : FlatMem} (r : PubDep)
+    (hr : S ≤ r.s ∧ r.s < r.t ∧ L0 ≤ r.L)
+    (hnew : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+      ∀ H', m'[a]? = some H' → ∀ e ∈ H', (∃ H, m[a]? = some H ∧ e ∈ H) ∨ (e.t = r.t ∧ e.tid = hartAgent r.c))
+    (h : pubDepsOk rs S L0 R m) : pubDepsOk rs S L0 (r :: R) m' := by
+  refine ⟨fun r' hr' => ?_, fun f w hf a ha H' hH' e he he0 => ?_⟩
+  · rcases List.mem_cons.1 hr' with rfl | hr'
+    · exact hr
+    · exact h.1 r' hr'
+  · rcases hnew f w hf a ha H' hH' e he with ⟨H, hH, he'⟩ | ⟨ht, htid⟩
+    · obtain ⟨r', hr', h1, h2⟩ := h.2 f w hf a ha H hH e he' he0
+      exact ⟨r', List.mem_cons_of_mem _ hr', h1, h2⟩
+    · exact ⟨r, List.mem_cons_self, ht.symm, htid⟩
+
 /-- **The sealed kernel table's conjunct** of era `E`'s interpretation, at
 the registry `reg`. -/
 def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) : IProp GF := iprop%
@@ -1714,13 +2038,68 @@ def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Age
       (kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn ∧
         MachFixedGS.kptOk (hlc := hlc) (GF := GF) dyn ∧
         ksPost (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem S stk reg))⌝ ∗
-    ([∗list] d ∈ dyn, kslotCellAt E S d) ∗ ([∗list] q ∈ stk, ksCarveAt E q) ∗ ksRcptsAll E reg
+    ([∗list] d ∈ dyn, kslotCellAt E S d) ∗ ([∗list] q ∈ stk, ksCarveAt E q) ∗ ksRcptsAll E reg ∗
+    kptSnapAt E σ reg S dyn
 
-/-- **The seal's certificate** (persistent): the era's record is sealed. -/
-def kptSealedAt [MachFixedGS hlc GF] (E : EraGS) : IProp GF := E.rsvName ↪◯MAP[kptSealKey]{.discard} 0
+/-- **The seal's certificate** (persistent): the era's record is sealed at stamp `S`, the landing
+top then `L` (route P, DESIGN D17′ (R1)). -/
+def kptSealedAt [MachFixedGS hlc GF] (E : EraGS) (S L : Nat) : IProp GF :=
+  E.rsvName ↪◯MAP[kptSealKey]{.discard} (kptSealEnc S L)
 
-instance [MachFixedGS hlc GF] (E : EraGS) : Persistent (PROP := IProp GF) (kptSealedAt E) := by
+instance [MachFixedGS hlc GF] (E : EraGS) (S L : Nat) : Persistent (PROP := IProp GF) (kptSealedAt E S L) := by
   unfold kptSealedAt; infer_instance
+
+/-- **The seal's route-P record moves with a step that leaves the publication words alone** (an
+insertion above the top). -/
+theorem kptSnapAt_mono [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} {reg : RegMapF Agent} {S : Nat}
+    {dyn : List KSlot} (hi : memIns σ.mem σ.top σ'.mem) (hS : dyn ≠ [] → S ≤ σ.top)
+    (hp : pubSame (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ'.mem) :
+    kptSnapAt (GF := GF) E σ reg S dyn ⊢ kptSnapAt E σ' reg S dyn := by
+  unfold kptSnapAt
+  iintro (%h0 | ⟨%c0, %L0, %ls, %R, %⟨hne, hreg, hsn, hdep⟩, Hls, HR⟩)
+  · ileft; ipureintro; exact ⟨h0.1, pubClean_of_same hp h0.2⟩
+  · iright
+    iexists c0, L0, ls, R
+    iframe Hls HR
+    ipureintro
+    exact ⟨hne, hreg, sealSnap_mono hi (hS hne) hsn, pubDepsOk_mono hp hdep⟩
+
+/-- The seal's route-P record reads the registry only at the seal key. -/
+theorem kptSnapAt_reg [MachFixedGS hlc GF] (E : EraGS) {σ : MState} {reg reg' : RegMapF Agent} {S : Nat}
+    {dyn : List KSlot} (h : get? reg' kptSealKey = get? reg kptSealKey) :
+    kptSnapAt (GF := GF) E σ reg S dyn ⊢ kptSnapAt E σ reg' S dyn := by
+  unfold kptSnapAt
+  iintro (%h0 | ⟨%c0, %L0, %ls, %R, %⟨hne, hreg, hsn, hdep⟩, Hls, HR⟩)
+  · ileft; ipureintro; exact h0
+  · iright
+    iexists c0, L0, ls, R
+    iframe Hls HR
+    ipureintro
+    exact ⟨hne, h.trans hreg, hsn, hdep⟩
+
+/-- **The seal's route-P record takes a publication store's deposit** (the certificate pins the
+seal stamp and its landing top). -/
+theorem kptSnapAt_pub [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} {reg : RegMapF Agent} {S : Nat}
+    {dyn : List KSlot} (hi : memIns σ.mem σ.top σ'.mem) (hS : S ≤ σ.top) (r : PubDep) (S0 L0 : Nat)
+    (hreg0 : get? reg kptSealKey = some (kptSealEnc S0 L0)) (hr : S0 ≤ r.s ∧ r.s < r.t ∧ L0 ≤ r.L)
+    (hnew : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) →
+      ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes, ∀ H', σ'.mem[a]? = some H' → ∀ e ∈ H',
+        (∃ H, σ.mem[a]? = some H ∧ e ∈ H) ∨ (e.t = r.t ∧ e.tid = hartAgent r.c))
+    (hne : dyn ≠ []) :
+    kptSnapAt (GF := GF) E σ reg S dyn ∗ pubDepAt E r ⊢ kptSnapAt E σ' reg S dyn := by
+  unfold kptSnapAt
+  iintro ⟨(%h0 | ⟨%c0, %L0', %ls, %R, %⟨_, hreg, hsn, hdep⟩, Hls, HR⟩), #Hr⟩
+  · exact absurd h0.1 hne
+  rw [hreg] at hreg0
+  obtain ⟨rfl, rfl⟩ := kptSealEnc_inj (Option.some.inj hreg0)
+  iright
+  iexists c0, L0', ls, r :: R
+  iframe Hls
+  isplitl []
+  · ipureintro
+    exact ⟨hne, hreg, sealSnap_mono hi hS hsn, pubDepsOk_push r hr hnew hdep⟩
+  iapply BigSepL.bigSepL_cons.2
+  iframe Hr HR
 
 /-- The sealed slots' histories in the memory `m`, each disciplined
 (`kslotHistOk`): what the interpretation's fragments say of the machine. -/
@@ -1847,7 +2226,7 @@ theorem kptModel_stateOk [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : R
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
     exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
@@ -1862,7 +2241,7 @@ theorem kptModel_stateOkK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : 
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOkK (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, _, hseal⟩, Hc, _, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
     exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
@@ -1877,7 +2256,7 @@ theorem kptModel_stateOkD [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : 
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOkD (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hdma, hseal⟩, Hc, _, _⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hdma, hseal⟩, Hc, _, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
     exact ⟨S, dyn, stk, hdma, .inl ⟨hnil.1, hnil.2.1⟩⟩
@@ -1918,11 +2297,15 @@ minted at an epoch-opening fence, `memModel_fenceE`; consumed by
 map shape: `authMap`). -/
 abbrev landMap (llog : List Nat) : RegMapF Agent := authMap llog
 
-/-- The key of hart `c`'s `k`-th store epoch. -/
-def epKey (c : CPU) (k : Nat) : Nat := k * NCPU + c.val
+theorem epKey_ne_laKey (c : CPU) (k t : Nat) : epKey c k ≠ laKey t := by
+  unfold epKey laKey; omega
+
+theorem laKey_inj {t t' : Nat} (h : laKey t = laKey t') : t = t' := by
+  unfold laKey at h; omega
 
 theorem epKey_inj {c c' : CPU} {k k' : Nat} (h : epKey c k = epKey c' k') : c = c' ∧ k = k' := by
   unfold epKey at h
+  replace h : k * NCPU + c.val = k' * NCPU + c'.val := by omega
   have hc := c.isLt
   have hc' := c'.isLt
   have hk : k = k' := by
@@ -1948,27 +2331,82 @@ def epochRecOk (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × N
       log[t' - 1]? = some (hartAgent c) → lpOf llog t' = some p' →
       ∃ p, p < p' ∧ lpOf llog t = some p
 
-/-- THE LANDING CERTIFICATE (design §2.3 `landedAt`, persistent): the store with
-issue stamp `t` landed at position `p`. -/
-def landedAtE [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : IProp GF := E.lpName ↪◯MAP[p]{.discard} t
+/-- **The lands-above records' invariant** (route P, coordinator decision (b) at the CP-6d resume,
+stated over the state's fields): a record `laKey t ↦ L` names an issued store `t` that, if it has
+landed, landed STRICTLY above position `L`, and `L` is a position already reached.  Minted at the
+store's issue (`L` at most the landing top then); kept by every step, since a store lands at the
+landing top + 1. -/
+def landsAboveOk (log : List Agent) (llog : List Nat) (M : RegMapF Agent) : Prop :=
+  ∀ (t L : Nat), get? M (laKey t) = some L → 1 ≤ t ∧ t ≤ log.length ∧ L ≤ llog.length ∧
+    ∀ p, lpOf llog t = some p → L < p
 
-/-- THE FENCE-EPOCH TOKEN (design §2.3 `epochAt`, [OWN.113], persistent): hart
-`c`'s `k`-th epoch-opening fence happened at issue top `s`. -/
-def epochAtE [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) : IProp GF :=
-  E.epName ↪◯MAP[epKey c k]{.discard} s
 
-instance [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : Persistent (PROP := IProp GF) (landedAtE E t p) := by
-  unfold landedAtE; infer_instance
-instance [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) :
-    Persistent (PROP := IProp GF) (epochAtE E c k s) := by
-  unfold epochAtE; infer_instance
+theorem landsAboveAtE_le [MachFixedGS hlc GF] (E : EraGS) (t K K' : Nat) (h : K' ≤ K) :
+    landsAboveAtE E t K ⊢@{IProp GF} landsAboveAtE E t K' := by
+  unfold landsAboveAtE
+  iintro ⟨%L, %hL, #H⟩
+  iexists L
+  iframe H
+  ipureintro; omega
+
+/-- A landing (of `t0`), with the log grown, keeps the lands-above records. -/
+theorem landsAboveOk_snoc {log log' : List Agent} {llog : List Nat} {M : RegMapF Agent}
+    (h : landsAboveOk log llog M) (hlen : log.length ≤ log'.length) (t0 : Nat) :
+    landsAboveOk log' (llog ++ [t0]) M := by
+  intro t L hM
+  obtain ⟨h1, h2, h3, h4⟩ := h t L hM
+  refine ⟨h1, by omega, by simp only [List.length_append, List.length_singleton]; omega, fun p hp => ?_⟩
+  cases hl : lpOf llog t with
+  | some p0 =>
+    rw [lpOf_snoc_of_some _ _ _ _ hl] at hp
+    obtain rfl := Option.some.inj hp
+    exact h4 p0 hl
+  | none =>
+    by_cases ht : t = t0
+    · subst ht
+      have hnm : t ∉ llog := fun hm => by
+        have := (lpOf_isSome_iff llog t (by omega)).2 hm
+        rw [hl] at this; cases this
+      rw [lpOf_snoc_self llog t (by omega) hnm] at hp
+      obtain rfl := Option.some.inj hp
+      omega
+    · rw [lpOf_snoc_ne llog t0 t ht, hl] at hp
+      cases hp
+
+/-- An issue (the log grown, nothing landed) keeps the lands-above records. -/
+theorem landsAboveOk_log {log log' : List Agent} {llog : List Nat} {M : RegMapF Agent}
+    (h : landsAboveOk log llog M) (hlen : log.length ≤ log'.length) : landsAboveOk log' llog M := by
+  intro t L hM
+  obtain ⟨h1, h2, h3, h4⟩ := h t L hM
+  exact ⟨h1, by omega, h3, h4⟩
+
+/-- An epoch record's insertion keeps the lands-above records (disjoint keys). -/
+theorem landsAboveOk_epIns {log : List Agent} {llog : List Nat} {M : RegMapF Agent}
+    (h : landsAboveOk log llog M) (c : CPU) (k s : Nat) : landsAboveOk log llog (insert M (epKey c k) s) := by
+  intro t L hM
+  rw [LawfulPartialMap.get?_insert_ne (epKey_ne_laKey c k t)] at hM
+  exact h t L hM
+
+/-- A lands-above record's insertion keeps the epoch records (disjoint keys). -/
+theorem epochRecOk_laIns {log : List Agent} {llog : List Nat} {sb : CPU → List (Nat × Nat)} {sbEp : CPU → Nat}
+    {M : RegMapF Agent} (h : epochRecOk log llog sb sbEp M) (t L : Nat) :
+    epochRecOk log llog sb sbEp (insert M (laKey t) L) := by
+  intro c k s hM
+  rw [LawfulPartialMap.get?_insert_ne (fun e => epKey_ne_laKey c k t e.symm)] at hM
+  exact h c k s hM
+
+
+/-- **The authorship authority** (route P, design D9): the issue log's map, with the receipt of
+every issued store kept (so an issue receipt of the top can be minted, `itopLbAt`). -/
+def authAuthAt [MachFixedGS hlc GF] (E : EraGS) (log : List Agent) : IProp GF := iprop%
+  (E.authName ↪●MAP authMap log) ∗ ([∗list] i ↦ a ∈ log, E.authName ↪◯MAP[i + 1]{.discard} a)
 
 /-- **The landing authority** (`lpAuth`, design §2.3), over the state's fields:
 the landing log's map with every certificate kept, and the store-epoch records. -/
 def lpAuthAt [MachFixedGS hlc GF] (E : EraGS) (log : List Agent) (llog : List Nat)
     (sb : CPU → List (Nat × Nat)) (sbEp : CPU → Nat) : IProp GF := iprop%
   (E.lpName ↪●MAP landMap llog) ∗ ([∗list] i ↦ t ∈ llog, landedAtE E t (i + 1)) ∗
-  ∃ M : RegMapF Agent, (E.epName ↪●MAP M) ∗ ⌜epochRecOk log llog sb sbEp M⌝
+  ∃ M : RegMapF Agent, (E.epName ↪●MAP M) ∗ ⌜epochRecOk log llog sb sbEp M ∧ landsAboveOk log llog M⌝
 
 /-! ### The records' invariant under every step -/
 
@@ -2013,37 +2451,6 @@ theorem epochRecOk_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu
     · have hlp'' : lpOf σ.llog t' = some p' := by rwa [lpOf_snoc_ne σ.llog t t' htt] at hlp'
       obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu hct' hlp''
       exact ⟨p, hp, lpOf_snoc_of_some σ.llog t u p hlpu⟩
-
-/-- A store that lands at once (any author `g`; the P-M2 machine's every RAM write) keeps the
-records' invariant, every earlier store being landed (the staging conjunct). -/
-theorem epochRecOk_storeG (σ : MState) (g : Agent) (hP : σ.okP) (hs0 : σ.sbNil) (M : RegMapF Agent)
-    (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
-    epochRecOk (σ.log ++ [g]) (σ.llog ++ [σ.top + 1]) σ.sb σ.sbEp M := by
-  have hll := hP.2.2.2.2.1
-  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
-  intro c k s hM
-  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
-  refine ⟨hk, by simp only [List.length_append, List.length_singleton]; omega, hsbr, ?_⟩
-  intro u t' p' hu1 hus hst' hu hct' hlp'
-  have hu_le : u ≤ σ.top := Nat.le_trans hus hs
-  have hu' : σ.log[u - 1]? = some (hartAgent c) := by
-    rw [List.getElem?_append_left (by simp only [MState.top] at hu_le; omega)] at hu; exact hu
-  by_cases htt : t' = σ.top + 1
-  · have hul := σ.okP_landed hP hs0 u hu1 hu_le
-    have hu0 : u ≠ 0 := by omega
-    obtain ⟨q, hq⟩ := Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog u hu0).2 hul)
-    have hq' := lpOf_le σ.llog u q hq
-    rw [htt, lpOf_snoc_self σ.llog _ (by omega) hfresh] at hlp'
-    obtain rfl := Option.some.inj hlp'
-    exact ⟨q, by omega, lpOf_snoc_of_some σ.llog _ u q hq⟩
-  · have hlp'' : lpOf σ.llog t' = some p' := by rwa [lpOf_snoc_ne σ.llog _ t' htt] at hlp'
-    have ht'0 : t' ≠ 0 := by omega
-    have ht'm : t' ∈ σ.llog := (lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp'']; rfl)
-    have ht'le := (hll t' ht'm).2
-    have hct'' : σ.log[t' - 1]? = some (hartAgent c) := by
-      rw [List.getElem?_append_left (by simp only [MState.top] at ht'le; omega)] at hct'; exact hct'
-    obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu' hct'' hlp''
-    exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
 
 /-- **AN ISSUE KEEPS THE RECORDS' INVARIANT** (route P's plain store, increment P-M3a; no
 staging premise): the new pending store joins the hart's buffer at the hart's CURRENT epoch,
@@ -2137,15 +2544,15 @@ theorem epochRecOk_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : 
 
 /-- **A DMA WRITE (route P) KEEPS THE RECORDS' INVARIANT** (increment P-M3b): it is the disk's,
 so it is no hart's store across a record's top. -/
-theorem epochRecOk_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+theorem epochRecOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hP : σ.okP) (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
-    epochRecOk (σ.storeDmaL pa n w).log (σ.storeDmaL pa n w).llog (σ.storeDmaL pa n w).sb
-      (σ.storeDmaL pa n w).sbEp M := by
+    epochRecOk (σ.storeDma pa n w).log (σ.storeDma pa n w).llog (σ.storeDma pa n w).sb
+      (σ.storeDma pa n w).sbEp M := by
   by_cases hn : n = 0
   · subst hn; exact h
   have hll := hP.2.2.2.2.1
-  have hlog : (σ.storeDmaL pa n w).log = σ.log ++ [diskAgent] := by simp only [if_neg hn]
-  have hllog : (σ.storeDmaL pa n w).llog = σ.llog ++ [σ.top + 1] := by
+  have hlog : (σ.storeDma pa n w).log = σ.log ++ [diskAgent] := by simp only [if_neg hn]
+  have hllog : (σ.storeDma pa n w).llog = σ.llog ++ [σ.top + 1] := by
     simp only [if_neg hn]
   rw [hlog, hllog]
   intro c k s hM
@@ -2171,10 +2578,10 @@ theorem epochRecOk_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8
     exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
 
 /-- An exclusive read (route P) moves no log, buffer or epoch: the records stay. -/
-theorem epochRecOk_afterExclL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+theorem epochRecOk_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
-    epochRecOk (σ.afterExclL cpu pa n w acq).log (σ.afterExclL cpu pa n w acq).llog
-      (σ.afterExclL cpu pa n w acq).sb (σ.afterExclL cpu pa n w acq).sbEp M := h
+    epochRecOk (σ.afterExcl cpu pa n w acq).log (σ.afterExcl cpu pa n w acq).llog
+      (σ.afterExcl cpu pa n w acq).sb (σ.afterExcl cpu pa n w acq).sbEp M := h
 
 /-- A step that raises store epochs only keeps the records' invariant. -/
 theorem epochRecOk_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
@@ -2220,7 +2627,8 @@ variable [MachFixedGS hlc GF] (E : EraGS)
 certificate is minted (and kept), the records follow (`hrec`). -/
 theorem lpAuthAt_snoc (log log' : List Agent) (llog : List Nat) (t : Nat)
     (sb sb' : CPU → List (Nat × Nat)) (sbEp : CPU → Nat)
-    (hrec : ∀ M, epochRecOk log llog sb sbEp M → epochRecOk log' (llog ++ [t]) sb' sbEp M) :
+    (hrec : ∀ M, epochRecOk log llog sb sbEp M → epochRecOk log' (llog ++ [t]) sb' sbEp M)
+    (hlen : log.length ≤ log'.length) :
     lpAuthAt E log llog sb sbEp ⊢@{IProp GF}
       |==> (lpAuthAt E log' (llog ++ [t]) sb' sbEp ∗ landedAtE E t (llog.length + 1)) := by
   unfold lpAuthAt
@@ -2239,7 +2647,7 @@ theorem lpAuthAt_snoc (log log' : List Agent) (llog : List Nat) (t : Nat)
     · iexists M
       iframe Hep
       ipureintro
-      exact hrec M hM
+      exact ⟨hrec M hM.1, landsAboveOk_snoc hM.2 hlen t⟩
   · unfold landedAtE
     iexact Hl
 
@@ -2253,7 +2661,7 @@ theorem lpAuthAt_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (N
   iexists M
   iframe Hep
   ipureintro
-  exact epochRecOk_epUp _ _ _ _ _ hge M hM
+  exact ⟨epochRecOk_epUp _ _ _ _ _ hge M hM.1, hM.2⟩
 
 /-- **An issue in the landing authority** (route P, increment P-M3a): nothing lands, so no
 certificate moves; the records follow (`epochRecOk_issue`). -/
@@ -2268,7 +2676,8 @@ theorem lpAuthAt_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : Bit
   iexists M
   iframe Hep
   ipureintro
-  exact epochRecOk_issue σ cpu pa n w hP M hM
+  exact ⟨epochRecOk_issue σ cpu pa n w hP M hM.1,
+    landsAboveOk_log hM.2 (by simp only [List.length_append, List.length_singleton]; omega)⟩
 
 /-- The epoch token's mint (see `epochRecOk_mint`). -/
 theorem lpAuthAt_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → Nat)
@@ -2277,7 +2686,7 @@ theorem lpAuthAt_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → N
       |==> (lpAuthAt E σ.log σ.llog σ.sb sbEp' ∗ epochAtE E cpu (σ.sbEp cpu + 1) σ.top) := by
   unfold lpAuthAt
   iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
-  obtain ⟨hfresh, hM'⟩ := epochRecOk_mint σ cpu hP sbEp' hcpu hge M hM
+  obtain ⟨hfresh, hM'⟩ := epochRecOk_mint σ cpu hP sbEp' hcpu hge M hM.1
   imod ghost_map_insert_persist (epKey cpu (σ.sbEp cpu + 1)) σ.top hfresh $$ Hep with ⟨Hep, #Hk⟩
   imodintro
   isplitl [Hlp Hfr Hep]
@@ -2285,7 +2694,7 @@ theorem lpAuthAt_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → N
     iexists _
     iframe Hep
     ipureintro
-    exact hM'
+    exact ⟨hM', landsAboveOk_epIns hM.2 cpu _ _⟩
   · unfold epochAtE
     iexact Hk
 
@@ -2302,8 +2711,40 @@ theorem lpAuthAt_boot (log : List Agent) (sb : CPU → List (Nat × Nat)) (sbEp 
   · iexists ∅
     iframe Hep
     ipureintro
-    intro c k s hM
-    simp [LawfulPartialMap.get?_empty] at hM
+    refine ⟨fun c k s hM => ?_, fun t L hM => ?_⟩
+    · simp [LawfulPartialMap.get?_empty] at hM
+    · simp [LawfulPartialMap.get?_empty] at hM
+
+/-- An issue in the authorship authority: the receipt is minted (and kept). -/
+theorem authAuthAt_snoc (log : List Agent) (a : Agent) :
+    authAuthAt E log ⊢@{IProp GF}
+      |==> (authAuthAt E (log ++ [a]) ∗ E.authName ↪◯MAP[log.length + 1]{.discard} a) := by
+  unfold authAuthAt
+  iintro ⟨Ha, Hfr⟩
+  imod ghost_map_insert_persist (log.length + 1) a
+    (by rw [authMap_get?, if_neg (by omega)]) $$ Ha with ⟨Ha, #Hl⟩
+  imodintro
+  rw [authMap_snoc]
+  iframe Ha Hl
+  iapply BigSepL.bigSepL_snoc.2
+  iframe Hfr Hl
+
+theorem authAuthAt_boot : (E.authName ↪●MAP (∅ : RegMapF Agent)) ⊢@{IProp GF} authAuthAt E [] := by
+  unfold authAuthAt
+  iintro Ha
+  rw [authMap_nil]
+  iframe Ha
+  exact BigSepL.bigSepL_nil_intro
+
+/-- The receipt of an issued store, from the authority. -/
+theorem authAuthAt_get (log : List Agent) (t : Nat) (h1 : 1 ≤ t) (h2 : t ≤ log.length) :
+    authAuthAt E log ⊢@{IProp GF} ∃ a : Agent, E.authName ↪◯MAP[t]{.discard} a := by
+  obtain ⟨u, rfl⟩ : ∃ u, t = u + 1 := ⟨t - 1, by omega⟩
+  unfold authAuthAt
+  iintro ⟨_, #Hfr⟩
+  obtain ⟨a, ha⟩ : ∃ a, log[u]? = some a := ⟨_, List.getElem?_eq_getElem (by omega)⟩
+  iexists a
+  iapply BigSepL.bigSepL_lookup (Φ := fun i (x : Agent) => iprop(E.authName ↪◯MAP[i + 1]{.discard} x)) ha $$ Hfr
 
 /-- **The landing certificate agrees with the landing log.** -/
 theorem lpAuthAt_landed (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
@@ -2341,14 +2782,64 @@ theorem lpAuthAt_landedBefore (log : List Agent) (llog : List Nat) (sb : CPU →
   iintro ⟨⟨_, _, %M, Hep, %hM⟩, H⟩
   ihave %Hl := ghost_map_lookup $$ Hep H
   ipureintro
-  exact (hM c k s Hl).2.2.2
+  exact (hM.1 c k s Hl).2.2.2
+
+/-- **An issue that mints a lands-above receipt** (route P, coordinator decision (b)): the store
+issued at the next stamp `log.length + 1` will land strictly above every position `K` reached now. -/
+theorem lpAuthAt_issueLA (log log' : List Agent) (llog : List Nat) (sb sb' : CPU → List (Nat × Nat))
+    (sbEp : CPU → Nat) (hlen : log'.length = log.length + 1)
+    (hrec : ∀ M, epochRecOk log llog sb sbEp M → epochRecOk log' llog sb' sbEp M)
+    (hfresh : log.length + 1 ∉ llog) (K : Nat) (hK : K ≤ llog.length) :
+    lpAuthAt E log llog sb sbEp ⊢@{IProp GF}
+      |==> (lpAuthAt E log' llog sb' sbEp ∗ landsAboveAtE E (log.length + 1) K) := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
+  have hnone : get? M (laKey (log.length + 1)) = none := by
+    cases hg : get? M (laKey (log.length + 1)) with
+    | none => rfl
+    | some L => have := (hM.2 _ L hg).2.1; omega
+  imod ghost_map_insert_persist (laKey (log.length + 1)) K hnone $$ Hep with ⟨Hep, #Hk⟩
+  imodintro
+  isplitl [Hlp Hfr Hep]
+  · iframe Hlp Hfr
+    iexists _
+    iframe Hep
+    ipureintro
+    refine ⟨epochRecOk_laIns (hrec M hM.1) _ K, fun t L hg => ?_⟩
+    by_cases ht : laKey (log.length + 1) = laKey t
+    · have htt := laKey_inj ht
+      subst htt
+      rw [LawfulPartialMap.get?_insert_eq ht] at hg
+      obtain rfl := Option.some.inj hg
+      refine ⟨by omega, by omega, hK, fun p hp => ?_⟩
+      have : (lpOf llog (log.length + 1)).isSome := by rw [hp]; rfl
+      exact absurd ((lpOf_isSome_iff llog _ (by omega)).1 this) hfresh
+    · rw [LawfulPartialMap.get?_insert_ne ht] at hg
+      exact landsAboveOk_log hM.2 (by omega) t L hg
+  · unfold landsAboveAtE
+    iexists K
+    iframe Hk
+    ipureintro; exact Nat.le_refl _
+
+/-- **The lands-above receipt, cashed against a landing certificate.** -/
+theorem lpAuthAt_landsAbove (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp : CPU → Nat) (t K : Nat) :
+    lpAuthAt E log llog sb sbEp ∗ landsAboveAtE E t K ⊢@{IProp GF}
+      ⌜∀ p, lpOf llog t = some p → K < p⌝ := by
+  unfold lpAuthAt landsAboveAtE
+  iintro ⟨⟨_, _, %M, Hep, %hM⟩, %L, %hKL, H⟩
+  ihave %Hl := ghost_map_lookup $$ Hep H
+  ipureintro
+  intro p hp
+  have := (hM.2 t L Hl).2.2.2 p hp
+  omega
 
 end lpauth
 
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
 def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
-  MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
-  ((E.authName ↪●MAP authMap σ.log) ∗ lpAuthAt E σ.log σ.llog σ.sb σ.sbEp) ∗
+  MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.ltop) ∗
+  (authAuthAt E σ.log ∗ lpAuthAt E σ.log σ.llog σ.sb σ.sbEp) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
   (E.resvName ↪●MAP resvMap σ) ∗
   ⌜mmOk σ⌝ ∗ rsvModelAt E σ
@@ -2357,12 +2848,40 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 store pcs. -/
 theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
     (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a)
-    (hp : σ'.pcAt = σ.pcAt := by rfl) :
+    (hp : σ'.pcAt = σ.pcAt := by rfl) (hll : σ'.llog = σ.llog := by rfl) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
   have ht : σ'.top = σ.top := by simp only [MState.top, hl]
-  unfold rsvModelAt reservedOk kptModelAt chainModelAt chainEnv chainEx relPcOk
+  have hlp : σ'.lp = σ.lp := by simp only [MState.lp, hll]
+  have hlt : σ'.ltop = σ.ltop := by simp only [MState.ltop, hll]
+  unfold rsvModelAt reservedOk kptModelAt kptSnapAt chainModelAt chainEnv chainEx relPcOk
   have hpk : pcKeysOk σ' = pcKeysOk σ := by funext Z; unfold pcKeysOk; rw [ht, hp]
-  rw [chainEnvAt_congr _ _ _ h hl hc hp, h, ht, hp, hpk]
+  rw [chainEnvAt_congr _ _ _ h hl hc hp hll, h, ht, hp, hpk, hlp, hlt]
+
+/-- **A landing keeps the reserved conjunct** (route P): the reserved regions, the release
+sites, the sealed table read the merged memory and the issue top, which a landing does not move;
+the chain conjunct's environment grows (the landed store joins its bytes' landed-only histories,
+`chainEnvAt_ext_land`) and its load-side invariant holds (`chainLoads_land`). -/
+theorem rsvModelAt_land [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) (t : Nat) (hmm : mmOk σ)
+    (hok : σ.landOk cpu t) : rsvModelAt (GF := GF) E σ ⊢ rsvModelAt E (σ.land cpu t) := by
+  have h1 : ∀ reg, reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.land cpu t) reg =
+      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg := fun _ => rfl
+  have h2 : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF))
+      (σ.land cpu t) = relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ := rfl
+  have h3 : ∀ reg, kptModelAt (GF := GF) E (σ.land cpu t) reg = kptModelAt E σ reg := fun _ => rfl
+  unfold rsvModelAt chainModelAt
+  simp only [h1, h2, h3]
+  iintro ⟨Hreg, Hhalf, %hlc, %Z, HZ, %⟨hcert, hpk⟩, Hel⟩
+  isplitl [Hreg]
+  · iexact Hreg
+  isplitl [Hhalf]
+  · iexact Hhalf
+  isplit
+  · ipureintro; exact chainLoads_land σ cpu t hmm hok hlc
+  · iexists Z
+    iframe HZ Hel
+    ipureintro
+    exact ⟨certsOk_mono (chainEnvAt_ext_land _ _ _ σ cpu t (mmOk_okP hmm)) hcert, hpk⟩
 
 /-- **THE LANDING, IN THE MEMORY-MODEL MIRRORS** (route P, design §2.3, the heart of
 `interp_land`): a landing consumes and produces no client resource -- the top, the author log,
@@ -2374,10 +2893,14 @@ theorem memModel_land [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU)
     (hok : σ.landOk cpu t) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E (σ.land cpu t) ∗ landedAtE E t (σ.ltop + 1)) := by
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.land cpu t) rfl rfl (fun _ _ => rfl)]
   iintro ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModelAt_land E σ cpu t hmm hok $$ Hrsv
   imod lpAuthAt_snoc E σ.log σ.log σ.llog t σ.sb (σ.land cpu t).sb σ.sbEp
-    (fun M hM => epochRecOk_land σ cpu t hok (mmOk_okP hmm) M hM) $$ Hlp with ⟨Hlp, #Hl⟩
+    (fun M hM => epochRecOk_land σ cpu t hok (mmOk_okP hmm) M hM) (Nat.le_refl _) $$ Hlp with ⟨Hlp, #Hl⟩
+  have hlt : (σ.land cpu t).ltop = σ.ltop + 1 := by
+    simp only [MState.ltop, MState.land, List.length_append, List.length_singleton]
+  imod MonoNat.own_update _ (.ofNat σ.ltop) (.ofNat (σ.land cpu t).ltop)
+    (by rw [hlt]; simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, _⟩
   imodintro
   have hresv : resvMap (σ.land cpu t) = resvMap σ := resvMap_congr _ _ (fun _ => ⟨rfl, rfl⟩)
   have hv : ∀ c, hartViewsAt (GF := GF) E (σ.land cpu t) c = hartViewsAt E σ c := fun _ => rfl
@@ -2396,6 +2919,20 @@ theorem memModel_landedAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : 
   · iframe Hlp H
   ipureintro
   exact lpOf_of_get σ.llog t p (mmOk_okP hmm).2.2.2.1 h.1 h.2 ht
+
+/-- **The landing certificate agrees with the machine**, and certifies a store (`t ≠ 0`). -/
+theorem memModel_landedAt' [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat) :
+    memModelAt E σ ∗ landedAtE E t p ⊢@{IProp GF} ⌜t ≠ 0 ∧ σ.lp t = some p⌝ := by
+  unfold memModelAt
+  iintro ⟨⟨_, ⟨_, Hlp⟩, _, _, %hmm, _⟩, H⟩
+  ihave %h := lpAuthAt_landed E _ _ _ _ t p $$ [Hlp H]
+  · iframe Hlp H
+  ipureintro
+  have hP := mmOk_okP hmm
+  have ht : t ≠ 0 := by
+    have := (hP.2.2.2.2.1 t (List.mem_of_getElem? h.2)).1
+    omega
+  exact ⟨ht, lpOf_of_get σ.llog t p hP.2.2.2.1 h.1 h.2 ht⟩
 
 /-- **`visibleAt`** (design §2.4, route P, increment P-M3a): a landing certificate at or below a
 view makes every entry at its stamp visible there, to every agent -- the visibility side
@@ -2417,6 +2954,49 @@ theorem memModel_landedGet [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p :
   have hg := lpOf_get σ.llog t p h ht
   iapply lpAuthAt_get E _ _ _ _ t p hg.1 hg.2 $$ Hlp
 
+/-- The landing log's receipts (persistent): every landed store's certificate. -/
+theorem memModel_llogRcpts [MachFixedGS hlc GF] (E : EraGS) (σ : MState) :
+    memModelAt E σ ⊢@{IProp GF} [∗list] i ↦ t ∈ σ.llog, landedAtE E t (i + 1) := by
+  unfold memModelAt lpAuthAt
+  iintro ⟨_, ⟨_, _, #Hfr, _⟩, _⟩
+  iexact Hfr
+
+/-- **The certificate of any landed store, the interpretation kept** (the authority keeps every
+certificate, persistently). -/
+theorem memModel_landedGetK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat)
+    (h : σ.lp t = some p) (ht : t ≠ 0) :
+    memModelAt E σ ⊢@{IProp GF} memModelAt E σ ∗ landedAtE E t p := by
+  unfold memModelAt lpAuthAt
+  iintro ⟨Htop, ⟨Hauth, Hl, #Hfr, Hrest⟩, R⟩
+  have hg := lpOf_get σ.llog t p h ht
+  have e : p = (p - 1) + 1 := by omega
+  ihave #Hc := (BigSepL.bigSepL_lookup (Φ := fun i t => landedAtE (GF := GF) E t (i + 1)) hg.2) $$ Hfr
+  rw [← e]
+  iframe Htop Hauth Hl Hfr Hrest R Hc
+
+/-- An own store of a hart with an EMPTY buffer has landed (route P: the buffer holds exactly the
+hart's issued, unlanded stamps). -/
+theorem MState.okP_landed_own (σ : MState) (h : σ.okP) (cpu : CPU) (hsb : σ.sb cpu = []) (T : Nat)
+    (h1 : 1 ≤ T) (hT : σ.log[T - 1]? = some (hartAgent cpu)) : ∃ p, σ.lp T = some p := by
+  have hle : T ≤ σ.top := by
+    have := (List.getElem?_eq_some_iff.1 hT).1
+    simp only [MState.top]; omega
+  by_cases hm : T ∈ σ.llog
+  · exact Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog T (by omega)).2 hm)
+  · exfalso
+    obtain ⟨e, he⟩ := (h.2.2.2.2.2.2.1 cpu T).2 ⟨h1, hle, hT, hm⟩
+    rw [hsb] at he; cases he
+
+/-- A landed own store is at or below the hart's last landed store's position. -/
+theorem ownPubL_ge (g : Agent) (log : List Agent) (llog : List Nat) (T p : Nat) (ht : T ≠ 0)
+    (hT : log[T - 1]? = some g) (hp : lpOf llog T = some p) : p ≤ ownPubL g log llog := by
+  obtain ⟨h1, hget⟩ := lpOf_get llog T p hp ht
+  unfold ownPubL
+  apply ownPub_ge g (landAuthors log llog) p h1
+  unfold landAuthors
+  rw [List.getElem?_map, hget]
+  simp [List.getD_eq_getElem?_getD, hT]
+
 /-- **`landedBeforeOfEpoch`** at the machine ([OWN.113], design §2.4): with hart `c`'s token of
 its epoch-opening fence at top `s`, an own store issued after `s` that has landed at `p'` was
 preceded in the landing order by every own store issued up to `s`. -/
@@ -2428,6 +3008,65 @@ theorem memModel_landedBefore [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (c 
   iintro ⟨⟨_, ⟨_, Hlp⟩, _⟩, H⟩
   iapply lpAuthAt_landedBefore E _ _ _ _ c k s $$ [Hlp H]
   iframe Hlp H
+
+/-- An epoch token's top is issued. -/
+theorem memModel_epochTop [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (c : CPU) (k s : Nat) :
+    memModelAt E σ ∗ epochAtE E c k s ⊢@{IProp GF} ⌜s ≤ σ.top⌝ := by
+  unfold memModelAt lpAuthAt epochAtE
+  iintro ⟨⟨_, ⟨_, ⟨_, _, %M, Hep, %hM⟩⟩, _⟩, H⟩
+  ihave %Hl := ghost_map_lookup $$ Hep H
+  ipureintro
+  exact (hM.1 c k s Hl).2.1
+
+/-- **The lands-above receipt agrees with the machine**: a store certified landed at `p` landed
+above the receipt's position. -/
+theorem memModel_landsAbove [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t K p : Nat) :
+    memModelAt E σ ∗ landsAboveAtE E t K ∗ landedAtE E t p ⊢@{IProp GF} ⌜K < p⌝ := by
+  iintro ⟨Hmm, #HA, #Hl⟩
+  ihave %h := memModel_landedAt' E σ t p $$ [Hmm Hl]
+  · iframe Hmm Hl
+  unfold memModelAt
+  icases Hmm with ⟨_, ⟨_, Hlp⟩, _⟩
+  ihave %h2 := lpAuthAt_landsAbove E _ _ _ _ t K $$ [Hlp HA]
+  · iframe Hlp HA
+  ipureintro
+  exact h2 p h.2
+
+/-- **The interpretation's persistent receipts** (route P): every issued store's authorship and
+every landed store's landing certificate, as two persistent lists. -/
+theorem memModel_pers [MachFixedGS hlc GF] (E : EraGS) (σ : MState) :
+    memModelAt E σ ⊢@{IProp GF} memModelAt E σ ∗
+      □ (([∗list] i ↦ a ∈ σ.log, E.authName ↪◯MAP[i + 1]{.discard} a) ∗
+        ([∗list] i ↦ t ∈ σ.llog, landedAtE E t (i + 1))) := by
+  unfold memModelAt authAuthAt lpAuthAt
+  iintro ⟨Htop, ⟨⟨Ha, #Hafr⟩, ⟨Hl, #Hlfr, Hrest⟩⟩, R⟩
+  iframe Htop Ha Hafr Hl Hlfr Hrest R
+
+/-- A landed store's certificate, from the persistent list. -/
+theorem landedPers_get [MachFixedGS hlc GF] (E : EraGS) (llog : List Nat) (t p : Nat)
+    (h : lpOf llog t = some p) (ht : t ≠ 0) :
+    ([∗list] i ↦ x ∈ llog, landedAtE E x (i + 1)) ⊢@{IProp GF} landedAtE E t p := by
+  iintro #Hfr
+  have hg := lpOf_get llog t p h ht
+  rw [show p = (p - 1) + 1 by omega]
+  iapply (BigSepL.bigSepL_lookup (Φ := fun i x => landedAtE (GF := GF) E x (i + 1)) hg.2) $$ Hfr
+
+/-- An authorship receipt agrees with the persistent list at an issued stamp. -/
+theorem authPers_agree [MachFixedGS hlc GF] (E : EraGS) (log : List Agent) (t : Nat) (a : Agent)
+    (h1 : 1 ≤ t) (h2 : t ≤ log.length) :
+    iprop(([∗list] i ↦ x ∈ log, E.authName ↪◯MAP[i + 1]{.discard} x) ∗ E.authName ↪◯MAP[t]{.discard} a) ⊢@{IProp GF}
+      ⌜log[t - 1]? = some a⌝ := by
+  obtain ⟨u, rfl⟩ : ∃ u, t = u + 1 := ⟨t - 1, by omega⟩
+  iintro ⟨#Hfr, #Ha⟩
+  obtain ⟨b, hb⟩ : ∃ b, log[u]? = some b := ⟨_, List.getElem?_eq_getElem (by omega)⟩
+  ihave #Hb := BigSepL.bigSepL_lookup (Φ := fun i (x : Agent) => iprop(E.authName ↪◯MAP[i + 1]{.discard} x)) hb $$ Hfr
+  have hag : iprop((E.authName ↪◯MAP[u + 1]{.discard} a) ∗ (E.authName ↪◯MAP[u + 1]{.discard} b)) ⊢@{IProp GF}
+      ⌜a = b⌝ := ghost_map_elem_agree _ _ _ _ _ _
+  ihave %hab := hag $$ [Ha Hb]
+  · iframe Ha Hb
+  ipureintro
+  simp only [Nat.add_sub_cancel]
+  rw [hb, hab]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by
@@ -2555,6 +3194,21 @@ def uslotHistOk (K : Nat) (d : KSlot) (Hs : Nat → Hist) : Prop :=
     ∃ v : BitVec 64, uepAD d.c v ∧ e.v = nthByte (n := 8) v j ∧
       ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
 
+/-- **A user-table slot's discipline over LANDING positions, certified** (route P, design D11): the
+heads spell the current word (frozen: the canonical value; a leaf: an A/D variant); each byte is
+`P ++ x :: Q` with `x` -- the slot's value as of `K` -- the boot image's or LANDED at or below the
+position `K` (certified in `L`), and every entry above it (`P`) a hart's whole-doubleword A/D store,
+landed PAST `K` (certified in `L`).  Below `x` everything landed earlier (co order), so the
+landed-view readings as of `K` are `x`'s (`uslotHistOkP`, at any landing function agreeing with `L`). -/
+def uslotHistOkL (K : Nat) (d : KSlot) (Hs : Nat → Hist) (L : List (Nat × Nat)) : Prop :=
+  (∃ w : BitVec 64, (∀ j, j < 8 → (Hs j).head?.map HEnt.v = some (nthByte (n := 8) w j)) ∧
+    (if d.frozen then w = d.c else uepAD d.c w)) ∧
+  ∀ j, j < 8 → ∃ (P : Hist) (x : HEnt) (Q : Hist), Hs j = P ++ x :: Q ∧ x.v = nthByte (n := 8) d.c j ∧
+    (x.t = 0 ∨ ∃ q, (x.t, q) ∈ L ∧ q ≤ K) ∧
+    ∀ e ∈ P, (∃ q, (e.t, q) ∈ L ∧ K < q) ∧ d.frozen = false ∧ e.tid < NCPU ∧
+      ∃ v : BitVec 64, uepAD d.c v ∧ e.v = nthByte (n := 8) v j ∧
+        ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
+
 /-- **The epoch record of one hart** (`satp` = `s`, privilege `p`, epoch
 `oe`; `ksat` the kernel table's root, once known): an open epoch names the
 table `satp` names, never the kernel's; with no epoch open the hart is not
@@ -2589,10 +3243,11 @@ table bytes stay disjoint by ownership. -/
 def uepCellsE [MachFixedGS hlc GF] (E : EraGS) (h : CPU) (e : UEp) : IProp GF :=
   iprop(⌜uepFacts e⌝ ∗ MonoNat.lb_own (E.iviewName h) (.ofNat e.K) ∗
       ([∗list] a ∈ e.text, ∃ (x : HEnt) (H : Hist),
-        pointsTo (G := E.mem) a (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ e.K⌝) ∗
-      [∗list] p ∈ e.slots, ∃ Hs : Nat → Hist,
+        pointsTo (G := E.mem) a (DFrac.own Qp.quarter) (x :: H) ∗
+          (⌜x.t = 0⌝ ∨ ∃ q : Nat, landedAtE E x.t q ∗ ⌜q ≤ e.K⌝)) ∗
+      [∗list] p ∈ e.slots, ∃ (Hs : Nat → Hist) (L : List (Nat × Nat)),
         ([∗list] j ∈ List.range 8, pointsTo (G := E.mem) (p.2.addr + BitVec.ofNat 64 j)
-          (DFrac.own Qp.quarter) (Hs j)) ∗ ⌜uslotHistOk e.K p.2 Hs⌝)
+          (DFrac.own Qp.quarter) (Hs j)) ∗ ([∗list] q ∈ L, landedAtE E q.1 q.2) ∗ ⌜uslotHistOkL e.K p.2 Hs L⌝)
 
 /-- The cells of a hart's record: none closed, an open epoch's custody. -/
 def uepCellsAt [MachFixedGS hlc GF] (E : EraGS) (_σ : MState) (h : CPU) : Option UEp → IProp GF

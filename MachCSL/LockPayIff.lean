@@ -28,69 +28,75 @@ theorem lockPay_payIff (R R' : CtxId → IProp GF) (W : WordHist 4) (Vb : CPU �
 
 /-- The lock's body at an equivalent family. -/
 theorem lockBody_payIff (γ : GName) (lk : BitVec 64) (s : String) (R R' : CtxId → IProp GF)
-    (lo lc : Nat) (Vb : CPU → Nat) :
-    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBody γ lk s R lo lc Vb -∗ lockBody γ lk s R' lo lc Vb := by
+    (lo lc : Nat) (Vb : CPU → Nat) (te : Nat) :
+    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBody γ lk s R lo lc Vb te -∗ lockBody γ lk s R' lo lc Vb te := by
   unfold lockBody
-  iintro #H ⟨%W, %W', %st, %B, Hw, Hc, %hst, Hh, Hcf, Hnm, Hpay⟩
+  iintro #H ⟨%W, %W', %st, %B, Hw, Hc, %hst, %hzh, Hh, Hcf, Hnm, Hpay⟩
   iexists W, W', st, B
   iframe Hw Hc Hh Hcf Hnm
   isplitr
   · ipureintro; exact hst
-  icases Hpay with (⟨%hn, Hh2, Hp⟩ | %hn)
+  isplitr
+  · ipureintro; exact hzh
+  icases Hpay with (⟨%hn, Hh2, Hp⟩ | ⟨%hn, #Hhd⟩)
   · ileft
     isplitr
     · ipureintro; exact hn
     iframe Hh2
     iapply lockPay_payIff R R' W Vb $$ H Hp
   · iright
+    iframe Hhd
     ipureintro; exact hn
 
 /-- The reserved lock's body at an equivalent family (W8-β′). -/
 theorem lockBodyR_payIff (γ : GName) (lk : BitVec 64) (s : String) (R R' : CtxId → IProp GF)
-    (Vb : CPU → Nat) :
-    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBodyR γ lk s R Vb -∗ lockBodyR γ lk s R' Vb := by
+    (lo : Nat) (Vb : CPU → Nat) :
+    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBodyR γ lk s R lo Vb -∗ lockBodyR γ lk s R' lo Vb := by
   unfold lockBodyR
-  iintro #H ⟨%W, %W', %st, %B, Hw, Hc, %hst, %hx, Hh, Hcf, Hpay⟩
+  iintro #H ⟨%W, %W', %st, %B, Hw, Hc, %hst, %hx, %hzh, Hh, Hcf, Hpay⟩
   iexists W, W', st, B
   iframe Hw Hc Hh Hcf
   isplitr
   · ipureintro; exact hst
   isplitr
   · ipureintro; exact hx
-  icases Hpay with (⟨%hn, Hh2, Hp⟩ | %hn)
+  isplitr
+  · ipureintro; exact hzh
+  icases Hpay with (⟨%hn, Hh2, Hp⟩ | ⟨%hn, #Hhd⟩)
   · ileft
     isplitr
     · ipureintro; exact hn
     iframe Hh2
     iapply lockPay_payIff R R' W Vb $$ H Hp
   · iright
+    iframe Hhd
     ipureintro; exact hn
 
 theorem lockBodyM_payIff (γ : GName) (lk : BitVec 64) (s : String) (R R' : CtxId → IProp GF)
-    (lo lc : Nat) (Vb : CPU → Nat) :
-    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBodyM γ lk s R lo lc Vb -∗ lockBodyM γ lk s R' lo lc Vb := by
+    (lo lc : Nat) (Vb : CPU → Nat) (te : Nat) :
+    □ (∀ ξ, R ξ -∗ R' ξ) ⊢ lockBodyM γ lk s R lo lc Vb te -∗ lockBodyM γ lk s R' lo lc Vb te := by
   unfold lockBodyM
   split
-  · exact lockBodyR_payIff γ lk s R R' Vb
-  · exact lockBody_payIff γ lk s R R' lo lc Vb
+  · exact lockBodyR_payIff γ lk s R R' lo Vb
+  · exact lockBody_payIff γ lk s R R' lo lc Vb te
 
 /-- **A lock handle at an equivalent payload.** -/
 theorem isLock_payIff [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R R' : CtxId → IProp GF) :
     □ (∀ ξ, R ξ -∗ R' ξ) ⊢ □ (∀ ξ, R' ξ -∗ R ξ) -∗ isLock γ lk s R -∗ isLock γ lk s R' := by
   unfold isLock
-  iintro #H1 #H2 ⟨%hok, #Hc0, #Hc16, %lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩
+  iintro #H1 #H2 ⟨%hok, #Hc0, #Hc16, %lo, %lc, %Vb, %te, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf, #Hfte⟩
   isplitr
   · ipureintro; exact hok
   iframe Hc0 Hc16
-  iexists lo, lc, Vb
-  iframe Hflo Hflc Hvf Hgf
-  iapply (inv_alter lockN (lockBodyM γ lk s R lo lc Vb) (lockBodyM γ lk s R' lo lc Vb)) $$ Hinv
+  iexists lo, lc, Vb, te
+  iframe Hflo Hflc Hvf Hgf Hfte
+  iapply (inv_alter lockN (lockBodyM γ lk s R lo lc Vb te) (lockBodyM γ lk s R' lo lc Vb te)) $$ Hinv
   inext
   imodintro
   iintro HB
   isplitl [HB]
-  · iapply lockBodyM_payIff γ lk s R R' lo lc Vb $$ H1 HB
+  · iapply lockBodyM_payIff γ lk s R R' lo lc Vb te $$ H1 HB
   · iintro HB
-    iapply lockBodyM_payIff γ lk s R' R lo lc Vb $$ H2 HB
+    iapply lockBodyM_payIff γ lk s R' R lo lc Vb te $$ H2 HB
 
 end MachCSL

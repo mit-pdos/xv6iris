@@ -133,27 +133,34 @@ theorem xv6Started_idx : xv6RsvStatic[2]? = some xv6StartedR := by
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-/-- THE PRIMARY'S TOKEN: half of the position ghost, at "not yet stored". -/
-def startedPrim (γ : GName) : IProp GF := ghost_var γ (.own (1 : Qp).half) (0 : Nat)
+/-- THE PRIMARY'S TOKEN at the deposit's issue watermark `W` (route P): half of the position
+ghost, at an EVEN code ("not yet stored"; the armed codes are odd). -/
+def startedPrimW (γ : GName) (W : Nat) : IProp GF := ghost_var γ (.own (1 : Qp).half) (2 * W)
 
-/-- The armed code of the position ghost: the store's position and (W8
-(f2-ctx)) the record's chain bound, frozen together. -/
-def startedCode (t : Nat) (a : ChainVG) : Nat := chainPair t (vgCode a) + 1
+/-- THE PRIMARY'S TOKEN, at some watermark. -/
+def startedPrim (γ : GName) : IProp GF := iprop(∃ W : Nat, startedPrimW γ W)
 
-theorem startedCode_inj {t t' : Nat} {a a' : ChainVG} (h : startedCode t a = startedCode t' a') :
-    t = t' ∧ a = a' := by
+/-- The armed code of the position ghost: the store's issue stamp `t`, the record's stamp `T` (a
+landing position, route P) and (W8 (f2-ctx)) the record's chain bound, frozen together (odd). -/
+def startedCode (t T : Nat) (a : ChainVG) : Nat := 2 * chainPair (chainPair t T) (vgCode a) + 1
+
+theorem startedCode_inj {t T t' T' : Nat} {a a' : ChainVG} (h : startedCode t T a = startedCode t' T' a') :
+    t = t' ∧ T = T' ∧ a = a' := by
   unfold startedCode at h
-  obtain ⟨h1, h2⟩ := chainPair_inj (Nat.add_right_cancel h)
-  exact ⟨h1, vgCode_inj h2⟩
+  obtain ⟨h1, h2⟩ := chainPair_inj (show chainPair (chainPair t T) (vgCode a) =
+    chainPair (chainPair t' T') (vgCode a') by omega)
+  obtain ⟨h3, h4⟩ := chainPair_inj h1
+  exact ⟨h3, h4, vgCode_inj h2⟩
 
-/-- The readers' agreement handle on the store's position `t` and the
-record's bound `a` (frozen at `startedCode t a`). -/
-def startedIdx (γ : GName) (t : Nat) (a : ChainVG) : IProp GF := ghost_var γ .discard (startedCode t a)
+/-- The readers' agreement handle on the store's stamp `t`, the record's stamp `T` and the
+record's bound `a` (frozen at `startedCode t T a`). -/
+def startedIdx (γ : GName) (t T : Nat) (a : ChainVG) : IProp GF := ghost_var γ .discard (startedCode t T a)
 
-instance startedIdx_persistent (γ : GName) (t : Nat) (a : ChainVG) : Persistent (startedIdx (GF := GF) γ t a) := by
+instance startedIdx_persistent (γ : GName) (t T : Nat) (a : ChainVG) :
+    Persistent (startedIdx (GF := GF) γ t T a) := by
   unfold startedIdx; infer_instance
 
-instance startedIdx_timeless (γ : GName) (t : Nat) (a : ChainVG) : Timeless (startedIdx (GF := GF) γ t a) := by
+instance startedIdx_timeless (γ : GName) (t T : Nat) (a : ChainVG) : Timeless (startedIdx (GF := GF) γ t T a) := by
   unfold startedIdx; infer_instance
 
 /-- The certificates hart 0 holds, at the store's position `t`, for a chain
@@ -167,6 +174,21 @@ instance startedCerts_persistent (a : ChainVG) (t : Nat) : Persistent (startedCe
 instance startedCerts_timeless (a : ChainVG) (t : Nat) : Timeless (startedCerts (GF := GF) a t) := by
   unfold startedCerts chainLb chainLbAt chainCertAt; infer_instance
 
+/-- **The primary's landing cover** for the record's bound (route P, design D9): every other
+hart's store under the bound landed at or below `K0`, which the flag store lands above
+(`landsAboveAt`), and the primary's own stores under the bound are below its epoch fence's top
+`s < t` -- what the publication read cashes into the reader's cover (`MachCSL.rdIn`). -/
+def startedCov (a : ChainVG) (t K0 : Nat) : IProp GF := iprop%
+  landCovAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 startedPrimary K0 ∗ landsAboveAt t K0 ∗
+    ∃ k s : Nat, epochAtE (MachGS.era (hlc := hlc) (GF := GF)) startedPrimary k s ∗
+      ⌜a.1 startedPrimary ≤ s ∧ s < t⌝
+
+instance startedCov_persistent (a : ChainVG) (t K0 : Nat) : Persistent (startedCov (GF := GF) a t K0) := by
+  unfold startedCov; infer_instance
+
+instance startedCov_timeless (a : ChainVG) (t K0 : Nat) : Timeless (startedCov (GF := GF) a t K0) := by
+  unfold startedCov landCovAt landsAboveAt landsAboveAtE epochAtE; infer_instance
+
 /-- **THE WINDOW** (W8 (f2-ctx) [R35.2]): `started` is a reserved word, so the
 invariant holds HALF of its bytes, over the image history; `W` lists the
 stores on top (none, or main's one). -/
@@ -176,19 +198,20 @@ def startedWin (W : WordHist 4) : IProp GF :=
 instance startedWin_timeless (W : WordHist 4) : Timeless (startedWin (GF := GF) W) := by
   unfold startedWin histBytes; infer_instance
 
-/-- The ARMED arm: the one store at `t`, its position frozen, the record
-stamped at or below it carrying the deposit; (W8 (f2-ctx)) the record's chain
-bound `a` frozen with `t`, and hart 0's certificates for it at `t`. -/
+/-- The ARMED arm: the one store at `t`, its stamp frozen with the record's stamp `T` and (W8
+(f2-ctx)) bound `a`, hart 0's certificates for `a` at `t`; route P: the record's stamp under a
+position `K0` the store lands above, the primary's landing cover there (`startedCov`). -/
 def startedArmed (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF := iprop%
-  ∃ (t T : Nat) (a : ChainVG), startedWin [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
-    startedIdx γ t a ∗ ⌜T ≤ t ∧ 0 < t⌝ ∗ ctxStamped ξd T a.1 a.2 ∗ P ξd ∗ startedCerts a t
+  ∃ (t T K0 : Nat) (a : ChainVG), startedWin [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
+    startedIdx γ t T a ∗ ⌜0 < t ∧ T ≤ K0⌝ ∗ ctxStamped ξd T a.1 a.2 ∗ P ξd ∗ startedCerts a t ∗
+    startedCov a t K0
 
 /-- The UNARMED arm (W8 (f2-ctx): with hart 0's certificates for the
-record's bound). -/
+record's bound; route P: the record's bound under the watermark `W` the primary's token records). -/
 def startedUnarmed (γ : GName) (ξd : CtxId) : IProp GF := iprop%
-  startedWin [] ∗ ghost_var γ (.own (1 : Qp).half) (0 : Nat) ∗
-    ∃ (T0 : Nat) (a0 : ChainVG), ctxStamped ξd T0 a0.1 a0.2 ∗
-      vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a0.1 a0.2 startedPrimary
+  startedWin [] ∗ ∃ (W T0 : Nat) (a0 : ChainVG), ghost_var γ (.own (1 : Qp).half) (2 * W) ∗
+    ctxStamped ξd T0 a0.1 a0.2 ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a0.1 a0.2 startedPrimary ∗
+    ⌜∀ h, a0.1 h ≤ W⌝
 
 /-- The invariant's body (Rocq `started_body`). -/
 def startedBody (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF :=
@@ -216,29 +239,38 @@ theorem started_alloc (E : CoPset) (ξd : CtxId) (P : CtxId → IProp GF) (T0 : 
   unfold startedCell
   iintro ⟨⟨Hw, %hrsv⟩, Hst⟩
   ihave #Hc0 := vecCertsAt_zero (MachGS.era (hlc := hlc) (GF := GF)) startedPrimary
-  imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%γ, Hg⟩
+  imod ghost_var_alloc (GF := GF) (2 * 0 : Nat) with ⟨%γ, Hg⟩
   rw [show (DFrac.own 1 : DFrac) = .own ((1 : Qp).half + (1 : Qp).half) by rw [Qp.half_add_half]]
-  icases ghost_var_split γ (0 : Nat) (1 : Qp).half (1 : Qp).half $$ Hg with ⟨Hg1, Hg2⟩
+  icases ghost_var_split γ (2 * 0 : Nat) (1 : Qp).half (1 : Qp).half $$ Hg with ⟨Hg1, Hg2⟩
   imod inv_alloc startedN E (startedBody γ ξd P) $$ [Hw Hst Hg1] with #Hinv
   · inext
     unfold startedBody
     ileft
     unfold startedUnarmed
-    iframe Hw Hg1
-    iexists T0, ((fun _ => 0), 0)
-    iframe Hst Hc0
+    iframe Hw
+    iexists 0, T0, ((fun _ => 0), 0)
+    iframe Hg1 Hst Hc0
+    ipureintro; intro h; exact Nat.le_refl _
   imodintro
   iexists γ
   isplitr [Hg2]
   · unfold startedInv
     iframe Hinv
     ipureintro; exact hrsv
-  · unfold startedPrim; iexact Hg2
+  · unfold startedPrim startedPrimW; iexists 0; iexact Hg2
 
 /-- The primary's token refutes the armed arm. -/
-theorem startedPrim_idx (γ : GName) (t : Nat) (a : ChainVG) :
-    startedPrim (GF := GF) γ ⊢ startedIdx γ t a -∗ False := by
-  unfold startedPrim startedIdx startedCode
+theorem startedPrim_idx (γ : GName) (t T : Nat) (a : ChainVG) :
+    startedPrim (GF := GF) γ ⊢ startedIdx γ t T a -∗ False := by
+  unfold startedPrim startedPrimW startedIdx startedCode
+  iintro ⟨%W, Hp⟩ Hi
+  ihave %h := ghost_var_agree γ _ _ _ _ $$ Hp Hi
+  omega
+
+/-- The unarmed arm's half refutes the armed one. -/
+theorem started_unarmed_idx (γ : GName) (W t T : Nat) (a : ChainVG) :
+    ghost_var (GF := GF) γ (.own (1 : Qp).half) (2 * W) ⊢ startedIdx γ t T a -∗ False := by
+  unfold startedIdx startedCode
   iintro Hp Hi
   ihave %h := ghost_var_agree γ _ _ _ _ $$ Hp Hi
   omega
@@ -256,40 +288,46 @@ theorem started_gatePrim (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) =
   exact (xv6Pub_only f w hp).2
 
 omit [Xv6G GF] in
+/-- A stamped record's issue watermark (route P, design D9: the bound's components are issue
+stamps under it). -/
+theorem started_stampedWm (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) :
+    ctxStamped (GF := GF) ξ T V g ⊢ ∃ W : Nat, itopLb W ∗ ⌜∀ h, V h ≤ W⌝ ∗ ctxStamped ξ T V g := by
+  iintro H
+  icases ctxStamped_cases ξ T V g $$ H with ⟨%D, %W, Hat, #HT, #HW, %hD, #Hels, Hv, %⟨hDV, hVW⟩⟩
+  iexists W
+  iframe HW
+  isplit
+  · ipureintro; exact hVW
+  iapply ctxStamped_intro ξ T V g D W
+  iframe Hat Hv HT HW Hels
+  ipureintro; exact ⟨hD, hDV, hVW⟩
+
+omit [Xv6G GF] in
 /-- **THE DEPOSIT** (Rocq `started_store_obl`'s `ctx_deposit`), by hart 0:
 hart 0 absorbs its certificates for the record's bound, the payload moves
-from the running context into the record, whose stamp `T` is a store-order
-receipt to hand the flag store (deviation 3), and hart 0's certificates for
-the record's new bound come out (W8 (f2-ctx)). -/
+from the running context into the record, and hart 0's certificates for the
+record's new bound come out (W8 (f2-ctx)); route P: with the new record's issue watermark (what
+the primary's epoch fence must pass, `started_writeAUT`). -/
 theorem started_deposit [CurCtx] (ξd : CtxId) (P : CtxId → IProp GF) [CtxMorph P]
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     ownCtx startedPrimary curCtx ∗ (∃ (T0 : Nat) (a0 : ChainVG), ctxStamped ξd T0 a0.1 a0.2 ∗
       vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a0.1 a0.2 startedPrimary) ∗ P curCtx ⊢
-      |==> (ownCtx startedPrimary curCtx ∗ ∃ (T : Nat) (a : ChainVG), ctxStamped ξd T a.1 a.2 ∗
-        vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 a.2 startedPrimary ∗ topLb T ∗ P ξd) := by
+      |==> (ownCtx startedPrimary curCtx ∗ ∃ (T W : Nat) (a : ChainVG), ctxStamped ξd T a.1 a.2 ∗
+        vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 a.2 startedPrimary ∗ itopLb W ∗
+        ⌜∀ h, a.1 h ≤ W⌝ ∗ P ξd) := by
   iintro ⟨Hrun, ⟨%T0, %a0, Hst, #Hc0⟩, HP⟩
-  icases ctxStamped_topLb ξd T0 a0.1 a0.2 $$ Hst with ⟨#HT0, Hst⟩
-  icases ctxStamped_cases ξd T0 a0.1 a0.2 $$ Hst with ⟨%D, Hat, -, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
-  ihave Hst := ctxStamped_intro ξd T0 a0.1 a0.2 D $$ [Hat Hv]
-  · iframe Hat Hv
-    isplit
-    · iexact HT0
-    isplit
-    · ipureintro; exact hD
-    isplit
-    · iexact Hels
-    · ipureintro; exact ⟨hDV, hVT⟩
-  imod ctx_vecAbsorb startedPrimary curCtx a0.1 a0.2 T0 hVT $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
+  icases started_stampedWm ξd T0 a0.1 a0.2 $$ Hst with ⟨%W0, #HW0, %hVW0, Hst⟩
+  imod ctx_vecAbsorb startedPrimary curCtx a0.1 a0.2 W0 hVW0 $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
   · iframe Hrun
     isplit
     · iexact Hc0
-    · iexact HT0
+    · iexact HW0
   imod ctxDeposit P startedPrimary curCtx ξd T0 a0.1 a0.2 $$ [Hrun Hst HP] with
     ⟨Hrun, ⟨%T, %a, -, -, Hst, #Ha, HP⟩⟩
   · iframe Hrun Hst HP
     unfold vgFloors
     iframe Hvf Hg
-  icases ctxStamped_topLb ξd T a.1 a.2 $$ Hst with ⟨#HT, Hst⟩
+  icases started_stampedWm ξd T a.1 a.2 $$ Hst with ⟨%W, #HW, %hVW, Hst⟩
   unfold vgFloors
   icases Ha with ⟨#Hav, _⟩
   icases ownCtx_vecCerts startedPrimary curCtx a.1 $$ [Hrun Hav] with ⟨Hrun, #Hca⟩
@@ -297,10 +335,12 @@ theorem started_deposit [CurCtx] (ξd : CtxId) (P : CtxId → IProp GF) [CtxMorp
   ihave #Hgp := started_gatePrim (hlc := hlc) (GF := GF) hrsv
   imodintro
   iframe Hrun
-  iexists T, a
-  iframe Hst HT HP
-  iapply vecCertsAt_gate a.1 a.2 0 startedPrimary
-  iframe Hca Hgp
+  iexists T, W, a
+  iframe Hst HW HP
+  isplitl []
+  · iapply vecCertsAt_gate a.1 a.2 0 startedPrimary
+    iframe Hca Hgp
+  · ipureintro; exact hVW
 
 omit [Xv6G GF] in
 /-- The read watermark receipt is downward closed. -/
@@ -312,41 +352,47 @@ theorem startedRviewLb_le (cpu : CPU) (K K' : Nat) (h : K' ≤ K) :
   · iapply MonoNat.lb_own_le _ _ _ (by simp only [MaxNat.le_toNat]; omega) $$ Hv
   · iapply topLbAt_le _ K K' h $$ Ht
 
+/-- What a secondary's read of the set flag certifies (route P, design D9): hart 0's chain
+certificates for the record's bound, carried over, and the reader's LANDING COVER for it at its
+read view (minted by the publication read, `MachCSL.rdOut`). -/
+def startedRdCerts (a : ChainVG) (t : Nat) (cpu : CPU) (K : Nat) : IProp GF := iprop%
+  ([∗list] p ∈ cpus.map (fun h => (h, a.1 h, t)), chainLb p.1 p.2.1 cpu 0) ∗
+    landCovAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 cpu K
+
+instance startedRdCerts_persistent (a : ChainVG) (t : Nat) (cpu : CPU) (K : Nat) :
+    Persistent (startedRdCerts (GF := GF) a t cpu K) := by
+  unfold startedRdCerts; infer_instance
+
 /-- What a secondary's read of the flag leaves (Rocq `started_W`): the
-cleared value, or the set value with the store's position, a read receipt
-past it, the deposit as the record holds it, and (W8 (f2-ctx)) the reader's
-BOOT GATE. -/
+cleared value, or the set value with the store's handle, a read receipt past the record's stamp
+(route P: a landing position), the deposit as the record holds it, and (W8 (f2-ctx)) the reader's
+BOOT GATE and certificates. -/
 def startedSeen (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) (cpu : CPU)
     (w : BitVec (8 * 4)) : IProp GF := iprop%
-  ⌜w = startedClear⌝ ∨ ∃ (t : Nat) (a : ChainVG), ⌜w = startedSet⌝ ∗ startedIdx γ t a ∗ rviewLb cpu t ∗ P ξd ∗
-    gatePassed cpu ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 a.2 cpu
+  ⌜w = startedClear⌝ ∨ ∃ (t T K : Nat) (a : ChainVG), ⌜w = startedSet ∧ T ≤ K⌝ ∗ startedIdx γ t T a ∗
+    rviewLb cpu K ∗ P ξd ∗ gatePassed cpu ∗ startedRdCerts a t cpu K
 
-/-- The pure half of the read: a non-primary reader of the armed window
-reads the store only at or below its view. -/
-theorem started_read_armed (Hold : Nat → Hist) (h : Agent) (t tvn : Nat) (w : BitVec (8 * 4))
-    (htail : tailOk 4 0 startedClear Hold) (hh : h ≠ hartAgent startedPrimary)
-    (hrd : readsAre h tvn (WordHist.hist [⟨t, hartAgent startedPrimary, startedSet⟩] Hold) 4 w) :
-    w = startedClear ∨ (w = startedSet ∧ t ≤ tvn) := by
-  rcases WordHist.read_cases_floor _ Hold h tvn 0 startedClear w (by decide) htail (Nat.zero_le _) hrd
-    with ⟨W1, e, W2, hW, hvis, -, rfl⟩ | ⟨-, rfl⟩
+/-- The pure half of the read, armed: the cleared or the set value. -/
+theorem started_read_armed (Hold : Nat → Hist) (lp : LandPos) (h : Agent) (t tvn : Nat) (w : BitVec (8 * 4))
+    (htail : tailOk 4 0 startedClear Hold) (hlp : lp 0 = some 0)
+    (hrd : readsAreP lp h tvn (WordHist.hist [⟨t, hartAgent startedPrimary, startedSet⟩] Hold) 4 w) :
+    w = startedClear ∨ w = startedSet := by
+  rcases WordHist.read_cases_floorP _ Hold lp h tvn 0 0 startedClear w htail hlp (Nat.zero_le _) hrd
+    with ⟨W1, e, W2, hW, -, -, rfl⟩ | ⟨-, rfl⟩
   · right
     cases W1 with
     | nil =>
       simp only [List.nil_append, List.cons.injEq] at hW
       obtain ⟨rfl, -⟩ := hW
-      refine ⟨rfl, ?_⟩
-      simp only [WEnt.visible, Bool.or_eq_true, decide_eq_true_eq] at hvis
-      rcases hvis with h1 | h1
-      · exact h1
-      · exact absurd h1.symm hh
+      rfl
     | cons x W1 => simp at hW
   · left; rfl
 
 /-- The pure half of the read, unarmed: the cleared value. -/
-theorem started_read_unarmed (Hold : Nat → Hist) (h : Agent) (tvn : Nat) (w : BitVec (8 * 4))
-    (htail : tailOk 4 0 startedClear Hold)
-    (hrd : readsAre h tvn (WordHist.hist ([] : WordHist 4) Hold) 4 w) : w = startedClear := by
-  rcases WordHist.read_cases_floor _ Hold h tvn 0 startedClear w (by decide) htail (Nat.zero_le _) hrd
+theorem started_read_unarmed (Hold : Nat → Hist) (lp : LandPos) (h : Agent) (tvn : Nat) (w : BitVec (8 * 4))
+    (htail : tailOk 4 0 startedClear Hold) (hlp : lp 0 = some 0)
+    (hrd : readsAreP lp h tvn (WordHist.hist ([] : WordHist 4) Hold) 4 w) : w = startedClear := by
+  rcases WordHist.read_cases_floorP _ Hold lp h tvn 0 0 startedClear w htail hlp (Nat.zero_le _) hrd
     with ⟨W1, e, W2, hW, -, -, -⟩ | ⟨-, h⟩
   · simp at hW
   · exact h
@@ -354,16 +400,26 @@ theorem started_read_unarmed (Hold : Nat → Hist) (h : Agent) (tvn : Nat) (w : 
 /-- The read's issue request (W8 (f2-ctx)): `started` is the only publication
 word, hart 0's, and in the armed window the only nonzero entry is main's
 store; hart 0's certificates for the record's bound, at the store's position,
-are carried over (F-B). -/
-theorem started_rdIn (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (W : WordHist 4) (a : ChainVG) (t : Nat)
+are carried over (F-B); route P: with hart 0's landing cover at `K0` (`startedCov`). -/
+theorem started_rdIn (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (W : WordHist 4) (a : ChainVG) (t K0 : Nat)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
-    (hW : ∀ e ∈ W, e.tid = hartAgent startedPrimary ∧ 0 < e.t ∧ t ≤ e.t) :
-    startedCerts (GF := GF) a t ⊢ rdIn cpu startedAddr 4 (W.hist startedImg)
-      (some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0))) := by
+    (hW : ∀ e ∈ W, e.tid = hartAgent startedPrimary ∧ e.t = t ∧ 0 < t) :
+    startedCerts (GF := GF) a t ∗ startedCov a t K0 ⊢ rdIn cpu startedAddr 4 (W.hist startedImg)
+      (some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0), a.1, K0)) := by
   simp only [rdIn]
-  unfold startedCerts
+  unfold startedCerts startedCov
   rw [BigSepL.bigSepL_map, BigSepL.bigSepL_map]
-  iintro #HC
+  iintro ⟨#HC, #Hcov, #Hla, %k, %s, #Hep, %⟨hs1, hs2⟩⟩
+  have hacc : ∀ e ∈ W.hist startedImg 0, decide (e.v ≠ 0) = true →
+      e.tid = hartAgent startedPrimary ∧ e.t = t ∧ 0 < t := by
+    intro e he hv
+    unfold WordHist.hist at he
+    rcases List.mem_append.1 he with he | he
+    · obtain ⟨x, hx, rfl⟩ := List.mem_map.1 he
+      exact hW x hx
+    · simp only [startedImg, List.mem_singleton] at he
+      subst he
+      simp at hv
   isplitr
   · ipureintro
     refine ⟨by omega, Ne.symm hcpu, ?_, ?_, ?_, ?_⟩
@@ -375,39 +431,45 @@ theorem started_rdIn (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (W : WordHist 4
       rw [hrsv] at hp
       exact xv6Pub_only f w' hp
     · intro e he hv
-      unfold WordHist.hist at he
-      rcases List.mem_append.1 he with he | he
-      · obtain ⟨x, hx, rfl⟩ := List.mem_map.1 he
-        refine ⟨(hW x hx).1, (hW x hx).2.1, fun _ h => by simp at h, fun p hp => ?_⟩
-        obtain ⟨h, -, rfl⟩ := List.mem_map.1 hp
-        exact (hW x hx).2.2
-      · simp only [startedImg, List.mem_singleton] at he
-        subst he
-        simp at hv
+      obtain ⟨h1, h2, h3⟩ := hacc e he hv
+      refine ⟨h1, by omega, fun _ h => by simp at h, fun p hp => ?_⟩
+      obtain ⟨h, -, rfl⟩ := List.mem_map.1 hp
+      simp only; omega
+  isplitr
   · iexact HC
+  iexists t, k, s
+  iframe Hcov Hla Hep
+  ipureintro
+  exact ⟨hs1, hs2, fun e he hv => (hacc e he hv).2.1⟩
 
-/-- The carried certificates, as the reader's certificates for the record's
-bound (its gate in hand). -/
-theorem started_seenCerts (cpu : CPU) (a : ChainVG) (t : Nat) :
-    ([∗list] p ∈ cpus.map (fun h => (h, a.1 h, t)), chainLb p.1 p.2.1 cpu 0) ∗ gatePassed cpu ⊢@{IProp GF}
+/-- The reader's certificates for the record's bound, at a view past its cover (route P,
+design D9: the cover at the read view, the view receipt after the reader's fence). -/
+theorem started_vecCerts (cpu : CPU) (a : ChainVG) (t K K' : Nat) (hKK : K ≤ K') :
+    startedRdCerts (GF := GF) a t cpu K ∗ gatePassed cpu ∗ viewLb cpu K' ⊢@{IProp GF}
       vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 a.2 cpu := by
+  unfold startedRdCerts
   rw [BigSepL.bigSepL_map]
   unfold vecCertsAt
-  iintro ⟨Hl, #Hg⟩
+  iintro ⟨⟨Hl, #Hcov⟩, #Hg, #HK⟩
   isplitl [Hl]
   · iapply BigSepL.bigSepL_mono ?_ $$ Hl
     intro _ c _
     iintro #H
     iexists 0
     iexact H
+  isplitl []
   · iright; iexact Hg
+  iexists K'
+  isplitl []
+  · iright; iexact HK
+  iapply landCovAt_le _ a.1 a.1 cpu K K' (fun _ _ => Nat.le_refl _) hKK $$ Hcov
 
 /-- **A read of the flag is certified** (W8 (f2-ctx) S3): its bytes are a
 publication word's -- the lock layer's exemption, `lockPubByteIn`. -/
-theorem started_certs (cpu : CPU) (K : Nat) (Hs : Nat → Hist)
+theorem started_certs (cpu : CPU) (K : Nat) (ls : List (Nat × Nat)) (Hs : Nat → Hist)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
-    ⊢@{IProp GF} readCertsAt cpu startedAddr 4 K [] Hs [] := by
-  iapply readCertsAt_of cpu startedAddr 4 K [] Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+    ⊢@{IProp GF} readCertsAt cpu startedAddr 4 K [] ls Hs [] := by
+  iapply readCertsAt_of cpu startedAddr 4 K [] ls Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ _ _ => trivial)
   imodintro
   iintro %j %e %⟨hj, _⟩
   ileft
@@ -421,16 +483,23 @@ theorem started_certs (cpu : CPU) (K : Nat) (Hs : Nat → Hist)
     List.flatMap_nil, List.append_nil, List.mem_map, List.mem_range]
   exact ⟨j, hj, rfl⟩
 
+/-- Every byte of the flag's window is readable at any view: by its image entry. -/
+theorem started_readable (h : Agent) (K : Nat) (W : WordHist 4) :
+    ∀ j, j < 4 → readableAt h K [] [] (W.hist startedImg j) := by
+  intro j _
+  refine ⟨⟨0, 0, 0#8⟩, ?_, Or.inl rfl⟩
+  unfold WordHist.hist startedImg
+  exact List.mem_append_right _ List.mem_cons_self
+
 /-- **THE READ, a secondary's** (Rocq `started_read_open` +
 `started_read_obl`): the invariant is the accessor of the racy `lw` of the
 flag (at its half, W8 (f2-ctx)), and the load's continuation learns
-`startedSeen` -- the set value with the reader's boot gate. -/
+`startedSeen` -- the set value with the reader's boot gate and (route P) its landing cover at
+its read view, past the record's stamp. -/
 theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)]
     (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (K : Nat) :
     startedInv (GF := GF) γ ξd P ⊢
       readAUr cpu startedAddr 4 K [] (fun w => startedSeen γ ξd P cpu w) := by
-  have hh : hartAgent cpu ≠ hartAgent startedPrimary := by
-    intro h; exact hcpu (Fin.ext h)
   unfold startedInv
   iintro ⟨%hrsv, #Hinv⟩
   unfold readAUr
@@ -439,125 +508,117 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) (CoPset.subseteq_top)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%⟨hT, ht0⟩, >Hst, HP, >#HC⟩)
+  icases Hbody with (⟨>Hw, >Hrest⟩ | ⟨%t, %T, %K0, %a, >Hw, >Hidx, >%⟨ht0, hTK0⟩, >Hst, HP, >#HC, >#Hcov⟩)
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none, []
+    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none, [], []
     unfold startedWin
     iframe Hw
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
     isplit
-    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
+    · ipureintro; exact started_readable (hartAgent cpu) K []
     isplitl []
     · simp only [rdIn]; iempintro
     isplitl []
     · iapply rdCompBytes_nil
     isplitl []
-    · iapply started_certs cpu K _ hrsv
+    · iapply started_certs cpu K [] _ hrsv
     inext
-    iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _
     imod Hmask
-    imod Hclose $$ [Hb Hg Hst]
+    imod Hclose $$ [Hb Hrest]
     · inext
       ileft
-      iframe Hb Hg Hst
+      iframe Hb Hrest
     imodintro
     dsimp only; unfold startedSeen
     ileft
     ipureintro
-    exact started_read_unarmed startedImg (hartAgent cpu) tvn w startedImg_tail hrd
+    exact started_read_unarmed startedImg lp (hartAgent cpu) tvn w startedImg_tail hla.1 hrd
   · icases Hidx with #Hidx
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     iexists (fun _ => DFrac.own (1 : Qp).half),
       WordHist.hist ([⟨t, hartAgent startedPrimary, startedSet⟩] : WordHist 4) startedImg,
-      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0)), []
+      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0), a.1, K0), [], []
     unfold startedWin
     iframe Hw
+    isplitl []
+    · iapply BigSepL.bigSepL_nil.2; itrivial
     isplit
-    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
-    isplitl [HC]
-    · iapply started_rdIn cpu hcpu _ a t hrsv
-        (fun e he => by simp at he; subst he; exact ⟨rfl, ht0, Nat.le_refl _⟩) $$ HC
+    · ipureintro; exact started_readable (hartAgent cpu) K _
+    isplitl []
+    · iapply started_rdIn cpu hcpu _ a t K0 hrsv
+        (fun e he => by simp at he; subst he; exact ⟨rfl, rfl, ht0⟩)
+      iframe HC Hcov
     isplitl []
     · iapply rdCompBytes_nil
     isplitl []
-    · iapply started_certs cpu K _ hrsv
+    · iapply started_certs cpu K [] _ hrsv
     inext
     icases HP with #HP
-    iintro %w %tvn %hKt %hrd %hauth #Hrv Hout Hb _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv Hout Hb _
     imod Hmask
     imod Hclose $$ [Hb Hst]
     · inext
       iright
-      iexists t, T, a
-      iframe Hb Hidx Hst HP HC
-      ipureintro; exact ⟨hT, ht0⟩
+      iexists t, T, K0, a
+      iframe Hb Hidx Hst HP HC Hcov
+      ipureintro; exact ⟨ht0, hTK0⟩
     imodintro
     dsimp only; unfold startedSeen
-    rcases started_read_armed startedImg (hartAgent cpu) t tvn w startedImg_tail hh hrd with hw | ⟨hw, htv⟩
+    rcases started_read_armed startedImg lp (hartAgent cpu) t tvn w startedImg_tail hla.1 hrd with hw | hw
     · ileft; ipureintro; exact hw
     · iright
       subst hw
       simp only [rdOut]
       rw [if_pos (by decide)]
-      icases Hout with ⟨#Hgp, _, #HCr⟩
-      iexists t, a
-      iframe Hidx HP Hgp
-      isplit
-      · iapply startedRviewLb_le cpu tvn t htv $$ Hrv
-      · iapply started_seenCerts cpu a t
-        iframe HCr Hgp
+      icases Hout with ⟨#Hgp, _, #HCr, #Hcr, %hK0⟩
+      iexists t, T, tvn, a
+      iframe Hidx HP Hgp Hrv
+      isplitl []
+      · ipureintro; refine ⟨?_, by omega⟩; first | rfl | trivial
+      · unfold startedRdCerts
+        iframe HCr Hcr
 
 /-- **THE ABSORB**, at a second opening after the fence (Rocq
-`started_absorb`): a reader whose floor has passed the store's position
+`started_absorb`): a reader whose floor has passed the record's stamp
 takes the deposit into its own context; the record stays stamped where it
 was, so every hart can.  (W8 (f2-ctx): the reader's certificates for the
 record's bound, from its read (the boot hop, F-B), join its context first.) -/
 theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF)
-    [CtxMorph P] [∀ ξ, Persistent (P ξ)] (cpu : CPU) (t K : Nat) (a : ChainVG) (htK : t ≤ K)
+    [CtxMorph P] [∀ ξ, Persistent (P ξ)] (cpu : CPU) (t T K : Nat) (a : ChainVG) (hTK : T ≤ K)
     (hE : (↑startedN : CoPset) ⊆ E) :
-    startedInv γ ξd P ∗ startedIdx γ t a ∗ viewLb cpu K ∗ ownCtx cpu curCtx ∗ P ξd ∗
+    startedInv γ ξd P ∗ startedIdx γ t T a ∗ viewLb cpu K ∗ ownCtx cpu curCtx ∗ P ξd ∗
       vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) a.1 a.2 cpu ⊢
       |={E}=> (ownCtx cpu curCtx ∗ P curCtx) := by
   unfold startedInv
   iintro ⟨⟨%hrsv, #Hinv⟩, #Hidx, #HK, Hrun, #HP, #Hvc⟩
   imod (inv_acc (E := E) (N := startedN) (P := startedBody γ ξd P) hE) $$ Hinv with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t', %T, %a', >Hw, >Hidx', >%hT, >Hst, HPd, >#HC⟩)
+  icases Hbody with (⟨>Hw, >⟨%W, %T0, %a0, Hg, Hrest⟩⟩ | ⟨%t', %T', %K0, %a', >Hw, >Hidx', >%hT, >Hst, HPd, >#HC, >#Hcov⟩)
   · iexfalso
-    unfold startedIdx startedCode
-    ihave %h := ghost_var_agree γ _ _ _ _ $$ Hg Hidx
-    omega
+    iapply started_unarmed_idx γ W t T a $$ Hg Hidx
   · icases Hidx' with #Hidx'
     unfold startedIdx
     ihave %h := ghost_var_agree γ _ _ _ _ $$ Hidx' Hidx
-    obtain ⟨rfl, rfl⟩ := startedCode_inj h
-    icases ctxStamped_cases ξd T a'.1 a'.2 $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
-    ihave Hst := ctxStamped_intro ξd T a'.1 a'.2 D $$ [Hat Hv]
-    · iframe Hat Hv
-      isplit
-      · iexact HT
-      isplit
-      · ipureintro; exact hD
-      isplit
-      · iexact Hels
-      · ipureintro; exact ⟨hDV, hVT⟩
-    ihave #HtK := viewLb_topLb cpu K $$ HK
-    imod ctx_vecAbsorb cpu curCtx a'.1 a'.2 K (fun h => by have := hVT h; omega) $$ [Hrun] with
-      ⟨Hrun, #Hvf, #Hg⟩
+    obtain ⟨rfl, rfl, rfl⟩ := startedCode_inj h
+    icases started_stampedWm ξd T' a'.1 a'.2 $$ Hst with ⟨%Wd, #HWd, %hVW, Hst⟩
+    imod ctx_vecAbsorb cpu curCtx a'.1 a'.2 Wd hVW $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
     · iframe Hrun
       isplit
       · iexact Hvc
-      · iexact HtK
-    imod ctxAbsorbLb P cpu ξd curCtx T K a'.1 a'.2 (by omega) $$ [Hrun Hst] with ⟨Hrun, Hst, HP'⟩
+      · iexact HWd
+    imod ctxAbsorbLb P cpu ξd curCtx T' K a'.1 a'.2 hTK $$ [Hrun Hst] with ⟨Hrun, Hst, HP'⟩
     · iframe Hrun Hst HP HK
       unfold vgFloors
       iframe Hvf Hg
     imod Hclose $$ [Hw Hst]
     · inext
       iright
-      iexists t', T, a'
-      iframe Hw Hidx' Hst HP HC
+      iexists t', T', K0, a'
+      iframe Hw Hidx' Hst HP HC Hcov
       ipureintro; exact hT
     imodintro
     iframe Hrun HP'
@@ -566,36 +627,48 @@ theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : Ctx
 /-! ## The primary's store (Rocq `started_store_obl`), in two openings
 
 The deposit needs the running token, which the store's accessor does not
-see, so it runs at a first opening, just before the store: the payload is
+see, so it runs at a first opening, before the store: the payload is
 deposited into `ξd` and the (unarmed) window closed again with the new
-stamp.  The store's accessor (`MachCSL.writeAUT`) is the second opening: it
-names the stamp's store-order receipt, learns that the flag's position
-passes it, and arms the invariant (`started_writeAUT`). -/
+stamp and (route P) the new record's issue watermark `W` recorded in the primary's token.  The
+primary's epoch-opening `fence rw,rw` then passes `W` (its epoch token's top `s ≥ W`).  The
+store's accessor (`MachCSL.writeAUT`) is the second opening: it names the token's top as the
+order bound, the record's stamp and the primary's cover position as the position the flag store
+lands above, and arms the invariant (`started_writeAUT`). -/
 
 /-- **The deposit**, at a first opening: the payload moves from the
 primary's context into `ξd`, whose stamp advances; the window stays
-unarmed (the payload is persistent and is kept outside). -/
+unarmed (the payload is persistent and is kept outside); the primary's token records the new
+record's issue watermark. -/
 theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [CtxMorph P]
     [∀ ξ, Persistent (P ξ)] :
     startedInv γ ξd P ∗ startedPrim γ ∗ ownCtx startedPrimary curCtx ∗ P curCtx ⊢
-      |={⊤}=> (ownCtx startedPrimary curCtx ∗ startedPrim γ ∗ P ξd) := by
+      |={⊤}=> (ownCtx startedPrimary curCtx ∗ ∃ W : Nat, startedPrimW γ W ∗ itopLb W ∗ P ξd) := by
   unfold startedInv
   iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, Hrun, HP⟩
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC⟩)
-  · imod started_deposit ξd P hrsv $$ [$Hrun $Hst $HP] with ⟨Hrun, %T, %a, Hst, #Hca, -, #HPd⟩
-    imod Hclose $$ [Hw Hg Hst]
+  icases Hbody with (⟨>Hw, >⟨%W0, %T0, %a0, Hg, Hst, #Hc0, %hW0⟩⟩ | ⟨%t, %T, %K0, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC, >Hcov⟩)
+  · imod started_deposit ξd P hrsv $$ [Hrun Hst HP] with ⟨Hrun, %T, %W, %a, Hst, #Hca, #HW, %hVW, #HPd⟩
+    · iframe Hrun HP
+      iexists T0, a0
+      iframe Hst Hc0
+    unfold startedPrim startedPrimW
+    icases Hprim with ⟨%W1, Hprim⟩
+    imod ghost_var_update_halves (2 * W) γ (2 * W1) (2 * W0) $$ Hprim Hg with ⟨H1, H2⟩
+    imod Hclose $$ [Hw H2 Hst]
     · inext
       ileft
-      iframe Hw Hg
-      iexists T, a
-      iframe Hst Hca
+      iframe Hw
+      iexists W, T, a
+      iframe H2 Hst Hca
+      ipureintro; exact hVW
     imodintro
-    iframe Hrun Hprim HPd
+    iframe Hrun
+    iexists W
+    iframe H1 HW HPd
   · iexfalso
-    iapply startedPrim_idx γ t a $$ Hprim Hidx
+    iapply startedPrim_idx γ t T a $$ Hprim Hidx
 
 /-- **No publication word is written while hart 0 holds its token** (W8
 (f3-ptek) [OWN.66]: what the kernel table's seal needs, `MachCSL.kptOn_seal`'s
@@ -609,13 +682,13 @@ theorem started_pubClean (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) :
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC⟩)
+  icases Hbody with (⟨>Hw, >Hrest⟩ | ⟨%t, %T, %K0, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC, >Hcov⟩)
   · ihave %hget := histBytes_valid m startedAddr 4 _ _ $$ [Hmem Hw]
     · unfold startedWin; iframe Hmem Hw
-    imod Hclose $$ [Hw Hg Hst]
+    imod Hclose $$ [Hw Hrest]
     · inext
       ileft
-      iframe Hw Hg Hst
+      iframe Hw Hrest
     imodintro
     iframe Hmem Hprim
     ipureintro
@@ -630,7 +703,7 @@ theorem started_pubClean (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) :
     simp only [WordHist.hist, List.map_nil, List.nil_append, startedImg, List.mem_singleton] at he
     rw [he]
   · iexfalso
-    iapply startedPrim_idx γ t a $$ Hprim Hidx
+    iapply startedPrim_idx γ t T a $$ Hprim Hidx
 
 /-- **The flag store's obligation, history-aware** (W8 (f2-ctx) [R35.2]): the
 first post-power-on store of hart 0 into the never-written window keeps the
@@ -666,31 +739,60 @@ theorem started_rsvStoreOk (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
     simp only [List.mem_cons, List.not_mem_nil, or_false] at he he'
     rcases he with rfl | rfl <;> rcases he' with rfl | rfl <;> simp_all
 
+
+omit [Xv6G GF] in
+/-- Two position receipts give one at their max. -/
+theorem started_topLb_max (K1 K2 : Nat) : topLb (GF := GF) K1 ∗ topLb K2 ⊢ topLb (max K1 K2) := by
+  iintro ⟨#H1, #H2⟩
+  rcases Nat.le_total K1 K2 with h | h
+  · rw [Nat.max_eq_right h]; iexact H2
+  · rw [Nat.max_eq_left h]; iexact H1
+
 /-- **The store's accessor**, at a second opening: the window's histories
-(the reserved half, W8 (f2-ctx)), the stamp's receipt as the order bound, the
-history-aware obligation, the arming, and (mcslrec (2) [OWN.82] (a1)) the
-store's own pc, a release site, read off the lent `PC` cell. -/
+(the reserved half, W8 (f2-ctx)), the history-aware obligation, the arming, and (mcslrec (2)
+[OWN.82] (a1)) the store's own pc, a release site, read off the lent `PC` cell.  Route P: the
+order bound is the primary's epoch-fence token's top `s` (which passed the deposit's watermark
+`W`, so the record's own component is under it); the flag store's lands-above position is the
+record's stamp and the primary's cover position, joined. -/
 theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)]
-    (pc : BitVec 64) (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF)) :
-    startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ∗ kptSealed ⊢
+    (pc : BitVec 64) (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF))
+    (W k s S0 L0 : Nat) (hWs : W ≤ s) (hS0 : S0 ≤ s) :
+    startedInv (GF := GF) γ ξd P ∗ startedPrimW γ W ∗ P ξd ∗
+      kptSealedAt (MachGS.era (hlc := hlc) (GF := GF)) S0 L0 ∗ topLb L0 ∗
+      epochAtE (MachGS.era (hlc := hlc) (GF := GF)) startedPrimary k s ∗ itopLb s ⊢
       LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc -∗
       writeAUT startedPrimary startedAddr 4 startedSet iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc ∗ emp) := by
   unfold startedInv
-  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP, #Hsl⟩ HPC
+  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP, #Hsl, #HL0, #Hep, #Hs⟩ HPC
   unfold writeAUT
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >⟨%T0, %a0, Hst, #Hc0⟩⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC⟩)
-  · icases ctxStamped_topLb ξd T0 a0.1 a0.2 $$ Hst with ⟨#HT, Hst⟩
+  icases Hbody with (⟨>Hw, >⟨%W0, %T0, %a0, Hg, Hst, #Hc0, %hW0⟩⟩ | ⟨%t, %T, %K0, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC, >Hcov⟩)
+  · unfold startedPrimW
+    ihave %hW := ghost_var_agree γ _ _ _ _ $$ Hprim Hg
+    have hW0s : ∀ h, a0.1 h ≤ s := fun h => by have := hW0 h; omega
+    icases ctxStamped_topLb ξd T0 a0.1 a0.2 $$ Hst with ⟨#HT, Hst⟩
     icases ctxStamped_rtList ξd T0 a0.1 a0.2 startedPrimary $$ [Hst Hc0] with ⟨Hst, HL⟩
     · iframe Hst Hc0
+    -- the primary's cover position
+    unfold vecCertsAt
+    icases Hc0 with ⟨_, _, %Kc, #HKc, #Hcov⟩
+    ihave #HKc' : topLb Kc $$ []
+    · icases HKc with (%h0 | #HKc)
+      · rw [h0]; iapply topLbAt_0
+      · iapply viewLb_topLb startedPrimary Kc $$ HKc
+    ihave #HK0 := started_topLb_max T0 Kc $$ [HT HKc']
+    · iframe HT HKc'
+    ihave #HK1 := started_topLb_max (max T0 Kc) L0 $$ [HK0 HL0]
+    · iframe HK0 HL0
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     iright
-    iexists WordHist.hist ([] : WordHist 4) startedImg, T0, [], some (cpus.map (fun h => (h, a0.1 h))), some pc
+    iexists WordHist.hist ([] : WordHist 4) startedImg, s, max (max T0 Kc) L0, [], some (cpus.map (fun h => (h, a0.1 h))),
+      some pc
     unfold startedWin
-    iframe Hw HT
+    iframe Hw Hs HK1
     isplitr
     · unfold compBytes; iempintro
     isplitr
@@ -698,7 +800,10 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
       rw [WordHist.hist_nil]
       exact started_rsvStoreOk hrsv
     isplitr
-    · iexact Hsl
+    · unfold pubDepIn
+      iexists k, S0, L0
+      iframe Hep Hsl
+      ipureintro; exact ⟨hS0, Nat.le_max_right _ _⟩
     isplitl [HL]
     · unfold rtIn; iexact HL
     isplitl [HPC]
@@ -706,29 +811,41 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
     isplitr
     · ipureintro; exact hrel
     inext
-    iintro %t %hTt %ht0 Hb _ HPC _ _ Hout
+    iintro %t %hst %ht0 Hb _ HPC _ _ #Hla Hout
+    ihave #Hla := landsAboveAtE_le _ t _ (max T0 Kc) (Nat.le_max_left _ _) $$ Hla
     rw [WordHist.hist_push] at *
     imod Hmask
-    unfold startedPrim
-    imod ghost_var_update_halves (startedCode t a0) γ (0 : Nat) (0 : Nat) $$ Hprim Hg with ⟨H1, -⟩
-    imod ghost_var_persist γ _ (startedCode t a0) $$ H1 with #H1
+    imod ghost_var_update_halves (startedCode t T0 a0) γ (2 * W) (2 * W0) $$ Hprim Hg with ⟨H1, -⟩
+    imod ghost_var_persist γ _ (startedCode t T0 a0) $$ H1 with #H1
     imod Hclose $$ [Hb Hst Hout]
     · inext
       iright
-      iexists t, T0, a0
+      iexists t, T0, max T0 Kc, a0
       iframe Hb Hst HP
       isplit
       · unfold startedIdx; iexact H1
       isplit
-      · ipureintro; exact ⟨hTt, ht0⟩
+      · ipureintro; exact ⟨ht0, Nat.le_max_left _ _⟩
+      isplitl [Hout]
       · unfold rtOut startedCerts; iexact Hout
+      · unfold startedCov
+        isplitl []
+        · iapply landCovAt_le _ a0.1 a0.1 startedPrimary Kc (max T0 Kc) (fun _ _ => Nat.le_refl _)
+            (Nat.le_max_right _ _) $$ Hcov
+        iframe Hla
+        iexists k, s
+        iframe Hep
+        ipureintro; exact ⟨hW0s startedPrimary, hst⟩
     imodintro
     isplitl [HPC]
     · iapply (show rsvPcCell (GF := GF) startedPrimary (some pc) ⊢
         LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc from .rfl) $$ HPC
     · iempintro
   · iexfalso
-    iapply startedPrim_idx γ t a $$ Hprim Hidx
+    iapply startedPrim_idx γ t T a $$ [Hprim] Hidx
+    unfold startedPrim
+    iexists W
+    iexact Hprim
 
 end
 

@@ -26,6 +26,7 @@
 -/
 import Xv6.MainSecondaryParts
 import MachCSL.WpLock
+import MachCSL.WpSmodeFencePub
 
 namespace Xv6
 
@@ -53,6 +54,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
     ⊢ wpLoop (GF := GF) cpu := by
   subst hcpu
   iintro ⟨Hk, Hpc, #Hinv, Hprim, #HP, #Hsl, HΦ⟩
+  icases kptSealed_cases $$ Hsl with ⟨%S0, %L0, #Hsl, #HS0, #HL0⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases kctx_relPcsEq _ _ $$ Hk with ⟨%hpcs, Hk⟩
@@ -60,16 +62,9 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   -- the deposit, at a first opening
   icases kctx_token_acc startedPrimary _ $$ Hk with ⟨Hrun, Hback⟩
   iapply wpLoop_fupd
-  imod started_deposit_open γi ξd P $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, Hprim, #HPd⟩
+  imod started_deposit_open γi ξd P $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, ⟨%W, Hprim, #HW, #HPd⟩⟩
   imodintro
   ihave Hk := Hback $$ Hrun
-  ihave HAU := started_writeAUT γi ξd P (KA.«main» + 176#64) (xv6RelPc_main hpcs) $$ [$Hinv $Hprim $HPd $Hsl]
-  ihave HAU := (show (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
-      writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet
-        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) ⊢
-    (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
-      writeAUT startedPrimary startedAddr 4 1#32
-        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) from .rfl) $$ HAU
   -- +0xa2  auipc a5,0x9 ; +0xa6  addi a5,a5,1008
   k_step (wp_s_auipc startedPrimary _ (KA.«main» + 162#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -81,10 +76,22 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   k_step (wp_s_addi startedPrimary _ (KA.«main» + 170#64) true 1#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  -- +0xac  fence rw,w
-  k_step (wp_s_fence_rw_w startedPrimary _ (KA.«main» + 172#64) false 0#5 0#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
+  -- +0xac  fence rw,w: the epoch token past the deposit's issue receipt (design D10 (a)) and past the
+  -- kernel table's seal (DESIGN D17′ (R3))
+  ihave #HWS := itopLb_max W S0 $$ [HW HS0]
+  · iframe HW HS0
+  k_step (wp_s_fence_rw_w_ep startedPrimary _ (KA.«main» + 172#64) false 0#5 0#5 (max W S0))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $HWS]
+  iintro Hk Hpc ⟨%ke, %s, #Hep, #Hs, %hWs⟩
+  ihave HAU := started_writeAUT γi ξd P (KA.«main» + 176#64) (xv6RelPc_main hpcs) W ke s S0 L0
+    (Nat.le_trans (Nat.le_max_left _ _) hWs) (Nat.le_trans (Nat.le_max_right _ _) hWs)
+    $$ [$Hinv $Hprim $HPd $Hsl $HL0 $Hep $Hs]
+  ihave HAU := (show (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
+      writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet
+        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) ⊢
+    (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
+      writeAUT startedPrimary startedAddr 4 1#32
+        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) from .rfl) $$ HAU
   -- +0xb0  sw a4,0(a5): started = 1, the invariant armed
   k_step (wp_s_sw_auT_pc startedPrimary _ ?hs (KA.«main» + 176#64) true 0#12 15#5 14#5 startedAddr
       ?ha (by decide) (by decide) iprop(emp))

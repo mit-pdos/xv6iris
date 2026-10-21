@@ -226,6 +226,242 @@ theorem histOfSnoc (img : Image) (log : List Wmsg) (m : Wmsg) (a : Int) :
     Option.bind_some]
   cases msgByte m a <;> simp
 
+/-- Every entry of a projected history is stamped within the log. -/
+theorem histOfStampLe (img : Image) (a : Int) (log : List Wmsg) :
+    ∀ e ∈ TsoOfPf.histOf img log a, e.t ≤ log.length := by
+  induction log using Weak.snocInd with
+  | h0 =>
+    intro e he
+    rw [histOfNil] at he
+    cases himg : img a with
+    | none => rw [himg] at he; simp at he
+    | some v => rw [himg] at he; simp at he; subst he; simp
+  | hs l m ih =>
+    intro e he
+    rw [histOfSnoc] at he
+    simp only [List.length_append, List.length_singleton]
+    cases hm : msgByte m a with
+    | none => rw [hm] at he; exact Nat.le_succ_of_le (ih e he)
+    | some v =>
+      rw [hm] at he
+      rcases List.mem_cons.1 he with rfl | he
+      · exact Nat.le_refl _
+      · exact Nat.le_succ_of_le (ih e he)
+
+/-- Under eager landing (route P, design D5) every stamp within the log has landed at itself. -/
+theorem lpEager (k t : Nat) (ht : t ≤ k) : lpOf (List.range' 1 k) t = some t := by
+  rw [lpOf_range'_one, if_pos ht]
+
+/-- Under eager landing the landed top of a projected history is its top. -/
+theorem topLHistOf (img : Image) (log : List Wmsg) (a : Int) (k : Nat) (hk : log.length ≤ k) :
+    Hist.topL (lpOf (List.range' 1 k)) (TsoOfPf.histOf img log a) = Hist.top (TsoOfPf.histOf img log a) :=
+  Hist.topL_eager _ _ (fun e he => lpEager k e.t (Nat.le_trans (histOfStampLe img a log e he) hk))
+
+/-- A write that lands at once over landed heads is a push (`MachCSL.WpAtomic`'s fold, here for the
+`Weak` tier, which does not import the program logic). -/
+theorem foldlPushLandedEqPush {n : Nat} (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+    (h : Agent) (ht : (lp t).isSome) : ∀ (l : List Nat) (m : FlatMem),
+      (∀ j ∈ l, ∀ x, (m.getD (pa + BitVec.ofNat 64 j) []).head? = some x → (lp x.t).isSome) →
+      l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m =
+        l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m
+  | [], _, _ => rfl
+  | j0 :: l, m, hh => by
+    simp only [List.foldl_cons]
+    have e1 : m.pushLanded lp (pa + BitVec.ofNat 64 j0) ⟨t, h, nthByte w j0⟩ =
+        m.push (pa + BitVec.ofNat 64 j0) ⟨t, h, nthByte w j0⟩ := by
+      unfold FlatMem.pushLanded FlatMem.push
+      rw [Hist.insLanded_of_head lp _ _ (hh j0 List.mem_cons_self)]
+    rw [e1]
+    apply foldlPushLandedEqPush lp pa w t h ht l
+    intro j hj x hx
+    unfold FlatMem.push at hx
+    rw [Std.ExtTreeMap.getD_insert] at hx
+    split at hx
+    · simp only [List.head?_cons, Option.some.injEq] at hx
+      subst hx
+      exact ht
+    · exact hh j (List.mem_cons_of_mem _ hj) x hx
+
+/-- **The eager DMA/exclusive write** (design D5): over a memory related by `rhist` to a log of
+length `k`, with the landing log `range' 1 k`, landing at once at `k + 1` is the TSO push. -/
+theorem landBytesEager (m : FlatMem) (img : Image) (log : List Wmsg) (k : Nat) (hk : log.length = k)
+    (hH : rhist m img log) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (h : Agent) :
+    m.landBytes (lpOf (List.range' 1 k ++ [k + 1])) pa n w (k + 1) h = m.writeBytes pa n w (k + 1) h := by
+  have hr : List.range' 1 k ++ [k + 1] = List.range' 1 (k + 1) := by
+    rw [List.range'_concat]; simp; omega
+  rw [hr]
+  unfold FlatMem.landBytes FlatMem.writeBytes
+  refine foldlPushLandedEqPush _ pa w (k + 1) h (by rw [lpEager _ _ (Nat.le_refl _)]; rfl) _ m ?_
+  intro j _ x hx
+  by_cases hin : inRam (pa + BitVec.ofNat 64 j) 1
+  · rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH.1 _ hin] at hx
+    simp only [Option.getD_some] at hx
+    have hxm : x ∈ TsoOfPf.histOf img log (paZ (pa + BitVec.ofNat 64 j)) := List.mem_of_head? hx
+    rw [lpEager _ _ (by have := histOfStampLe img _ log x hxm; omega)]; rfl
+  · rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH.2 _ hin] at hx
+    simp at hx
+
+/-- Under eager landing an entry's landed reading is its TSO reading. -/
+theorem readEntPEager (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist)
+    (hH : ∀ e ∈ H, lp e.t = some e.t) : Hist.readEntP lp h tv H = Hist.readEnt h tv H := by
+  induction H with
+  | nil => rfl
+  | cons e H ih =>
+    have ih' := ih (fun x hx => hH x (List.mem_cons_of_mem _ hx))
+    unfold Hist.readEntP Hist.readEnt at ih' ⊢
+    rw [List.find?_cons, List.find?_cons, HEnt.visibleP_eager lp h tv e (hH e List.mem_cons_self)]
+    cases e.visible h tv
+    · exact ih'
+    · rfl
+
+theorem readSrcPEager (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist)
+    (hH : ∀ e ∈ H, lp e.t = some e.t) : Hist.readSrcP lp h tv H = Hist.readSrc h tv H := by
+  unfold Hist.readSrcP Hist.readSrc
+  rw [readEntPEager lp h tv H hH]
+  cases hf : Hist.readEnt h tv H with
+  | none => rfl
+  | some e =>
+    have hm : e ∈ H := by
+      unfold Hist.readEnt at hf; exact List.mem_of_find?_eq_some hf
+    simp [hH e hm]
+
+/-- **The eager memory** (design D5): under `rmem` with the landing log `range' 1 top`, every
+history entry has landed at its own stamp. -/
+theorem memEager {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (σ : MState) (hR : rmem c st σ)
+    (heg : σ.llog = List.range' 1 σ.log.length) :
+    ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → ∀ e ∈ H, σ.lp e.t = some e.t := by
+  have hlen : c.pcLog.length = σ.log.length := by
+    have := congrArg List.length hR.1.1; simpa using this
+  intro a H hH e he
+  by_cases hin : inRam a 1
+  · rw [hR.2.2.1.1 _ hin] at hH
+    cases hH
+    show lpOf σ.llog e.t = some e.t
+    rw [heg]
+    exact lpEager _ _ (by have := histOfStampLe c.pcImg _ c.pcLog e he; omega)
+  · rw [hR.2.2.1.2 _ hin] at hH; cases hH
+
+theorem readBytesPEager (m : FlatMem) (lp : LandPos) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp e.t = some e.t)
+    (h : Agent) (tv : Nat) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    m.readBytesP lp h tv pa n w ↔ m.readBytes h tv pa n w := by
+  have e : ∀ a : PAddr, m.readP lp h tv a = m.read h tv a := by
+    intro a
+    unfold FlatMem.readP FlatMem.read
+    cases hH : m[a]? with
+    | none => rfl
+    | some H => exact Hist.readP_eager lp h tv H (hm a H hH)
+  unfold FlatMem.readBytesP FlatMem.readBytes
+  simp only [e]
+
+theorem topBytesLEager (m : FlatMem) (lp : LandPos) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp e.t = some e.t)
+    (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    m.topBytesL lp pa n w ↔ m.topBytes pa n w := by
+  have e : ∀ a : PAddr, (m[a]?).bind (Hist.topL lp) = (m[a]?).bind Hist.top := by
+    intro a
+    cases hH : m[a]? with
+    | none => rfl
+    | some H => exact Hist.topL_eager lp H (hm a H hH)
+  unfold FlatMem.topBytesL FlatMem.topBytes
+  simp only [e]
+
+theorem loadSrcsPEager (m : FlatMem) (lp : LandPos) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp e.t = some e.t)
+    (h : Agent) (tv : Nat) (pa : PAddr) (n : Nat) :
+    m.loadSrcsP lp h tv pa n = m.loadSrcs h tv pa n := by
+  unfold FlatMem.loadSrcsP FlatMem.loadSrcs
+  apply List.map_congr_left
+  intro j _
+  cases hH : m[pa + BitVec.ofNat 64 j]? with
+  | none => rfl
+  | some H => exact readSrcPEager lp h tv H (hm _ H hH)
+
+/-- **THE LANDING OF A JUST-ISSUED PLAIN STORE IS LEGAL** (design D5, the `Weak` twin of
+`Vtest.XState.landOk_issue`): over an eager memory (every entry landed at its own stamp, so at or
+below the top) and an empty buffer, the issued store is the hart's only pending one and the lowest
+pending entry of each of its bytes; no other hart reserves its footprint (W2a), the hart's own
+reservation the issue clears. -/
+theorem landOkIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hm : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → ∀ e ∈ H, σ.lp e.t = some e.t)
+    (heg : σ.llog = List.range' 1 σ.log.length) (hsb : σ.sb cpu = [])
+    (hnw : pa.toNat + n ≤ 2 ^ 64) (hres : ¬ othersReserve σ.resv cpu pa n) :
+    (σ.issue cpu pa n w).landOk cpu (σ.top + 1) := by
+  have hle : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → ∀ e ∈ H, e.t ≤ σ.top := by
+    intro a H hH e he
+    have h1 := hm a H hH e he
+    rw [show σ.lp = lpOf σ.llog from rfl, heg, lpOf_range'_one] at h1
+    by_cases hk : e.t ≤ σ.log.length
+    · exact hk
+    · rw [if_neg hk] at h1; cases h1
+  have hleD : ∀ (a : PAddr), ∀ e ∈ σ.mem.getD a [], e.t ≤ σ.top := by
+    intro a e he
+    rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at he
+    cases hH : σ.mem[a]? with
+    | none => rw [hH] at he; simp at he
+    | some H => rw [hH] at he; exact hle a H hH e he
+  refine ⟨σ.sbEp cpu, ?_, ?_, ?_⟩
+  · show (σ.top + 1, σ.sbEp cpu) ∈ updCpu σ.sb cpu (σ.sb cpu ++ [(σ.top + 1, σ.sbEp cpu)]) cpu
+    simp [updCpu, hsb]
+  · intro p hp
+    have hp' : p ∈ updCpu σ.sb cpu (σ.sb cpu ++ [(σ.top + 1, σ.sbEp cpu)]) cpu := hp
+    simp [updCpu, hsb] at hp'
+    rw [hp']; exact Nat.le_refl _
+  · rintro a H hH ⟨e, he, het⟩
+    have hH' : (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))[a]? = some H := hH
+    by_cases hfp : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
+    · obtain ⟨j, hj, rfl⟩ := hfp
+      have hat := foldPushIn σ.mem pa (fun j => (⟨σ.top + 1, hartAgent cpu, nthByte w j⟩ : HEnt)) n hnw n
+        (Nat.le_refl n) j hj
+      unfold FlatMem.writeBytes at hH'
+      rw [hat] at hH'
+      obtain rfl := Option.some.inj hH'
+      refine ⟨fun c r hr => ?_, fun H1 y H2 hsplit hyt z hz => ?_⟩
+      · by_cases hc : c = cpu
+        · subst hc
+          have : (σ.issue c pa n w).resv c = none := by simp [updCpu]
+          rw [this] at hr
+          cases hr
+        · have hr' : σ.resv c = some r := by
+            have : (σ.issue cpu pa n w).resv c = σ.resv c := by simp [updCpu, hc]
+            rw [← this]; exact hr
+          cases hra : r[pa + BitVec.ofNat 64 j]? with
+          | none => rfl
+          | some v => exact (hres ⟨c, hc, r, hr', j, hj, by rw [hra]; rfl⟩).elim
+      · show (lpOf σ.llog z.t).isSome = true
+        cases H1 with
+        | nil =>
+          simp only [List.nil_append, List.cons.injEq] at hsplit
+          obtain ⟨-, rfl⟩ := hsplit
+          have := hleD _ z hz
+          rw [heg, lpEager _ _ this]; rfl
+        | cons h1 H1 =>
+          simp only [List.cons_append, List.cons.injEq] at hsplit
+          obtain ⟨-, hrest⟩ := hsplit
+          have hy : y ∈ σ.mem.getD (pa + BitVec.ofNat 64 j) [] := by
+            rw [hrest]; exact List.mem_append_right _ List.mem_cons_self
+          have := hleD _ y hy
+          simp only [MState.top] at this hyt
+          omega
+    · have ha : ∀ j ∈ List.range n, a ≠ pa + BitVec.ofNat 64 j :=
+        fun j hj he => hfp ⟨j, List.mem_range.1 hj, he⟩
+      unfold FlatMem.writeBytes at hH'
+      rw [foldPushOut pa a _ (List.range n) ha] at hH'
+      have := hle a H hH' e he
+      simp only [MState.top] at this het
+      omega
+
+/-- With an empty buffer the forwarding read is the landed read. -/
+theorem readFwdNil (σ : MState) (cpu : CPU) (hsb : σ.sb cpu = []) (tvn : Nat) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) : σ.readFwd cpu tvn pa n w ↔ σ.mem.readBytesP σ.lp (hartAgent cpu) tvn pa n w := by
+  have e : ∀ a : PAddr, σ.byteFwd cpu tvn a = σ.mem.readP σ.lp (hartAgent cpu) tvn a := by
+    intro a
+    unfold MState.byteFwd FlatMem.readP
+    cases σ.mem[a]? with
+    | none => rfl
+    | some H =>
+      simp only [Option.bind_some, hsb, List.any_nil, Bool.and_false]
+      rw [List.find?_eq_none.2 (fun _ _ => by simp)]
+  unfold MState.readFwd FlatMem.readBytesP
+  simp only [e]
+
 /-- A log none of whose messages writes `a` projects to the image byte alone. -/
 theorem histOfPristine (img : Image) (a : Int) (log : List Wmsg)
     (h : ∀ m ∈ log, msgByte m a = none) :
@@ -656,13 +892,15 @@ theorem pfExLoadRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → 
 /-- **(12)** Disk `DRead` under `candDiskLat`: the latest pf bytes are TsoMem's `dmaView`. -/
 theorem pfDReadRowMem {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (σ : MState)
     (pa : PAddr) (base : Int) (n : Nat) (tvs : List (Nat × BitVec 8)) (w : BitVec (8 * n))
-    (hR : rmem c st σ)
+    (hR : rmem c st σ) (heg : σ.llog = List.range' 1 σ.log.length)
     (htvs : ∀ j t v, tvs[j]? = some (t, v) →
       latest c.pcImg c.pcLog (accAddr base j) t ∧
       logByte c.pcImg c.pcLog t (accAddr base j) = some v)
     (hb : base = paZ pa) (hnw : pa.toNat + n ≤ 2 ^ 64)
     (hw : ∀ j, j < n → (tvs[j]?).map Prod.snd = some (nthByte w j)) :
     dmaView σ pa n w := by
+  have hlen : c.pcLog.length = σ.log.length := by
+    have := congrArg List.length hR.1.1; simpa using this
   subst hb
   intro j hj b hbt
   by_cases hin : inRam (pa + BitVec.ofNat 64 j) 1
@@ -671,8 +909,8 @@ theorem pfDReadRowMem {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (
     have htop := (histOfTop c.pcImg c.pcLog (accAddr (paZ pa) j) (nthByte w j)).2
       ⟨t, hlat, hlb⟩
     rw [hR.2.2.1.1 _ hin, paZAddJ pa n j hnw hj] at hbt
-    simp only [Option.bind_some] at hbt
-    rw [htop] at hbt
+    simp only [Option.bind_some, MState.lp, heg] at hbt
+    rw [topLHistOf _ _ _ _ (Nat.le_of_eq hlen), htop] at hbt
     exact Option.some.inj hbt
   · rw [hR.2.2.1.2 _ hin] at hbt; cases hbt
 
@@ -706,6 +944,7 @@ theorem pfDWriteDevRowMem {P D : Type} (pstep : P → D → Wlabel → P → D �
     (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) (st rest : List (Nat × Wlabel))
     (σ : MState) (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
     (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (d : DevId) (s' : DevSt d) (hR : rmem c st σ)
+    (heg : σ.llog = List.range' 1 σ.log.length)
     (hstep : wpPfStep pstep pcls NCPU (.LStore rl base data asrc vsrc) c c')
     (hadj : pairAdjacent (st ++ (NCPU, .LStore rl base data asrc vsrc) :: rest))
     (hb : base = paZ pa) (hram : ramBytes pa n) (hd : data.length = n) (hn : n ≠ 0)
@@ -714,7 +953,12 @@ theorem pfDWriteDevRowMem {P D : Type} (pstep : P → D → Wlabel → P → D �
       rmem c' (st ++ [(NCPU, .LStore rl base data asrc vsrc)]) ((σ.storeDma pa n w).setDev d s') := by
   obtain ⟨h1, h2⟩ := pfDWriteRowMem pstep pcls c c' st rest σ rl base data asrc vsrc pa n w hR hstep
     hadj hb hram hd hbytes
-  refine ⟨h1, h2 _ (MState.storeDma_mem_of_ne σ pa n w hn) ?_ rfl rfl⟩
+  have hlen : c.pcLog.length = σ.log.length := by
+    have := congrArg List.length hR.1.1; simpa using this
+  refine ⟨h1, h2 _ ?_ ?_ rfl rfl⟩
+  · show (if n = 0 then σ.mem else _) = _
+    rw [if_neg hn, heg]
+    exact landBytesEager σ.mem c.pcImg c.pcLog σ.log.length hlen hR.2.2.1 pa n w diskAgent
   show (if n = 0 then σ.log else σ.log ++ [diskAgent]) = _
   rw [if_neg hn]
 

@@ -134,6 +134,45 @@ theorem swp_checked_mem_write_dev4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   conf_intro HmConf
   iapply HΦ $$ HmConf HΨ
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+set_option swp_run.memStop true in
+/-- The `DRIVER_OK` four-byte device store (NAMED ASSUMPTION [OWN.127]/[OWN.131]). -/
+theorem swp_checked_mem_write_dev4_drvOk_S (cpu : CPU) (hc : cpu.val = 0) (pc0 : BitVec 64) (hpc0 : pc0 = drvOkPc) (dq : DFrac) (c : MConf) (sie : Bool)
+    (hok : SConfPhys (GF := GF) c sie) (pa : BitVec 64) (data : BitVec (8 * 4)) (off : Nat)
+    (hdec : devDecode pa = some (.virtio, off)) (hio : devWordOk pa) (ev : List (PAddr × DFrac × Hist)) (ts : List Nat) (Ψ : IProp GF)
+    (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ Register.PC ↦ᵣ[cpu] pc0 ∗ evPts ev ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗ 
+    devWriteAUD off 4 data ev ts Ψ ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ Register.PC ↦ᵣ[cpu] pc0 -∗ Ψ -∗ Φ (.Ok true))
+    ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 4 data
+        (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
+        Privilege.Supervisor () false false false) Φ := by
+  subst hpc0
+  iintro ⟨HmConf, Hpc, Hev, #Hts, HAU, HΦ⟩
+  unfold checked_mem_write
+  conf_cases HmConf
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  have hpma := matching_pma_io pa 4 (by have := hio.2.2.1; omega) hio.2.2.2 (by decide) (by decide)
+  have hclint := within_clint_io pa 4 hio.2.2.1
+  have halign := is_aligned_paddr_of pa 4 (by decide) hio.2.1
+  swp_run 60
+  iapply swp_bind
+  iapply (hpmp cpu dq pa 4 _ _ (by simp [kernelAccess]) (devWordOk_pmpOk hio))
+  iframe
+  inext
+  iintro Hpmpcfg_n Hpmpaddr_n
+  swp_run 80
+  iapply swp_bind
+  iapply (swp_sail_mem_write_dev_drvOk cpu hc _ rfl _ pa rfl off hdec (devWordOk_devBytes hio) (by decide) data rfl ev ts Ψ)
+  iframe Hpc Hev HAU Hts
+  inext
+  iintro Hpc HΨ
+  swp_run 60
+  conf_intro HmConf
+  iapply HΦ $$ HmConf Hpc HΨ
+
 /-! ## The execute stages over the register file -/
 
 set_option maxHeartbeats 4000000 in
@@ -304,6 +343,95 @@ theorem execSpecF_sw_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   iapply HΦ $$ HmConf HPC HnextPC [Htrans Htok HF HΨ]
   iframe Htrans Htok HF HΨ
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- `sw rs2, imm(rs1)` at `drvOkPc` (`STATUS |= DRIVER_OK`, NAMED ASSUMPTION [OWN.127]/[OWN.131]). -/
+theorem execSpecF_sw_dev_drvOk [CurCtx] (cpu : CPU) (hc : cpu.val = 0) (pc : BitVec 64) (hpc0 : pc = drvOkPc) (dq : DFrac) (c : MConf) (sie : Bool)
+    (root : BitVec 44) (hok : SConfAt (GF := GF) curTier c root sie)
+    (npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap)
+    (off : Nat) (ev : List (PAddr × DFrac × Hist)) (ts : List Nat) (Ψ : IProp GF)
+    (hdec : devDecode (RegMap.get R rs1 + BitVec.signExtend 64 imm) = some (.virtio, off))
+    (hio : devWordOk (RegMap.get R rs1 + BitVec.signExtend 64 imm)) :
+    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc npc₀ npc₀
+      iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1 + BitVec.signExtend 64 imm) ∗
+        gprFile cpu R ∗ evPts ev ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+        devWriteAUD off 4 (BitVec.extractLsb' 0 32 (RegMap.get R rs2)) ev ts Ψ)
+      iprop(transTok cpu curTier root ∗ gprFile cpu R ∗ Ψ) := by
+  subst hpc0
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HT, #Hcl, HF, Hev, #Hts, HAU⟩, HΦ⟩
+  have hva := is_aligned_vaddr_of (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 hio.2.1
+  have hsplit := split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hio.2.1
+  have hlt := devWordOk_lt38 hio
+  have hlt' := devWordOk_lt39 hio
+  have hpin := tierPin_id curTier (RegMap.get R rs1 + BitVec.signExtend 64 imm) hlt'
+  have hok' : SConfPhys (GF := GF) c sie := hok.phys
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok'
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  have hok' : SConfPhys (GF := GF) c sie := hok.phys
+  have hpma := matching_pma_io (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4
+    (by have := hio.2.2.1; omega) hio.2.2.2 (by decide) (by decide)
+  have hclint := within_clint_io (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 hio.2.2.1
+  have halign := is_aligned_paddr_of (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (by decide) hio.2.1
+  conf_cases HmConf
+  unfold execute
+  swp_run 60
+  iapply swp_bind
+  iapply swp_rX_file
+  iframe
+  iintro HF
+  swp_run 60
+  iapply swp_bind
+  iapply swp_rX_file
+  iframe
+  iintro HF
+  swp_run 150
+  iapply swp_bind
+  conf_intro HmConf
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iframe HmConf
+  inext
+  iintro HmConf
+  conf_cases HmConf
+  swp_run 100
+  iapply swp_bind
+  conf_intro HmConf
+  iapply (swp_translationMode_tier cpu dq c sie curTier root hok)
+  iframe HmConf
+  inext
+  iintro HmConf
+  conf_cases HmConf
+  swp_run 100
+  iapply swp_bind
+  conf_intro HmConf
+  unfold transTok
+  icases HT with ⟨Htrans, Htok⟩
+  iapply (swp_translateAddr_tier cpu dq c sie curTier root hok _ hlt _ (Or.inr (Or.inr (Or.inl rfl)))
+    (idPpn (vpnOf (RegMap.get R rs1 + BitVec.signExtend 64 imm))) .rw rfl hpin)
+  iframe HmConf Hcl Htrans Htok
+  iintro HmConf Htrans Htok
+  rw [paOf_id _ hlt']
+  conf_cases HmConf
+  swp_run 40
+  iapply swp_bind
+  iapply (hpmp cpu dq _ 4 _ _ (by simp [kernelAccess]) (devWordOk_pmpOk hio))
+  iframe
+  inext
+  iintro Hpmpcfg_n Hpmpaddr_n
+  swp_run 100
+  iapply swp_bind
+  conf_intro HmConf
+  iapply (swp_checked_mem_write_dev4_drvOk_S cpu hc _ rfl dq c sie hok' _ _ off hdec hio ev ts Ψ)
+  iframe HmConf HPC Hev HAU Hts
+  inext
+  iintro HmConf HPC HΨ
+  conf_cases HmConf
+  swp_run 30
+  conf_intro HmConf
+  iapply HΦ $$ HmConf HPC HnextPC [Htrans Htok HF HΨ]
+  iframe Htrans Htok HF HΨ
+
 /-! ## The `wpLoop` rules -/
 
 variable {lent : Bool}
@@ -406,5 +534,56 @@ theorem wp_s_sw_dev [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
     iprop(kmapId va ∗ devWriteAU d off 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) Ψ) (fun _ => Ψ) hexec)
   iframe HI Hk Hpc HAU HΦ
   iexact Hcl
+
+set_option maxHeartbeats 4000000 in
+/-- **`sw rs2, imm(rs1)` at `drvOkPc`** -- `virtio_disk_init`'s `STATUS |= DRIVER_OK` store
+under the NAMED ASSUMPTION [OWN.127]/[OWN.131] (xv6 weak-memory bug #1): besides the device
+accessor, the accessor's continuation gets, at the step, the landing certificates of the hart's own stores of `ts` that
+have an entry on one of the client's queue-page bytes `ev` (the accessor's state names the
+pages).  Hart 0, interrupts off. -/
+theorem wp_s_sw_dev_drvOk [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (hc : cpu.val = 0) (k : KCtx) (pc : BitVec 64) (hpc0 : pc = drvOkPc)
+    (hsie : k.sie = false) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
+    (hrs2 : rs2 ≠ 4#5) (off : Nat) (va : BitVec 64) (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = va)
+    (hdec : devDecode va = some (.virtio, off)) (hio : devWordOk va)
+    (ev : List (PAddr × DFrac × Hist)) (ts : List Nat) (Ψ : IProp GF) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    iprop(kmapId va ∗ evPts ev ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+      devWriteAUD off 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) ev ts Ψ) ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          Ψ -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  have hexec : ∀ (cpu' : CPU) (c : MConf), (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
+      SConfAt (GF := GF) curTier c k.root k.sie → c.menvcfg = menvcfgS →
+      execSpecPP (GF := GF) cpu' (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
+        (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc (pc + instrLen is_rvc)
+        (pc + instrLen is_rvc)
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
+          (kmapId va ∗ evPts ev ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+            devWriteAUD off 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) ev ts Ψ))
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗ Ψ) := by
+    intro cpu' c hpin hok _
+    obtain rfl : cpu' = cpu := hpin (Or.inl hsie)
+    have haddr' : RegMap.get (tpPin cpu' k.regs) rs1 + BitVec.signExtend 64 imm = va := by
+      rw [KCtx.rget_hart cpu' cpu' k rs1 hrs1]; exact haddr
+    have hdata : BitVec.extractLsb' 0 32 (RegMap.get (tpPin cpu' k.regs) rs2) =
+        BitVec.extractLsb' 0 32 (k.rget cpu' rs2) := by
+      rw [KCtx.rget_hart cpu' cpu' k rs2 hrs2]
+    have e := execSpecF_sw_dev_drvOk (GF := GF) cpu' hc pc hpc0 (DFrac.own 1) c k.sie k.root hok (pc + instrLen is_rvc)
+      imm rs1 rs2 (tpPin cpu' k.regs) off ev ts Ψ (by rw [haddr']; exact hdec) (by rw [haddr']; exact hio)
+    rw [haddr', hdata] at e
+    intro Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, #Hcl, Hev, #Hts, HAU⟩, HΦ⟩
+    iapply (e Φ)
+    iframe HmConf HPC HnextPC HT HF Hcl Hev Hts HAU
+    inext
+    iintro HmConf HPC HnextPC ⟨HT, HF, HΨ⟩
+    iapply HΦ $$ HmConf HPC HnextPC
+    iframe HT HF HΨ
+  exact wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(kmapId va ∗ evPts ev ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+      devWriteAUD off 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) ev ts Ψ)
+    (fun _ => Ψ) hexec
 
 end MachCSL

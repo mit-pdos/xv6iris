@@ -372,8 +372,9 @@ theorem releaseWpd3 :
       (wp_s_sd_zero_lkcpu_release_gen := wSdlk3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
         Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap lockOpenable lockedCore lockedPre
         held sdlkRule kt)
-      (wp_s_fence_rw_w := wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
-        Htext Hflow Hloc G HG held kt)
+      (relTok := fun γ R c => iprop(lockedPre γ c ∗ lockCtxHeld ∗ payAt R))
+      (wp_s_fence_rw_w := AxLeafS5.fenceLeafOfPlain (payOk := payOk) (lockCtxHeld := lockCtxHeld) (lockedPre := lockedPre) (payAt := payAt) (wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
+        Htext Hflow Hloc G HG held kt))
       (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
         Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap payAt payOk lockOpenable lockedPre
         lockCtxHeld held swlkRule kt))) :=
@@ -387,8 +388,9 @@ theorem releaseWpd3 :
     (wp_s_sd_zero_lkcpu_release_gen := wSdlk3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
       Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap lockOpenable lockedCore lockedPre
       held sdlkRule kt)
-    (wp_s_fence_rw_w := wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
-      Htext Hflow Hloc G HG held kt)
+    (relTok := fun γ R c => iprop(lockedPre γ c ∗ lockCtxHeld ∗ payAt R))
+      (wp_s_fence_rw_w := AxLeafS5.fenceLeafOfPlain (payOk := payOk) (lockCtxHeld := lockCtxHeld) (lockedPre := lockedPre) (payAt := payAt) (wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
+      Htext Hflow Hloc G HG held kt))
     (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
       Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap payAt payOk lockOpenable lockedPre
       lockCtxHeld held swlkRule kt))

@@ -39,6 +39,39 @@ def devWriteAU (d : DevId) (off n : Nat) (w : BitVec (8 * n)) (Ψ : IProp GF) : 
   |={⊤,∅}=> ∃ s : DevSt d, devFrag d s ∗ ⌜((devSig d).write s off n w).isSome⌝ ∗
     ▷ (∀ s' : DevSt d, ⌜(devSig d).write s off n w = some s'⌝ -∗ devFrag d s' ={∅,⊤}=∗ Ψ)
 
+/-! ## The `DRIVER_OK` store's accessor (NAMED ASSUMPTION [OWN.127]/[OWN.131], xv6 weak-memory bug #1) -/
+
+/-- A byte of one of the three virtqueue pages a configuration names. -/
+def vqPageByte (c : VirtioCfg) (a : PAddr) : Prop :=
+  (∃ j, j < vqPageSize ∧ a = c.desc + BitVec.ofNat 64 j) ∨
+  (∃ j, j < vqPageSize ∧ a = c.avail + BitVec.ofNat 64 j) ∨
+  (∃ j, j < vqPageSize ∧ a = c.used + BitVec.ofNat 64 j)
+
+/-- The client's queue-page bytes: history points-to's (address, fraction, history). -/
+def evPts (ev : List (PAddr × DFrac × Hist)) : IProp GF :=
+  iprop([∗list] q ∈ ev, q.1 ↦ₕ{q.2.1} q.2.2)
+
+/-- What the `DRIVER_OK` store hands back: the landing certificates of every receipt in `ts`
+whose stamp has an entry on a byte of `ev`. -/
+def drvOkCerts (ev : List (PAddr × DFrac × Hist)) (ts : List Nat) : IProp GF :=
+  iprop(∃ ls : List (Nat × Nat), landedAll ls ∗
+    ⌜∀ t ∈ ts, (∃ q ∈ ev, ∃ e ∈ q.2.2, e.t = t) → ∃ p, (t, p) ∈ ls⌝)
+
+instance drvOkCerts_persistent (ev : List (PAddr × DFrac × Hist)) (ts : List Nat) :
+    Persistent (PROP := IProp GF) (drvOkCerts ev ts) := by
+  unfold drvOkCerts landedAll; infer_instance
+
+/-- The accessor of the `DRIVER_OK` store (NAMED ASSUMPTION [OWN.127]/[OWN.131]): `devWriteAU` at
+the virtio device whose opening names the device state (so the client's queue bytes `ev` are shown
+to lie on its configuration's three queue pages) and whose continuation, at the step, gets the
+client's queue-byte points-to's back together with the guard's landing certificates. -/
+def devWriteAUD (off n : Nat) (w : BitVec (8 * n)) (ev : List (PAddr × DFrac × Hist)) (ts : List Nat)
+    (Ψ : IProp GF) : IProp GF := iprop%
+  |={⊤,∅}=> ∃ s : DevSt .virtio, devFrag .virtio s ∗ ⌜((devSig .virtio).write s off n w).isSome⌝ ∗
+    ⌜∀ q ∈ ev, vqPageByte (show VirtioState from s).cfg q.1⌝ ∗
+    ▷ (∀ s' : DevSt .virtio, ⌜(devSig .virtio).write s off n w = some s'⌝ -∗ devFrag .virtio s' -∗
+        evPts ev -∗ drvOkCerts ev ts ={∅,⊤}=∗ Ψ)
+
 theorem devReadAU_wand (d : DevId) (off n : Nat) (Ψ Ψ' : BitVec (8 * n) → IProp GF) :
     devReadAU d off n Ψ ⊢ ▷ (∀ w, Ψ w -∗ Ψ' w) -∗ devReadAU d off n Ψ' := by
   unfold devReadAU

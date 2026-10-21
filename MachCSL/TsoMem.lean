@@ -1262,6 +1262,66 @@ reads; `FlatMem.topBytes`'s twin). -/
 def FlatMem.topBytesL (m : FlatMem) (lp : LandPos) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
   ∀ j, j < n → (m[pa + BitVec.ofNat 64 j]?).bind (Hist.topL lp) = some (nthByte w j)
 
+/-- The source agent `h` reads at (landing) view `tv` (route P, the switch; `Hist.readSrc`'s
+twin): the (author, LANDING POSITION) of the entry `Hist.readEntP` returns -- the position is
+what a later read of the byte is floored at (RVWMO ppo rule 2: co order is landing order).  A
+pending entry is only ever the reader's own (forwarded), whose position is recorded as 0. -/
+def Hist.readSrcP (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist) : Option (Agent × Nat) :=
+  (Hist.readEntP lp h tv H).map (fun e => (e.tid, (lp e.t).getD 0))
+
+/-- A source read by `h` that `h` did not author is landed at or below the view. -/
+theorem Hist.readSrcP_foreign_le (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist) (tid t : Nat)
+    (hs : Hist.readSrcP lp h tv H = some (tid, t)) (hne : tid ≠ h) : t ≤ tv := by
+  unfold Hist.readSrcP Hist.readEntP at hs
+  cases hf : H.find? (HEnt.visibleP lp h tv) with
+  | none => rw [hf] at hs; cases hs
+  | some e =>
+    rw [hf] at hs
+    simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hs
+    obtain ⟨rfl, rfl⟩ := hs
+    have hv := List.find?_some hf
+    simp only [HEnt.visibleP, Bool.or_eq_true, decide_eq_true_eq] at hv
+    rcases hv with hv | hv
+    · cases hl : lp e.t with
+      | none => rw [hl] at hv; cases hv
+      | some p =>
+        rw [hl] at hv
+        simp only [Option.any_some, decide_eq_true_eq] at hv
+        simpa [hl] using hv
+    · exact absurd hv hne
+
+/-- The per-byte sources agent `h` reads at (landing) view `tv` from the footprint
+`pa .. pa+n-1` (route P, the switch; `FlatMem.loadSrcs`'s twin): (author, landing position). -/
+def FlatMem.loadSrcsP (m : FlatMem) (lp : LandPos) (h : Agent) (tv : Nat) (pa : PAddr) (n : Nat) :
+    LoadSrcs :=
+  (List.range n).map (fun j => (m[pa + BitVec.ofNat 64 j]?).bind (Hist.readSrcP lp h tv))
+
+/-- Every foreign position of a load's sources is at or below its view. -/
+theorem FlatMem.loadSrcsP_stampAt_le (m : FlatMem) (lp : LandPos) (h : Agent) (tv : Nat) (pa : PAddr)
+    (n j : Nat) : (m.loadSrcsP lp h tv pa n).stampAt h j ≤ tv := by
+  unfold LoadSrcs.stampAt FlatMem.loadSrcsP
+  split
+  · rename_i tid t hs
+    split
+    · exact Nat.zero_le _
+    · rename_i hne
+      simp only [List.getElem?_map, Option.map_eq_some_iff] at hs
+      obtain ⟨k, hk, hs⟩ := hs
+      cases hH : m[pa + BitVec.ofNat 64 k]? with
+      | none => rw [hH] at hs; cases hs
+      | some H =>
+        rw [hH] at hs
+        exact Hist.readSrcP_foreign_le lp h tv H tid t hs hne
+  · exact Nat.zero_le _
+
+/-- A load's per-byte sources are the bytes' read sources (route P). -/
+theorem FlatMem.loadSrcsP_get? (m : FlatMem) (lp : LandPos) (h : Agent) (tvn : Nat) (pa : PAddr)
+    (n k : Nat) (hk : k < n) :
+    (m.loadSrcsP lp h tvn pa n)[k]? = some ((m[pa + BitVec.ofNat 64 k]?).bind (Hist.readSrcP lp h tvn)) := by
+  unfold FlatMem.loadSrcsP
+  rw [List.getElem?_map, List.getElem?_range hk]
+  rfl
+
 /-! ### Route P, increment P-M3b: a write that LANDS AT ONCE keeps the co order
 
 An exclusive write (an AMO's write half, `sc`, the walker's A/D write-back) and a DMA write

@@ -36,7 +36,7 @@ that identifies the writer's post-power-on entries. -/
 
 /-- A publication read's request: the writer, its own entry positions to
 certify, its certificates to carry over, the byte test. -/
-abbrev RdIssue := CPU × List Nat × List (CPU × Nat × Nat) × (BitVec 8 → Bool)
+abbrev RdIssue := CPU × List Nat × List (CPU × Nat × Nat) × (BitVec 8 → Bool) × (CPU → Nat) × Nat
 
 /-- What a publication read's request asserts: the window's first byte is the
 base of a publication word of another writer `wr`, every publication word is
@@ -46,20 +46,25 @@ position to certify and at or after every carried certificate's deadline;
 and the carried certificates. -/
 def rdIn (cpu : CPU) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) : Option RdIssue → IProp GF
   | none => iprop(emp)
-  | some (wr, L, C, okv) => iprop(⌜0 < n ∧ wr ≠ cpu ∧ pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa wr ∧
+  | some (wr, L, C, okv, V, K0) => iprop(⌜0 < n ∧ wr ≠ cpu ∧ pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa wr ∧
       (∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' = wr) ∧
       (∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' ≠ cpu → f = pa ∧ w' = wr) ∧
       ∀ e ∈ Hs 0, okv e.v = true → e.tid = hartAgent wr ∧ 0 < e.t ∧ (∀ t0 ∈ L, t0 < e.t) ∧
         ∀ p ∈ C, p.2.2 ≤ e.t⌝ ∗
-      [∗list] p ∈ C, chainLb p.1 p.2.1 wr p.2.2)
+      ([∗list] p ∈ C, chainLb p.1 p.2.1 wr p.2.2) ∗
+      ∃ (ta k s : Nat), landCovAt (MachGS.era (hlc := hlc) (GF := GF)) V wr K0 ∗ landsAboveAt ta K0 ∗
+        epochAtE (MachGS.era (hlc := hlc) (GF := GF)) wr k s ∗
+        ⌜V wr ≤ s ∧ s < ta ∧ ∀ e ∈ Hs 0, okv e.v = true → e.t = ta⌝)
 
 /-- What it hands back, given the value read: if the test accepts the read
 byte, the reader's gate and the certificates. -/
-def rdOut (cpu : CPU) {n : Nat} (w : BitVec (8 * n)) : Option RdIssue → IProp GF
+def rdOut (cpu : CPU) {n : Nat} (tvn : Nat) (w : BitVec (8 * n)) : Option RdIssue → IProp GF
   | none => iprop(emp)
-  | some (wr, L, C, okv) => if okv (nthByte w 0) = true then
+  | some (wr, L, C, okv, V, K0) => if okv (nthByte w 0) = true then
       iprop(gatePassed cpu ∗ ([∗list] t0 ∈ L, chainLb wr t0 cpu 0) ∗
-        [∗list] p ∈ C, chainLb p.1 p.2.1 cpu 0) else iprop(emp)
+        ([∗list] p ∈ C, chainLb p.1 p.2.1 cpu 0) ∗ landCovAt (MachGS.era (hlc := hlc) (GF := GF)) V cpu tvn ∗
+        ⌜K0 < tvn⌝)
+    else iprop(emp)
 
 /-- The accessor of a plain load by `cpu` whose view is at least `K`, WITH
 the read watermark's receipt: the continuation also gets
@@ -70,11 +75,15 @@ and (S3) the certificates of every entry the read may return
 def readAUr (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
     (Ψ : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
   ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
-  (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (o : Option RdIssue) (cs : RdComps),
-    histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → Hs j ≠ []⌝ ∗ rdIn cpu pa n Hs o ∗
-    rdCompBytes cs ∗ readCertsAt cpu pa n K ts Hs cs ∗
-    ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat), ⌜K ≤ tvn⌝ -∗ ⌜readsAre (hartAgent cpu) tvn Hs n w⌝ -∗
-        ⌜authorsAre ts n Hs⌝ -∗ rviewLb cpu tvn -∗ rdOut cpu w o -∗ histBytes pa n dqs Hs -∗
+  (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (o : Option RdIssue) (cs : RdComps)
+      (ls : List (Nat × Nat)),
+    landedAll ls ∗ histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → readableAt (hartAgent cpu) K ls ts (Hs j)⌝ ∗
+    rdIn cpu pa n Hs o ∗ rdCompBytes cs ∗ readCertsAt cpu pa n K ts ls Hs cs ∗
+    ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat) (lp : LandPos) (es : Nat → HEnt) (ps : Nat → Nat), ⌜K ≤ tvn⌝ -∗
+        ⌜lpAgree ls lp ∧ readsAreP lp (hartAgent cpu) tvn Hs n w ∧
+          ∀ j, j < n → Hist.readEntP lp (hartAgent cpu) tvn (Hs j) = some (es j)⌝ -∗
+        ([∗list] j ∈ List.range n, readEntCert cpu tvn (es j) (ps j)) -∗
+        ⌜authorsAre ts n Hs⌝ -∗ rviewLb cpu tvn -∗ rdOut cpu tvn w o -∗ histBytes pa n dqs Hs -∗
         rdCompBytes cs ={∅,⊤}=∗ Ψ w))
 
 /-- The postcondition may be weakened, as for `MachCSL.readAU`. -/
@@ -84,15 +93,15 @@ theorem readAUr_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Age
   unfold readAUr
   iintro ⟨#Hts, H⟩ Hw
   iframe Hts
-  imod H with ⟨%dqs, %Hs, %o, %cs, Hb, %hne, Ho, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, #Hls, Hb, %hne, Ho, Hcs, #Hcert, Hcont⟩
   imodintro
-  iexists dqs, Hs, o, cs
-  iframe Hb Ho Hcs Hcert
+  iexists dqs, Hs, o, cs, ls
+  iframe Hls Hb Ho Hcs Hcert
   isplitl []
   · ipureintro; exact hne
   inext
-  iintro %w %tvn %hK %hrd %hau #Hrv Hout Hb Hcs
-  imod Hcont $$ %w %tvn %hK %hrd %hau Hrv Hout Hb Hcs with HΨ
+  iintro %w %tvn %lp %es %ps %hK %hrd Hrc %hau #Hrv Hout Hb Hcs
+  imod Hcont $$ %w %tvn %lp %es %ps %hK %hrd Hrc %hau Hrv Hout Hb Hcs with HΨ
   imodintro
   iapply Hw $$ %w HΨ
 
@@ -135,7 +144,8 @@ own arm) covers it for the reader. -/
 theorem ReadAUr.chainIssueL (σ : MState) (wr cpu : CPU) (f : PAddr) (r : Nat) (v : BitVec 8) (H : Hist)
     (hne : cpu ≠ wr) (hp : pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f wr)
     (hall : ∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' = wr)
-    (hf : σ.mem[f]? = some H) (he : (⟨r, hartAgent wr, v⟩ : HEnt) ∈ H) (hcoh : r ≤ (σ.hr cpu).coh f) :
+    (hf : (σ.mem.landedOnly σ.lp)[f]? = some H) (he : (⟨r, hartAgent wr, v⟩ : HEnt) ∈ H)
+    (hcoh : ∃ p, σ.lp r = some p ∧ p ≤ (σ.hr cpu).coh f) :
     ∀ C : List (CPU × Nat × Nat), (∀ p ∈ C, p.2.2 ≤ r) →
       memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗ ([∗list] p ∈ C, chainLb p.1 p.2.1 wr p.2.2) ⊢@{IProp GF}
         |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗ [∗list] p ∈ C, chainLb p.1 p.2.1 cpu 0)
@@ -178,10 +188,10 @@ whose test accepts the read byte issues the reader's gate, the boot-hop
 certificates for the writer's own entries, and the carried certificates
 (`MachCSL.memModel_gateIssue`, `MachCSL.memModel_certIssue`). -/
 theorem memModel_rdIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (Hs : Nat → Hist)
-    (w : BitVec (8 * n)) (hget : histsAt σ.mem pa n Hs) (hrd : readsAre (hartAgent cpu) tvn Hs n w)
+    (w : BitVec (8 * n)) (hget : histsAt σ.mem pa n Hs) (hrd : readsAreP σ.lp (hartAgent cpu) tvn Hs n w)
     (o : Option RdIssue) :
     memModelAt (MachGS.era (hlc := hlc) (GF := GF)) (σ.afterLoad cpu pa n tvn) ∗ rdIn cpu pa n Hs o ⊢@{IProp GF}
-      |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) (σ.afterLoad cpu pa n tvn) ∗ rdOut cpu w o) := by
+      |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) (σ.afterLoad cpu pa n tvn) ∗ rdOut cpu tvn w o) := by
   cases o with
   | none =>
     iintro ⟨Hmm, _⟩
@@ -189,46 +199,109 @@ theorem memModel_rdIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (H
     iframe Hmm
     simp only [rdOut]; iempintro
   | some d =>
-    obtain ⟨wr, L, C, okv⟩ := d
+    obtain ⟨wr, L, C, okv, V, K0⟩ := d
     simp only [rdIn, rdOut]
-    iintro ⟨Hmm, %⟨hn0, hwr, hpub, hallw, huniq, hents⟩, #HC⟩
+    iintro ⟨Hmm, %⟨hn0, hwr, hpub, hallw, huniq, hents⟩, #HC, %ta, %k, %s, #HcovW, #Hla, #Hep, %⟨hVs, hsta, hta⟩⟩
     by_cases hok : okv (nthByte w 0) = true
     · rw [if_pos hok]
-      obtain ⟨e, hre, hmem, hev⟩ := ReadAUr.read_ent _ _ _ _ (hrd 0 hn0)
-      obtain ⟨hetid, het0, hL, hCτ⟩ := hents e hmem (by rw [hev]; exact hok)
       have hpa : pa + BitVec.ofNat 64 0 = pa := by simp
       have hget0 : σ.mem[pa]? = some (Hs 0) := by rw [← hget 0 hn0, hpa]
-      -- the reader's coherence floor at the word reached the writer's store
-      have hcoh : e.t ≤ ((σ.afterLoad cpu pa n tvn).hr cpu).coh pa := by
-        simp only [updCpu, if_true, HRead.afterLoad]
+      have hr0 := hrd 0 hn0
+      unfold Hist.readP at hr0
+      obtain ⟨e, hre, hev⟩ : ∃ e, Hist.readEntP σ.lp (hartAgent cpu) tvn (Hs 0) = some e ∧ e.v = nthByte w 0 := by
+        cases hx : (Hs 0).find? (HEnt.visibleP σ.lp (hartAgent cpu) tvn) with
+        | none => rw [hx] at hr0; cases hr0
+        | some e =>
+          rw [hx] at hr0
+          exact ⟨e, hx, Option.some.inj hr0⟩
+      have hmem : e ∈ Hs 0 := List.mem_of_find?_eq_some hre
+      obtain ⟨hetid, het0, hL, hCτ⟩ := hents e hmem (by rw [hev]; exact hok)
+      -- the foreign entry read is LANDED at or below the view
+      have hvis := List.find?_some hre
+      have hne' : e.tid ≠ hartAgent cpu := by rw [hetid]; exact fun h => hwr (Fin.ext h)
+      obtain ⟨q, hq, hqle⟩ : ∃ q, σ.lp e.t = some q ∧ q ≤ tvn := by
+        simp only [HEnt.visibleP, Bool.or_eq_true, decide_eq_true_eq] at hvis
+        rcases hvis with hv | hv
+        · cases hl : σ.lp e.t with
+          | none => rw [hl] at hv; cases hv
+          | some q => rw [hl] at hv; exact ⟨q, rfl, by simpa using hv⟩
+        · exact absurd hv hne'
+      -- the reader's coherence floor at the word reached the store's landing position
+      have hcoh : ∃ p, (σ.afterLoad cpu pa n tvn).lp e.t = some p ∧ p ≤ ((σ.afterLoad cpu pa n tvn).hr cpu).coh pa := by
+        refine ⟨q, hq, ?_⟩
+        simp only [MState.afterLoad, updCpu, if_true, HRead.afterLoad]
         refine Nat.le_trans ?_ (Nat.le_max_right _ _)
         unfold LoadSrcs.stamp
         apply TsoMem.le_foldrMax
         rw [List.mem_map]
         refine ⟨0, List.mem_range.2 hn0, ?_⟩
         rw [if_pos hpa.symm]
-        unfold LoadSrcs.stampAt FlatMem.loadSrcs
-        rw [List.getElem?_map, List.getElem?_range hn0]
-        simp only [Option.map_some, hpa, hget0, Option.bind_some, Hist.readSrc, hre, Option.map_some]
-        rw [if_neg (by rw [hetid]; exact fun h => hwr (Fin.ext h))]
-      have hmemσ : (σ.afterLoad cpu pa n tvn).mem[pa]? = some (Hs 0) := hget0
-      have he' : (⟨e.t, hartAgent wr, e.v⟩ : HEnt) ∈ Hs 0 := by
+        unfold LoadSrcs.stampAt
+        rw [FlatMem.loadSrcsP_get? σ.mem σ.lp (hartAgent cpu) tvn pa n 0 hn0]
+        simp only [hpa, hget0, Option.bind_some, Hist.readSrcP, hre, Option.map_some, hq, Option.getD_some]
+        rw [if_neg (by exact hne')]
+      have hlo : ((σ.afterLoad cpu pa n tvn).mem.landedOnly (σ.afterLoad cpu pa n tvn).lp)[pa]? =
+          some ((Hs 0).filter (fun x => ((σ.afterLoad cpu pa n tvn).lp x.t).isSome)) := by
+        rw [FlatMem.landedOnly_get?]
+        show (σ.mem[pa]?).map _ = _
+        rw [hget0]; rfl
+      have he' : (⟨e.t, hartAgent wr, e.v⟩ : HEnt) ∈ (Hs 0).filter (fun x => ((σ.afterLoad cpu pa n tvn).lp x.t).isSome) := by
         have : (⟨e.t, hartAgent wr, e.v⟩ : HEnt) = e := by cases e; simp at hetid ⊢; exact hetid.symm
-        rw [this]; exact hmem
+        rw [this]
+        exact List.mem_filter.2 ⟨hmem, by show (σ.lp e.t).isSome; rw [hq]; rfl⟩
       have hgate : gateOk (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn)) cpu := by
         intro f w' hp hne
         obtain ⟨rfl, rfl⟩ := huniq f w' hp (Ne.symm hne)
-        exact ⟨e.t, e.v, Hs 0, hmemσ, he', het0, hcoh⟩
+        exact ⟨e.t, e.v, _, hlo, he', het0, hcoh⟩
       imod memModel_gateIssue _ _ cpu hgate $$ Hmm with ⟨Hmm, #Hg⟩
       have hcert : ∀ t0 ∈ L, ChainCert.valid (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn))
           ⟨wr, t0, cpu, 0⟩ := fun t0 ht0 =>
-        .inr (.inr ⟨pa, wr, e.t, e.v, Hs 0, Ne.symm hwr, hpub, hmemσ, he', hcoh, .inl ⟨rfl, hL t0 ht0⟩⟩)
+        .inr (.inr ⟨pa, wr, e.t, e.v, _, Ne.symm hwr, hpub, hlo, he', hcoh, .inl ⟨rfl, hL t0 ht0⟩⟩)
       imod ReadAUr.certIssueL _ wr cpu L hcert $$ Hmm with ⟨Hmm, HL⟩
-      imod ReadAUr.chainIssueL _ wr cpu pa e.t e.v (Hs 0) (Ne.symm hwr) hpub hallw hmemσ he' hcoh C hCτ
+      imod ReadAUr.chainIssueL _ wr cpu pa e.t e.v _ (Ne.symm hwr) hpub hallw hlo he' hcoh C hCτ
         $$ [Hmm HC] with ⟨Hmm, HC'⟩
       · iframe Hmm HC
+      -- the reader's landing cover at its view (coordinator decision (b)): the writer's own stores
+      -- up to its epoch fence landed below the publication store, the others' below the writer's
+      -- cover's position, which the publication store lands above
+      have heta : e.t = ta := hta e hmem (by rw [hev]; exact hok)
+      ihave %hmm' := memModel_mmOk _ _ $$ Hmm
+      have hlogt : σ.log[e.t - 1]? = some (hartAgent wr) := by
+        have hok' := mmOk_hist hmm' _ _ hget0
+        rcases (hok'.2 e hmem).2 with h0 | h0
+        · omega
+        · rw [h0, hetid]
+      ihave %hlb := memModel_landedBefore _ _ wr k s $$ [Hmm Hep]
+      · iframe Hmm Hep
+      ihave %hs := memModel_epochTop _ _ wr k s $$ [Hmm Hep]
+      · iframe Hmm Hep
+      icases memModel_pers _ _ $$ Hmm with ⟨Hmm, #Hauths, #Hlands⟩
+      ihave #Hlq : landedAtE (MachGS.era (hlc := hlc) (GF := GF)) ta q $$ []
+      · iapply landedPers_get _ σ.llog ta q (by rw [← heta]; exact hq) (by omega) $$ Hlands
+      ihave %hK0 := memModel_landsAbove _ _ ta K0 q $$ [Hmm Hla Hlq]
+      · iframe Hmm Hla Hlq
+      ihave #Hcov : landCovAt (MachGS.era (hlc := hlc) (GF := GF)) V cpu tvn $$ []
+      · unfold landCovAt
+        iintro !> %X %u %⟨hX, hu1, huV⟩ #Hau
+        by_cases hXw : X = wr
+        · subst hXw
+          ihave %hlogu := authPers_agree _ σ.log u (hartAgent X) hu1
+            (by simp only [MState.afterLoad, MState.top] at hs; omega) $$ [Hauths Hau]
+          · iframe Hauths
+            iapply authoredByAt_frag $$ Hau
+          obtain ⟨q', hq'lt, hlpu⟩ := hlb u e.t q hu1 (Nat.le_trans huV hVs) (by omega) hlogu hlogt hq
+          iexists q'
+          isplit
+          · iapply landedPers_get _ σ.llog u q' hlpu (by omega) $$ Hlands
+          · ipureintro; omega
+        · icases HcovW $$ %X %u %⟨hXw, hu1, huV⟩ Hau with ⟨%q', #Hq', %hq'⟩
+          iexists q'
+          iframe Hq'
+          ipureintro
+          omega
       imodintro
-      iframe Hmm HL Hg HC'
+      iframe Hmm HL Hg HC' Hcov
+      ipureintro; omega
     · rw [if_neg hok]
       imodintro
       iframe Hmm

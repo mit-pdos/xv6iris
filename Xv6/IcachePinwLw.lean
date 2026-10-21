@@ -12,11 +12,11 @@ lemma per read, and no hart is fixed before the step:
 
 * `wp_s_lw_iref` -- the lock-free GUARD read (ilock +0x0e, iunlock +0x1c):
   the slice's `credFloor lo tl` pays the read licence in-step
-  (`credFloor_lk` → `wp_s_lw_au_key`), `iref_readAU` gives
+  (`credFloor_lk` → `wp_s_lw_au_key`, its licence and certificates `ls`), `iref_readAU` gives
   `0 < ref < 2^31`, the slice comes back.
 * `wp_s_lw_iref_locked` -- the lock holder's EXACT read (iget scan, idup,
-  iput), at any `SIE` for uniformity: the payload's `ctxFloor curCtx tst`
-  pays `tst ≤ K` (`wp_s_lw_au_floor`), `iref_readAU_locked` gives
+  iput), at any `SIE` for uniformity: the payload's `visFloor curCtx tst` (the head's key; route P,
+  design D12‴ (a″)) pays the head's licence (`wp_s_lw_au_key`), `iref_readAU_locked` gives
   `ref = irefWord M k`.
 -/
 import MachCSL.WpSmodeLwKey
@@ -52,13 +52,15 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
   iapply (wp_s_lw_au_key (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd _ haddr hram hal lo
     iprop(itableInv (hlc := hlc) (GF := GF) ∗ liveGenlo i s g lo)
     (fun _ w => iprop(⌜0 < w.toNat ∧ w.toNat < 2 ^ 31⌝ ∗ liveGenlo i s g lo))
-    (fun cpu' K ts _ hvis => by
-      iintro ⟨#Hts, #Hinv, Hlv⟩
-      iapply iref_readAU cpu' i s g lo K ts hi hvis heqR
+    (fun cpu' K ts ls _ hvis => by
+      iintro ⟨#Hts, #Hls, #Hinv, Hlv⟩
+      iapply iref_readAU cpu' i s g lo K ts ls hi hvis heqR
       iframe Hlv
       isplit
       · iexact Hinv
-      · iexact Hts))
+      isplit
+      · iexact Hts
+      · iexact Hls))
   iframe HI Hk Hpc Hlv
   isplit
   · iexact Hcl
@@ -78,29 +80,31 @@ theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
     (hrd : rdOk rd) (i : Nat) (hi : i < NINODE)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = iRef (ientry i))
-    (M : RegMapF (Qp × PosNat)) (his : ∃ v, PartialMap.get? M i = some v) (tst : Nat)
+    (M : RegMapF (Qp × PosNat)) (his : ∃ v, PartialMap.get? M i = some v) (lo tst : Nat)
     (heqR : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (iRef (ientry i)) ∗
-    itableInv (hlc := hlc) (GF := GF) ∗ ctxFloor curCtx tst ∗ itableHalf M ∗
-    istmpAuth i (1 : Qp).half tst ∗
+    itableInv (hlc := hlc) (GF := GF) ∗ visFloor curCtx tst ∗ itableHalf M ∗
+    istmpAuthL i (1 : Qp).half lo tst ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(∀ w : BitVec (8 * 4), kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜w = irefWord M i⌝ -∗
-          itableHalf M -∗ istmpAuth i (1 : Qp).half tst -∗ wpLoop cpu'))
+          itableHalf M -∗ istmpAuthL i (1 : Qp).half lo tst -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   obtain ⟨hram, hal⟩ := iRef_ram_aligned i hi
   iintro ⟨HI, Hk, Hpc, #Hcl, #Hinv, #Hfl, Hhalf, Hst, HΦ⟩
-  iapply (wp_s_lw_au_floor (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd _ haddr hram hal tst
-    iprop(itableInv (hlc := hlc) (GF := GF) ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst)
-    (fun _ w => iprop(⌜w = irefWord M i⌝ ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst))
-    (fun cpu' K _ htK => by
-      iintro ⟨#Hinv, Hhalf, Hst⟩
-      iapply iref_readAU_locked cpu' M i tst K [] hi his htK heqR
+  iapply (wp_s_lw_au_key (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd _ haddr hram hal tst
+    iprop(itableInv (hlc := hlc) (GF := GF) ∗ itableHalf M ∗ istmpAuthL i (1 : Qp).half lo tst)
+    (fun _ w => iprop(⌜w = irefWord M i⌝ ∗ itableHalf M ∗ istmpAuthL i (1 : Qp).half lo tst))
+    (fun cpu' K ts ls _ hvis => by
+      iintro ⟨#Hts, #Hls, #Hinv, Hhalf, Hst⟩
+      iapply iref_readAU_locked cpu' M i lo tst K ts ls hi his hvis heqR
       iframe Hhalf Hst
       isplit
       · iexact Hinv
-      · iclear Hinv; exact BigSepL.bigSepL_nil_intro))
+      isplit
+      · iexact Hts
+      · iexact Hls))
   iframe HI Hk Hpc Hhalf Hst
   isplit
   · iexact Hcl

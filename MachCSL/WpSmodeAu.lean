@@ -136,7 +136,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
     (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
-    exclReadAU pa 4 (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w)) ∗
+    exclReadAU cpu pa 4 (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read amoswapAq page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 4 true false true false) Φ := by
@@ -146,7 +146,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   iapply swp_bind
   iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide) r)
   iframe Hfrag
-  iapply exclReadAU_wand pa 4 _ _ $$ HAU
+  iapply exclReadAU_wand cpu pa 4 _ _ $$ HAU
   inext
   iintro %w HΨ Hfrag
   swp_run 60

@@ -198,11 +198,11 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   icases itableSlotRes_acc_upd curCtx Mt ci kk hkk $$ Hstamps with ⟨Hsrow, Hstback⟩
   ihave Hsrow := Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk) $$ Hsrow
   unfold itableSlotLive
-  icases Hsrow with ⟨Hbrow, ⟨%tst, Hst, #Hllbk, #Hflk⟩⟩
+  icases Hsrow with ⟨Hbrow, ⟨%loS, %tst, Hst, #Hllbk, #Hflk, #Hflo⟩⟩
   -- +0x18 c.lw a5,8(s1): THE EXACT READ
   icases kctx_rsvEq c1 _ $$ Hk with ⟨%heqR, Hk⟩
   k_step (wp_s_lw_iref_locked c1 _ (KA.«iput» + 0x18#64) true 8#12 15#5 9#5 (by decide)
-      (by decide) kk hkk ?ha18 Mt ⟨_, hMk⟩ tst heqR)
+      (by decide) kk hkk ?ha18 Mt ⟨_, hMk⟩ loS tst heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $Hinv $Hflk $Hhalf $Hst]
   iintro %w Hk Hpc %hw Hhalf Hst
   case ha18 => k_norm [b9, ha0]; exact iRef_sext _
@@ -213,8 +213,8 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   · iapply Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk qt cnt hMk).symm
     unfold itableSlotLive
     iframe Hbrow
-    iexists tst
-    iframe Hst Hllbk Hflk
+    iexists loS, tst
+    iframe Hst Hllbk Hflk Hflo
   -- +0x1a c.li a4,1
   k_step (wp_s_addi c1 _ (KA.«iput» + 0x1a#64) true 1#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

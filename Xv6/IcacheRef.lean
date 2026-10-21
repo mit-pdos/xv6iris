@@ -139,16 +139,13 @@ open Iris.Algebra
 section CredFloor
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- A6.146: THE CREDENTIAL FLOOR, received-or-wrote (the §0.38' pair,
-`WpLock.lk_floor`'s shape at the bundle tier).  The right arm is the FRESH
-ARM's whole story: the arm store's author registered its own message as a
-dirty key of its context; no `ctxFloor` covering its own buffered store is
-mintable (TSO), and none is needed -- the author's own message is visible
-to it at EVERY view (store forwarding).  Cash-in: `credFloor_lk` +
-`MachCSL.ownCtx_lkFloor_vis` (Rocq `IcachePinwObl.cred_floor_vis`).
-(Deviation 1: the wrote arm is `keyAt`'s dirty arm.) -/
-def credFloor [CurCtx] (lo tl : Nat) : IProp GF := iprop(
-  ctxFloor curCtx tl ∨ ∃ h : CPU, dirtyIn curCtx lo h ∗ authoredBy lo (hartAgent h))
+/-- A6.146: THE CREDENTIAL FLOOR (the §0.38' pair, `WpLock.lk_floor`'s shape at the bundle tier).
+Route P, design D12 (approved): the credential is a VISIBILITY floor at the generation stamp `lo`
+(`MachCSL.visFloor`: a key of `lo`, or `lo` landed under the context's bound) -- under D9 a stamp and
+a floor POSITION cannot be compared, so `tl` stays nominal (every statement mentioning the pair is
+kept).  The fresh arm (the arm store's author: a dirty key) is `visFloor`'s key arm.  Cash-in:
+`credFloor_lk` + `MachCSL.ownCtx_visFloor_vis`. -/
+def credFloor [CurCtx] (lo tl : Nat) : IProp GF := visFloor curCtx lo
 
 instance credFloor_persistent [CurCtx] (lo tl : Nat) :
     Persistent (credFloor (GF := GF) lo tl) := by
@@ -157,43 +154,27 @@ instance credFloor_timeless [CurCtx] (lo tl : Nat) :
     Timeless (credFloor (GF := GF) lo tl) := by
   unfold credFloor; infer_instance
 
-theorem credFloor_of_ctx [CurCtx] (lo tl : Nat) :
-    ctxFloor (GF := GF) curCtx tl ⊢ credFloor lo tl := by
-  unfold credFloor
-  iintro H
-  ileft
-  iexact H
+/-- A stamp landed under the context's bound is a credential (route P: what a row's identity
+store's landing certificate and the reader's floor give). -/
+theorem credFloor_of_landed [CurCtx] (lo tl p : Nat) :
+    landedAt (GF := GF) lo p ∗ ctxFloor curCtx p ⊢ credFloor lo tl :=
+  visFloor_of_landed curCtx lo p
 
 /-- The arm store's mint (`MachCSL.wp_s_sw_mint` returns `lkFloor curCtx t`)
 is a credential at `(t, t)`. -/
 theorem credFloor_of_lk [CurCtx] (lo : Nat) :
-    lkFloor (GF := GF) curCtx lo ⊢ credFloor lo lo := by
-  iintro H
-  ihave #Hv := visFloor_of_lk curCtx lo $$ H
-  unfold visFloor credFloor
-  icases Hv with (H | ⟨%h, H⟩)
-  · ileft; iexact H
-  · iright; iexists h; iexact H
+    lkFloor (GF := GF) curCtx lo ⊢ credFloor lo lo :=
+  visFloor_of_lk curCtx lo
 
 /-- A visibility floor at `lo` is a credential at `(lo, lo)` (W8 (f2-ctx):
 the form the floors law transports, `MachCSL.instCtxMorphVisFloor`). -/
 theorem credFloor_of_vis [CurCtx] (lo : Nat) :
-    visFloor (GF := GF) curCtx lo ⊢ credFloor lo lo := by
-  unfold visFloor credFloor
-  iintro H
-  icases H with (H | ⟨%h, H⟩)
-  · ileft; iexact H
-  · iright; iexists h; iexact H
+    visFloor (GF := GF) curCtx lo ⊢ credFloor lo lo := .rfl
 
-/-- The cash-in side: a credential at `lo ≤ tl` is a lock floor at `lo`
-(which `MachCSL.ownCtx_lkFloor_vis` turns into a view receipt). -/
+/-- The cash-in side: a credential at `lo ≤ tl` is a visibility floor at `lo`
+(which `MachCSL.ownCtx_visFloor_vis` turns into a view receipt). -/
 theorem credFloor_lk [CurCtx] (lo tl : Nat) (hle : lo ≤ tl) :
-    credFloor (GF := GF) lo tl ⊢ visFloor curCtx lo := by
-  unfold visFloor credFloor
-  iintro H
-  icases H with (H | ⟨%h, H⟩)
-  · ileft; iapply ctxFloor_le curCtx tl lo hle; iexact H
-  · iright; iexists h; iexact H
+    credFloor (GF := GF) lo tl ⊢ visFloor curCtx lo := .rfl
 
 end CredFloor
 

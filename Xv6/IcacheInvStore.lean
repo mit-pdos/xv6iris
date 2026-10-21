@@ -434,54 +434,57 @@ end Ghost
 section Stamp
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-theorem istmpAuth_whole [Icfg] (k : Nat) (t : Nat) :
-    istmpAuth (GF := GF) k (1 : Qp).half t ∗ istmpAuth k (1 : Qp).half t ⊣⊢ istmpAuth k 1 t := by
-  have h := istmpAuth_split (GF := GF) k (1 : Qp).half (1 : Qp).half t
+theorem istmpAuthL_whole [Icfg] (k : Nat) (lo t : Nat) :
+    istmpAuthL (GF := GF) k (1 : Qp).half lo t ∗ istmpAuthL k (1 : Qp).half lo t ⊣⊢
+      istmpAuthL k 1 lo t := by
+  have h := istmpAuthL_split (GF := GF) k (1 : Qp).half (1 : Qp).half lo t
   rw [Qp.half_add_half] at h
   exact h.symm
 
-/-- Rocq `mono_nat_own_update` at the stamp's whole authority. -/
-theorem istmpAuth_update [Icfg] (k : Nat) (t t' : Nat) (h : t ≤ t') :
-    istmpAuth (GF := GF) k 1 t ⊢ |==> istmpAuth k 1 t' := by
-  unfold istmpAuth
-  iintro H
-  imod MonoNat.own_update (icfgIstmp k) (.ofNat t) (.ofNat t') ((MaxNat.le_toNat _ _).mpr h) $$ H
-    with ⟨H, -⟩
+/-- Rocq `mono_nat_own_update` at the stamp's whole authority, along the two moves of the pair
+(a push keeps `lo`; a re-arm jumps past the head). -/
+theorem istmpAuthL_update [Icfg] (k : Nat) (l t l' t' : Nat)
+    (h : (l = l' ∧ t ≤ t') ∨ (t < l' ∧ l' ≤ t')) :
+    istmpAuthL (GF := GF) k 1 l t ⊢ |==> istmpAuthL k 1 l' t' := by
+  unfold istmpAuthL
+  iintro ⟨H, %hl⟩
+  imod MonoNat.own_update (icfgIstmp k) (.ofNat (istmpEnc l t)) (.ofNat (istmpEnc l' t'))
+    ((MaxNat.le_toNat _ _).mpr (istmpEnc_le hl h)) $$ H with ⟨H, -⟩
   imodintro
-  iexact H
+  iframe H
+  ipureintro
+  rcases h with ⟨rfl, h⟩ | ⟨_, h⟩ <;> omega
 
 /-- THE STAMP BUMP (Rocq's `iCombine "Hst Hstp"; mono_nat_own_update (max
-tstp tst')`): both halves in hand, to the max. -/
-theorem istmpAuth_bump [Icfg] (k : Nat) (t t' : Nat) :
-    istmpAuth (GF := GF) k (1 : Qp).half t ∗ istmpAuth k (1 : Qp).half t ⊢
-      |==> (istmpAuth k (1 : Qp).half (max t t') ∗ istmpAuth k (1 : Qp).half (max t t')) := by
+tstp tst')`): both halves in hand, the head to `t' ≥ t`, the generation kept. -/
+theorem istmpAuthL_bump [Icfg] (k : Nat) (lo t t' : Nat) (h : t ≤ t') :
+    istmpAuthL (GF := GF) k (1 : Qp).half lo t ∗ istmpAuthL k (1 : Qp).half lo t ⊢
+      |==> (istmpAuthL k (1 : Qp).half lo t' ∗ istmpAuthL k (1 : Qp).half lo t') := by
   iintro H
-  ihave H := (istmpAuth_whole k t).1 $$ H
-  imod istmpAuth_update k t (max t t') (Nat.le_max_left _ _) $$ H with H
+  ihave H := (istmpAuthL_whole k lo t).1 $$ H
+  imod istmpAuthL_update k lo t lo t' (.inl ⟨rfl, h⟩) $$ H with H
   imodintro
-  iapply (istmpAuth_whole k (max t t')).2
+  iapply (istmpAuthL_whole k lo t').2
   iexact H
 
 /-- What a member store's post turns into at the live re-close: the rows
-re-bound to `max tstp tst'` (Rocq's `big_sepL_mono`), both stamp halves
-bumped there, and the receipts joined (Rocq `TsoGhost.llb_max`). -/
-theorem pinw_post_bump [Icfg] (k : Nat) (w' : BitVec 32) (lo tstp : Nat) :
-    pinwStorePost (GF := GF) k w' lo ∗ istmpAuth k (1 : Qp).half tstp ∗
-      istmpAuth k (1 : Qp).half tstp ∗ topLb tstp ⊢
+at the store's stamp `tstn > tstp`, both stamp halves bumped there (the generation `lo` kept), and
+the store's receipts. -/
+theorem pinw_post_bump [Icfg] (k : Nat) (w' : BitVec 32) (lo tstp : Nat) (ag : Agent) :
+    pinwStorePost (GF := GF) k w' lo tstp ag ∗ istmpAuthL k (1 : Qp).half lo tstp ∗
+      istmpAuthL k (1 : Qp).half lo tstp ⊢
       |==> ∃ tstn : Nat, ⌜tstp ≤ tstn⌝ ∗ irefPinRows k w' lo tstn ∗
-        istmpAuth k (1 : Qp).half tstn ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn := by
+        istmpAuthL k (1 : Qp).half lo tstn ∗ istmpAuthL k (1 : Qp).half lo tstn ∗ itopLb tstn ∗
+        authoredBy tstn ag := by
   unfold pinwStorePost
-  iintro ⟨⟨%tst', #Hllb', Hpin⟩, Hst, Hstp, #Hllbp⟩
-  imod istmpAuth_bump k tstp tst' $$ [Hst Hstp] with ⟨Hst, Hstp⟩
+  iintro ⟨⟨%tst', %hlt, #Hllb', #Hau', Hpin⟩, Hst, Hstp⟩
+  imod istmpAuthL_bump k lo tstp tst' (Nat.le_of_lt hlt) $$ [Hst Hstp] with ⟨Hst, Hstp⟩
   · iframe
-  ihave Hpin := irefPinRows_mono k w' lo tst' (max tstp tst') (Nat.le_max_right _ _) $$ Hpin
-  ihave #Hllb := topLb_max tstp tst' $$ [Hllbp Hllb']
-  · iframe Hllbp Hllb'
   imodintro
-  iexists max tstp tst'
-  iframe Hpin Hst Hstp Hllb
+  iexists tst'
+  iframe Hpin Hst Hstp Hllb' Hau'
   ipureintro
-  exact Nat.le_max_left _ _
+  exact Nat.le_of_lt hlt
 
 end Stamp
 
@@ -542,17 +545,17 @@ theorem itable_open_slot [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : 
 /-- A live slot's row, with the stamp halves met (Rocq's inline
 `mono_nat_auth_own_agree`: the yield is at the PAYLOAD's number). -/
 theorem pinwSlot_live_stamp [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp) (n : PosNat)
-    (tstp : Nat) (hM : PartialMap.get? M k = some (qt, n)) :
-    pinwSlot (GF := GF) M k ∗ istmpAuth k (1 : Qp).half tstp ⊢
-      ∃ (g : GName) (lo : Nat), ⌜lo ≤ tstp⌝ ∗ istmpAuth k (1 : Qp).half tstp ∗
-        istmpAuth k (1 : Qp).half tstp ∗ irefPinRows k (irefWord M k) lo tstp ∗
+    (lo tstp : Nat) (hM : PartialMap.get? M k = some (qt, n)) :
+    pinwSlot (GF := GF) M k ∗ istmpAuthL k (1 : Qp).half lo tstp ⊢
+      ∃ g : GName, ⌜lo ≤ tstp⌝ ∗ istmpAuthL k (1 : Qp).half lo tstp ∗
+        istmpAuthL k (1 : Qp).half lo tstp ∗ irefPinRows k (irefWord M k) lo tstp ∗
         pinwArm k qt g lo := by
   iintro ⟨Hslot, Hstp⟩
-  icases pinwSlot_live_cases M k qt n hM $$ Hslot with ⟨%g, %lo, %tst, %hlot, Hst, Hpin, Harm⟩
-  ihave %htt := istmpAuth_agree k _ _ tst tstp $$ [Hst Hstp]
+  icases pinwSlot_live_cases M k qt n hM $$ Hslot with ⟨%g, %lo0, %tst, %hlot, Hst, Hpin, Harm⟩
+  ihave %htt := istmpAuthL_agree k _ _ lo0 tst lo tstp $$ [Hst Hstp]
   · iframe
-  subst htt
-  iexists g, lo
+  obtain ⟨rfl, rfl⟩ := htt
+  iexists g
   iframe Hst Hstp Hpin Harm
   ipureintro; exact hlot
 
@@ -578,7 +581,8 @@ move is paid by the caller's LICENCE (`iregIcnt_lic_acc`); the new
 reference's slice comes off the residual at the slot's `(g, lo)`. -/
 theorem iref_incr_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (M : RegMapF (Qp × PosNat)) (k : Nat) (inum : BitVec 32)
-    (l : Ilic) (qt qn : Qp) (n : PosNat) (tstp : Nat)
+    (l : Ilic) (qt qn : Qp) (n : PosNat) (lo tstp : Nat)
+    (ag : Agent)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hEL : (↑logN : CoPset) ⊆ Eo) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
@@ -586,22 +590,22 @@ theorem iref_incr_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ islSlot M k -∗ frzsel k (1 : Qp).half false -∗
       iname γi γfs inodestart inum l -∗ icntHalf inum.toNat n.val -∗
-      istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
-      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ∃ (g : GName) (lo : Nat), ⌜lo ≤ tstp⌝ ∗
+      istmpAuthL k (1 : Qp).half lo tstp -∗ itopLb tstp -∗
+      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ∃ g : GName, ⌜lo ≤ tstp⌝ ∗
         irefPinRows k (irefWord M k) lo tstp ∗
-        (pinwStorePost k (BitVec.ofNat 32 n.succ.val) lo ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
+        (pinwStorePost k (BitVec.ofNat 32 n.succ.val) lo tstp ag ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
           itableHalf (PartialMap.insert M k (qt + qn, n.succ)) ∗
           islSlot (PartialMap.insert M k (qt + qn, n.succ)) k ∗
           irefTokGenlo k qn g lo ∗ frzsel k (1 : Qp).half false ∗
           iname γi γfs inodestart inum l ∗ icntHalf inum.toNat n.succ.val ∗
           runit (isClaim l) inum.toNat ∗
-          (∃ tstn : Nat, ⌜lo ≤ tstn⌝ ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn)) := by
+          (∃ tstn : Nat, istmpAuthL k (1 : Qp).half lo tstn ∗ itopLb tstn ∗ authoredBy tstn ag)) := by
   have hqv : ✓ (qt + qn) := qp_valid_of_lt_half hq
   iintro #Hinv #Hrinv Hhalf Hislot Hsel Hoff Hcnt Hstp #Hllbp
   imod itable_open_slot Eo M k hE (.inl ⟨_, hMk⟩) $$ Hinv Hhalf with
     ⟨%hk, %hwf, Hauth, Hslot, Hclose⟩
-  icases pinwSlot_live_stamp M k qt n tstp hMk $$ [Hslot Hstp] with
-    ⟨%g, %lo, %hlot, Hst, Hstp, Hpin, Harm⟩
+  icases pinwSlot_live_stamp M k qt n lo tstp hMk $$ [Hslot Hstp] with
+    ⟨%g, %hlot, Hst, Hstp, Hpin, Harm⟩
   · iframe
   icases pinwArm_sel k qt g lo $$ [Harm Hsel] with ⟨%c, %hc, Hres, Hselh, Hsel⟩
   · iframe
@@ -610,13 +614,13 @@ theorem iref_incr_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
       (iregN_sub_diff_icacheN Eo hER) (logN_sub_diff_icacheN Eo hEL) hin $$ Hrinv Hoff Hcnt
     with ⟨Hoff, Hrback⟩
   imodintro
-  iexists g, lo
+  iexists g
   isplitr
   · ipureintro; exact hlot
   iframe Hpin
   iintro Hpost
-  imod pinw_post_bump k _ lo tstp $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb⟩
-  · iframe; iexact Hllbp
+  imod pinw_post_bump k _ lo tstp ag $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb, #Hautn⟩
+  · iframe
   -- the ghost count move
   rw [islSlot_some M k qt n hMk, islSlot_some _ k (qt + qn) n.succ (get?_insert_eq rfl)]
   imod slh_mint (icfgIsl k) qt qn $$ Hislot with ⟨Hislot, Hshare⟩
@@ -639,8 +643,7 @@ theorem iref_incr_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
   · unfold irefTokGenlo irefFrag
     iframe
   iexists tstn
-  iframe Hstp Hllb
-  ipureintro; omega
+  iframe Hstp Hllb Hautn
 
 /-- Rocq `iref_close_store_pinw_au`: THE DOWN-COUNT STORE (survivor),
 pinw-faced -- `iref_close_store_au`'s twin.  The closing reference's slice
@@ -654,59 +657,62 @@ at `n + 1 ≥ 2`, where BOTH phases of §2.3's pin are already refuted by
 arithmetic (`iregFrzOk_ge2_any`). -/
 theorem iref_close_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (M : RegMapF (Qp × PosNat)) (k : Nat) (inum : BitVec 32)
-    (bfl : Bool) (q qt qr : Qp) (n : PosNat) (g : GName) (lo tstp : Nat)
+    (bfl : Bool) (q qt qr : Qp) (n : PosNat) (g : GName) (lo loS tstp : Nat)
+    (ag : Agent)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n.succ)) (hsub : qpSub qt q = some qr) :
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregInv (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ irefTokGenlo k q g lo -∗ islSlot M k -∗
       runit bfl inum.toNat -∗ icntHalf inum.toNat n.succ.val -∗
-      istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
-      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ⌜lo ≤ tstp⌝ ∗
+      istmpAuthL k (1 : Qp).half loS tstp -∗ itopLb tstp -∗
+      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ⌜loS = lo⌝ ∗ ⌜lo ≤ tstp⌝ ∗
         irefPinRows k (irefWord M k) lo tstp ∗
-        (pinwStorePost k (BitVec.ofNat 32 n.val) lo ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
+        (pinwStorePost k (BitVec.ofNat 32 n.val) lo tstp ag ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
           itableHalf (PartialMap.insert M k (qr, n)) ∗
           islSlot (PartialMap.insert M k (qr, n)) k ∗ icntHalf inum.toNat n.val ∗
-          (∃ tstn : Nat, ⌜lo ≤ tstn⌝ ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn)) := by
+          (∃ tstn : Nat, istmpAuthL k (1 : Qp).half lo tstn ∗ itopLb tstn ∗ authoredBy tstn ag)) := by
   have hge2 : 2 ≤ n.succ.val := by have := n.pos; simp; omega
   iintro #Hinv #Hrinv Hhalf Htok Hislot Hu Hcnt Hstp #Hllbp
   imod itable_open_slot Eo M k hE (.inl ⟨_, hMk⟩) $$ Hinv Hhalf with
     ⟨%hk, %hwf, Hauth, Hslot, Hclose⟩
   have hno : n.val ≤ IREFSLOTS := by have := hwf.2 k qt n.succ hMk; simp at this; omega
-  icases pinwSlot_live_stamp M k qt n.succ tstp hMk $$ [Hslot Hstp] with
-    ⟨%g0, %lo0, %hlot, Hst, Hstp, Hpin, Harm⟩
+  icases pinwSlot_live_stamp M k qt n.succ loS tstp hMk $$ [Hslot Hstp] with
+    ⟨%g0, %hlot, Hst, Hstp, Hpin, Harm⟩
   · iframe
   unfold irefTokGenlo
   icases Htok with ⟨Hf, Hlv, Hsh⟩
   -- the frozen alternative dies on the incoming slice, which pins (g, lo)
-  icases pinwArm_slice k qt g0 lo0 q g lo $$ [Harm Hlv] with ⟨%he, %c, %hc, Hres, Hselh, Hlv⟩
+  icases pinwArm_slice k qt g0 loS q g lo $$ [Harm Hlv] with ⟨%he, %c, %hc, Hres, Hselh, Hlv⟩
   · iframe
-  obtain ⟨rfl, rfl⟩ := he
+  obtain ⟨rfl, hl⟩ := he
+  subst loS
   imod iregIcnt_acc (Eo \ ↑icacheN) γi γfs inodestart nib inum n.succ.val
       (iregN_sub_diff_icacheN Eo hER) hin $$ Hrinv Hcnt with ⟨%fz, %dsl, %hfrz, Hrback⟩
   imodintro
   isplitr
+  · ipureintro; rfl
+  isplitr
   · ipureintro; exact hlot
   iframe Hpin
   iintro Hpost
-  imod pinw_post_bump k _ lo0 tstp $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb⟩
-  · iframe; iexact Hllbp
+  imod pinw_post_bump k _ lo tstp ag $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb, #Hautn⟩
+  · iframe
   imod iref_close_step_noarm M k q qt n qr hMk hsub $$ [Hauth Hf Hsh Hislot] with ⟨Hauth, Hislot⟩
   · iframe
-  icases pinw_arm_join qt qr q c k g0 lo0 hsub hc $$ [Hres Hlv] with ⟨%c', %hc', Hres⟩
+  icases pinw_arm_join qt qr q c k g0 lo hsub hc $$ [Hres Hlv] with ⟨%c', %hc', Hres⟩
   · iframe
   imod Hrback $$ %n.val %bfl %(iregFrzOk_ge2_any fz _ _ dsl hge2 hfrz) %rfl Hu with Hcnt
   imod Hclose $$ %(PartialMap.insert M k (qr, n)) %(icM_insert_agree_off M k _)
       %(icMWf_insert M k _ _ hwf hk hno) [Hauth Hst Hpin Hres Hselh] with Hhalf
   · iframe Hauth
-    iapply pinwSlot_intro_norm _ k qr n c' g0 lo0 tstn (get?_insert_eq rfl) hc' (by omega)
+    iapply pinwSlot_intro_norm _ k qr n c' g0 lo tstn (get?_insert_eq rfl) hc' (by omega)
     rw [irefWord_insert]
     iframe
   imodintro
   iframe Hhalf Hislot Hcnt
   iexists tstn
-  iframe Hstp Hllb
-  ipureintro; omega
+  iframe Hstp Hllb Hautn
 
 /-- Rocq `iref_upgrade_mir_store_pinw_au`: THE LICENCE-FREE UP-COUNT,
 pinw-faced -- `iref_upgrade_mir_store_au`'s twin, and idup's mover.  The
@@ -734,7 +740,8 @@ class wall -- `iregInv` puts `LogG` on every statement naming it.  Lean's
 wall is the consumer's question, not this lemma's.) -/
 theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (M : RegMapF (Qp × PosNat)) (k : Nat) (inum : BitVec 32)
-    (bfl : Bool) (qt qn s : Qp) (n : PosNat) (g : GName) (lo tstp : Nat)
+    (bfl : Bool) (qt qn s : Qp) (n : PosNat) (g : GName) (lo loS tstp : Nat)
+    (ag : Agent)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hER : (↑iregN : CoPset) ⊆ Eo)
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
@@ -742,45 +749,48 @@ theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs 
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ liveGenlo k s g lo -∗ islSlot M k -∗
       frzmH inum.toNat false -∗ runit bfl inum.toNat -∗ icntHalf inum.toNat n.val -∗
-      istmpAuth k (1 : Qp).half tstp -∗ topLb tstp -∗
-      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ⌜lo ≤ tstp⌝ ∗
+      istmpAuthL k (1 : Qp).half loS tstp -∗ itopLb tstp -∗
+      |={Eo, (Eo \ ↑icacheN) \ ↑iregN}=> ⌜loS = lo⌝ ∗ ⌜lo ≤ tstp⌝ ∗
         irefPinRows k (irefWord M k) lo tstp ∗
-        (pinwStorePost k (BitVec.ofNat 32 n.succ.val) lo ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
+        (pinwStorePost k (BitVec.ofNat 32 n.succ.val) lo tstp ag ={(Eo \ ↑icacheN) \ ↑iregN, Eo}=∗
           itableHalf (PartialMap.insert M k (qt + qn, n.succ)) ∗
           islSlot (PartialMap.insert M k (qt + qn, n.succ)) k ∗
           irefTokGenlo k qn g lo ∗ liveGenlo k s g lo ∗
           frzmH inum.toNat false ∗ icntHalf inum.toNat n.succ.val ∗
           runit bfl inum.toNat ∗ runit bfl inum.toNat ∗
-          (∃ tstn : Nat, ⌜lo ≤ tstn⌝ ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn)) := by
+          (∃ tstn : Nat, istmpAuthL k (1 : Qp).half lo tstn ∗ itopLb tstn ∗ authoredBy tstn ag)) := by
   have hqv : ✓ (qt + qn) := qp_valid_of_lt_half hq
   iintro #Hinv #Hrinv Hhalf Hlv Hislot Hmir Hu Hcnt Hstp #Hllbp
   imod itable_open_slot Eo M k hE (.inl ⟨_, hMk⟩) $$ Hinv Hhalf with
     ⟨%hk, %hwf, Hauth, Hslot, Hclose⟩
-  icases pinwSlot_live_stamp M k qt n tstp hMk $$ [Hslot Hstp] with
-    ⟨%g0, %lo0, %hlot, Hst, Hstp, Hpin, Harm⟩
+  icases pinwSlot_live_stamp M k qt n loS tstp hMk $$ [Hslot Hstp] with
+    ⟨%g0, %hlot, Hst, Hstp, Hpin, Harm⟩
   · iframe
-  icases pinwArm_slice k qt g0 lo0 s g lo $$ [Harm Hlv] with ⟨%he, %c, %hc, Hres, Hselh, Hlv⟩
+  icases pinwArm_slice k qt g0 loS s g lo $$ [Harm Hlv] with ⟨%he, %c, %hc, Hres, Hselh, Hlv⟩
   · iframe
-  obtain ⟨rfl, rfl⟩ := he
+  obtain ⟨rfl, hl⟩ := he
+  subst loS
   imod iregIcnt_mir_acc (Eo \ ↑icacheN) γi γfs inodestart nib inum bfl n.val
       (iregN_sub_diff_icacheN Eo hER) hin n.pos $$ Hrinv Hmir Hcnt with ⟨Hmir, Hrback⟩
   imodintro
   isplitr
+  · ipureintro; rfl
+  isplitr
   · ipureintro; exact hlot
   iframe Hpin
   iintro Hpost
-  imod pinw_post_bump k _ lo0 tstp $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb⟩
-  · iframe; iexact Hllbp
+  imod pinw_post_bump k _ lo tstp ag $$ [Hpost Hst Hstp] with ⟨%tstn, %hle, Hpin, Hst, Hstp, #Hllb, #Hautn⟩
+  · iframe
   rw [islSlot_some M k qt n hMk, islSlot_some _ k (qt + qn) n.succ (get?_insert_eq rfl)]
   imod slh_mint (icfgIsl k) qt qn $$ Hislot with ⟨Hislot, Hshare⟩
   imod iOwn_update (ic_incr_upd M k qt qn n hMk hqv) $$ Hauth with Hauth
   icases iOwn_op.1 $$ Hauth with ⟨Hauth, Hfr⟩
-  icases pinw_arm_split qt qn c k g0 lo0 hq hc $$ Hres with ⟨%c', %hc', Hqn, Hres⟩
+  icases pinw_arm_split qt qn c k g0 lo hq hc $$ Hres with ⟨%c', %hc', Hqn, Hres⟩
   imod Hrback $$ %n.succ.val %rfl Hu with ⟨Hcnt, Hu, Hu2⟩
   imod Hclose $$ %(PartialMap.insert M k (qt + qn, n.succ)) %(icM_insert_agree_off M k _)
       %(icMWf_insert M k _ _ hwf hk hno) [Hauth Hst Hpin Hres Hselh] with Hhalf
   · iframe Hauth
-    iapply pinwSlot_intro_norm _ k (qt + qn) n.succ c' g0 lo0 tstn (get?_insert_eq rfl) hc'
+    iapply pinwSlot_intro_norm _ k (qt + qn) n.succ c' g0 lo tstn (get?_insert_eq rfl) hc'
       (by omega)
     rw [irefWord_insert]
     iframe
@@ -790,8 +800,7 @@ theorem iref_upgrade_mir_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs 
   · unfold irefTokGenlo irefFrag
     iframe
   iexists tstn
-  iframe Hstp Hllb
-  ipureintro; omega
+  iframe Hstp Hllb Hautn
 
 /-- Rocq `iref_alloc_pinw_install`: THE ARM (recycle 0 → 1), pinw-faced --
 THE SIXTH MOVE (iclaim-ledger.md §3.1).  The physical leg runs on the
@@ -818,7 +827,7 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ iregReg (hlc := hlc) γi γfs inodestart nib -∗
       itableHalf M -∗ islSlot M k -∗ iname γi γfs inodestart inum l -∗
       ifreezeOff inum.toNat -∗ icntHalf inum.toNat 0 -∗
-      istmpAuth k 1 tstp -∗ topLb tstp -∗ topLb loA -∗
+      istmpAuth k 1 tstp -∗ itopLb tstp -∗ ⌜tstp < loA⌝ -∗ itopLb loA -∗
       irefPinRows k (BitVec.ofNat 32 1) loA loA -∗
       |={Eo}=> itableHalf (PartialMap.insert M k (q, PosNat.one)) ∗
         islSlot (PartialMap.insert M k (q, PosNat.one)) k ∗
@@ -826,8 +835,8 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
           ityPending g) ∗
         frzsel k (1 : Qp).half false ∗ iname γi γfs inodestart inum l ∗
         ifreezeOff inum.toNat ∗ icntHalf inum.toNat 1 ∗ runit (isClaim l) inum.toNat ∗
-        (∃ tstn : Nat, ⌜loA ≤ tstn⌝ ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn) := by
-  iintro #Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt Hstf #Hllbtp #HllbA Hpin
+        istmpAuthL k (1 : Qp).half loA loA ∗ itopLb loA := by
+  iintro #Hinv #Hrinv Hhalf Hislot Hl Hoff Hcnt Hstf #Hllbtp %hltA #HllbA Hpin
   imod itable_open_slot Eo M k hE (.inr hk) $$ Hinv Hhalf with
     ⟨-, %hwf, Hauth, Hslot, Hclose⟩
   rw [pinwSlot_none M k hMk]
@@ -847,19 +856,17 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
   imod iref_alloc_step_noarm M k q hMk hq $$ [Hauth Hislot] with ⟨Hauth, Hislot, Hfr, Hshare⟩
   · iframe
   -- the stamp: bump the full auth, split a half into the slot row
-  imod istmpAuth_update k tstp (max tstp loA) (Nat.le_max_left _ _) $$ Hstf with Hstf
-  icases (istmpAuth_whole k (max tstp loA)).2 $$ Hstf with ⟨Hstin, Hstout⟩
+  icases istmpAuth_cases k _ tstp $$ Hstf with ⟨%lst, Hstf⟩
+  imod istmpAuthL_update k lst tstp loA loA (.inr ⟨hltA, Nat.le_refl _⟩) $$ Hstf with Hstf
+  icases (istmpAuthL_whole k loA loA).2 $$ Hstf with ⟨Hstin, Hstout⟩
   imod Hrback $$ %1 %rfl with ⟨Hcnt, Hu⟩
-  ihave Hpin := irefPinRows_mono k _ loA loA (max tstp loA) (Nat.le_max_right _ _) $$ Hpin
   imod Hclose $$ %(PartialMap.insert M k (q, PosNat.one)) %(icM_insert_agree_off M k _)
       %(icMWf_insert M k _ _ hwf hk (by decide)) [Hauth Hstin Hpin Hres Hselin] with Hhalf
   · iframe Hauth
-    iapply pinwSlot_intro_norm _ k q PosNat.one c g' loA (max tstp loA) (get?_insert_eq rfl) hc
-      (Nat.le_max_right _ _)
+    iapply pinwSlot_intro_norm _ k q PosNat.one c g' loA loA (get?_insert_eq rfl) hc
+      (Nat.le_refl _)
     rw [irefWord_insert, PosNat.one_val]
     iframe
-  ihave #Hllb := topLb_max tstp loA $$ [Hllbtp HllbA]
-  · iframe Hllbtp HllbA
   imodintro
   iframe Hhalf Hislot Hselout Hl Hoff Hcnt Hu
   isplitl [Hfr Htokl Hshare Hesc Hpend]
@@ -867,9 +874,7 @@ theorem iref_alloc_pinw_install [Icfg] (Eo : CoPset) (γi : GName) (γfs : FsNam
     iframe Hesc Hpend
     unfold irefTokGenlo irefFrag
     iframe
-  iexists max tstp loA
-  iframe Hstout Hllb
-  ipureintro; exact Nat.le_max_right _ _
+  iframe Hstout HllbA
 
 /-- The last close's phase step is admissible from any phase: it lands at
 count zero, never at `FrzPre`, and keeps the unfrozen column unfrozen
@@ -921,8 +926,9 @@ theorem iref_close_last_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs :
   iintro #Hinv #Hrinv Hhalf Htok Hesc Hsel Hislot Hu Hfz Hcnt Hmir Hstp
   imod itable_open_slot Eo M k hE (.inl ⟨_, hMk⟩) $$ Hinv Hhalf with
     ⟨-, %hwf, Hauth, Hslot, Hclose⟩
-  icases pinwSlot_live_stamp M k qt PosNat.one tstp hMk $$ [Hslot Hstp] with
-    ⟨%g0, %lo0, %hlot, Hst, Hstp, Hpin, Harm⟩
+  icases istmpAuth_cases k _ tstp $$ Hstp with ⟨%lo0, Hstp⟩
+  icases pinwSlot_live_stamp M k qt PosNat.one lo0 tstp hMk $$ [Hslot Hstp] with
+    ⟨%g0, %hlot, Hst, Hstp, Hpin, Harm⟩
   · iframe
   unfold irefTokGenlo
   icases Htok with ⟨Hf, Hlv, Hsh⟩
@@ -946,8 +952,9 @@ theorem iref_close_last_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γfs :
   imod iref_close_last_step_noarm M k qt hMk $$ [Hauth Hf Hsh Hislot] with ⟨Hauth, Hislot⟩
   · iframe
   -- the stamp halves rejoin: the FULL auth leaves for the payload
-  ihave Hstf := (istmpAuth_whole k tstp).1 $$ [Hst Hstp]
+  ihave Hstf := (istmpAuthL_whole k lo0 tstp).1 $$ [Hst Hstp]
   · iframe
+  ihave Hstf := istmpAuth_of_L k 1 lo0 tstp $$ Hstf
   imod Hrback $$ %(frzClose ph) %0 %bfl %(iregFrzOk_close ph dsl hpin)
       %(Or.inr (frzClose_reg ph)) %rfl Hu %(frzBit_close ph) with ⟨Hfz2, Hcnt, Hmirb⟩
   imod Hclose $$ %(PartialMap.delete M k) %(icM_delete_agree_off M k) %(icMWf_delete M k hwf)
@@ -988,8 +995,9 @@ theorem iref_close_last_frz_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γ
   iintro #Hinv #Hrinv Hhalf Hf Hsh Hsel Hislot Hu Hfz Hcnt Hmir Hstp
   imod itable_open_slot Eo M k hE (.inl ⟨_, hMk⟩) $$ Hinv Hhalf with
     ⟨-, %hwf, Hauth, Hslot, Hclose⟩
-  icases pinwSlot_live_stamp M k qt PosNat.one tstp hMk $$ [Hslot Hstp] with
-    ⟨%g0, %lo0, %hlot, Hst, Hstp, Hpin, Harm⟩
+  icases istmpAuth_cases k _ tstp $$ Hstp with ⟨%lo0, Hstp⟩
+  icases pinwSlot_live_stamp M k qt PosNat.one lo0 tstp hMk $$ [Hslot Hstp] with
+    ⟨%g0, %hlot, Hst, Hstp, Hpin, Harm⟩
   · iframe
   icases pinwArm_frz k qt g0 lo0 $$ [Harm Hsel] with ⟨Hfull, Hselh, Hsel⟩
   · iframe
@@ -1011,8 +1019,9 @@ theorem iref_close_last_frz_store_pinw_au [Icfg] (Eo : CoPset) (γi : GName) (γ
   -- the auth delete
   imod iref_close_last_step_noarm M k qt hMk $$ [Hauth Hf Hsh Hislot] with ⟨Hauth, Hislot⟩
   · iframe
-  ihave Hstf := (istmpAuth_whole k tstp).1 $$ [Hst Hstp]
+  ihave Hstf := (istmpAuthL_whole k lo0 tstp).1 $$ [Hst Hstp]
   · iframe
+  ihave Hstf := istmpAuth_of_L k 1 lo0 tstp $$ Hstf
   imod Hrback $$ %(frzClose (.frzPre rg)) %0 %bfl %(iregFrzOk_close (.frzPre rg) dsl hpin)
       %(Or.inr (frzClose_reg (.frzPre rg))) %rfl Hu %(frzBit_close (.frzPre rg))
     with ⟨Hfz2, Hcnt, Hmirb⟩

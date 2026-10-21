@@ -220,41 +220,21 @@ theorem WordHist.read_head_vis {n : Nat} (W : WordHist n) (Hold : Nat → Hist) 
 section res
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- A KEY of the running context is under the store order's top
-(Rocq: the `llb` of an arm store's own position; design §3's
-`ownCtx_key_topLb`).  A floor key is under a view receipt of the hart; a
-dirty key is under the token's watermark. -/
-theorem ownCtx_key_topLb (cpu : CPU) (ξ : CtxId) (t : Nat) :
+/-- A KEY of the running context is ISSUED (Rocq: the `llb` of an arm store's own position;
+design §3's `ownCtx_key_topLb`).  Route P (design D9): a key's timestamp is an ISSUE stamp, so what
+it gives is an issue receipt (`itopLb`), not a landing position; every arm but the image's carries
+the stamp's authorship receipt. -/
+theorem ownCtx_key_itopLb (cpu : CPU) (ξ : CtxId) (t : Nat) :
     ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢
-      ownCtx cpu ξ ∗ topLb t := by
+      ownCtx cpu ξ ∗ itopLb t := by
   iintro ⟨Hctx, #Hkey⟩
-  icases keyAt_cases _ ξ t $$ Hkey with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, #Hau⟩⟩
-  · icases ownCtx_floor_view cpu ξ t $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hle⟩⟩
-    · iframe Hctx; iexact Hfl
-    iframe Hctx
-    iapply topLb_le K t hle
-    iapply viewLb_topLb cpu K
-    iexact HK
-  · icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
-    ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
-    · iapply ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
-      iframe Hat
-      iexact Hd
-    have hW := (hok t h hD).1
-    isplitl [Hat Hch]
-    · iapply ownCtx_intro cpu ξ B K W D
-      iframe Hat Hch
-      isplit
-      · iexact HK
-      isplit
-      · ipureintro; exact hBK
-      isplit
-      · iexact HW
-      isplit
-      · ipureintro; exact hok
-      · iexact Hels
-    · iapply topLb_le W t hW
-      iexact HW
+  iframe Hctx
+  icases keyAt_cases _ ξ t $$ Hkey with (#Hc | ⟨%h, #Hd, #Hau⟩)
+  · unfold chainKey
+    icases Hc with (%h0 | ⟨%a, #Hau, _⟩)
+    · rw [h0]; iapply itopLbAt_0
+    · iapply itopLbAt_of_auth _ t a $$ Hau
+  · iapply itopLbAt_of_auth _ t (hartAgent h) $$ Hau
 
 end res
 
@@ -348,26 +328,56 @@ theorem irefClaims_at [CurCtx] (k : Nat) (hk : k < NINODE) :
   exact BigSepL.bigSepL_mem (Φ := fun j => kmapId (GF := GF) (iRef (ientry j)))
     (List.mem_range.mpr hk)
 
+/-- A window's stamps strictly DESCENDING and above the tails' `lo` (route P, design D12‴: every
+`ip->ref` store is a plain push by an `itable.lock` holder, issued after the window's head). -/
+def WordHist.descAbove {n : Nat} (lo : Nat) (W : WordHist n) : Prop :=
+  (W.map WEnt.t).Pairwise (· > ·) ∧ ∀ e ∈ W, lo < e.t
+
 /-- Rocq `iref_pin_rows k w lo tst`, over `wordCell` (deviation 1): the
 window at `w`, every store since the floor `lo` (and the floor's own
-value) a member, the head at most `tst`. -/
+value) a member, the head EXACTLY at `tst` and the window's stamps descending above `lo` (route P,
+design D12‴ (a″)). -/
 def irefPinRows (k : Nat) (w : BitVec 32) (lo tst : Nat) : IProp GF :=
   iprop(∃ (v0 : BitVec 32) (W : WordHist 4), wordCell (iRef (ientry k)) 4 lo v0 W ∗
-    ⌜irefSet v0 ∧ (∀ e ∈ W, irefSet e.v) ∧ curVal W v0 = w ∧ W.headPos lo ≤ tst⌝)
+    ⌜irefSet v0 ∧ (∀ e ∈ W, irefSet e.v) ∧ curVal W v0 = w ∧ W.headPos lo = tst ∧ WordHist.descAbove lo W⌝)
 
 instance irefPinRows_timeless (k : Nat) (w : BitVec 32) (lo tst : Nat) :
     Timeless (irefPinRows (GF := GF) k w lo tst) := by
   unfold irefPinRows; infer_instance
 
-/-- Rocq's `big_sepL_mono` re-bound of the stamps. -/
-theorem irefPinRows_mono (k : Nat) (w : BitVec 32) (lo tst tst' : Nat) (h : tst ≤ tst') :
-    irefPinRows (GF := GF) k w lo tst ⊢ irefPinRows k w lo tst' := by
-  unfold irefPinRows
-  iintro ⟨%v0, %W, Hc, %⟨h1, h2, h3, h4⟩⟩
-  iexists v0, W
-  iframe Hc
-  ipureintro
-  exact ⟨h1, h2, h3, by omega⟩
+/-- The head of a window is at or above its tails' position. -/
+theorem WordHist.headPos_ge {n : Nat} (lo : Nat) (W : WordHist n) (hd : WordHist.descAbove lo W) : lo ≤ W.headPos lo := by
+  cases W with
+  | nil => simp [WordHist.headPos]
+  | cons e W => simp only [WordHist.headPos]; exact Nat.le_of_lt (hd.2 e List.mem_cons_self)
+
+/-- Every stamp of a window is at or below its head's. -/
+theorem WordHist.le_headPos {n : Nat} (lo : Nat) (W : WordHist n) (hd : WordHist.descAbove lo W) :
+    ∀ e ∈ W, e.t ≤ W.headPos lo := by
+  cases W with
+  | nil => intro e he; cases he
+  | cons x W =>
+    intro e he
+    simp only [WordHist.headPos]
+    rcases List.mem_cons.1 he with rfl | he
+    · exact Nat.le_refl _
+    · have := (List.pairwise_cons.1 (List.pairwise_map.1 hd.1)).1 e he
+      exact Nat.le_of_lt this
+
+/-- Pushing a store issued after the head keeps the window descending above `lo`. -/
+theorem WordHist.descAbove_push {n : Nat} (lo : Nat) (W : WordHist n) (hd : WordHist.descAbove lo W) (t : Nat)
+    (h : Agent) (w : BitVec (8 * n)) (ht : W.headPos lo < t) :
+    WordHist.descAbove lo (⟨t, h, w⟩ :: W) := by
+  refine ⟨?_, fun e he => ?_⟩
+  · simp only [List.map_cons]
+    refine List.pairwise_cons.2 ⟨fun b hb => ?_, hd.1⟩
+    obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hb
+    have := WordHist.le_headPos lo W hd x hx
+    show x.t < t
+    omega
+  · rcases List.mem_cons.1 he with rfl | he
+    · have := WordHist.headPos_ge lo W hd; show lo < t; omega
+    · exact hd.2 e he
 
 /-- THE MEMBER STORE (Rocq `pinw_write_c`, `pinw_ok1_app_member`): the
 window's histories go out to a `MachCSL.writeAU`, and a store of a member
@@ -378,26 +388,25 @@ theorem irefPinRows_push (k : Nat) (w w' : BitVec 32) (lo tst : Nat)
     (hw' : irefSet w') :
     irefPinRows (GF := GF) k w lo tst ⊢ ∃ Hs : Nat → Hist,
       histBytes (iRef (ientry k)) 4 (fun _ => DFrac.own 1) Hs ∗
-      (∀ (t : Nat) (h : Agent),
+      (∀ (t : Nat) (h : Agent), ⌜tst < t⌝ -∗
         histBytes (iRef (ientry k)) 4 (fun _ => DFrac.own 1) (pushed (n := 4) Hs t h w') -∗
-        irefPinRows k w' lo (max tst t)) := by
+        irefPinRows k w' lo t) := by
   unfold irefPinRows
-  iintro ⟨%v0, %W, Hc, %⟨h1, h2, -, -⟩⟩
+  iintro ⟨%v0, %W, Hc, %⟨h1, h2, -, hhd, hd⟩⟩
   icases wordCell_cases _ 4 lo v0 W $$ Hc with ⟨%Hold, Hb, %htail⟩
   iexists W.hist Hold
   iframe Hb
-  iintro %t %h Hb
+  iintro %t %h %htt Hb
   iexists v0, (⟨t, h, w'⟩ :: W)
   isplitl [Hb]
   · iapply wordCell_push _ 4 lo v0 W Hold htail t h w'
     iexact Hb
   · ipureintro
-    refine ⟨h1, ?_, rfl, ?_⟩
-    · intro e he
-      rcases List.mem_cons.mp he with rfl | he
-      · exact hw'
-      · exact h2 e he
-    · simp only [WordHist.headPos]; omega
+    refine ⟨h1, ?_, rfl, rfl, WordHist.descAbove_push lo W hd t h w' (by omega)⟩
+    intro e he
+    rcases List.mem_cons.mp he with rfl | he
+    · exact hw'
+    · exact h2 e he
 
 /-- THE ARM STORE's fresh window (Rocq `pinw_ok1_mint`): the cell
 `MachCSL.wp_s_sw_mint` returns at a member value is the rows at `(t, t)`. -/
@@ -408,9 +417,8 @@ theorem irefPinRows_mint (k : Nat) (w : BitVec 32) (t : Nat) (hw : irefSet w) :
   iexists w, []
   iframe Hc
   ipureintro
-  refine ⟨hw, ?_, rfl, ?_⟩
-  · intro e he; simp at he
-  · simp [WordHist.headPos]
+  refine ⟨hw, ?_, rfl, rfl, ⟨List.Pairwise.nil, fun e he => by cases he⟩⟩
+  intro e he; simp at he
 
 end Claims
 
@@ -419,29 +427,129 @@ end Claims
 section IstmpAuth
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
+/-- The pairing of the stamp authority's two components (route P, D12‴ (a″)): the generation
+stamp `lo` and the head stamp `tst`, `lo ≤ tst`, as one number `tst * tst + lo`.  Injective on
+`lo ≤ tst` (`istmpEnc_inj`) and increasing along the two moves the slot makes: a push `(lo, tst) →
+(lo, tst')`, `tst ≤ tst'`, and a re-arm `(lo, tst) → (lo', lo')`, `tst < lo'` (`istmpEnc_le`). -/
+def istmpEnc (lo tst : Nat) : Nat := tst * tst + lo
+
+theorem istmpEnc_inj {l1 t1 l2 t2 : Nat} (h1 : l1 ≤ t1) (h2 : l2 ≤ t2)
+    (h : istmpEnc l1 t1 = istmpEnc l2 t2) : l1 = l2 ∧ t1 = t2 := by
+  unfold istmpEnc at h
+  have ht : t1 = t2 := by
+    rcases Nat.lt_trichotomy t1 t2 with hlt | heq | hgt
+    · have : (t1 + 1) * (t1 + 1) ≤ t2 * t2 := Nat.mul_le_mul hlt hlt
+      have e : (t1 + 1) * (t1 + 1) = t1 * t1 + 2 * t1 + 1 := by simp only [Nat.add_mul, Nat.mul_add, Nat.mul_one, Nat.one_mul]; omega
+      omega
+    · exact heq
+    · have : (t2 + 1) * (t2 + 1) ≤ t1 * t1 := Nat.mul_le_mul hgt hgt
+      have e : (t2 + 1) * (t2 + 1) = t2 * t2 + 2 * t2 + 1 := by simp only [Nat.add_mul, Nat.mul_add, Nat.mul_one, Nat.one_mul]; omega
+      omega
+  subst ht
+  exact ⟨by omega, rfl⟩
+
+/-- The encoding is monotone along a push (`lo` kept, `tst ≤ tst'`) and a re-arm (`tst < lo'`). -/
+theorem istmpEnc_le {l1 t1 l2 t2 : Nat} (h1 : l1 ≤ t1)
+    (h : (l1 = l2 ∧ t1 ≤ t2) ∨ (t1 < l2 ∧ l2 ≤ t2)) : istmpEnc l1 t1 ≤ istmpEnc l2 t2 := by
+  unfold istmpEnc
+  rcases h with ⟨rfl, ht⟩ | ⟨hl, hl2⟩
+  · have := Nat.mul_le_mul ht ht; omega
+  · have h3 : (t1 + 1) * (t1 + 1) ≤ t2 * t2 := Nat.mul_le_mul (by omega) (by omega)
+    have e : (t1 + 1) * (t1 + 1) = t1 * t1 + 2 * t1 + 1 := by simp only [Nat.add_mul, Nat.mul_add, Nat.mul_one, Nat.one_mul]; omega
+    omega
+
 /-- Rocq `mono_nat_auth_own (icfg_istmp k) q tst` (deviation 4): the A6.144
-exact-read stamp's authority.  Half in the live slot's row, half on
-itable.lock's payload. -/
+exact-read stamp's authority.  Half in the live slot's row, half in the invariant's live arm.
+Route P, D12‴ (a″): the authority NAMES the slot's generation stamp `lo` beside the head stamp
+`tst` (one `MonoNat` at the pairing `istmpEnc lo tst`), so the payload row and the invariant agree
+on both (`istmpAuthL_agree`) and the row can carry the generation's visibility floor. -/
+def istmpAuthL [Icfg] (k : Nat) (q : Qp) (lo tst : Nat) : IProp GF :=
+  iprop(MonoNat.auth_own (icfgIstmp k) (DFrac.own q) (.ofNat (istmpEnc lo tst)) ∗ ⌜lo ≤ tst⌝)
+
+/-- The authority at head stamp `tst`, its generation not named (the free slot's and the boot
+image's form; every consumer that only carries the stamp). -/
 def istmpAuth [Icfg] (k : Nat) (q : Qp) (tst : Nat) : IProp GF :=
-  MonoNat.auth_own (icfgIstmp k) (DFrac.own q) (.ofNat tst)
+  iprop(∃ lo : Nat, istmpAuthL k q lo tst)
+
+instance istmpAuthL_timeless [Icfg] (k : Nat) (q : Qp) (lo tst : Nat) :
+    Timeless (istmpAuthL (GF := GF) k q lo tst) := by
+  unfold istmpAuthL; infer_instance
 
 instance istmpAuth_timeless [Icfg] (k : Nat) (q : Qp) (tst : Nat) :
     Timeless (istmpAuth (GF := GF) k q tst) := by
   unfold istmpAuth; infer_instance
 
+theorem istmpAuth_of_L [Icfg] (k : Nat) (q : Qp) (lo tst : Nat) :
+    istmpAuthL (GF := GF) k q lo tst ⊢ istmpAuth k q tst := by
+  unfold istmpAuth; iintro H; iexists lo; iexact H
+
+theorem istmpAuth_cases [Icfg] (k : Nat) (q : Qp) (tst : Nat) :
+    istmpAuth (GF := GF) k q tst ⊢ ∃ lo, istmpAuthL k q lo tst := .rfl
+
+/-- The boot image's authority: the raw `MonoNat` at `0` is the pair `(0, 0)`. -/
+theorem istmpAuth_boot [Icfg] (k : Nat) :
+    MonoNat.auth_own (GF := GF) (icfgIstmp k) (DFrac.own 1) (.ofNat 0) ⊢ istmpAuth k 1 0 := by
+  unfold istmpAuth istmpAuthL
+  iintro H
+  iexists 0
+  rw [show istmpEnc 0 0 = 0 from rfl]
+  iframe H
+  ipureintro; exact Nat.le_refl 0
+
+theorem istmpAuthL_le [Icfg] (k : Nat) (q : Qp) (lo tst : Nat) :
+    istmpAuthL (GF := GF) k q lo tst ⊢ ⌜lo ≤ tst⌝ := by
+  unfold istmpAuthL; iintro ⟨-, %h⟩; ipureintro; exact h
+
+theorem istmpAuthL_agree [Icfg] (k : Nat) (q1 q2 : Qp) (l1 t1 l2 t2 : Nat) :
+    istmpAuthL (GF := GF) k q1 l1 t1 ∗ istmpAuthL k q2 l2 t2 ⊢ ⌜l1 = l2 ∧ t1 = t2⌝ := by
+  unfold istmpAuthL
+  iintro ⟨⟨H1, %h1⟩, ⟨H2, %h2⟩⟩
+  ihave %h := MonoNat.auth_own_agree _ _ _ _ _ $$ H1 H2
+  ipureintro
+  exact istmpEnc_inj h1 h2 (MaxNat.ofNat.inj h.2)
+
 theorem istmpAuth_agree [Icfg] (k : Nat) (q1 q2 : Qp) (t1 t2 : Nat) :
     istmpAuth (GF := GF) k q1 t1 ∗ istmpAuth k q2 t2 ⊢ ⌜t1 = t2⌝ := by
   unfold istmpAuth
-  iintro ⟨H1, H2⟩
-  ihave %h := MonoNat.auth_own_agree _ _ _ _ _ $$ H1 H2
-  ipureintro
-  exact MaxNat.ofNat.inj h.2
+  iintro ⟨⟨%l1, H1⟩, ⟨%l2, H2⟩⟩
+  ihave %h := istmpAuthL_agree k q1 q2 l1 t1 l2 t2 $$ [H1 H2]
+  · iframe
+  ipureintro; exact h.2
+
+theorem istmpAuthL_split [Icfg] (k : Nat) (q1 q2 : Qp) (lo tst : Nat) :
+    istmpAuthL (GF := GF) k (q1 + q2) lo tst ⊣⊢ istmpAuthL k q1 lo tst ∗ istmpAuthL k q2 lo tst := by
+  have hf := Fractional.fractional (Φ := fun q : Qp => MonoNat.auth_own (GF := GF) (icfgIstmp k)
+    (DFrac.own q) (.ofNat (istmpEnc lo tst))) q1 q2
+  unfold istmpAuthL
+  constructor
+  · iintro ⟨H, %h⟩
+    icases hf.1 $$ H with ⟨H1, H2⟩
+    iframe H1 H2
+    isplit <;> ipureintro <;> exact h
+  · iintro ⟨⟨H1, %h⟩, ⟨H2, -⟩⟩
+    isplitl [H1 H2]
+    · iapply hf.2
+      iframe
+    · ipureintro; exact h
 
 theorem istmpAuth_split [Icfg] (k : Nat) (q1 q2 : Qp) (tst : Nat) :
     istmpAuth (GF := GF) k (q1 + q2) tst ⊣⊢ istmpAuth k q1 tst ∗ istmpAuth k q2 tst := by
-  unfold istmpAuth
-  exact Fractional.fractional (Φ := fun q : Qp => MonoNat.auth_own (GF := GF) (icfgIstmp k)
-    (DFrac.own q) (.ofNat tst)) q1 q2
+  constructor
+  · unfold istmpAuth
+    iintro ⟨%lo, H⟩
+    icases (istmpAuthL_split k q1 q2 lo tst).1 $$ H with ⟨H1, H2⟩
+    isplitl [H1]
+    · iexists lo; iexact H1
+    · iexists lo; iexact H2
+  · unfold istmpAuth
+    iintro ⟨⟨%l1, H1⟩, ⟨%l2, H2⟩⟩
+    icases persistent_entails_left (istmpAuthL_agree k q1 q2 l1 tst l2 tst) $$ [H1 H2]
+      with ⟨⟨H1, H2⟩, %h⟩
+    · iframe
+    obtain ⟨rfl, -⟩ := h
+    iexists l1
+    iapply (istmpAuthL_split k q1 q2 l1 tst).2
+    iframe
 
 end IstmpAuth
 
@@ -465,7 +573,7 @@ def pinwArm [Icfg] (k : Nat) (qt : Qp) (g : GName) (lo : Nat) : IProp GF :=
 /-- A live slot: the pin custody AND the liveness arm, one `(g, lo)` binder
 over both. -/
 def pinwLive [Icfg] (k : Nat) (qt : Qp) (w : BitVec 32) : IProp GF :=
-  iprop(∃ (g : GName) (lo tst : Nat), ⌜lo ≤ tst⌝ ∗ istmpAuth k (1 : Qp).half tst ∗
+  iprop(∃ (g : GName) (lo tst : Nat), ⌜lo ≤ tst⌝ ∗ istmpAuthL k (1 : Qp).half lo tst ∗
     irefPinRows k w lo tst ∗ pinwArm k qt g lo)
 
 /-- Rocq `pinw_slot`: the merged per-slot row (deviation 6). -/
@@ -477,13 +585,13 @@ def pinwSlot [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) : IProp GF :=
 theorem pinwSlot_live_cases [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp) (n : PosNat)
     (hM : PartialMap.get? M k = some (qt, n)) :
     pinwSlot (GF := GF) M k ⊢ ∃ (g : GName) (lo tst : Nat), ⌜lo ≤ tst⌝ ∗
-      istmpAuth k (1 : Qp).half tst ∗ irefPinRows k (irefWord M k) lo tst ∗ pinwArm k qt g lo := by
+      istmpAuthL k (1 : Qp).half lo tst ∗ irefPinRows k (irefWord M k) lo tst ∗ pinwArm k qt g lo := by
   unfold pinwSlot pinwLive
   rw [hM]
 
 theorem pinwSlot_live_intro [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp) (n : PosNat)
     (hM : PartialMap.get? M k = some (qt, n)) (g : GName) (lo tst : Nat) (hlo : lo ≤ tst) :
-    istmpAuth (GF := GF) k (1 : Qp).half tst ∗ irefPinRows k (irefWord M k) lo tst ∗
+    istmpAuthL (GF := GF) k (1 : Qp).half lo tst ∗ irefPinRows k (irefWord M k) lo tst ∗
       pinwArm k qt g lo ⊢ pinwSlot M k := by
   unfold pinwSlot pinwLive
   rw [hM]
@@ -539,7 +647,7 @@ theorem itableBody_intro [Icfg] (M : RegMapF (Qp × PosNat)) (hwf : icMWf M) :
 theorem pinwSlot_intro_norm [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp) (n : PosNat)
     (c : Qp) (g : GName) (lo tst : Nat) (hM : PartialMap.get? M k = some (qt, n))
     (hc : qpSub (1 : Qp).half qt = some c) (hlo : lo ≤ tst) :
-    istmpAuth (GF := GF) k (1 : Qp).half tst ∗ irefPinRows k (irefWord M k) lo tst ∗
+    istmpAuthL (GF := GF) k (1 : Qp).half lo tst ∗ irefPinRows k (irefWord M k) lo tst ∗
       liveGenlo k c g lo ∗ frzsel k (1 : Qp).half false ⊢ pinwSlot M k := by
   rw [pinwSlot_some M k qt n hM]
   unfold pinwLive pinwArm
@@ -596,7 +704,7 @@ theorem pinwSlot_slice [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (s : Qp) (g
     pinwSlot (GF := GF) M k ∗ liveGenlo k s g lo ⊢
       ∃ (qt : Qp) (n : PosNat) (tst : Nat) (c : Qp),
         ⌜PartialMap.get? M k = some (qt, n)⌝ ∗ ⌜qpSub (1 : Qp).half qt = some c⌝ ∗
-        ⌜lo ≤ tst⌝ ∗ istmpAuth k (1 : Qp).half tst ∗ irefPinRows k (irefWord M k) lo tst ∗
+        ⌜lo ≤ tst⌝ ∗ istmpAuthL k (1 : Qp).half lo tst ∗ irefPinRows k (irefWord M k) lo tst ∗
         liveGenlo k c g lo ∗ frzsel k (1 : Qp).half false ∗ liveGenlo k s g lo := by
   cases hM : PartialMap.get? M k with
   | none =>
@@ -662,13 +770,13 @@ names the word, the A6.144 payload stamp half names the bound, and the
 window crosses the load step unchanged.  (Free slots' cells are plain ctx
 cells in the payload -- a different, ordinary leaf.) -/
 theorem iref_load_locked_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
-    (tstp : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE)
+    (lo tstp : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ istmpAuth k (1 : Qp).half tstp -∗
-      |={Eo, Eo \ ↑icacheN}=> ∃ lo : Nat, ⌜lo ≤ tstp⌝ ∗
+    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ istmpAuthL k (1 : Qp).half lo tstp -∗
+      |={Eo, Eo \ ↑icacheN}=> ⌜lo ≤ tstp⌝ ∗
         irefPinRows k (irefWord M k) lo tstp ∗
         (irefPinRows k (irefWord M k) lo tstp ={Eo \ ↑icacheN, Eo}=∗
-          itableHalf M ∗ istmpAuth k (1 : Qp).half tstp) := by
+          itableHalf M ∗ istmpAuthL k (1 : Qp).half lo tstp) := by
   iintro #Hinv Hhalf Hstp
   unfold itableInv
   imod (inv_acc_timeless (E := Eo) (N := icacheN) (P := itableBody (GF := GF)) hE) $$ Hinv
@@ -681,11 +789,10 @@ theorem iref_load_locked_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG
   icases pinwSlot_acc M' k hk $$ Hrows with ⟨Hslot, Hback⟩
   icases pinwSlot_live_cases M' k qt n hMk $$ Hslot with
     ⟨%g0, %lo0, %tst, %hlot, Hst, Hpin, Harm⟩
-  ihave %htt := istmpAuth_agree k _ _ tst tstp $$ [Hst Hstp]
+  ihave %htt := istmpAuthL_agree k _ _ lo0 tst lo tstp $$ [Hst Hstp]
   · iframe
-  subst htt
+  obtain ⟨rfl, rfl⟩ := htt
   imodintro
-  iexists lo0
   isplitr
   · ipureintro; exact hlot
   iframe Hpin
@@ -929,10 +1036,10 @@ theorem pinw_arm_split [Icfg] (qt qn c : Qp) (k : Nat) (g : GName) (lo : Nat)
   exact qpSub_some.mpr hc'
 
 /-- Rocq `pinw_store_post` (deviation 2): what the store leaf's obligation
-gives back for a member store -- the window at the NEW word, stamps bounded
-by a fresh store-order receipt. -/
-def pinwStorePost (k : Nat) (w' : BitVec 32) (lo : Nat) : IProp GF :=
-  iprop(∃ tst' : Nat, topLb tst' ∗ irefPinRows k w' lo tst')
+gives back for a member store -- the window at the NEW word, its head the store's stamp `tst'`,
+ISSUED after the previous head `tstp` (route P, D12‴: an issue receipt, `writeAU`'s `⌜T < t⌝`). -/
+def pinwStorePost (k : Nat) (w' : BitVec 32) (lo tstp : Nat) (ag : Agent) : IProp GF :=
+  iprop(∃ tst' : Nat, ⌜tstp < tst'⌝ ∗ itopLb tst' ∗ authoredBy tst' ag ∗ irefPinRows k w' lo tst')
 
 /-! ### THE FROZEN PARK (iclaim-ledger.md §3.16, RULING A⁗; ZZProbeFrz)
 

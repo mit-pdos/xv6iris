@@ -66,14 +66,15 @@ theorem WbPrimed.readAtPrimed (log' : List Wmsg) (c c' : Wpcfg Pexv6 Efab)
     rmem c st σ → WbPrimed.cfgRel c c' → Xv6.AccessDiscipline.xv6AccessDisc σ →
     relSiteWCrel σ c'.pcLog → c'.pcLog <+: log' → c.pcLog[p]? = some m →
     (msgByte m (paZ pa)).isSome → inRam pa 1 → (σ.hr j).coh pa = p + 1 →
+    σ.llog = List.range' 1 σ.log.length →
     ∃ m', c'.pcLog[p]? = some m' ∧ m'.wmPa = m.wmPa ∧ m'.wmData = m.wmData ∧
       m'.wmTid = m.wmTid ∧ readAt log' c' st σ j pa p m' := by
-  rintro hR hrel hD hsite hpre hp hv hram hcoh
+  rintro hR hrel hD hsite hpre hp hv hram hcoh heg
   obtain ⟨himg, -, ⟨f, hlog⟩, -⟩ := hrel
   have hp' := retagLogLookupSome f c.pcLog p m hp
   rw [← hlog] at hp'
   refine ⟨_, hp', rfl, rfl, rfl, WbPrimed.rmemRetag c c' f st σ himg hlog hR, hD, hsite, hpre, hp',
-    ?_, hram, hcoh⟩
+    ?_, hram, hcoh, heg⟩
   rw [retagMsgByte]; exact hv
 
 /-- **W11-C's refutation over the primed log** (`ownedUnpubRefuted` at the primed
@@ -83,11 +84,12 @@ theorem WbPrimed.ownedUnpubRefutedPrimed (log' : List Wmsg) (c c' : Wpcfg Pexv6 
     (hR : rmem c st σ) (hrel : WbPrimed.cfgRel c c') (hD : Xv6.AccessDiscipline.xv6AccessDisc σ)
     (hsite : relSiteWCrel σ c'.pcLog) (hpre : c'.pcLog <+: log') (hp : c.pcLog[p]? = some m)
     (hv : (msgByte m (paZ pa)).isSome) (hram : inRam pa 1) (hcoh : (σ.hr j).coh pa = p + 1)
+    (heg : σ.llog = List.range' 1 σ.log.length)
     (hi : m.wmTid = some i) (hiN : i < NCPU) (hij : i ≠ hartAgent j) :
     ∃ m', c'.pcLog[p]? = some m' ∧ m'.wmTid = m.wmTid ∧
       (benignAt σ pa (p + 1) ∨ ¬ (m'.wmAk = .WCplain ∧ ¬ wpublished log' m'.wmTid p)) := by
   obtain ⟨m', hp', -, -, htid, hrd⟩ :=
-    WbPrimed.readAtPrimed log' c c' st σ j pa p m hR hrel hD hsite hpre hp hv hram hcoh
+    WbPrimed.readAtPrimed log' c c' st σ j pa p m hR hrel hD hsite hpre hp hv hram hcoh heg
   exact ⟨m', hp', htid, ownedUnpubRefuted log' c' st σ j pa p m' i hrd (by rw [htid]; exact hi) hiN hij⟩
 
 /-! ## 2. The primed run, recorded along W4's record -/

@@ -206,7 +206,7 @@ theorem RvwmoXv6Adequacy.rhistGet {m : FlatMem} {img : Image} {log : List Wmsg} 
 /-- The entries a sync path's FIRST move consists of: a `syncHop`'s release entry on a hop byte,
 or a publication store. -/
 def RvwmoXv6Adequacy.relEntAt (σ : MState) (r : Nat) : Prop :=
-  (∃ (b : PAddr) (A C : CPU) (a' : Nat), syncHop σ.mem b A r C a' ∧
+  (∃ (b : PAddr) (A C : CPU) (a' : Nat), syncHop (σ.mem.landedOnly σ.lp) b A r C a' ∧
       Xv6.AccessDiscipline.hopByteAt σ b a') ∨
   (∃ (f : PAddr) (w : CPU) (v : BitVec 8) (H : Hist),
       (Xv6.AccessDiscipline.xv6Env σ).isPub f w ∧ σ.mem[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H)
@@ -234,9 +234,25 @@ theorem RvwmoXv6Adequacy.syncHopRel {m : FlatMem} {b : PAddr} {A : CPU} {r : Nat
   obtain ⟨H1, H2, e0, va, hb, -⟩ := h
   exact ⟨_, hb, by simp⟩
 
+/-- Under eager landing (route P, design D5) the landed-only memory is the memory. -/
+theorem RvwmoXv6Adequacy.landedOnlyEager (m : FlatMem) (lp : LandPos)
+    (h : ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp e.t = some e.t) :
+    m.landedOnly lp = m := by
+  apply Std.ExtTreeMap.ext_getElem?
+  intro a
+  rw [FlatMem.landedOnly_get?]
+  cases hH : m[a]? with
+  | none => rfl
+  | some H =>
+    simp only [Option.map_some, Option.some.injEq]
+    apply List.filter_eq_self.2
+    intro e he
+    simp [h a H hH e he]
+
 /-- **A sync path's first move** from author `A`'s entries at or below `t`: an entry of `A` above
 `t` that is a lock release or a publication store, held in some byte's history. -/
 theorem RvwmoXv6Adequacy.syncPathFirst {σ : MState} {A : CPU} {t : Nat} {B : CPU} {τ : Nat}
+    (hlo : σ.mem.landedOnly σ.lp = σ.mem)
     (h : Xv6.AccessDiscipline.syncPath σ A t B τ) :
     ∃ (r : Nat) (pa : PAddr) (H : Hist) (v : BitVec 8), t < r ∧ σ.mem[pa]? = some H ∧
       (⟨r, hartAgent A, v⟩ : HEnt) ∈ H ∧ RvwmoXv6Adequacy.relEntAt σ r := by
@@ -246,12 +262,17 @@ theorem RvwmoXv6Adequacy.syncPathFirst {σ : MState} {A : CPU} {t : Nat} {B : CP
     intro B' a hc
     obtain ⟨b, r, C, a', hb, hh, ht⟩ := RvwmoXv6Adequacy.hopChainFirst hc
     obtain ⟨H, hH, he⟩ := RvwmoXv6Adequacy.syncHopRel hh
-    exact ⟨r, b, H, 0, ht, hH, he, .inl ⟨b, A, C, a', hh, hb⟩⟩
+    exact ⟨r, b, H, 0, ht, hH, he, .inl ⟨b, A, C, a', by rw [hlo]; exact hh, hb⟩⟩
   rcases h with ⟨a, -, hc⟩ | ⟨f, w, r, v, H, -, hp, hf, he, -, harm⟩
-  · exact hop hc
-  · rcases harm with ⟨rfl, ht⟩ | ⟨a, -, hc⟩
-    · exact ⟨r, f, H, v, ht, hf, he, .inr ⟨f, A, v, H, hp, hf, he⟩⟩
-    · -- `hopChain X.m X.isLk` is `hopChain σ.mem (hopByteAt σ)` by definition
+  · rw [hlo] at hc; exact hop hc
+  · have hf' : σ.mem[f]? = some H := by
+      have e : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
+      rw [← e]; exact hf
+    rcases harm with ⟨rfl, ht⟩ | ⟨a, -, hc⟩
+    · exact ⟨r, f, H, v, ht, hf', he, .inr ⟨f, A, v, H, hp, hf', he⟩⟩
+    · -- `hopChain X.lm X.isLk` is `hopChain σ.mem (hopByteAt σ)` under eager landing
+      have e : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
+      rw [e] at hc
       exact hop hc
 
 /-! # 4. The refutation at a realized read, through `R` -/
@@ -260,10 +281,10 @@ theorem RvwmoXv6Adequacy.syncPathFirst {σ : MState} {A : CPU} {t : Nat} {B : CP
 publication word, a live page-table byte, or an audited racy word whose value is in the value
 set (`chainOkAt`'s exemptions and its `racyValOk` arm). -/
 def benignAt (σ : MState) (pa : PAddr) (t : Nat) : Prop :=
-  (∃ b, Xv6.AccessDiscipline.custAt σ pa t = .lockw b) ∨
-  (∃ w, Xv6.AccessDiscipline.custAt σ pa t = .pub w) ∨
-  Xv6.AccessDiscipline.custAt σ pa t = .pte ∨
-  (Xv6.AccessDiscipline.custAt σ pa t = .racy ∧ Xv6.AccessDiscipline.racyValOk σ pa t)
+  (∃ b, Xv6.AccessDiscipline.custAtP σ pa t = .lockw b) ∨
+  (∃ w, Xv6.AccessDiscipline.custAtP σ pa t = .pub w) ∨
+  Xv6.AccessDiscipline.custAtP σ pa t = .pte ∨
+  (Xv6.AccessDiscipline.custAtP σ pa t = .racy ∧ Xv6.AccessDiscipline.racyValOkP σ pa t)
 
 /-- **A realized read** of byte `pa` by hart `j` from log position `p` (message `m`): a MachCSL
 state `σ` related to the pf configuration `c` by `R`'s memory half (`rmem`), with the export and
@@ -273,7 +294,7 @@ def readAt (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) 
     (j : CPU) (pa : PAddr) (p : Nat) (m : Wmsg) : Prop :=
   rmem c st σ ∧ Xv6.AccessDiscipline.xv6AccessDisc σ ∧ relSiteWCrel σ c.pcLog ∧
   c.pcLog <+: log ∧ c.pcLog[p]? = some m ∧ (msgByte m (paZ pa)).isSome ∧ inRam pa 1 ∧
-  (σ.hr j).coh pa = p + 1
+  (σ.hr j).coh pa = p + 1 ∧ σ.llog = List.range' 1 σ.log.length
 
 /-- **THE REFUTATION** (plan §C W11-C): at a realized read of a FOREIGN hart's message, the
 message is not owned-and-unpublished at `log`, unless the byte is `benignAt`. -/
@@ -282,7 +303,9 @@ theorem ownedUnpubRefuted (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (N
     (hrd : readAt log c st σ j pa p m) (hi : m.wmTid = some i) (hiN : i < NCPU)
     (hij : i ≠ hartAgent j) :
     benignAt σ pa (p + 1) ∨ ¬ (m.wmAk = .WCplain ∧ ¬ wpublished log m.wmTid p) := by
-  obtain ⟨hR, hD, hrel, hpre, hp, hv, hram, hcoh⟩ := hrd
+  obtain ⟨hR, hD, hrel, hpre, hp, hv, hram, hcoh, heg⟩ := hrd
+  have hm := PfStepTsoMem.memEager c st σ hR heg
+  have hlo := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp hm
   obtain ⟨⟨htid, -⟩, -, hr, -⟩ := hR
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hv
   -- every log message has an author (`R-log`)
@@ -303,14 +326,16 @@ theorem ownedUnpubRefuted (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (N
   · exact .inl hb
   right
   rintro ⟨-, hnp⟩
-  have h1 : ∀ b, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .lockw b :=
+  have h1 : ∀ b, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .lockw b :=
     fun b hb' => hb (.inl ⟨b, hb'⟩)
-  have h2 : ∀ w, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pub w :=
+  have h2 : ∀ w, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pub w :=
     fun w hw => hb (.inr (.inl ⟨w, hw⟩))
-  have h3 : Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pte := fun h => hb (.inr (.inr (.inl h)))
-  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) hcoh.symm hiN hij h1 h2 h3 with hs | hrc
+  have h3 : Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pte := fun h => hb (.inr (.inr (.inl h)))
+  rw [← hcoh] at h1 h2 h3
+  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) (by rw [hm pa _ hH _ he, hcoh]) hiN hij h1 h2 h3
+    with hs | hrc
   · -- the chained case: the author's first move after its entry is release-class
-    obtain ⟨r, pb, H, w, hlt, hHb, heb, hrelr⟩ := RvwmoXv6Adequacy.syncPathFirst hs
+    obtain ⟨r, pb, H, w, hlt, hHb, heb, hrelr⟩ := RvwmoXv6Adequacy.syncPathFirst hlo hs
     rw [RvwmoXv6Adequacy.rhistGet hr hHb] at heb
     rcases RvwmoXv6Adequacy.histOfMemInv _ _ _ _ heb with h0 | ⟨mq, hq, -, htq⟩
     · simp only at h0 hlt
@@ -326,7 +351,8 @@ theorem ownedUnpubRefuted (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (N
       · rw [hk, hi]
         rw [hk] at htq
         exact congrArg some htq.symm
-  · exact hb (.inr (.inr (.inr hrc)))
+  · rw [hcoh] at hrc
+    exact hb (.inr (.inr (.inr hrc)))
 
 /-- **The graph-level corollary**: a realized entry read (`segRealized`, W11-F's composition
 supplies it from the certified run) leaves `badSeg` only on a `benignAt` byte. -/
@@ -365,30 +391,30 @@ is not the holder never reads its own pointer `&cpus[c]` out of `lk->cpu` -- the
 `holding()`'s compare consumes (NOT a refutation of `badSeg`, deviation 2).  Static-lock case; since W8 (f3-pipelk) the export's
 `lkCpuReadAt` has a second arm for live pipe locks (`xv6DynLock`), read off the export directly. -/
 theorem lkCpuArm (σ : MState) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ) (b : PAddr) (t : Nat)
-    (hb : Xv6.AccessDiscipline.xv6LockWord σ b t)
+    (hb : Xv6.AccessDiscipline.xv6LockWordP σ b t)
     (hs : b ∈ Xv6.AccessDiscipline.xv6StaticLocks) :
     ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool))
       (B : Nat),
       wordHistAt σ.mem b 4 W Hold ∧ wordHistAt σ.mem (b + 16#64) 8 W' Hold' ∧
       lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
       ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
-        ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c :=
+        ReadCasesP σ.lp W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c :=
   (hD.2.2.2.1 b t hb).1 hs
 
 /-- **The `ip->ref` route** ([OWN.63]): on a `racy` byte whose entry is value-safe, the audited
 word, as of the entry, is in the registry's value set (`racyValAt`: `[1, 2^31)`, the guard
 `ip->ref < 1` reads `≥ 1`) -- NO sync path claimed (NOT a refutation of `badSeg`, deviation 2). -/
 theorem irefArm (σ : MState) (pa : PAddr) (t : Nat)
-    (h : Xv6.AccessDiscipline.custAt σ pa t = .racy ∧ Xv6.AccessDiscipline.racyValOk σ pa t) :
-    racyValAt Xv6.AccessDiscipline.xv6Rsv σ.mem t pa :=
+    (h : Xv6.AccessDiscipline.custAtP σ pa t = .racy ∧ Xv6.AccessDiscipline.racyValOkP σ pa t) :
+    racyValAtP Xv6.AccessDiscipline.xv6Rsv σ.mem σ.lp t pa :=
   h.2
 
 /-- On a `benignAt` byte that is no lock-layer, publication or page-table byte, the value fact. -/
 theorem benignValue (σ : MState) (pa : PAddr) (t : Nat) (hb : benignAt σ pa t)
-    (h1 : ∀ b, Xv6.AccessDiscipline.custAt σ pa t ≠ .lockw b)
-    (h2 : ∀ w, Xv6.AccessDiscipline.custAt σ pa t ≠ .pub w)
-    (h3 : Xv6.AccessDiscipline.custAt σ pa t ≠ .pte) :
-    racyValAt Xv6.AccessDiscipline.xv6Rsv σ.mem t pa := by
+    (h1 : ∀ b, Xv6.AccessDiscipline.custAtP σ pa t ≠ .lockw b)
+    (h2 : ∀ w, Xv6.AccessDiscipline.custAtP σ pa t ≠ .pub w)
+    (h3 : Xv6.AccessDiscipline.custAtP σ pa t ≠ .pte) :
+    racyValAtP Xv6.AccessDiscipline.xv6Rsv σ.mem σ.lp t pa := by
   rcases hb with ⟨b, hb⟩ | ⟨w, hw⟩ | hp | hr
   · exact absurd hb (h1 b)
   · exact absurd hw (h2 w)
@@ -687,7 +713,10 @@ theorem chainHypsOfSyncPath (GD : Gdexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efa
     (hrun : s.sgEntry = s.sgExit ∨ WeakRvwmoGraph.gpo GD.gdG s.sgEntry s.sgExit)
     (hmx : gmem GD.gdG s.sgExit) (hre : syncRealized GD σ j s) :
     chainHyps GD prev s := by
-  obtain ⟨hR, hD, -, hpre, hp, hv, hram, hcoh⟩ := hrd
+  obtain ⟨hR, hD, -, hpre, hp, hv, hram, hcoh, heg⟩ := hrd
+  have hm := PfStepTsoMem.memEager c st σ hR heg
+  have hlo := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp hm
+  have hlo' : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
   have hr := hR.2.2.1
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hv
   obtain ⟨hpw, hpix⟩ := gwriteAtInv GD.gdG (p + 1) prev hwf.1 hprev
@@ -695,14 +724,17 @@ theorem chainHypsOfSyncPath (GD : Gdexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efa
   have he : (⟨p + 1, i, v⟩ : HEnt) ∈ TsoOfPf.histOf c.pcImg c.pcLog (paZ pa) := by
     have := RvwmoXv6Adequacy.histOfMem c.pcImg c.pcLog (paZ pa) p m v hp hv
     rwa [hi] at this
-  have h1 : ∀ b, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .lockw b :=
+  have h1 : ∀ b, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .lockw b :=
     fun b hb' => hnb (.inl ⟨b, hb'⟩)
-  have h2 : ∀ w, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pub w :=
+  have h2 : ∀ w, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pub w :=
     fun w hw => hnb (.inr (.inl ⟨w, hw⟩))
-  have h3 : Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
-  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) hcoh.symm hiN hij h1 h2 h3 with hs | hrc
+  have h3 : Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
+  rw [← hcoh] at h1 h2 h3
+  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) (by rw [hm pa _ hH _ he, hcoh]) hiN hij h1 h2 h3
+    with hs | hrc
   · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v', H', hne, hpub, hf, hew, hrle, harm⟩
-    · -- the hop chain: the reader's own acquire is the terminal write
+    · rw [hlo] at hc
+      -- the hop chain: the reader's own acquire is the terminal write
       obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, b, C, r, hbl, hsh⟩ :=
         RvwmoXv6Adequacy.hopChainSpan hr hc
       simp only at ht1
@@ -720,13 +752,23 @@ theorem chainHypsOfSyncPath (GD : Gdexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efa
       have hlt : p + 1 < r := by
         rcases harm with ⟨-, h⟩ | ⟨a, ha, hc⟩
         · exact h
-        · obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, -⟩ :=
+        · rw [hlo'] at hc
+          obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, -⟩ :=
             RvwmoXv6Adequacy.hopChainSpan (m := σ.mem) hr hc
           simp only at ht1
           omega
-      obtain ⟨W, Y, hW, hrW, hWY, hfc⟩ := hre.2 f w r v' H' hne hpub hf hew hrle
+      have hf' : σ.mem[f]? = some H' := by rw [← hlo']; exact hf
+      have hrle' : r ≤ (σ.hr j).coh f := by
+        obtain ⟨q, hq, hle⟩ := hrle
+        have hlr : σ.lp r = some r := hm f H' hf' _ hew
+        have hlr' : (Xv6.AccessDiscipline.xv6Env σ).lp r = some r := hlr
+        rw [hlr'] at hq
+        cases hq
+        exact hle
+      obtain ⟨W, Y, hW, hrW, hWY, hfc⟩ := hre.2 f w r v' H' hne hpub hf' hew hrle'
       exact ⟨W, Y, hpw, hW, by rw [hpix]; omega, hWY, .inr hfc⟩
-  · exact absurd (.inr (.inr (.inr hrc))) hnb
+  · rw [hcoh] at hrc
+    exact absurd (.inr (.inr (.inr hrc))) hnb
 
 /-- **…as the certificate** (cat, any cross order): the cross-hart kill into the read. -/
 theorem chainHypsCertOfRealized (GD : Gdexec) (ad : List (Geid × Geid))

@@ -270,23 +270,23 @@ theorem pipe_ends_alloc :
 initialised fields, the data and the slack become a well-formed `struct pipe`
 and the two end references its creator keeps.  (W8 (f2-ctx) [OWN.49]
 (a′-r): the fresh lock's words come opened -- the lock word's floor `lo` is
-the one its registration `lkDynReg pi (max lo lc)` is at or past -- with the
+the one its registration `lkDynReg pi (max lo lc) te` is at or past -- with the
 owner word's floor, W8 (f3-pipelk) [OWN.65]: the receipts of the `f->pipe`
 store that named it.) -/
 theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
-    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) (hok : lockAddrOk pi) (lo lc : Nat)
+    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) (hok : lockAddrOk pi) (lo lc te : Nat)
     (hc : ∃ c : CPU, cpuRsvIn (hlc := hlc) (GF := GF) c) (vname : BitVec 64)
     (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) (E : CoPset) :
     kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗ ownCtx cpu curCtx ∗
     wordCell pi 4 lo 0 [] ∗ lkFloor curCtx lo ∗ wordCell (pi + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗
-    lkDynReg pi (max lo lc) ∗
+    lkDynReg pi (max lo lc) te ∗ lkFloor curCtx te ∗
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
     pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ gateFloor curCtx
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
-  iintro ⟨#Hcl, #Hcl', Hrun, Hw, #Hflo, Hc, #Hflc, #Hreg, Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack, #Hg⟩
+  iintro ⟨#Hcl, #Hcl', Hrun, Hw, #Hflo, Hc, #Hflc, #Hreg, #Hfte, Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack, #Hg⟩
   imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, Hqa, Hqf⟩
   ihave Hst0 := pipeEndstate_open_intro γp false 1#32 pflag_one_open $$ Hm0
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
@@ -310,20 +310,23 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
   imod lock_pay_born cpu (pipeResAt γp pi) [] (fun _ h => by simp at h) $$ [$Hrun $HR]
     with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γl, H1, H2⟩
-  ihave #HregW := lkDynRegW_nil pi lo lc hc $$ Hreg
+  ihave #HregW := lkDynRegW_nil pi lo lc te hc $$ Hreg
   imod inv_alloc lockN E
-    (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb ∨ pipeDead γl γp))
+    (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb te ∨ pipeDead γl γp))
     $$ [Hw Hc H1 H2 Hpay] with #Hinv
   · inext
     ileft
     unfold lockBody
     iexists [], [], none, 0
+    ihave H1 := lockHalfC_of_half γl none 0 [] (fun _ h => by cases h) $$ H1
     iframe Hw Hc H1 HregW
     isplit
     · ipureintro
       refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
       obtain ⟨W1, W2, hW, _, _⟩ := hl
       cases W1 <;> cases hW
+    isplitl []
+    · ipureintro; exact lkZeroHead_nil lo
     isplitr [H2 Hpay]
     · unfold lkCpuFrag; iempintro
     · ileft
@@ -347,25 +350,25 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
     · iexact Hcl
     isplit
     · iexact Hcl'
-    iexists lo, lc, Vb
-    iframe Hinv Hflo Hflc Hvf Hg
+    iexists lo, lc, Vb, te
+    iframe Hinv Hflo Hflc Hvf Hg Hfte
   · iframe Hf0 Hf1 Hqf
 
 /-- The same at the kernel execution context (which carries the running
 context inside its `ctxTok`), under a fancy update. -/
 theorem kctx_newPipe {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
-    (hpv : pageValid pi) (hok : lockAddrOk pi) (lo lc : Nat) (vname : BitVec 64)
+    (hpv : pageValid pi) (hok : lockAddrOk pi) (lo lc te : Nat) (vname : BitVec 64)
     (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) :
     kctxL lent cpu k ∗ kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗
     wordCell pi 4 lo 0 [] ∗ lkFloor curCtx lo ∗ wordCell (pi + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗
-    lkDynReg pi (max lo lc) ∗
+    lkDynReg pi (max lo lc) te ∗ lkFloor curCtx te ∗
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
     pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ gateFloor curCtx
     ⊢ |={⊤}=> (kctxL lent cpu k ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
-  iintro ⟨Hk, #Hcl, #Hcl', Hw, #Hflo, Hc, #Hflc, #Hreg, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack, #Hg⟩
+  iintro ⟨Hk, #Hcl, #Hcl', Hw, #Hflo, Hc, #Hflc, #Hreg, #Hfte, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack, #Hg⟩
   icases kctx_lkHigh cpu k (lk := pi) hpv.2.1 $$ Hk with ⟨%hm, Hk⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
@@ -376,10 +379,10 @@ theorem kctx_newPipe {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
   · unfold cpuOwn cpuCells cpuCell
     icases Hcpu with ⟨⟨⟨_, _, %hcok⟩, _, _⟩, _, _⟩
     ipureintro; exact hcok.1
-  imod newPipe cpu pi hpv hm hok lo lc ⟨cpu, hcr⟩ vname bs hlen ⊤
+  imod newPipe cpu pi hpv hm hok lo lc te ⟨cpu, hcr⟩ vname bs hlen ⊤
     $$ [Hctx Hw Hc Hnm Hnr Hnw Hropen Hwopen Hdat Hslack]
     with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1, Hqf⟩⟩
-  · iframe Hcl Hcl' Hctx Hw Hc Hnm Hnr Hnw Hropen Hwopen Hdat Hslack Hg Hflo Hflc Hreg
+  · iframe Hcl Hcl' Hctx Hw Hc Hnm Hnr Hnw Hropen Hwopen Hdat Hslack Hg Hflo Hflc Hreg Hfte
   imodintro
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf

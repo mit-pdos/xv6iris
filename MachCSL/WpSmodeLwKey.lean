@@ -223,17 +223,19 @@ theorem wp_s_lw_au_ctx [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
 /-- `wp_s_lw_au_ctx` with the credential a LOCK FLOOR (a key of the running
 context: floor proper or own buffered store), cashed in-step by
 `ownCtx_lkFloor_vis` (Rocq `lk_floor_vis`/`cred_floor_vis`): the obligation
-builds the running hart's accessor from the two-armed read licence
-`f ≤ K ∨ (f, hartAgent cpu') ∈ ts` and `R`.  This is the icache guard read's
+builds the running hart's accessor from the read licence `f = 0 ∨
+(f, hartAgent cpu') ∈ ts ∨ ∃ p, (f, p) ∈ ls ∧ p ≤ K` (route P, design D9:
+the landing certificates `ls`) and `R`.  This is the icache guard read's
 leaf (`Xv6.iref_readAU`'s shape, W1-M2). -/
 theorem wp_s_lw_au_key [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
     (hrd : rdOk rd) (va : BitVec 64) (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = va)
     (hram : inRam va 4) (hal : va.toNat % 4 = 0)
     (f : Nat) (R : IProp GF) (Ψ : CPU → BitVec (8 * 4) → IProp GF)
-    (hobl : ∀ (cpu' : CPU) (K : Nat) (ts : List (Nat × Agent)),
-      (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → (f ≤ K ∨ (f, hartAgent cpu') ∈ ts) →
-      ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗ R ⊢ readAU cpu' va 4 K ts (Ψ cpu')) :
+    (hobl : ∀ (cpu' : CPU) (K : Nat) (ts : List (Nat × Agent)) (ls : List (Nat × Nat)),
+      (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
+      (f = 0 ∨ (f, hartAgent cpu') ∈ ts ∨ ∃ p, (f, p) ∈ ls ∧ p ≤ K) →
+      ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗ landedAll ls ∗ R ⊢ readAU cpu' va 4 K ts (Ψ cpu')) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗ visFloor curCtx f ∗ R ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -245,14 +247,13 @@ theorem wp_s_lw_au_key [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
         ∃ (K : Nat) (ts : List (Nat × Agent)), viewLb cpu' K ∗ readAU cpu' va 4 K ts (Ψ cpu') := by
     intro cpu' hpin
     iintro ⟨Hctx, #Hfl, HR⟩
-    icases ownCtx_visFloor_vis cpu' f $$ [Hctx] with ⟨Hctx, %K, %ts, #HK, #Hts, %hvis⟩
+    icases ownCtx_visFloor_vis cpu' f $$ [Hctx] with ⟨Hctx, %K, %ts, %ls, #HK, #Hts, #Hls, %hvis⟩
     · iframe Hctx; iexact Hfl
     iframe Hctx
     iexists K, ts
     iframe HK
-    iapply hobl cpu' K ts hpin hvis
-    iframe HR
-    iexact Hts
+    iapply hobl cpu' K ts ls hpin hvis
+    iframe HR Hts Hls
   iintro ⟨HI, Hk, Hpc, #Hcl, #Hfl, HR, HΦ⟩
   iapply (wp_s_lw_au_ctx (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd va haddr hram hal
     iprop(visFloor curCtx f ∗ R) Ψ hobl')

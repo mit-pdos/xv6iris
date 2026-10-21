@@ -76,9 +76,9 @@ theorem not_othersReserve_dev {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
     (hmm : mmOk σ) (hdev : devBytes pa n) : ¬ othersReserve σ.resv cpu pa n := by
   rintro ⟨c, _, r, hr, j, hj, hsome⟩
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hsome
-  have htop := hmm.2.2.1 c r hr _ v hv
+  have htop := mmOk_resv hmm c r hr _ v hv
   obtain ⟨H, hH, -⟩ := Option.bind_eq_some_iff.1 htop
-  have hram := hmm.2.2.2.1 _ H hH
+  have hram := hmm.1 _ H hH
   have hd := hdev j hj
   rw [devAddr_false_of_inRam hram] at hd
   exact absurd hd (by decide)
@@ -137,8 +137,10 @@ theorem swp_sail_mem_read_dev (cpu : CPU) {n vasize : Nat}
       iapply HΦ $$ HΨ
   all_goals exact absurd hr (not_ramBytes_of_devBytes hdev hn)
 
-/-- An MMIO write: the device takes the value into its mirror.  Never
-blocked (the reservations are RAM's). -/
+/-- An MMIO write: the device takes the value into its mirror.  Never blocked by a
+reservation (the reservations are RAM's); blocked only at hart 0's `DRIVER_OK` store while a
+virtqueue-page store is pending (NAMED ASSUMPTION [OWN.127]/[OWN.131], `MState.drvOkGuard`),
+where it is retried (Löb) until the guard holds. -/
 theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (pa : PAddr) (hpa : req.pa = pa) (d : DevId) (off : Nat)
@@ -148,50 +150,277 @@ theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
     devWriteAU d off n w' Ψ ∗ ▷ (Ψ -∗ Φ (.Ok (some true)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
   subst hpa
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit devWriteAU
+  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit
   iintro ⟨HAU, HΦ⟩
+  iloeb as IH
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
-  -- the reservations are RAM's: the write is never blocked
-  icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-  · iapply memModel_mmOk $$ Hmm
-  ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
-  have hnb : ¬ othersReserve σ.resv cpu req.pa n := not_othersReserve_dev hmm hdev
-  imod HAU with ⟨%s, Hfrag, %hsome, Hcont⟩
-  icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hclose⟩
-  ihave %hs := devAgreeAt _ d (σ.devs.st d) s $$ [Hauth Hfrag]
-  case' _ => iframe
-  subst hs
-  obtain ⟨s', hwr⟩ := Option.isSome_iff_exists.1 hsome
-  have hdw : devWrite σ.devs req.pa n w' = some (σ.devs.set d s') := devWrite_some hdec hwr
-  imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
-  · iframe
-  imodintro
-  isplit
-  · ipureintro
-    exact Or.inl ⟨.Ok (some true), _, Or.inl ⟨hdev, w', _, hv, hdw, rfl, rfl⟩⟩
-  inext
-  iintro %σ'
-  isplit
-  · iintro %v %Hev
-    rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl⟩ | ⟨hr, _⟩
-    · rw [hv] at hv'
-      obtain rfl := Option.some.inj hv'
-      rw [hdw] at hdw'
-      obtain rfl := Option.some.inj hdw'
-      ihave HΨ := Hcont $$ %s' %hwr Hfrag
-      imod HΨ
+  by_cases hg : σ.drvOkGuard cpu
+  · unfold devWriteAU
+    -- the reservations are RAM's: the write is never blocked by one
+    icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+    ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+    · iapply memModel_mmOk $$ Hmm
+    ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
+    have hnb : ¬ othersReserve σ.resv cpu req.pa n := not_othersReserve_dev hmm hdev
+    imod HAU with ⟨%s, Hfrag, %hsome, Hcont⟩
+    icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hclose⟩
+    ihave %hs := devAgreeAt _ d (σ.devs.st d) s $$ [Hauth Hfrag]
+    case' _ => iframe
+    subst hs
+    obtain ⟨s', hwr⟩ := Option.isSome_iff_exists.1 hsome
+    have hdw : devWrite σ.devs req.pa n w' = some (σ.devs.set d s') := devWrite_some hdec hwr
+    imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
+    · iframe
+    imodintro
+    isplit
+    · ipureintro
+      exact Or.inl ⟨.Ok (some true), _, Or.inl ⟨hdev, w', _, hv, hdw, rfl, rfl, hg⟩⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl, _⟩ | ⟨hr, _⟩ | ⟨hr, _⟩
+      rotate_left
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        rw [hdw] at hdw'
+        obtain rfl := Option.some.inj hdw'
+        ihave HΨ := Hcont $$ %s' %hwr Hfrag
+        imod HΨ
+        imodintro
+        isplitl [Hauth Hclose]
+        · iapply Hclose $$ %s' Hauth
+        · iapply swp_ret
+          iapply HΦ $$ HΨ
+    · iintro %Hbk
+      rcases Hbk with ⟨_, hr | ⟨hr, _⟩, _⟩ | ⟨_, _, hng, _⟩
+      · exact absurd hr hnb
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hg hng
+  · -- the `DRIVER_OK` guard fails: the store waits (the hart's land arm drains its buffer)
+    iapply fupd_mask_intro LawfulSet.empty_subset
+    iintro Hmask
+    isplit
+    · ipureintro
+      exact Or.inr ⟨σ, Or.inr ⟨hdev, hn, hg, rfl⟩⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      rcases Hev with ⟨_, _, _, _, _, _, _, hg'⟩ | ⟨hr, _⟩ | ⟨hr, _⟩
+      · exact absurd hg' hg
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+    · iintro %Hbk
+      have hσ : σ' = σ := by rcases Hbk with ⟨_, _, h⟩ | ⟨_, _, _, h⟩ <;> exact h
+      subst hσ
+      imod Hmask
       imodintro
-      isplitl [Hauth Hclose]
-      · iapply Hclose $$ %s' Hauth
-      · iapply swp_ret
-        iapply HΦ $$ HΨ
-    · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
-  · iintro %Hbk
-    rcases Hbk.1 with hr | ⟨hr, _⟩
-    · exact absurd hr hnb
-    · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      iframe Hσ
+      iapply IH $$ HAU HΦ
+
+/-! ## The `DRIVER_OK` store (NAMED ASSUMPTION [OWN.127]/[OWN.131], xv6 weak-memory bug #1)
+
+The machine's one MMIO guard (`MState.drvOkGuard`): hart 0's store at `drvOkPc` waits until it
+has no pending store to the three virtqueue pages.  The leaf below is the generic MMIO write
+leaf plus what the guard gives at the step: the landing certificates of the hart's own stores
+whose entries the client shows on queue-page bytes. -/
+
+/-- **What the guard gives** (pure): at hart 0's `DRIVER_OK` store, an own store with an
+entry on a queue-page byte has LANDED. -/
+theorem MState.landed_of_drvOkGuard (σ : MState) (h : σ.okP) (cpu : CPU) (hg : σ.drvOkGuard cpu)
+    (hc : cpu.val = 0) (hpc : (σ.regs cpu) Register.PC = drvOkPc) (T : Nat)
+    (h1 : 1 ≤ T) (hT : σ.log[T - 1]? = some (hartAgent cpu)) (a : PAddr) (H : Hist)
+    (ha : σ.mem[a]? = some H) (he : ∃ e ∈ H, e.t = T)
+    (hq : vqPageByte (show VirtioState from σ.devs.st .virtio).cfg a) : ∃ p, σ.lp T = some p := by
+  have hle : T ≤ σ.top := by
+    have := (List.getElem?_eq_some_iff.1 hT).1
+    simp only [MState.top]; omega
+  by_cases hm : T ∈ σ.llog
+  · exact Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog T (by omega)).2 hm)
+  · exfalso
+    obtain ⟨e, hsb⟩ := (h.2.2.2.2.2.2.1 cpu T).2 ⟨h1, hle, hT, hm⟩
+    apply hg hc hpc
+    rcases hq with ⟨j, hj, rfl⟩ | ⟨j, hj, rfl⟩ | ⟨j, hj, rfl⟩
+    · exact Or.inl ⟨(T, e), hsb, j, hj, H, ha, he⟩
+    · exact Or.inr (Or.inl ⟨(T, e), hsb, j, hj, H, ha, he⟩)
+    · exact Or.inr (Or.inr ⟨(T, e), hsb, j, hj, H, ha, he⟩)
+
+/-- A list of history points-to's agrees with the heap. -/
+theorem heapList_valid (m : FlatMem) : ∀ ev : List (PAddr × DFrac × Hist),
+    genHeapInterp m ∗ evPts ev ⊢@{IProp GF}
+      ⌜∀ q ∈ ev, m[q.1]? = some q.2.2⌝
+  | [] => by
+    iintro ⟨_, _⟩
+    ipureintro
+    intro q hq; cases hq
+  | q :: ev => by
+    unfold evPts
+    iintro ⟨Hm, Hl⟩
+    icases BigSepL.bigSepL_cons.1 $$ Hl with ⟨Hq, Hl⟩
+    ihave %H1 : ⌜∀ q ∈ ev, m[q.1]? = some q.2.2⌝ $$ [Hm Hl]
+    · iapply heapList_valid m ev $$ [Hm Hl]
+      unfold evPts
+      iframe
+    ihave %H2 : ⌜m[q.1]? = some q.2.2⌝ $$ [Hm Hq]
+    · icases genHeap_valid $$ [$Hm $Hq] with >%_
+      itrivial
+    ipureintro
+    intro q' hq'
+    rcases List.mem_cons.1 hq' with rfl | hq'
+    · exact H2
+    · exact H1 q' hq'
+
+/-- Landing certificates for the own stores of a list that satisfy `Q`, when `Q` (with the
+receipt) forces the landing. -/
+theorem memModel_landedOwnSel (σ : MState) (cpu : CPU) (Q : Nat → Prop)
+    (hQ : ∀ T, Q T → 1 ≤ T → σ.log[T - 1]? = some (hartAgent cpu) → ∃ p, σ.lp T = some p) :
+    ∀ ts : List Nat, memModel σ ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ⊢@{IProp GF}
+      memModel σ ∗ ∃ ls : List (Nat × Nat), landedAll ls ∗ ⌜∀ t ∈ ts, Q t → ∃ p, (t, p) ∈ ls⌝
+  | [] => by
+    iintro ⟨Hmm, _⟩
+    iframe Hmm
+    iexists []
+    isplit
+    · exact BigSepL.bigSepL_nil_intro
+    · ipureintro; intro t ht; cases ht
+  | T :: ts => by
+    iintro ⟨Hmm, #Hau, #Hts⟩
+    icases memModel_landedOwnSel σ cpu Q hQ ts $$ [Hmm Hts] with ⟨Hmm, %ls, #Hls, %hls⟩
+    · iframe Hmm Hts
+    by_cases hq : Q T
+    · ihave %hl : ⌜1 ≤ T ∧ σ.log[T - 1]? = some (hartAgent cpu)⌝ $$ [Hmm Hau]
+      · iapply memModel_authored _ σ T (hartAgent cpu) $$ [Hmm Hau]
+        iframe Hmm
+        iexact Hau
+      obtain ⟨p, hp⟩ := hQ T hq hl.1 hl.2
+      icases memModel_landedGetK _ σ T p hp (by omega) $$ Hmm with ⟨Hmm, #Hl⟩
+      iframe Hmm
+      iexists (T, p) :: ls
+      isplit
+      · iapply BigSepL.bigSepL_cons.2
+        iframe Hl Hls
+      · ipureintro
+        intro t ht hqt
+        rcases List.mem_cons.1 ht with rfl | ht
+        · exact ⟨p, List.mem_cons_self⟩
+        · obtain ⟨q, hq'⟩ := hls t ht hqt
+          exact ⟨q, List.mem_cons_of_mem _ hq'⟩
+    · iframe Hmm
+      iexists ls
+      iframe Hls
+      ipureintro
+      intro t ht hqt
+      rcases List.mem_cons.1 ht with rfl | ht
+      · exact absurd hqt hq
+      · exact hls t ht hqt
+
+/-- **The `DRIVER_OK` store's leaf** (NAMED ASSUMPTION [OWN.127]/[OWN.131], xv6 weak-memory bug
+#1): an MMIO write by hart 0 at `drvOkPc` (the lent `PC` cell names it), blocked (and retried)
+while the guard fails; when it happens, every own store of `ts` with an entry on one of the
+client's queue-page bytes `ev` (the accessor's state names the pages) has landed. -/
+theorem swp_sail_mem_write_dev_drvOk (cpu : CPU) (hc : cpu.val = 0) (pc : BitVec 64) (hpc0 : pc = drvOkPc) {n vasize : Nat}
+    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+    (pa : PAddr) (hpa : req.pa = pa) (off : Nat)
+    (hdec : devDecode pa = some (.virtio, off)) (hdev : devBytes pa n)
+    (hn : 0 < n) (w' : BitVec (8 * n)) (hv : req.value = some w')
+    (ev : List (PAddr × DFrac × Hist)) (ts : List Nat)
+    (Ψ : IProp GF) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
+    Register.PC ↦ᵣ[cpu] pc ∗ evPts ev ∗
+      ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗ devWriteAUD off n w' ev ts Ψ ∗
+      ▷ (Register.PC ↦ᵣ[cpu] pc -∗ Ψ -∗ Φ (.Ok (some true)))
+    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
+  subst hpa
+  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit
+  iintro ⟨Hpc, Hev, #Hts, HAU, HΦ⟩
+  iloeb as IH
+  iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
+  iintro %σ Hσ
+  by_cases hg : σ.drvOkGuard cpu
+  · unfold devWriteAUD
+    icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+    ihave %hpc := reg_valid cpu (σ.regs cpu) Register.PC (DFrac.own 1) pc $$ [Hregs Hpc]
+    · iframe
+    rw [hpc0] at hpc
+    ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+    · iapply memModel_mmOk $$ Hmm
+    ihave %hevm := heapList_valid σ.mem ev $$ [Hmem Hev]
+    · unfold evPts
+      iframe
+    ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
+    have hnb : ¬ othersReserve σ.resv cpu req.pa n := not_othersReserve_dev hmm hdev
+    imod HAU with ⟨%s, Hfrag, %hsome, %hP, Hcont⟩
+    icases machInterp_acc_dev σ .virtio $$ Hσ with ⟨Hauth, Hclose⟩
+    ihave %hs := devAgreeAt _ .virtio (σ.devs.st .virtio) s $$ [Hauth Hfrag]
+    case' _ => iframe
+    subst hs
+    obtain ⟨s', hwr⟩ := Option.isSome_iff_exists.1 hsome
+    have hdw : devWrite σ.devs req.pa n w' = some (σ.devs.set .virtio s') := devWrite_some hdec hwr
+    imod (devUpdateAt _ .virtio (σ.devs.st .virtio) (σ.devs.st .virtio) s') $$ [Hauth Hfrag] with
+      ⟨Hauth, Hfrag⟩
+    · iframe
+    imodintro
+    isplit
+    · ipureintro
+      exact Or.inl ⟨.Ok (some true), _, Or.inl ⟨hdev, w', _, hv, hdw, rfl, rfl, hg⟩⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl, _⟩ | ⟨hr, _⟩ | ⟨hr, _⟩
+      rotate_left
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        rw [hdw] at hdw'
+        obtain rfl := Option.some.inj hdw'
+        ihave Hσ' := Hclose $$ %s' Hauth
+        icases machInterp_acc_mem _ cpu $$ Hσ' with ⟨Hregs, Hmem, Hmm, Hclose⟩
+        icases memModel_landedOwnSel { σ with devs := σ.devs.set .virtio s' } cpu
+            (fun t => ∃ q ∈ ev, ∃ e ∈ q.2.2, e.t = t)
+            (fun T ⟨q, hq, he⟩ h1 hT =>
+              MState.landed_of_drvOkGuard σ (mmOk_okP hmm) cpu hg hc hpc T h1 hT q.1 q.2.2
+                (hevm q hq) he (hP q hq)) ts $$ [Hmm Hts] with ⟨Hmm, Hcert⟩
+        · iframe Hmm Hts
+        ihave Hσ' := Hclose $$ %_ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
+        ihave HΨ := Hcont $$ %s' %hwr Hfrag Hev [Hcert]
+        · unfold drvOkCerts
+          iexact Hcert
+        imod HΨ
+        imodintro
+        iframe Hσ'
+        iapply swp_ret
+        iapply HΦ $$ Hpc HΨ
+    · iintro %Hbk
+      rcases Hbk with ⟨_, hr | ⟨hr, _⟩, _⟩ | ⟨_, _, hng, _⟩
+      · exact absurd hr hnb
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hg hng
+  · -- the guard fails: the store waits (the hart's land arm drains its queue-page stores)
+    iapply fupd_mask_intro LawfulSet.empty_subset
+    iintro Hmask
+    isplit
+    · ipureintro
+      exact Or.inr ⟨σ, Or.inr ⟨hdev, hn, hg, rfl⟩⟩
+    inext
+    iintro %σ'
+    isplit
+    · iintro %v %Hev
+      rcases Hev with ⟨_, _, _, _, _, _, _, hg'⟩ | ⟨hr, _⟩ | ⟨hr, _⟩
+      · exact absurd hg' hg
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+      · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
+    · iintro %Hbk
+      have hσ : σ' = σ := by rcases Hbk with ⟨_, _, h⟩ | ⟨_, _, _, h⟩ <;> exact h
+      subst hσ
+      imod Hmask
+      imodintro
+      iframe Hσ
+      iapply IH $$ Hpc Hev HAU HΦ
 
 /-! ## The physical stage: a byte through the PMA, PMP and MMIO checks -/
 

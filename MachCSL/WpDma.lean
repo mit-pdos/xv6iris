@@ -62,9 +62,9 @@ theorem hartViews_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 *
 the new disk entries -- on the footprint, at the next position -- are off the static stacks and
 (once sealed) off every carved kernel-stack page, by the footprint's certificate (`ksDmaCertAt`:
 static, through the client's sealed-table shape, or a stack-free receipt of the page). -/
-theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hn : n ≠ 0)
-    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
-      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
+theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hn : n ≠ 0) (hmm : mmOk σ)
+    (hpub : pubSame (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem
+      (σ.storeDma pa n w).mem)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
     (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
@@ -81,8 +81,12 @@ theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       genHeapInterp (G := E.mem) σ.mem ∗ rsvModelAt E (σ.storeDma pa n w) := by
   have hg := kptGrow_dma σ pa n w
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨Hm, ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩,
+  iintro ⟨Hm, ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩,
     Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩, #Hc⟩
+  ihave Hsnap := kptSnapAt_mono E hg.1 (fun hne => by
+    rcases hseal with h0 | h0
+    · exact absurd h0.1 hne
+    · exact h0.1.1) hpub $$ Hsnap
   -- the certificate, validated against the record
   ihave %hcert : ⌜∀ j, j < n → ¬ stackByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j) ∧
       (dyn ≠ [] → ∀ p ∈ stk, ¬ inPage p (pa + BitVec.ofNat 64 j))⌝ $$ [Hm Hcells Hreg Hc]
@@ -114,36 +118,50 @@ theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       rw [← inPage_eq (KptSeal.leafTo_aligned pl) hal hpin (hq j hj)]
       exact hp
   have hnew := h (all_of_reservedOk hin hok)
-  have hmem : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := MState.storeDma_mem_of_ne σ pa n w hn
+  have hmem : (σ.storeDma pa n w).mem =
+      σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent := MState.storeDma_mem_of_ne σ pa n w hn
+  -- a new entry sits on the footprint (off it the histories are unchanged, and old stamps are at most the top)
+  have hnewA : ∀ (a : PAddr) (H' : Hist) (e : HEnt), (σ.storeDma pa n w).mem[a]? = some H' → e ∈ H' →
+      (∃ H, σ.mem[a]? = some H ∧ e ∈ H) ∨ ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
+    intro a H' e hH' he
+    rw [hmem] at hH'
+    rcases memNew_landBytes σ.mem (lpOf (σ.llog ++ [σ.top + 1])) pa w (σ.top + 1) diskAgent a H' hH' e he with
+      hold | ⟨het, -⟩
+    · exact .inl hold
+    · by_cases hin : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
+      · exact .inr hin
+      · exfalso
+        rw [FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ (fun j hj heq => hin ⟨j, hj, heq⟩)] at hH'
+        have := mmOk_le_top hmm a H' e hH' he
+        omega
   have hdma' : dmaOkAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem S stk dyn := by
     refine ⟨fun a H' e hH' he hd => ?_, fun hne a H' e hH' he hd hS => ?_⟩
-    · rw [hmem] at hH'
-      rcases memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent a H' hH' e he with ⟨H, hH, he'⟩ | ⟨_, _, j, hj, rfl⟩
+    · rcases hnewA a H' e hH' he with ⟨H, hH, he'⟩ | ⟨j, hj, rfl⟩
       · exact hdma.1 a H e hH he' hd
       · exact (hcert j hj).1
-    · rw [hmem] at hH'
-      rcases memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent a H' hH' e he with ⟨H, hH, he'⟩ | ⟨_, _, j, hj, rfl⟩
+    · rcases hnewA a H' e hH' he with ⟨H, hH, he'⟩ | ⟨j, hj, rfl⟩
       · exact hdma.2 hne a H e hH he' hd hS
       · exact (hcert j hj).2 hne
   iframe Hh Hm
-  isplitl [Hreg Hcells Hcarve]
+  isplitl [Hreg Hcells Hcarve Hsnap]
   · iexists reg
     iframe Hreg
     isplit
     · ipureintro
       exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
     iexists S, dyn, stk
-    iframe Hcells Hcarve Hrc
+    iframe Hcells Hcarve Hrc Hsnap
     ipureintro
-    exact ⟨hlk, hdma', hseal.imp (fun h0 => ⟨h0.1, hpub h0.2.1, h0.2.2⟩)
-      (fun h0 => ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1, ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩)⟩
+    exact ⟨hlk, hdma', hseal.imp (fun h0 => ⟨h0.1, pubClean_of_same hpub h0.2.1, h0.2.2⟩)
+      (fun h0 => ⟨kptSealOk_grow ⟨hg.1.2, hg.2⟩ h0.1, h0.2.1, ksPost_ins hg.1 h0.1.1 h0.2.2⟩)⟩
   · isplit
     · ipureintro
       exact hch hnew hlc0
     iexists Z
     iframe HZ Hels
     ipureintro
-    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2.1 hpcs hZ.2⟩
+    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2 hpcs hZ.2⟩
+
 
 /-- A DMA write by the disk: the store order grows by the disk's message,
 whose authorship and position become persistent facts.  No reservation
@@ -155,28 +173,32 @@ byte (`hn`): a zero-byte DMA write appends nothing (`MState.storeDma_zero`),
 so there is no position to mint receipts for. -/
 theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0)
-    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
-      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
+    (hpres : ∀ j, j < n → ∃ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H)
+    (hpub : pubSame (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem
+      (σ.storeDma pa n w).mem)
     (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
     (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) :
     genHeapInterp (G := E.mem) σ.mem ∗ memModelAt E σ ∗ ksDmaCertAt E pa n ⊢@{IProp GF} |==>
       (genHeapInterp (G := E.mem) σ.mem ∗ memModelAt E (σ.storeDma pa n w) ∗
-       authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
+       authoredByAt E (σ.top + 1) diskAgent ∗ itopLbAt E (σ.top + 1) ∗
+       landedAtE E (σ.top + 1) (σ.ltop + 1) ∗ topLbAt E (σ.ltop + 1)) := by
   unfold memModelAt
   iintro ⟨Hm, ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩, #Hc⟩
   imod lpAuthAt_snoc E σ.log (σ.log ++ [diskAgent]) σ.llog (σ.top + 1) σ.sb σ.sb σ.sbEp
-    (fun M hM => epochRecOk_storeG σ diskAgent (mmOk_okP hmm) hmm.2.2.2.2.2.1 M hM) $$ Hlp with ⟨Hlp, _⟩
-  ihave Hx := rsvModel_dma E σ pa n w hn hpub hrsv
-    (relPcOk_storeDma σ pa n w (ramBytes_le hram) (relPc_le_top hmm.1) hnr) (relPc_dmaOld σ pa n w)
-    (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (relPc_le_top hmm.1)) (fun _ h => chainLoads_dma σ pa n w hmm h)
+    (fun M hM => by
+      have := epochRecOk_storeDma σ pa n w (mmOk_okP hmm) M hM
+      rwa [MState.storeDma_log_of_ne σ pa n w hn, MState.storeDma_llog_of_ne σ pa n w hn] at this) (by simp only [List.length_append, List.length_singleton]; omega)
+    $$ Hlp with ⟨Hlp, #Hland⟩
+  ihave Hx := rsvModel_dma E σ pa n w hn hmm hpub hrsv
+    (relPcOk_storeDma σ pa n w (ramBytes_le hram) (mmOk_le_top hmm) hnr) (relPc_dmaOld σ pa n w)
+    (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (mmOk_okP hmm)) (fun _ h => chainLoads_dma σ pa n w hmm h)
     $$ [Hm Hrsv Hc]
   · iframe Hm Hrsv Hc
   icases Hx with ⟨Hm, Hrsv⟩
-  imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
+  imod MonoNat.own_update _ (.ofNat σ.ltop) (.ofNat (σ.ltop + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
-  imod ghost_map_insert_persist (σ.top + 1) diskAgent
-    (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+  imod authAuthAt_snoc E σ.log diskAgent $$ Hauth with ⟨Hauth, #Hau⟩
   imodintro
   iframe Hm
   have hresv : resvMap (σ.storeDma pa n w) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
@@ -184,19 +206,25 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   iframe Hresv
   isplitl [Htop Hauth Hlp Hviews Hrsv]
   · iframe Hrsv
-    rw [show (σ.storeDma pa n w).top = σ.top + 1 by
-          simp [MState.top, hn],
-        MState.storeDma_log_of_ne σ pa n w hn, MState.storeDma_llog_of_ne σ pa n w hn, authMap_snoc]
+    rw [show (σ.storeDma pa n w).ltop = σ.ltop + 1 by
+          simp [MState.ltop, MState.storeDma, hn],
+        MState.storeDma_log_of_ne σ pa n w hn, MState.storeDma_llog_of_ne σ pa n w hn]
     iframe Htop Hauth Hlp
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_storeDma E σ pa n w c)]
       iexact Hviews
     · ipureintro
-      exact mmOk_storeDma σ pa n w hram hno hmm
-  · unfold authoredByAt topLbAt
-    iframe Hau
-    iright
-    iexact Htoplb
+      exact mmOk_storeDma σ pa n w hram hno hpres hmm
+  · unfold authoredByAt
+    iframe Hau Hland
+    isplit
+    · iapply itopLbAt_of_auth E (σ.top + 1) diskAgent
+      unfold authoredByAt
+      iexact Hau
+    · unfold topLbAt
+      iright
+      iexact Htoplb
+
 
 end memmodel
 
@@ -218,18 +246,19 @@ theorem histBytes_ramBytes (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → D
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk _ σ $$ Hmm
   ipureintro
-  exact ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+  exact ramBytes_of_cells hmm.1 (fun j hj => ⟨Hs j, hget j hj⟩)
 
 /-- Re-assembling the interpretation after a DMA write of at least one byte:
 the registers and the device states are literally the same propositions. -/
 theorem machInterp_of_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hn : n ≠ 0) :
     ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗
-      genHeapInterp (σ.mem.writeBytes pa n w (σ.top + 1) diskAgent) ∗
+      genHeapInterp (σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent) ∗
       memModel (σ.storeDma pa n w) ∗ devInterp σ.devs ∗ uepModel σ ⊢@{IProp GF}
     machInterp (σ.storeDma pa n w) := by
   rw [MState.storeDma_of_ne σ pa n w hn]
   exact .rfl
+
 
 /-- A position the client holds a top-bound for is below the machine's
 store-order top, hence strictly below the position a store about to
@@ -239,8 +268,45 @@ kept. -/
 theorem machInterp_topLb (σ : MState) (K : Nat) :
     machInterp (GF := GF) σ ∗ topLb K ⊢@{IProp GF} ⌜K ≤ σ.top⌝ := by
   iintro ⟨⟨_, _, Hmm, _, _⟩, HK⟩
+  iapply memModel_itopLb _ σ K $$ [Hmm HK]
+  iframe Hmm
+  iapply itopLbAt_of_top
+  iexact HK
+
+/-- The leased heads' certificates agree with the machine: every head is landed. -/
+theorem memModel_headsLanded (σ : MState) (Hs : Nat → Hist) : ∀ n : Nat,
+    memModel σ ∗ ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ⊢@{IProp GF}
+      ⌜∀ j, j < n → ∀ e, (Hs j).head? = some e → (σ.lp e.t).isSome⌝
+  | 0 => by
+    iintro ⟨_, _⟩
+    ipureintro
+    intro j hj; omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hl⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hl with ⟨Hl1, ⟨%e, %p, %he, Hc⟩⟩
+    ihave %h1 := memModel_headsLanded σ Hs n $$ [Hmm Hl1]
+    · iframe Hmm Hl1
+    ihave %h2 : ⌜(σ.lp e.t).isSome⌝ $$ [Hmm Hc]
+    · icases Hc with (%h0 | #Hc)
+      · ipureintro; show (lpOf σ.llog e.t).isSome; rw [h0]; rfl
+      · ihave %hl := memModel_landedAt' _ σ e.t p $$ [Hmm Hc]
+        · iframe Hmm Hc
+        ipureintro; rw [hl.2]; rfl
+    ipureintro
+    intro j hj e' he'
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact h1 j h e' he'
+    · rw [he] at he'; obtain rfl := Option.some.inj he'; exact h2
+
+/-- A POSITION the client holds a receipt for is at or below the landing top (route P, D9). -/
+theorem machInterp_topLbL (σ : MState) (K : Nat) :
+    machInterp (GF := GF) σ ∗ topLb K ⊢@{IProp GF} ⌜K ≤ σ.ltop⌝ := by
+  iintro ⟨⟨_, _, Hmm, _, _⟩, HK⟩
   iapply memModel_topLb _ σ K $$ [Hmm HK]
-  iframe
+  iframe Hmm
+  iexact HK
 
 /-- **The DMA write ghost update.**  Against the lease over its footprint --
 the raw histories at full ownership -- the disk's store moves the machine's
@@ -252,33 +318,54 @@ nothing. -/
 theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist)
     (w : BitVec (8 * n)) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0) :
     machInterp (GF := GF) σ ∗ histBytes pa n (fun _ => DFrac.own 1) Hs ∗
-      ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ⊢ |==>
+      ksDmaCertAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
+      ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ⊢ |==>
       (machInterp (σ.storeDma pa n w) ∗
        histBytes pa n (fun _ => DFrac.own 1) (pushed Hs (σ.top + 1) diskAgent w) ∗
-       authoredBy (σ.top + 1) diskAgent ∗ topLb (σ.top + 1)) := by
-  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev, Huep⟩, Hb, #Hc⟩
+       authoredBy (σ.top + 1) diskAgent ∗ itopLb (σ.top + 1) ∗
+       landedAt (σ.top + 1) (σ.ltop + 1) ∗ topLb (σ.ltop + 1)) := by
+  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev, Huep⟩, Hb, #Hc, #Hl⟩
   ihave %hram : ⌜ramBytes pa n⌝ $$ [Hmem Hmm Hb]
   · iapply histBytes_ramBytes σ pa n _ Hs $$ [Hmem Hmm Hb]
     iframe
   ihave %hnr := memModel_notRsv_hist σ pa Hs n $$ [Hmm Hb]
   · iframe
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk _ σ $$ Hmm
+  ihave %hget : ⌜∀ j, j < n → σ.mem[pa + BitVec.ofNat 64 j]? = some (Hs j)⌝ $$ [Hmem Hb]
+  · iapply histBytes_valid σ.mem pa n _ Hs $$ [Hmem Hb]
+    iframe
+  ihave %hhl := memModel_headsLanded σ Hs n $$ [Hmm Hl]
+  · iframe Hmm Hl
+  have hP := mmOk_okP hmm
+  have hnotin : σ.top + 1 ∉ σ.llog := fun h => by have := (hP.2.2.2.2.1 _ h).2; omega
+  have hmemEq := FlatMem.landBytes_eq_writeBytes σ.mem (lpOf (σ.llog ++ [σ.top + 1])) pa w (σ.top + 1) diskAgent
+    (by rw [lpOf_snoc_self σ.llog (σ.top + 1) (by omega) hnotin]; rfl) (fun j hj x hx => by
+      rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hget j hj, Option.getD_some] at hx
+      have hxm : x ∈ Hs j := by
+        cases hH : Hs j with
+        | nil => rw [hH] at hx; cases hx
+        | cons y H => rw [hH] at hx; obtain rfl := Option.some.inj hx; exact List.mem_cons_self
+      have hle : x.t ≤ σ.top := ((mmOk_hist hmm _ _ (hget j hj)).2 x hxm).1
+      rw [lpOf_snoc_ne σ.llog (σ.top + 1) x.t (by omega)]
+      exact hhl j hj x hx)
   have hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem := by
     intro h
     rw [MState.storeDma_of_ne σ pa n w hn]
-    exact rsvAllOk_store_off w (σ.top + 1) diskAgent hnr h
-  have hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
-      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem := by
-    intro h
+    exact rsvAllOk_landBytes_off w (σ.top + 1) diskAgent hnr h
+  have hpub : pubSame (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem (σ.storeDma pa n w).mem := by
     rw [MState.storeDma_of_ne σ pa n w hn]
-    exact pubClean_store_off w (σ.top + 1) diskAgent hnr h
-  imod memModel_storeDma (MachGS.era (hlc := hlc) (GF := GF)) σ pa n w hram hno hn hpub hrsv hnr $$ [Hmem Hmm Hc]
-    with ⟨Hmem, Hmm, #Hau, #Htop⟩
+    exact pubSame_landBytes_off w (σ.top + 1) diskAgent hnr
+  imod memModel_storeDma (MachGS.era (hlc := hlc) (GF := GF)) σ pa n w hram hno hn (fun j hj => ⟨_, hget j hj⟩) hpub hrsv hnr $$ [Hmem Hmm Hc]
+    with ⟨Hmem, Hmm, #Hau, #Htop, #Hland, #Htoplb⟩
   · iframe Hmem Hmm Hc
   imod histBytes_update σ.mem pa n Hs (σ.top + 1) diskAgent w $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
   imodintro
-  iframe Hb Hau Htop
+  iframe Hb Hau Htop Hland Htoplb
   iapply machInterp_of_storeDma σ pa n w hn
+  rw [hmemEq]
   iframe Hregs Hmem Hmm Hdev Huep
 
 /-! ## The value form of a lease -/
@@ -292,18 +379,29 @@ theorem headsAre_pushed (Hs : Nat → Hist) (t : Nat) (h : Agent) (n : Nat) (w :
 model lets a DMA read see: `dmaView` has no freedom left. -/
 theorem dmaView_pinned (σ : MState) (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) (Hs : Nat → Hist)
     (w : BitVec (8 * n)) (hh : headsAre Hs n w) :
-    genHeapInterp (GF := GF) σ.mem ∗ histBytes pa n dqs Hs ⊢ ⌜∀ v, dmaView σ pa n v → v = w⌝ := by
-  iintro ⟨Hmem, Hb⟩
+    genHeapInterp (GF := GF) σ.mem ∗ memModel σ ∗ histBytes pa n dqs Hs ∗
+      ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ⊢ ⌜∀ v, dmaView σ pa n v → v = w⌝ := by
+  iintro ⟨Hmem, Hmm, Hb, #Hl⟩
   ihave %hget : ⌜∀ j, j < n → σ.mem[pa + BitVec.ofNat 64 j]? = some (Hs j)⌝ $$ [Hmem Hb]
   · iapply histBytes_valid σ.mem pa n dqs Hs $$ [Hmem Hb]
     iframe
+  ihave %hhl := memModel_headsLanded σ Hs n $$ [Hmm Hl]
+  · iframe Hmm Hl
   ipureintro
   intro v hv
   apply bv_eq_of_bytes
   intro j hj
   refine hv j hj (nthByte w j) ?_
   rw [hget j hj, Option.bind_some]
-  exact hh j hj
+  have hh' := hh j hj
+  cases hH : Hs j with
+  | nil => rw [hH] at hh'; cases hh'
+  | cons e H =>
+    rw [hH] at hh'
+    have hl := hhl j hj e (by rw [hH]; rfl)
+    simp only [Hist.topL, List.find?_cons, hl, Option.map_some]
+    simpa using hh'
 
 end ambient
 

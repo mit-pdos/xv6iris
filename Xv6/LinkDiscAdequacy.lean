@@ -34,6 +34,24 @@ of lock-protected words, harmless by a value argument).  The user tables'
 half of the A/D clause is `uptDiscAt` (W8 (f3-utext) T4); `cpuProcDiscAt` is
 permanently out of the export ([OWN.80]); later items only strengthen the
 conjunction.
+
+**Route P** ([OWN.122], RVWMO's store buffer): each conjunct is read over LANDING positions (the
+export `xv6AccessDisc` IS the route-P twins' conjunction, `AccessDiscipline.xv6AccessDisc_eq_P`;
+same eleven conjuncts, same order).  The three page-table conjuncts (`pteDiscAtP`, `kptMapsExpP`,
+`ksFrameAtP`) are claimed once `started` has landed ([OWN.135]; before, `startedUnlandedP`), the
+order "the sealed table lands before `started`" DERIVED from main's fence epoch and the seal's
+snapshot (DESIGN D17′, `MachCSL.KptSeal.recordP_of`; no premise on the final state).
+
+**THE ONLY NAMED ASSUMPTION** ([OWN.127]/[OWN.131], xv6 weak-memory bug #1,
+`notes/xv6-weak-memory-bugs.md` entry 1): the machine's step guard `MachCSL.MState.drvOkGuard` --
+hart 0's MMIO store `STATUS |= DRIVER_OK` at `virtio_disk_init+0x170` waits until hart 0's three
+virtqueue-page `memset`s (`+0xf0/+0x102/+0x10c`) have landed, as if a `fence w,o` were there, at
+that one instruction only (STRONGER than RVWMO there, by the owner's ruling; the kernel unchanged).
+
+**Flagged to REVISIT** ([OWN.124], F-HH2-1): `holding()`'s unlocked `lk->cpu` read at
+`holding+0x12` is exempt from the replay's gate like the two `ip->ref` reads (it reads the landed
+top, provably `≠ cpuAddr x` on both sides); alternative (b), a custody-aware `waitedOn` with a
+per-load MachCSL record, is kept on file.
 -/
 import Xv6.SystemAdequacyDisc
 import Xv6.ProofUser

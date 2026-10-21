@@ -161,6 +161,9 @@ variable (lockOpenable : GName → BitVec 64 → String → Pay → IProp GF →
   (hlo : ∀ γ lk s R D, Persistent (lockOpenable γ lk s R D))
 variable (locked lockedCore lockedPre : GName → CPU → IProp GF) (lockCtxHeld : IProp GF)
 variable (armP : CPU → Bool → BitVec 64 → IProp GF)
+/- the release fence's receipt for the release store (route P, design D10 (a): `MachCSL.lockRelReady`
+at the real leaves; the payload and the held token themselves at the WPd ones) -/
+variable (relTok : GName → Pay → CPU → IProp GF)
 
 -- the leaf specs the proof applies (statements copied, `wpLoop` := `Goal`, no `▷` before the
 -- continuations: deviation 3)
@@ -221,11 +224,12 @@ variable (wp_s_branch : ∀ (cpu : CPU) (k : KCtx) (pc : BitVec 64) (is_rvc : Bo
             else pc + instrLen is_rvc) -∗ Goal cpu'))
     ⊢ Goal cpu)
 /- the fence slot at Rocq's `rs = rd = x0` (deviation 3) -/
-variable (wp_s_fence_rw_w : ∀ (cpu : CPU) (k : KCtx) (pc : BitVec 64) (is_rvc : Bool),
+variable (wp_s_fence_rw_w : ∀ (cpu : CPU) (k : KCtx) (_hsie : k.sie = false) (pc : BitVec 64)
+    (is_rvc : Bool) (γ : GName) (R : Pay) (_hR : payOk R),
     instr pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx 0#5, regidx.Regidx 0#5)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗
+    kctx cpu k ∗ pcIs cpu pc ∗ lockCtxHeld ∗ payAt R ∗ lockedPre γ cpu ∗
     wpNext k.sie k.proc cpu (fun cpu' =>
-        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ Goal cpu'))
+        iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ relTok γ R cpu -∗ Goal cpu'))
     ⊢ Goal cpu)
 variable (wp_s_sd_zero_lkcpu_release_gen : ∀ (cpu : CPU) (k : KCtx) (_hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
@@ -243,8 +247,7 @@ variable (wp_s_sw_zero_release_gen : ∀ (cpu : CPU) (k : KCtx) (_hsie : k.sie =
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (_hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (_haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) (_hrel : pc = KA.«release» + 0x1a#64),
     instr pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ Tc ∗ lockedPre γ cpu ∗ lockCtxHeld ∗
-    payAt R ∗
+    kctx cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ Tc ∗ relTok γ R cpu ∗
     wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.withLocks (k.locks.filter (fun x => x ≠ s))) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜s ∈ k.locks⌝ -∗ Tc -∗ Goal cpu'))
@@ -276,14 +279,44 @@ theorem relLeafOfFree {Goal : CPU → IProp GF} {kctx : CPU → KCtx → IProp G
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (_hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (_haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) (_hrel : pc = KA.«release» + 0x1a#64),
     instr pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
-    kctx cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ Tc ∗ lockedPre γ cpu ∗ lockCtxHeld ∗
-    payAt R ∗
+    kctx cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ Tc ∗
+    iprop(lockedPre γ cpu ∗ lockCtxHeld ∗ payAt R) ∗
     wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' (k.withLocks (k.locks.filter (fun x => x ≠ s))) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜s ∈ k.locks⌝ -∗ Tc -∗ Goal cpu'))
     ⊢ Goal cpu :=
-  fun cpu k hsie pc is_rvc imm rs1 γ lk s R hR D _ Tc hrefute haddr _ =>
-    h cpu k hsie pc is_rvc imm rs1 γ lk s R hR D Tc hrefute haddr
+  fun cpu k hsie pc is_rvc imm rs1 γ lk s R hR D _ Tc hrefute haddr _ => by
+    iintro ⟨Hi, Hk, Hpc, Hlo, HTc, ⟨Hlp, Hh, Hp⟩, HΦ⟩
+    iapply h cpu k hsie pc is_rvc imm rs1 γ lk s R hR D Tc hrefute haddr
+    iframe Hi Hk Hpc Hlo HTc Hlp Hh Hp HΦ
+
+/-- (Lean-only, design D10 (a)) A PLAIN fence leaf fills the release-fence slot at the WPd
+instantiations, whose release receipt is the held token and the payload themselves. -/
+theorem fenceLeafOfPlain {Goal : CPU → IProp GF} {kctx : CPU → KCtx → IProp GF}
+    {pcIs : CPU → BitVec 64 → IProp GF} {instr : BitVec 64 → Bool → instruction → IProp GF}
+    {payAt : Pay → IProp GF} {payOk : Pay → Prop} {lockCtxHeld : IProp GF}
+    {lockedPre : GName → CPU → IProp GF}
+    (h : ∀ (cpu : CPU) (k : KCtx) (pc : BitVec 64) (is_rvc : Bool),
+      instr pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx 0#5, regidx.Regidx 0#5)) ∗
+      kctx cpu k ∗ pcIs cpu pc ∗
+      wpNext k.sie k.proc cpu (fun cpu' =>
+          iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ Goal cpu'))
+      ⊢ Goal cpu) :
+    ∀ (cpu : CPU) (k : KCtx) (_hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (γ : GName) (R : Pay)
+      (_hR : payOk R),
+      instr pc is_rvc (instruction.FENCE (0#4, 3#4, 1#4, regidx.Regidx 0#5, regidx.Regidx 0#5)) ∗
+      kctx cpu k ∗ pcIs cpu pc ∗ lockCtxHeld ∗ payAt R ∗ lockedPre γ cpu ∗
+      wpNext k.sie k.proc cpu (fun cpu' =>
+          iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ iprop(lockedPre γ cpu ∗ lockCtxHeld ∗ payAt R) -∗
+            Goal cpu'))
+      ⊢ Goal cpu := fun cpu k _ pc is_rvc γ R _ => by
+  iintro ⟨Hi, Hk, Hpc, Hh, Hp, Hlp, HΦ⟩
+  iapply h cpu k pc is_rvc
+  iframe Hi Hk Hpc
+  iapply (wpNext_mono k.sie k.proc cpu _ _) $$ HΦ
+  iintro %cpu' HK Hk' Hpc'
+  iapply HK $$ Hk' Hpc'
+  iframe Hlp Hh Hp
 
 /-- The callee `holding` (Rocq `hold_body`): `Xv6.wp_holding_locked_gen_body` with `wpLoop` :=
 `Goal`, resources abstract. -/
@@ -401,11 +434,12 @@ theorem wpReleaseGen (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : Pay) 
   case haddr => k_norm [h29]
   iintro Hk Hpc ⟨Hlp, Hcred⟩
   -- fence rw,w
-  ax_leafs5_kstep (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false) from (textInstr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
+  ax_leafs5_kstep (wp_s_fence_rw_w cpu _ ?hs (KA.«release» + 0x16#64) false γ R hR) from (textInstr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc $Hheld $HR $Hlp]
+  iintro Hk Hpc Hrdy
   -- sw zero,0(s1): the lock is free
   ax_leafs5_kstep (wp_s_sw_zero_release_gen cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R hR D Tc hrefute ?haddr rfl) from (textInstr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc $Hcred $Hlp $Hheld $HR]
+    $$ [- $Hk $Hpc $Hcred $Hrdy]
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem Hcred
   -- jal pop_off
@@ -494,7 +528,8 @@ theorem releaseFaithful (HO : Xv6.HOLDING) (PO : Xv6.POPOFF) : Xv6.RELEASE_GEN :
       (lockOpenable := fun γ lk s R D => MachCSL.lockOpenable γ lk s R D)
       (hlo := fun _ _ _ _ _ => inferInstance)
       (locked := fun γ c => MachCSL.locked γ c) (lockedCore := fun γ c => MachCSL.lockedCore γ c)
-      (lockedPre := fun γ c => MachCSL.lockedPre γ c) (lockCtxHeld := MachCSL.lockCtxHeld)
+      (lockedPre := fun γ c => iprop(∃ tc : Nat, MachCSL.lockedClr γ c tc ∗ MachCSL.itopLb tc))
+      (lockCtxHeld := MachCSL.lockCtxHeld)
       (armP := fun c r p => if r then sieArm c true p else emp)
       (kctx_kernelText := fun c k => Xv6.kctx_kernelText (lent := false) c k)
       (kctx_wf := fun c k => MachCSL.kctx_wf (lent := false) c k)
@@ -515,9 +550,15 @@ theorem releaseFaithful (HO : Xv6.HOLDING) (PO : Xv6.POPOFF) : Xv6.RELEASE_GEN :
       (wp_s_branch := fun c k pc rvc imm rs1 rs2 h op =>
         (sep_mono_right (sep_mono_right (sep_mono_right (later_intro)))).trans
           (MachCSL.wp_s_branch (lent := false) c k pc rvc imm rs1 rs2 h op))
-      (wp_s_fence_rw_w := fun c k pc rvc =>
-        (sep_mono_right (sep_mono_right (sep_mono_right later_intro))).trans
-          (MachCSL.wp_s_fence_rw_w (lent := false) c k pc rvc 0#5 0#5))
+      (relTok := fun γ R c => MachCSL.lockRelReady γ R c)
+      (wp_s_fence_rw_w := fun c k hs pc rvc γ R hR => by
+        haveI : CtxMorph R := hR
+        iintro ⟨Hi, Hk, Hpc, Hh, HR, Hlp, HΦ⟩
+        iapply (MachCSL.wp_s_fence_rw_w_rel (lent := false) c k hs pc rvc 0#5 0#5 γ R R)
+        iframe Hi Hk Hpc Hh HR Hlp
+        isplitl []
+        · iapply MachCSL.lockHook_id
+        · inext; iexact HΦ)
       (wp_s_sd_zero_lkcpu_release_gen := fun c k hs pc rvc imm rs1 γ lk s R D _ Tc hr ha =>
         (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (later_intro))))))).trans
           (MachCSL.wp_s_sd_zero_lkcpu_release_gen (lent := false) c k hs pc rvc imm rs1 γ lk s R D Tc hr ha))
@@ -526,7 +567,7 @@ theorem releaseFaithful (HO : Xv6.HOLDING) (PO : Xv6.POPOFF) : Xv6.RELEASE_GEN :
         subst hpc
         iintro ⟨Hi, Hk, Hrest⟩
         icases Xv6.kctx_relPcsEq (lent := false) c k $$ Hk with ⟨%hpcs, Hk⟩
-        iapply (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (later_intro))))))))).trans
+        iapply (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (sep_mono_right (later_intro))))))).trans
           (MachCSL.wp_s_sw_zero_release_gen (lent := false) c k hs _ rvc imm rs1 γ lk s R D Tc hr ha
             (Xv6.xv6RelPc_release hpcs))
         iframe Hi Hk Hrest)
@@ -626,19 +667,24 @@ theorem wpFenceW (c : CPU) (k : KCtx) (pc : BitVec 64) (is_rvc : Bool) :
 include hmode hasid hppn Htext Hflow Hloc HG in
 /-- **The release proof at the WPd surface** (Rocq `release_wpd`), the fence slot and the
 kernel-text projection REAL, every other slot and resource λ-bound (the binders of this type). -/
-theorem releaseWpd {Pay : Type _} :
+theorem releaseWpd {Pay : Type _} (payAt : Pay → IProp GF) (payOk : Pay → Prop) (lockCtxHeld : IProp GF)
+    (lockedPre : GName → CPU → IProp GF) :
     type_of% (wpReleaseGen (GF := GF) (Pay := Pay) (Goal := goalW i cid cpu γm γp γn T satp0 Cond)
       (kctx := kctxW γm γn kt) (pcIs := pcW γp) (instr := instr2 σi T satp0)
-      (kernelText := kt) (hkt := inferInstance)
+      (kernelText := kt) (hkt := inferInstance) (payAt := payAt) (payOk := payOk)
+      (lockCtxHeld := lockCtxHeld) (lockedPre := lockedPre)
+      (relTok := fun γ R c => iprop(lockedPre γ c ∗ lockCtxHeld ∗ payAt R))
       (kctx_kernelText := kctxWKt γm γn kt)
-      (wp_s_fence_rw_w := wpFenceW i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
-        Htext Hflow Hloc G HG kt)) :=
+      (wp_s_fence_rw_w := fenceLeafOfPlain (payOk := payOk) (wpFenceW i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
+        Htext Hflow Hloc G HG kt))) :=
   wpReleaseGen (GF := GF) (Pay := Pay) (Goal := goalW i cid cpu γm γp γn T satp0 Cond)
     (kctx := kctxW γm γn kt) (pcIs := pcW γp) (instr := instr2 σi T satp0)
-    (kernelText := kt) (hkt := inferInstance)
+    (kernelText := kt) (hkt := inferInstance) (payAt := payAt) (payOk := payOk)
+    (lockCtxHeld := lockCtxHeld) (lockedPre := lockedPre)
+      (relTok := fun γ R c => iprop(lockedPre γ c ∗ lockCtxHeld ∗ payAt R))
     (kctx_kernelText := kctxWKt γm γn kt)
-    (wp_s_fence_rw_w := wpFenceW i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
-      Htext Hflow Hloc G HG kt)
+    (wp_s_fence_rw_w := fenceLeafOfPlain (payOk := payOk) (wpFenceW i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
+      Htext Hflow Hloc G HG kt))
 
 end WPdRelease
 

@@ -40,28 +40,121 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 may depend on the answer: the client owns a cell -- at any fractions -- over
 the WHOLE footprint, whose heads spell a `w` with `Q w`, and giving the
 bytes back yields `P w`.  There is no "any answer will do" arm: with no
-pinned value there is nothing to index `P` by. -/
+pinned value there is nothing to index `P` by.
+
+Route P, design D15 (a): the SECOND arm is a window with ONE PENDING STORE on top -- every byte's
+head is the same store `t` (spelling `wt`), not known to have landed, over a tail whose heads are
+landed (spelling `wb`).  A store lands all its bytes at once (one stamp), so the landed view is all
+`wb` or all `wt`; the client proves `P` at both answers, and the top answer hands the continuation
+the store's landing certificate. -/
 def dmaReadPinV (pa : PAddr) (n : Nat) (Q : BitVec (8 * n) → Prop)
     (P : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
-  ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (w : BitVec (8 * n)),
-     histBytes pa n dqs Hs ∗ ⌜headsAre Hs n w⌝ ∗ ⌜Q w⌝ ∗ (histBytes pa n dqs Hs -∗ P w)
+  (∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (w : BitVec (8 * n)),
+     histBytes pa n dqs Hs ∗ ⌜headsAre Hs n w⌝ ∗ ⌜Q w⌝ ∗
+     ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜(Hs j).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ∗ (histBytes pa n dqs Hs -∗ P w)) ∨
+  (∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (t : Nat) (wb wt : BitVec (8 * n)),
+     histBytes pa n dqs Hs ∗
+     ⌜t ≠ 0 ∧ headsAre Hs n wt ∧ (∀ j, j < n → ∀ e, (Hs j).head? = some e → e.t = t) ∧
+       headsAre (fun j => (Hs j).tail) n wb⌝ ∗ ⌜Q wb ∧ Q wt⌝ ∗
+     ([∗list] j ∈ List.range n, ∃ (e : HEnt) (p : Nat), ⌜((Hs j).tail).head? = some e⌝ ∗
+        (⌜e.t = 0⌝ ∨ landedAt e.t p)) ∗
+     ((histBytes pa n dqs Hs -∗ |==> P wb) ∧
+      (∀ p : Nat, landedAt t p -∗ histBytes pa n dqs Hs -∗ |==> P wt)))
 
-/-- Cashing the pin against the interpretation: every answer of a DMA read
-of the footprint IS the pinned `w`, and `P w` comes back. -/
+/-- The landed view of a one-store stack: all the base's bytes, or (the store landed) all the
+top's. -/
+theorem dmaView_stack (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (t : Nat)
+    (wb wt v : BitVec (8 * n))
+    (hget : ∀ j, j < n → σ.mem[pa + BitVec.ofNat 64 j]? = some (Hs j))
+    (htop : headsAre Hs n wt) (hts : ∀ j, j < n → ∀ e, (Hs j).head? = some e → e.t = t)
+    (hbase : headsAre (fun j => (Hs j).tail) n wb)
+    (hland : ∀ j, j < n → ∀ e, ((Hs j).tail).head? = some e → (σ.lp e.t).isSome)
+    (hv : dmaView σ pa n v) : (σ.lp t = none → v = wb) ∧ ((σ.lp t).isSome → v = wt) := by
+  constructor
+  · intro hnone
+    apply bv_eq_of_bytes
+    intro j hj
+    refine hv j hj (nthByte wb j) ?_
+    rw [hget j hj, Option.bind_some]
+    have hb : ((Hs j).tail).head?.map HEnt.v = some (nthByte wb j) := hbase j hj
+    cases hH : Hs j with
+    | nil => have := htop j hj; rw [hH] at this; cases this
+    | cons e H =>
+      have het : e.t = t := hts j hj e (by rw [hH]; rfl)
+      rw [hH] at hb
+      cases H with
+      | nil => cases hb
+      | cons e' H' =>
+        have hl := hland j hj e' (by rw [hH]; rfl)
+        simp only [List.tail_cons, List.head?_cons, Option.map_some, Option.some.injEq] at hb
+        simp only [Hist.topL, List.find?_cons, het, hnone, Option.isSome_none, hl]
+        simp [hb]
+  · intro hsome
+    apply bv_eq_of_bytes
+    intro j hj
+    refine hv j hj (nthByte wt j) ?_
+    rw [hget j hj, Option.bind_some]
+    have ht := htop j hj
+    cases hH : Hs j with
+    | nil => rw [hH] at ht; cases ht
+    | cons e H =>
+      have het : e.t = t := hts j hj e (by rw [hH]; rfl)
+      rw [hH] at ht
+      simp only [List.head?_cons, Option.map_some, Option.some.injEq] at ht
+      simp only [Hist.topL, List.find?_cons, het, hsome]
+      simp [ht]
+
+/-- Cashing the pin against the interpretation at the read's ANSWER `v`: `Q v` holds and `P v`
+comes back (route P, D15 (a): with the stack arm the answer is the base or the top). -/
 theorem dmaReadPinV_view (σ : MState) (pa : PAddr) (n : Nat) (Q : BitVec (8 * n) → Prop)
-    (P : BitVec (8 * n) → IProp GF) :
-    machInterp σ ∗ dmaReadPinV pa n Q P ⊢@{IProp GF}
-      ∃ w, ⌜(∀ v, dmaView σ pa n v → v = w) ∧ Q w⌝ ∗ machInterp σ ∗ P w := by
+    (P : BitVec (8 * n) → IProp GF) (v : BitVec (8 * n)) (hv : dmaView σ pa n v) :
+    machInterp σ ∗ dmaReadPinV pa n Q P ⊢@{IProp GF} |==> (⌜Q v⌝ ∗ machInterp σ ∗ P v) := by
   unfold dmaReadPinV
-  iintro ⟨Hσ, %dqs, %Hs, %w, Hb, %hh, %hQ, Hback⟩
-  ihave %hpin : ⌜∀ v, dmaView σ pa n v → v = w⌝ $$ [Hσ Hb]
-  · iapply dmaView_pinned_mach σ pa n dqs Hs w hh $$ [Hσ Hb]
-    iframe
-  iexists w
-  isplitl []
-  · ipureintro; exact ⟨hpin, hQ⟩
-  iframe Hσ
-  iapply Hback $$ Hb
+  iintro ⟨Hσ, Hpin⟩
+  icases Hpin with (⟨%dqs, %Hs, %w, Hb, %hh, %hQ, #Hl, Hback⟩ |
+    ⟨%dqs, %Hs, %t, %wb, %wt, Hb, %⟨ht0, htop, hts, hbase⟩, %⟨hQb, hQt⟩, #Hl, Hback⟩)
+  · ihave %hpin : ⌜∀ v, dmaView σ pa n v → v = w⌝ $$ [Hσ Hb]
+    · iapply dmaView_pinned_mach σ pa n dqs Hs w hh $$ [Hσ Hb]
+      iframe Hσ Hb Hl
+    have hvw : v = w := hpin v hv
+    subst hvw
+    imodintro
+    isplitr
+    · ipureintro; exact hQ
+    iframe Hσ
+    iapply Hback $$ Hb
+  · icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
+    ihave %hget := histBytes_valid σ.mem pa n dqs Hs $$ [Hmem Hb]
+    · iframe
+    ihave %hland := memModel_headsLanded σ (fun j => (Hs j).tail) n $$ [Hmm Hl]
+    · iframe Hmm Hl
+    have hst := dmaView_stack σ pa n Hs t wb wt v hget htop hts hbase hland hv
+    cases hlp : σ.lp t with
+    | none =>
+      have hvb : v = wb := hst.1 hlp
+      subst hvb
+      imod (BI.and_elim_l (P := iprop(histBytes pa n dqs Hs -∗ |==> P v))) $$ Hback Hb with HP
+      imodintro
+      isplitr
+      · ipureintro; exact hQb
+      isplitl [Hregs Hmem Hmm Hdev Huep]
+      · unfold machInterp; iframe
+      iexact HP
+    | some p =>
+      have hvt : v = wt := hst.2 (by rw [hlp]; rfl)
+      subst hvt
+      icases memModel_landedGetK (MachGS.era (hlc := hlc) (GF := GF)) σ t p hlp ht0 $$ Hmm
+        with ⟨Hmm, #Hlt⟩
+      ihave Hback := (BI.and_elim_r (Q := iprop(∀ p : Nat, landedAt (GF := GF) t p -∗
+        histBytes pa n dqs Hs -∗ |==> P v))) $$ Hback
+      imod Hback $$ %p Hlt Hb with HP
+      imodintro
+      isplitr
+      · ipureintro; exact hQt
+      isplitl [Hregs Hmem Hmm Hdev Huep]
+      · unfold machInterp; iframe
+      iexact HP
 
 /-! ## The derivation -/
 

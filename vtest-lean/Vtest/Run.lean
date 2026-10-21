@@ -286,7 +286,19 @@ def initX (t : Test) : Option XState :=
         rtU1 := DevRt.init
         rtP := DevRt.init
         rtV := DevRt.init
-        pcAt := fun _ => -1 }
+        pcAt := fun _ => -1
+        stampOk := by
+          intro a H hH e he
+          rw [imgFlat_get?] at hH
+          split at hH
+          · cases hm : (memOf t)[a]? with
+            | none => rw [hm] at hH; cases hH
+            | some v =>
+              rw [hm] at hH
+              cases hH
+              rcases List.mem_singleton.1 he with rfl
+              exact Nat.le_refl _
+          · cases hH }
   else none
 
 theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testMState t := by
@@ -332,11 +344,11 @@ abbrev TRun (t : Test) := RRun (testConfig t)
 def TRun.start (t : Test) : Option (TRun t) :=
   match h : initX t with
   | some x =>
-    some ⟨powerFork 0, x, 0, [], by
+    some ⟨powerFork 0, x, 0, [], ⟨0, by
       have := initX_abs t x h
       unfold gOf
       rw [this]
-      exact Language.NSteps.refl _⟩
+      exact Language.NSteps.refl _⟩⟩
   | none => none
 
 /-! ## From a run to the claims -/
@@ -344,17 +356,16 @@ def TRun.start (t : Test) : Option (TRun t) :=
 /-- A run that typed the test's input and ends showing `o` EXHIBITS `o`. -/
 theorem TRun.exhibits {t : Test} (r : TRun t) (o : Observation)
     (hin : obsIn r.obs = t.uartInput) (hobs : observedAt (gOf r.x) o) : Exhibits t o :=
-  ⟨r.n, r.obs, r.pool, gOf r.x, r.ok, hin, hobs⟩
+  let ⟨k, hk⟩ := r.ok
+  ⟨k, r.obs, r.pool, gOf r.x, hk, hin, hobs⟩
 
 /-- A run that typed the test's input and ends with a thread at an error
-node, with no store buffered, is STUCK. -/
+node is STUCK (route P: no store is buffered between the interpreter's steps). -/
 theorem TRun.noStep {t : Test} (r : TRun t) (hin : obsIn r.obs = t.uartInput)
-    (hst : r.pool.any errorNode = true) (hsb : allCpus.all (fun c => (r.x.sb c).isEmpty) = true) :
-    RunNoStepAt t := by
+    (hst : r.pool.any errorNode = true) : RunNoStepAt t := by
   rw [List.any_eq_true] at hst
   obtain ⟨e, he, hn⟩ := hst
-  rw [List.all_eq_true] at hsb
-  exact ⟨r.n, r.obs, r.pool, gOf r.x, e, r.ok, hin, he,
-    errorNode_noStep r.x e (fun c => List.isEmpty_iff.1 (hsb c (mem_allCpus c))) hn⟩
+  obtain ⟨k, hk⟩ := r.ok
+  exact ⟨k, r.obs, r.pool, gOf r.x, e, hk, hin, he, errorNode_noStep r.x e hn⟩
 
 end Vtest

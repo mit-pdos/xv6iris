@@ -167,7 +167,7 @@ claims -- the 64 stacks and the trampoline -- are handed back.  W8 (f3-ptek)
 registers every slot of the table with it), given that no publication word
 is written yet (`Hpub`, handing back `R`). -/
 theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    {lent : Bool} (cpu : CPU) (k : KCtx) (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44)
+    {lent : Bool} (cpu : CPU) (hc0 : cpu.val = 0) (k : KCtx) (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44)
     (hct : curTier = KTier.bare) (hok : kvmTableOk t pas) (R : IProp GF) :
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
       (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
@@ -221,8 +221,12 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
     · intro hp
       obtain ⟨i, hi, rfl, -⟩ := AccessDiscipline.kstkPage_walk hs' hh hr hmaps (Nat.le_refl _) hp
       exact List.mem_map.2 ⟨i, List.mem_range.2 hi, (kSlotP_pteAddr (pas i) 0#9).symm⟩
+  have hpubw : ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) →
+      w = cpu := fun f w h => by
+    rw [heqR] at h
+    exact Fin.ext ((xv6Pub_hart0 f w h).trans hc0.symm)
   ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) hso kernelPagetableAddr hra
-    hroots hkok (kstackCarve pas) hstk R $$ [Hctx Hcarve Hents Hrw Hauth Hroot Hpub]
+    hroots hkok (kstackCarve pas) hstk hpubw R $$ [Hctx Hcarve Hents Hrw Hauth Hroot Hpub]
   · iframe Hctx Hcarve Hents Hrw Hauth Hroot Hpub
   imod Hseal $$ %σ [Hmem Hmm] with ⟨Hmem, Hmm, Hctx, #Hkpt, Hrp, HR⟩
   · iframe Hmem Hmm

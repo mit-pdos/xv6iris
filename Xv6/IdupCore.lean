@@ -72,21 +72,23 @@ theorem id_runit_of_any [Icfg] (z : Nat) : runitAny (GF := GF) z ⊢ runit false
 /-- What the store's mover hands back (the post of
 `iref_upgrade_mir_store_pinw_au`, Rocq ProofIdup 607--617). -/
 def idStoreOut [Icfg] (M : RegMapF (Qp × PosNat)) (k : Nat) (inum : BitVec 32) (qt qn s : Qp)
-    (n : PosNat) (g : GName) (lo : Nat) : IProp GF :=
+    (n : PosNat) (g : GName) (lo loS : Nat) (ag : Agent) : IProp GF :=
   iprop(itableHalf (PartialMap.insert M k (qt + qn, n.succ)) ∗
     islSlot (PartialMap.insert M k (qt + qn, n.succ)) k ∗
     irefTokGenlo k qn g lo ∗ liveGenlo k s g lo ∗
     frzmH inum.toNat false ∗ icntHalf inum.toNat n.succ.val ∗
     runit false inum.toNat ∗ runit false inum.toNat ∗
-    (∃ tstn : Nat, ⌜lo ≤ tstn⌝ ∗ istmpAuth k (1 : Qp).half tstn ∗ topLb tstn))
+    (∃ tstn : Nat, istmpAuthL k (1 : Qp).half loS tstn ∗ itopLb tstn ∗ authoredBy tstn ag))
 
 /-- What the critical section closes to: the lock's resource in the
 release form, the caller's share back untouched, the new reference, and the
 two units (Rocq's release premise plus the core's continuation rows). -/
-def idClosed [Fscfg] [Icfg] [CurCtx] (k : Nat) (s qn : Qp) (inum : BitVec 32) : IProp GF :=
-  iprop(itableRes2Llb curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    inodeShr k s icfgDev inum ∗ inodeRef k qn icfgDev inum ∗
-    runitAny inum.toNat ∗ runitAny inum.toNat)
+def idClosed [Fscfg] [Icfg] [CurCtx] (k : Nat) (s qn : Qp) (inum : BitVec 32) (ag : Agent) : IProp GF :=
+  iprop(∃ tstn : Nat, authoredBy tstn ag ∗ itopLb tstn ∗
+    (visFloor curCtx tstn -∗
+      itableRes2Llb curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
+      inodeShr k s icfgDev inum ∗ inodeRef k qn icfgDev inum ∗
+      runitAny inum.toNat ∗ runitAny inum.toNat))
 
 /-- `ci` names every live slot (`icCiWf`'s domain clause). -/
 theorem id_ci_live (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -113,17 +115,17 @@ theorem id_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
 /-- **THE OPEN** (Rocq ProofIdup 384--487): everything between the acquire
 and the `lw`, in Rocq's order.  See the file header. -/
 theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
-    (inum : BitVec 32) :
+    (inum : BitVec 32) (ag : Agent) :
     itableInv (hlc := hlc) (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst k ∗
     itableRes2 curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     inodeShr k s icfgDev inum ∗ runitAny inum.toNat ∗ irefSlot ⊢
-    |={⊤}=> ∃ (M : RegMapF (Qp × PosNat)) (qt qn : Qp) (n : PosNat) (g : GName) (lo tst : Nat),
+    |={⊤}=> ∃ (M : RegMapF (Qp × PosNat)) (qt qn : Qp) (n : PosNat) (g : GName) (lo loS tst : Nat),
       ⌜PartialMap.get? M k = some (qt, n) ∧ qt + qn < (1 : Qp).half ∧ n.succ.val ≤ IREFSLOTS ∧
         (inum.toNat : Int) < 16 * (icfgNib : Int)⌝ ∗
-      itableHalf M ∗ istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor curCtx tst ∗
+      itableHalf M ∗ istmpAuthL k (1 : Qp).half loS tst ∗ itopLb tst ∗ visFloor curCtx tst ∗
       liveGenlo k s g lo ∗ islSlot M k ∗ frzmH inum.toNat false ∗ runit false inum.toNat ∗
       icntHalf inum.toNat n.val ∗
-      (idStoreOut M k inum qt qn s n g lo -∗ idClosed k s qn inum) := by
+      (idStoreOut M k inum qt qn s n g lo loS ag -∗ idClosed k s qn inum ag) := by
   iintro ⟨#Hinv, #Hbox, HR, Hshr, Hru, Hislot⟩
   unfold itableRes2
   icases HR with ⟨%M, %ci, Hhalf, Hstamps, %hwf, %hciwf, Hiauth, Hipool, Hslots, Hpool⟩
@@ -173,7 +175,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   ihave Hsrow := id_ent_of_eq (itableSlotRes_some curCtx M ci k qt n hMk) $$ Hsrow
   unfold itableSlotLive icSlotRowFl icSlotRow
   icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc, #Hvd⟩, #Hllbb, -⟩,
-    ⟨%tst, Hstk, #Hllbk, #Hflk⟩⟩
+    ⟨%loS, %tst, Hstk, #Hllbk, #Hflk, #Hflo⟩⟩
   -- the box's `ref++` (R3): mints the new reference's stamps
   obtain ⟨c0, hc0⟩ : ∃ c0, n.val = c0 + 1 := ⟨n.val - 1, by have := n.pos; omega⟩
   ihave Hc := id_ent_of_eq (show icCnt (GF := GF) k n.val = icCnt k (c0 + 1) by rw [hc0]) $$ Hc
@@ -182,14 +184,17 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   icases islPool_acc_upd M k hk $$ Hipool with ⟨Hisl, Hislback⟩
   ihave Hru := id_runit_of_any inum.toNat $$ Hru
   imodintro
-  iexists M, qt, qr.half, n, g, lo, tst
+  iexists M, qt, qr.half, n, g, lo, loS, tst
   isplitr
   · ipureintro
     exact ⟨hMk, Xv6.ig_frac_lt qt qr hqr, hno, hin⟩
   iframe Hhalf Hstk Hllbk Hflk Hrlive Hisl Hmir Hru Hicnt
   -- THE CLOSE (Rocq 670--729, 932--946)
   unfold idStoreOut idClosed
-  iintro ⟨Hhalf, Hisl, Htok, Hrlive, Hmir, Hicnt, Hru1, Hru2, ⟨%tstn, -, Hstn, #Hllbn⟩⟩
+  iintro ⟨Hhalf, Hisl, Htok, Hrlive, Hmir, Hicnt, Hru1, Hru2, ⟨%tstn, Hstn, #Hllbn, #Hautn⟩⟩
+  iexists tstn
+  iframe Hautn Hllbn
+  iintro #Hvfn
   have hM' : PartialMap.get? (PartialMap.insert M k (qt + qr.half, n.succ)) k =
       some (qt + qr.half, n.succ) := get?_insert_eq rfl
   have hag := icM_insert_agree_off M k (qt + qr.half, n.succ)
@@ -220,8 +225,8 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
           rw [PosNat.succ_val, hc0])
         iexact Hc
       · iexact Hllbb
-    · iexists tstn
-      iframe Hstn Hllbn
+    · iexists loS, tstn
+      iframe Hstn Hllbn Hvfn Hflo
   -- the slot's share authority back into the lock's resource
   ihave Hipool := Hislback $$ %(PartialMap.insert M k (qt + qr.half, n.succ)) %hag Hisl
   -- the table's retained identity: half to the new reference, half back
@@ -270,36 +275,38 @@ table and the region, the window goes out to the store, and the member
 store comes back as `pinwStorePost`; the caller's close runs after the
 mover shuts. -/
 theorem idup_store_au [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (M : RegMapF (Qp × PosNat))
-    (k : Nat) (inum : BitVec 32) (qt qn s : Qp) (n : PosNat) (g : GName) (lo tst : Nat)
+    (k : Nat) (inum : BitVec 32) (qt qn s : Qp) (n : PosNat) (g : GName) (lo loS tst : Nat)
     (P : IProp GF) (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) (hin : (inum.toNat : Int) < 16 * (icfgNib : Int)) :
     itableInv (hlc := hlc) (GF := GF) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-    itableHalf M ∗ istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗
+    itableHalf M ∗ istmpAuthL k (1 : Qp).half loS tst ∗ itopLb tst ∗
     liveGenlo k s g lo ∗ islSlot M k ∗ frzmH inum.toNat false ∗ runit false inum.toNat ∗
-    icntHalf inum.toNat n.val ∗ (idStoreOut M k inum qt qn s n g lo -∗ P) ⊢
+    icntHalf inum.toNat n.val ∗ (idStoreOut M k inum qt qn s n g lo loS (hartAgent cpu) -∗ P) ⊢
     writeAU cpu (iRef (ientry k)) 4 (BitVec.ofNat 32 n.succ.val) P := by
   iintro ⟨#Hinv, #Hrinv, Hhalf, Hst, #Hllb, Hlv, Hisl, Hmir, Hru, Hcnt, Hclose⟩
-  iapply writeAU_of_own
-  unfold writeAUOwn
+  iapply writeAU_of_ownT
+  unfold writeAUOwnT
   imod iref_upgrade_mir_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M k inum false
-      qt qn s n g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hq hno
-    $$ Hinv Hrinv Hhalf Hlv Hisl Hmir Hru Hcnt Hst Hllb with ⟨%hlot, Hrows, Hcl⟩
+      qt qn s n g lo loS tst (hartAgent cpu) CoPset.subseteq_top CoPset.subseteq_top hin hMk hq hno
+    $$ Hinv Hrinv Hhalf Hlv Hisl Hmir Hru Hcnt Hst Hllb with ⟨%hlS, %hlot, Hrows, Hcl⟩
+  subst loS
   icases irefPinRows_push k (irefWord M k) (BitVec.ofNat 32 n.succ.val) lo tst
       (irefSet_count n.succ hno) $$ Hrows with ⟨%Hs, Hb, Hpush⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists Hs
-  iframe Hb
+  iexists Hs, tst, 0
+  iframe Hb Hllb
+  isplitl []
+  · iapply topLbAt_0
   inext
-  iintro %t Hb #Hau #Ht
+  iintro %t %htt Hb #Hau #Ht _
   imod Hmask
-  ihave Hrows := Hpush $$ %t %(hartAgent cpu) Hb
+  ihave Hrows := Hpush $$ %t %(hartAgent cpu) %htt Hb
   imod Hcl $$ [Hrows] with Hout
   · unfold pinwStorePost
-    iexists (max tst t)
-    iframe Hrows
-    iapply topLb_max tst t
-    iframe Hllb Ht
+    iexists t
+    iframe Hrows Ht Hau
+    ipureintro; exact htt
   imodintro
   iapply Hclose
   unfold idStoreOut

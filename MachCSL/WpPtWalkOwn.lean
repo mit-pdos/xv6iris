@@ -96,33 +96,158 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
         iapply ctxByte_intro ξ _ dq e H $$ [Hh2]
         iframe Hh2 Hkey
 
-/-- **The read half of an exclusive pair, from ownership**: owned bytes
-give the accessor directly (no invariant to open); the heads read are the
-owned value. -/
-theorem ctxBytes_exclReadAU (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    ctxBytes (GF := GF) ξ pa n dq w ⊢ exclReadAU pa n (fun w0 => iprop(⌜w0 = w⌝ ∗ ctxBytes ξ pa n dq w)) := by
-  unfold ctxBytes exclReadAU histBytes
-  iintro H
-  icases ctxBytes_hist ξ pa dq (nthByte w) n $$ H with ⟨%Hs, Hh, %h, W⟩
+/-- A history's head stamp (0 for an empty history). -/
+abbrev WpPtWalkOwn.hdT (H : Hist) : Nat := (H.head?.map HEnt.t).getD 0
+
+/-- `ctxBytes_hist` with the heads' keys handed out. -/
+theorem ctxBytes_histK (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) : ∀ n : Nat,
+    ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
+      ∃ Hs : Nat → Hist, ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j) ∗
+        ⌜∀ j, j < n → Hs j ≠ [] ∧ (Hs j).head?.map HEnt.v = some (bs j)⌝ ∗
+        ([∗list] j ∈ List.range n, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (WpPtWalkOwn.hdT (Hs j))) ∗
+        (([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j) -∗
+          [∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j))
+  | 0 => by
+    iintro _
+    iexists (fun _ => [])
+    isplitl []
+    · simp only [List.range_zero, Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
+    isplit
+    · ipureintro; intro j hj; omega
+    isplitl []
+    · simp only [List.range_zero, Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
+    · iintro _
+      simp only [List.range_zero, Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro Hb
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    icases ctxBytes_histK ξ pa dq bs n $$ Hb1 with ⟨%Hs1, H1, %h1, Hk1, W1⟩
+    icases ctxByte_cases ξ _ _ _ $$ Hb2 with ⟨%e, %H, Hpt, %he, #Hkey⟩
+    have hmem : ∀ {k x : Nat}, (List.range n)[k]? = some x → x ≠ n := by
+      intro k x hk hx
+      have := List.mem_of_getElem? hk
+      rw [List.mem_range] at this
+      omega
+    iexists (fun j => if j = n then e :: H else Hs1 j)
+    have heq : ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq}
+        (fun j => if j = n then e :: H else Hs1 j) j) =
+        ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs1 j : IProp GF) := by
+      apply BigSepL.bigSepL_eq
+      intro k x hk
+      simp only [hmem hk, if_false]
+    have heqK : ([∗list] j ∈ List.range n, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ
+        (WpPtWalkOwn.hdT ((fun j => if j = n then e :: H else Hs1 j) j))) =
+        ([∗list] j ∈ List.range n, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (WpPtWalkOwn.hdT (Hs1 j)) : IProp GF) := by
+      apply BigSepL.bigSepL_eq
+      intro k x hk
+      simp only [hmem hk, if_false]
+    isplitl [H1 Hpt]
+    · iapply BigSepL.bigSepL_snoc.2
+      simp only [if_true]
+      rw [heq]
+      iframe H1 Hpt
+    isplit
+    · ipureintro
+      intro j hj
+      by_cases hjn : j = n
+      · subst hjn; simp [he]
+      · simp only [hjn, if_false]; exact h1 j (by omega)
+    isplitl [Hk1]
+    · iapply BigSepL.bigSepL_snoc.2
+      simp only [if_true]
+      rw [heqK]
+      iframe Hk1
+      simp only [WpPtWalkOwn.hdT, List.head?_cons, Option.map_some, Option.getD_some]
+      iexact Hkey
+    · iintro Hh
+      icases BigSepL.bigSepL_snoc.1 $$ Hh with ⟨Hh1, Hh2⟩
+      simp only [if_true]
+      rw [heq]
+      iapply BigSepL.bigSepL_snoc.2
+      isplitl [Hh1 W1]
+      · iapply W1 $$ Hh1
+      · try simp only [List.length_range]
+        rw [← he]
+        iapply ctxByte_intro ξ _ dq e H $$ [Hh2]
+        iframe Hh2 Hkey
+
+/-- **The read half of an exclusive pair, from ownership** (route P, D7): owned bytes give the
+accessor directly (no invariant to open); the running token makes every head readable -- its key is
+the image's, the hart's own (authored), or landed under the hart's view (`ownCtx_keys_vis`) -- so the
+landed heads the read half reads ARE the owned heads. -/
+theorem ctxBytes_exclReadAU (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    ownCtx cpu ξ ∗ ctxBytes (GF := GF) ξ pa n dq w ⊢
+      ownCtx cpu ξ ∗ exclReadAU cpu pa n (fun w0 => iprop(⌜w0 = w⌝ ∗ ctxBytes ξ pa n dq w)) := by
+  iintro ⟨Hctx, Hb⟩
+  unfold ctxBytes
+  icases ctxBytes_histK ξ pa dq (nthByte w) n $$ Hb with ⟨%Hs, H1, %h1, Hk, W1⟩
+  icases ownCtx_keys_vis cpu ξ (fun j => WpPtWalkOwn.hdT (Hs j)) n $$ [Hctx Hk] with
+    ⟨Hctx, %K, %tsl, %ls, #HK, #Hts, #Hls, %hv⟩
+  · iframe Hctx Hk
+  iframe Hctx
+  unfold exclReadAU
   iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hmask
-  iexists (fun _ => dq), Hs
-  iframe Hh
+  iintro Hclose
+  iexists (fun _ => dq), Hs, ls, tsl
+  iframe Hls Hts
+  isplitl [H1]
+  · unfold histBytes; iexact H1
   isplit
-  · ipureintro; exact fun j hj => (h j hj).1
+  · ipureintro
+    intro j hj
+    obtain ⟨hne, -⟩ := h1 j hj
+    cases hH : Hs j with
+    | nil => exact absurd hH hne
+    | cons e H =>
+      refine ⟨e, List.mem_cons_self, ?_⟩
+      have := hv j hj
+      simp only [hH, WpPtWalkOwn.hdT, List.head?_cons, Option.map_some, Option.getD_some] at this
+      rcases this with h | h | ⟨p, hp, _⟩
+      · exact Or.inl h
+      · exact Or.inr (Or.inr (Or.inr h))
+      · exact Or.inr (Or.inr (Or.inl ⟨p, hp⟩))
   inext
-  iintro %w0 %hheads Hh
-  imod Hmask
+  iintro %w0 %es %ps %⟨lp, hla, hau, hown, hheads⟩ _ Hb
+  imod Hclose
   imodintro
   isplit
   · ipureintro
-    apply bv_eq_of_bytes
-    intro j hj
-    have h1 := hheads j hj
-    have h2 := (h j hj).2
-    rw [h2] at h1
-    exact (Option.some.inj h1).symm
-  · iapply W $$ Hh
+    refine bv_eq_of_bytes _ _ (fun j hj => ?_)
+    obtain ⟨hne, hv0⟩ := h1 j hj
+    obtain ⟨hev, hel, P, Q, hPQ, hP⟩ := hheads j hj
+    cases hH : Hs j with
+    | nil => exact absurd hH hne
+    | cons e H =>
+      -- the head is landed: the image's, own (landed after the drain), or certified
+      have hl : (lp e.t).isSome := by
+        have := hv j hj
+        simp only [hH, WpPtWalkOwn.hdT, List.head?_cons, Option.map_some, Option.getD_some] at this
+        rcases this with h | h | ⟨p, hp, _⟩
+        · rw [h, hla.1]; rfl
+        · exact hown j hj e (by rw [hH]; exact List.mem_cons_self) (hau _ h j hj e (by rw [hH]; exact List.mem_cons_self) rfl)
+        · by_cases h0 : e.t = 0
+          · rw [h0, hla.1]; rfl
+          · rw [hla.2 _ hp h0]; rfl
+      rw [hH] at hPQ
+      cases P with
+      | nil =>
+        simp only [List.nil_append, List.cons.injEq] at hPQ
+        obtain ⟨rfl, -⟩ := hPQ
+        rw [← hev]
+        rw [hH] at hv0
+        simpa using hv0
+      | cons x P =>
+        simp only [List.cons_append, List.cons.injEq] at hPQ
+        obtain ⟨rfl, -⟩ := hPQ
+        have := hP _ List.mem_cons_self
+        rw [this] at hl; cases hl
+  · have hdef : histBytes pa n (fun _ => dq) Hs =
+        ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j : IProp GF) := rfl
+    irevert Hb
+    rw [hdef]
+    iintro Hb
+    iapply W1 $$ Hb
 
 /-- A store of an exclusive pair by the running context: the memory model
 moves, the new timestamp enters ξ's dirty set (`ctx_store`, over
@@ -131,27 +256,29 @@ the machine lets the conditional write through whenever no other hart
 reserves the footprint, whatever this hart holds; an acquire pair's view
 receipt is dropped. -/
 theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (r : Option Resv) (ak : AK) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hpres : ∀ j, j < n → ∃ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H)
+    (hln : σ.landNowOk cpu pa n ak)
     (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
-      (memModel (σ.store cpu pa n w true) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
+      (memModel (σ.storeL cpu pa n w) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
   unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
   iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels, Hch⟩, %acq, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]
-  · iapply memModel_topLb _ σ W $$ [Hmm HW]
+  · iapply memModel_itopLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_excl_any _ σ cpu pa n w r acq hram hno
-    (pubClean_store_off w (σ.top + 1) (hartAgent cpu) hnr)
-    (rsvAllOk_store_off w (σ.top + 1) (hartAgent cpu) hnr) (storeRelOk_off hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
+  imod memModel_store_excl_any _ σ cpu pa n w r acq ak hram hno hpres
+    (pubSame_landBytes_off w (σ.top + 1) (hartAgent cpu) hnr)
+    (rsvAllOk_landBytes_off w (σ.top + 1) (hartAgent cpu) hnr) hln (exclRelOk_off hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _, _⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
     cases hD : get? D (σ.top + 1) with
     | none => rfl
     | some h =>
-      have := (hDW (σ.top + 1) h hD).1
+      have := hDW (σ.top + 1) h hD
       omega
   imod ghost_map_insert_persist (σ.top + 1) cpu hfresh $$ Hdirty with ⟨Hdirty, #Hdin⟩
   imodintro
@@ -166,11 +293,10 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
       intro k h hk
       by_cases hkt : k = σ.top + 1
       · subst hkt
-        rw [LawfulPartialMap.get?_insert_eq rfl] at hk
-        exact ⟨Nat.le_refl _, Or.inr (Option.some.inj hk).symm⟩
+        exact Nat.le_refl _
       · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hkt)] at hk
-        obtain ⟨h1, h2⟩ := hDW k h hk
-        exact ⟨by omega, h2⟩
+        have := hDW k h hk
+        omega
     isplitr [Hch]
     · unfold dirtyElems
       imodintro
@@ -201,6 +327,43 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
       iexact Hdin
     · iexact Hau
 
+
+/-- **The heads of owned bytes are visible to their owner** (route P): each byte's head is landed
+or the owner's own (`ctxByte_vis` at the hart's view). -/
+theorem ctxBytes_heads_vis (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (dq : DFrac)
+    (bs : Nat → BitVec 8) : ∀ n : Nat,
+    memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗
+      ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
+      ⌜∀ j, j < n → ∃ (e : HEnt) (H : Hist), σ.mem[pa + BitVec.ofNat 64 j]? = some (e :: H) ∧
+        ((σ.lp e.t).isSome ∨ e.tid = hartAgent cpu)⌝
+  | 0 => by
+    iintro ⟨_, _, _, _⟩
+    ipureintro
+    intro j hj
+    omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hctx, Hmem, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %H1 := ctxBytes_heads_vis σ cpu ξ pa dq bs n $$ [Hmm Hctx Hmem Hb1]
+    · iframe
+    icases ctxByte_cases ξ _ dq (bs n) $$ Hb2 with ⟨%e, %H, Hpt, %_, #Hkey⟩
+    ihave %hvis := ctxByte_vis σ cpu ξ _ dq e H $$ [Hmm Hctx Hmem Hpt]
+    · iframe Hmm Hctx Hmem Hpt; iexact Hkey
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact H1 j h
+    · refine ⟨e, H, hvis.1, ?_⟩
+      have := hvis.2 (σ.tv cpu) (Nat.le_refl _)
+      simp only [HEnt.visibleP, Bool.or_eq_true, decide_eq_true_eq] at this
+      rcases this with h | h
+      · left
+        cases hl : σ.lp e.t with
+        | none => rw [hl] at h; cases h
+        | some _ => rfl
+      · right; exact h
+
 /-! ## The memory leaves -/
 
 /-- **The write half of an exclusive pair, on owned bytes**: full ownership
@@ -223,47 +386,65 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n vasize : Nat}
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hram : ⌜ramBytes req.pa n⌝ $$ [Hctx Hb Hmem Hmm]
-  · ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
-        $$ [Hmm Hctx Hmem Hb]
-    · iapply ctxBytes_readable σ cpu ξ req.pa n (DFrac.own 1) w $$ [Hmm Hctx Hmem Hb]
-      iframe
-    ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-    · iapply memModel_mmOk $$ Hmm
-    ipureintro
-    exact ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
+  ihave %hheads := ctxBytes_heads_vis σ cpu ξ req.pa (DFrac.own 1) (nthByte w) n $$ [Hmm Hctx Hmem Hb]
+  · unfold ctxBytes
+    iframe
+  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.1 (fun j hj => by
+    obtain ⟨e, H, hH, _⟩ := hheads j hj
+    exact ⟨_, hH⟩)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.pa n ∨ ¬ σ.landNowOk cpu req.pa n req.access_kind
-    · exact Or.inr ⟨σ, hno.imp id (fun h => ⟨hram, h⟩), rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, fun h => hno (Or.inl h),
-        Classical.byContradiction (fun h => hno (Or.inr h)), rfl, rfl⟩⟩
+    · exact Or.inr ⟨σ, Or.inl ⟨hk, hno.imp id (fun h => ⟨hram, h⟩), rfl⟩⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inr ⟨hram, hk, w', hv, fun h => hno (Or.inl h),
+        Classical.byContradiction (fun h => hno (Or.inr h)), rfl, rfl⟩)⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, hk', _⟩ | ⟨_, _, w'', hv', hno, hln, rfl, rfl⟩
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+    · rw [hk] at hk'; exact absurd hk' (by decide)
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
     ihave %hnr := memModel_notRsv_ctxBytes σ ξ req.pa n w $$ [Hmm Hb]
     · iframe
-    imod ctx_store_excl σ cpu ξ req.pa n w' r hram hno hnr $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    -- every head is landed (the own ones: the write waits for the hart's same-address drain)
+    have hsb : ¬ σ.sbOverlaps cpu req.pa n := fun ⟨p, hp, hs⟩ => (hln.2 p hp).2 hs
+    have hP := mmOk_okP hmm
+    have hnotin : σ.top + 1 ∉ σ.llog := fun h => by have := (hP.2.2.2.2.1 _ h).2; omega
+    have hmemEq := FlatMem.landBytes_eq_writeBytes σ.mem (lpOf (σ.llog ++ [σ.top + 1])) req.pa w' (σ.top + 1)
+      (hartAgent cpu) (by rw [lpOf_snoc_self σ.llog (σ.top + 1) (by omega) hnotin]; rfl) (fun j hj x hx => by
+        obtain ⟨e, H, hH, hvis⟩ := hheads j hj
+        rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH] at hx
+        simp only [Option.getD_some, List.head?_cons, Option.some.injEq] at hx
+        subst hx
+        have hle : e.t ≤ σ.top := ((mmOk_hist hmm _ _ hH).2 e List.mem_cons_self).1
+        rw [lpOf_snoc_ne σ.llog (σ.top + 1) e.t (by omega)]
+        rcases hvis with h | h
+        · exact h
+        · exact MState.ownLanded_of_noOverlap σ hP cpu req.pa n hsb j hj _ hH e List.mem_cons_self h)
+    imod ctx_store_excl σ cpu ξ req.pa n w' r req.access_kind hram hno
+      (fun j hj => let ⟨e, H, hH, _⟩ := hheads j hj; ⟨e :: H, hH⟩) hln hnr $$ [$Hmm $Hctx $Hfrag]
+      with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
       with ⟨Hmem, Hb⟩
     imod Hmask
     imodintro
-    rw [hk]
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
+    · ihave Hmem := (show genHeapInterp (GF := GF) (σ.mem.writeBytes req.pa n w' (σ.top + 1) (hartAgent cpu)) ⊢
+          genHeapInterp (σ.storeL cpu req.pa n w').mem from by
+            rw [show (σ.storeL cpu req.pa n w').mem =
+              σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) req.pa n w' (σ.top + 1) (hartAgent cpu) from rfl, hmemEq]) $$ Hmem
+      iapply Hclose $$ %(σ.storeL cpu req.pa n w') %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hfrag Hb
   · iintro %Hbk
-    obtain ⟨_, hσ⟩ := Hbk
+    have hσ : σ' = σ := by rcases Hbk with ⟨_, _, h⟩ | ⟨_, _, _, h⟩ <;> exact h
     subst σ'
     imod Hmask
     imodintro
@@ -328,17 +509,19 @@ theorem swp_read_pte_exclusive_ctx [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (dq' : DFrac) (w : BitVec (8 * 8))
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ bytesPointsTo pa 8 dq' w ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗
+    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r ∗ bytesPointsTo pa 8 dq' w ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗
         bytesPointsTo pa 8 dq' w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
-  iintro ⟨HmConf, Hfrag, Hb, HΦ⟩
+  iintro ⟨HmConf, Hctx, Hfrag, Hb, HΦ⟩
+  icases ctxBytes_exclReadAU cpu curCtx pa 8 dq' w $$ [Hctx Hb] with ⟨Hctx, Hau⟩
+  · iframe Hctx Hb
   iapply (swp_read_pte_exclusive cpu dq c sie hok pa hram hal r
     (fun w0 => iprop(⌜w0 = w⌝ ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗ bytesPointsTo pa 8 dq' w)))
   iframe HmConf Hfrag
-  isplitl [Hb]
-  · iapply exclReadAU_wand pa 8 _ _ $$ [Hb]
-    · iapply ctxBytes_exclReadAU curCtx pa 8 dq' w $$ Hb
+  isplitl [Hau]
+  · iapply exclReadAU_wand cpu pa 8 _ _ $$ [Hau]
+    · iexact Hau
     inext
     iintro %w0 ⟨%hw, Hb⟩ Hfrag
     iframe Hb Hfrag
@@ -346,7 +529,7 @@ theorem swp_read_pte_exclusive_ctx [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
   inext
   iintro HmConf %w0 ⟨%hw, Hfrag, Hb⟩
   subst hw
-  iapply HΦ $$ HmConf Hfrag Hb
+  iapply HΦ $$ HmConf Hctx Hfrag Hb
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -544,9 +727,9 @@ theorem swp_update_and_write_pte_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_intro HmConf
     iapply swp_bind
     iapply (swp_read_pte_exclusive_ctx cpu dq c sie hok addr haddr.1 haddr.2 r0 (DFrac.own 1) (kLeaf ppn perm a d))
-    iframe HmConf Hfrag Hb
+    iframe HmConf Hctx Hfrag Hb
     inext
-    iintro HmConf Hfrag Hb
+    iintro HmConf Hctx Hfrag Hb
     swp_run 40
     rw [check_leaf_pte39_eq]
     iapply swp_bind

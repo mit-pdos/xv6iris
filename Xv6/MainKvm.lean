@@ -151,7 +151,7 @@ the 64 stack claims and the trampoline claim, and the root cell persisted.
 W8 (f3-ptek) [OWN.66]: the seal registers the table with the state
 interpretation (`MachCSL.wpLoop_interpUpd`), given that `started` is not yet
 written (`Hpub`, handing back `R`). -/
-theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) (t : PTree)
+theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (hc0 : cpu.val = 0) (k : KCtx) (t : PTree)
     (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) (R : IProp GF) :
     kctx cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
@@ -166,7 +166,7 @@ theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) 
   iapply wpLoop_interpUpd cpu iprop(kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
       pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ kstackPagesC pas ∗ R)
   isplitl [Hk Ht Hauth Hroot Hw Hstk Hpub]
-  · iapply kctx_kptOn_publish cpu k t pas r0 hct hok R $$ [Hk Ht Hauth Hroot Hw Hstk Hpub]
+  · iapply kctx_kptOn_publish cpu hc0 k t pas r0 hct hok R $$ [Hk Ht Hauth Hroot Hw Hstk Hpub]
     iframe Hk Ht Hauth Hroot Hw Hstk Hpub
   · iintro ⟨Hk, Hkpt, Hs, Htr, Hrp, HstkC, HR⟩
     iapply HΦ $$ Hk Hkpt Hs Htr Hrp HstkC HR

@@ -69,7 +69,7 @@ theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
       exact hmm
   · unfold iviewLbAt
     iframe Hilb
-    iapply topLbAt_le E σ.top _ (hmm.2.1 cpu).2.1
+    iapply topLbAt_le E σ.ltop _ (mmOk_views hmm cpu).2.1
     unfold topLbAt
     iright
     iexact Htoplb
@@ -92,41 +92,50 @@ theorem ctxBytesX_forget (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFr
 /-! ## A5: the fetch gate -/
 
 /-- **Rocq `ctx_phys_xfetch_ok`**: a stamped byte is read, by every agent, at
-every view at or above the stamp, at its latest value. -/
-theorem uic_ctxByteX_read (m : FlatMem) (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
-    genHeapInterp m ∗ ctxByteX ξ K a dq v ⊢@{IProp GF}
-      ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → m.read ag tvn a = some v⌝ := by
+every view at or above the stamp, at its latest value (route P: the head is the image's or
+landed at or below `K`, so visible there to every agent). -/
+theorem uic_ctxByteX_read (σ : MState) (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
+    genHeapInterp σ.mem ∗ memModel σ ∗ ctxByteX ξ K a dq v ⊢@{IProp GF}
+      ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readP σ.lp ag tvn a = some v⌝ := by
   unfold ctxByteX
-  iintro ⟨Hmem, ⟨%e, %H, Hpt, %hev, _, %htK⟩⟩
-  ihave %hget : ⌜m[a]? = some (e :: H)⌝ $$ [Hmem Hpt]
+  iintro ⟨Hmem, Hmm, ⟨%e, %H, Hpt, %hev, _, Hc⟩⟩
+  ihave %hget : ⌜σ.mem[a]? = some (e :: H)⌝ $$ [Hmem Hpt]
   · icases genHeap_valid $$ [$Hmem $Hpt] with >%_
     itrivial
+  ihave %hl : ⌜∃ p, σ.lp e.t = some p ∧ p ≤ K⌝ $$ [Hmm Hc]
+  · icases Hc with (%h0 | ⟨%p, Hp, %hp⟩)
+    · ipureintro; exact ⟨0, by rw [h0]; rfl, Nat.zero_le _⟩
+    · ihave %h := memModel_landedAt' _ σ e.t p $$ [Hmm Hp]
+      · iframe Hmm Hp
+      ipureintro; exact ⟨p, h.2, hp⟩
   ipureintro
+  obtain ⟨p, hp, hpK⟩ := hl
   intro ag tvn htvn
-  unfold FlatMem.read
-  rw [hget, Option.bind_some, Hist.read_cons_visible _ _ _ _ (HEnt.visible_of_le _ _ _ (by omega)), hev]
+  unfold FlatMem.readP
+  rw [hget, Option.bind_some, Hist.readP_cons_visible _ _ _ _ _
+    (HEnt.visibleP_of_landed σ.lp ag tvn _ (p := p) hp (by omega)), hev]
 
-theorem uic_ctxBytesX_read' (m : FlatMem) (ξ : CtxId) (K : Nat) (pa : PAddr) (dq : DFrac)
+theorem uic_ctxBytesX_read' (σ : MState) (ξ : CtxId) (K : Nat) (pa : PAddr) (dq : DFrac)
     (bs : Nat → BitVec 8) : ∀ n : Nat,
-    genHeapInterp m ∗ ([∗list] j ∈ List.range n, ctxByteX ξ K (pa + BitVec.ofNat 64 j) dq (bs j))
+    genHeapInterp σ.mem ∗ memModel σ ∗ ([∗list] j ∈ List.range n, ctxByteX ξ K (pa + BitVec.ofNat 64 j) dq (bs j))
       ⊢@{IProp GF} ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → ∀ j, j < n →
-        m.read ag tvn (pa + BitVec.ofNat 64 j) = some (bs j)⌝
+        σ.mem.readP σ.lp ag tvn (pa + BitVec.ofNat 64 j) = some (bs j)⌝
   | 0 => by
-    iintro ⟨_, _⟩
+    iintro ⟨_, _, _⟩
     ipureintro
     intro _ _ _ j hj
     omega
   | n + 1 => by
     rw [List.range_succ]
-    iintro ⟨Hmem, Hb⟩
+    iintro ⟨Hmem, Hmm, Hb⟩
     icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
     ihave %H1 : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → ∀ j, j < n →
-        m.read ag tvn (pa + BitVec.ofNat 64 j) = some (bs j)⌝ $$ [Hmem Hb1]
-    · iapply uic_ctxBytesX_read' m ξ K pa dq bs n $$ [Hmem Hb1]
+        σ.mem.readP σ.lp ag tvn (pa + BitVec.ofNat 64 j) = some (bs j)⌝ $$ [Hmem Hmm Hb1]
+    · iapply uic_ctxBytesX_read' σ ξ K pa dq bs n $$ [Hmem Hmm Hb1]
       iframe
     ihave %H2 : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn →
-        m.read ag tvn (pa + BitVec.ofNat 64 n) = some (bs n)⌝ $$ [Hmem Hb2]
-    · iapply uic_ctxByteX_read m ξ K _ dq (bs n) $$ [Hmem Hb2]
+        σ.mem.readP σ.lp ag tvn (pa + BitVec.ofNat 64 n) = some (bs n)⌝ $$ [Hmem Hmm Hb2]
+    · iapply uic_ctxByteX_read σ ξ K _ dq (bs n) $$ [Hmem Hmm Hb2]
       iframe
     ipureintro
     intro ag tvn htvn j hj
@@ -136,11 +145,11 @@ theorem uic_ctxBytesX_read' (m : FlatMem) (ξ : CtxId) (K : Nat) (pa : PAddr) (d
 
 /-- The stamped word is read, by every agent, at every view at or above the
 stamp. -/
-theorem uic_ctxBytesX_read (m : FlatMem) (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFrac)
+theorem uic_ctxBytesX_read (σ : MState) (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFrac)
     (w : BitVec (8 * n)) :
-    genHeapInterp m ∗ ctxBytesX ξ K pa n dq w ⊢@{IProp GF}
-      ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → m.readBytes ag tvn pa n w⌝ :=
-  uic_ctxBytesX_read' m ξ K pa dq (nthByte w) n
+    genHeapInterp σ.mem ∗ memModel σ ∗ ctxBytesX ξ K pa n dq w ⊢@{IProp GF}
+      ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytesP σ.lp ag tvn pa n w⌝ :=
+  uic_ctxBytesX_read' σ ξ K pa dq (nthByte w) n
 
 /-- **A5, THE FETCH GATE** (Rocq `ctx_phys_xfetch_ok`): an instruction fetch
 of stamped bytes, once the hart's instruction view has passed the stamp,
@@ -161,8 +170,9 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytes ag tvn req.pa n w⌝ $$ [Hmem Hb]
-  · iapply uic_ctxBytesX_read σ.mem ξ K req.pa n dq w $$ [Hmem Hb]
+  ihave %hrd : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytesP σ.lp ag tvn req.pa n w⌝
+      $$ [Hmem Hmm Hb]
+  · iapply uic_ctxBytesX_read σ ξ K req.pa n dq w $$ [Hmem Hmm Hb]
     iframe
   ihave %hK : ⌜K ≤ σ.itv cpu⌝ $$ [Hmm Hiv]
   · iapply uic_memModel_iviewLb _ σ cpu K $$ [Hmm Hiv]
@@ -170,20 +180,20 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     iexact Hiv
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) _ hK)
+  have hram : ramBytes req.pa n := ramBytes_of_readBytesP hmm.1 (hrd (ifetchAgent cpu) _ hK)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
-      ⟨hram, hk, σ.itv cpu, w, le_refl _, (hmm.2.1 cpu).2.1, hrd _ _ hK, rfl, rfl⟩)⟩
+      ⟨hram, hk, σ.itv cpu, w, le_refl _, (mmOk_views hmm cpu).2.1, hrd _ _ hK, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', htvn, _, hrd', rfl, hσ⟩ |
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', hitv, _, hrd', rfl, hσ⟩ |
     ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'
-    obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd _ tvn (Nat.le_trans hK htvn)) hrd'
+    obtain rfl := readBytesP_unique _ _ _ _ _ _ _ _ (hrd _ _ (Nat.le_trans hK hitv)) hrd'
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
@@ -218,27 +228,29 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
+  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytesP σ.lp (hartAgent cpu) tvn req.pa n w⌝
       $$ [Hmm Hctx Hmem Hb]
   · iapply ctxBytes_readable σ cpu ξ req.pa n dq w $$ [Hmm Hctx Hmem Hb]
     iframe Hmm Hctx Hmem
-    iapply ctxBytesX_forget $$ Hb
+    iapply ctxBytesX_forget ξ K req.pa n dq w $$ Hb
   ihave %hsrc : ⌜∀ tvn, σ.tv cpu ≤ tvn → loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ)
       (chainEx (hlc := hlc) (GF := GF) σ) σ.mem cpu req.pa n tvn⌝ $$ [Hmm Hctx Hmem Hb]
   · iapply ctxBytes_srcOk σ cpu ξ req.pa n dq w (chainEx (hlc := hlc) (GF := GF) σ) $$ [Hmm Hctx Hmem Hb]
     iframe Hmm Hctx Hmem
-    iapply ctxBytesX_forget $$ Hb
+    iapply ctxBytesX_forget ξ K req.pa n dq w $$ Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
+  have hram : ramBytes req.pa n := ramBytes_of_readBytesP hmm.1 (hrd _ (Nat.le_refl _))
+  have hP := mmOk_okP hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
-      ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hrd _ (hmm.2.1 cpu).1, rfl, rfl⟩))⟩
+    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.ltop, Or.inr (Or.inr (Or.inl
+      ⟨hram, hk, σ.ltop, w, (mmOk_views hmm cpu).1, le_refl _, ?_,
+        (σ.readFwd_iff hP cpu σ.ltop req.pa n w).2 (hrd _ (mmOk_views hmm cpu).1), rfl, rfl⟩))⟩
     intro j _
-    exact (hmm.2.1 cpu).2.2.2 _
+    exact (mmOk_views hmm cpu).2.2.2 _
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
@@ -246,7 +258,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
-  · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
+  · obtain rfl := readBytesP_unique _ _ _ _ _ _ _ _ (hrd tvn htv) ((σ.readFwd_iff hP cpu tvn req.pa n w').1 hrd')
     imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) $$ Hmm with Hmm
     imod Hmask
     imodintro

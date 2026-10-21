@@ -69,7 +69,7 @@ theorem ctxBytes_of_keyed (ξ : CtxId) (pa : PAddr) (dq : DFrac) (t : Nat) (ag :
 
 theorem ctxBytes_of_pushed (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
     (t : Nat) (Hs : Nat → Hist) (w : BitVec (8 * n)) :
-    ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ topLb t ∗
+    ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ itopLb t ∗
       histBytes pa n (fun _ => dq) (pushed Hs t (hartAgent cpu) w) ⊢
       |==> (ownCtx cpu ξ ∗ ctxBytes ξ pa n dq w) := by
   iintro ⟨Hctx, #Hau, #Ht, Hb⟩

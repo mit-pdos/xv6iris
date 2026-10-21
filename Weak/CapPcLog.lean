@@ -49,12 +49,24 @@ theorem CapPcLog.pcLogOfSnoc {σ σ' : MState} (g : Agent) (v : Int) (hl : σ'.l
     rw [if_neg (by omega)]
   · rw [hp, if_pos rfl]
 
+/-- **A hart's store, route P**: a plain store's ISSUE (`MState.issue`) or an exclusive store's
+landed write (`MState.storeL`). -/
+abbrev CapPcLog.storeOf (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
+    MState :=
+  if excl then σ.storeL cpu pa n w else σ.issue cpu pa n w
+
+theorem CapPcLog.storeOf_log (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (excl : Bool) : (CapPcLog.storeOf σ cpu pa n w excl).log = σ.log ++ [hartAgent cpu] := by
+  cases excl <;> rfl
+
 /-- **A hart's store appends its pc**: the hart's `PC` (plain) or `-1` (exclusive / AMO). -/
 theorem CapPcLog.pcLogOfStore (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (excl : Bool) :
-    RelSiteProvExp.pcLogOf (σ.store cpu pa n w excl) =
-      RelSiteProvExp.pcLogOf σ ++ [if excl then -1 else (((σ.regs cpu) LeanRV64D.Register.PC).toNat : Int)] :=
-  CapPcLog.pcLogOfSnoc (hartAgent cpu) _ rfl (fun t => rfl)
+    RelSiteProvExp.pcLogOf (CapPcLog.storeOf σ cpu pa n w excl) =
+      RelSiteProvExp.pcLogOf σ ++ [if excl then -1 else (((σ.regs cpu) LeanRV64D.Register.PC).toNat : Int)] := by
+  cases excl
+  · exact CapPcLog.pcLogOfSnoc (hartAgent cpu) _ rfl (fun t => rfl)
+  · exact CapPcLog.pcLogOfSnoc (hartAgent cpu) _ rfl (fun t => rfl)
 
 /-- **A DMA write appends `-1`** (a zero-byte one is the identity). -/
 theorem CapPcLog.pcLogOfDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -73,12 +85,13 @@ def CapPcLog.keepsPc (σ σ' : MState) : Prop := σ'.log = σ.log ∧ σ'.pcAt =
 theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) (v : o.ret)
     (σ' : MState) (h : evStep cpu o σ v σ') :
     CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
-      (w : BitVec (8 * n)), o = .memWrite n va req ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+      (w : BitVec (8 * n)), o = .memWrite n va req ∧ σ' = CapPcLog.storeOf σ cpu req.pa n w (akExcl req.access_kind) := by
   cases o with
   | memWrite n va req =>
-    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, -, -, rfl, -⟩ | ⟨-, hk, w, -, -, rfl⟩ | ⟨-, hk, w, -, -, -, -, rfl⟩
     · exact Or.inl ⟨rfl, rfl⟩
-    · exact Or.inr ⟨n, va, req, w, rfl, rfl⟩
+    · exact Or.inr ⟨n, va, req, w, rfl, by simp only [CapPcLog.storeOf, hk]; rfl⟩
+    · exact Or.inr ⟨n, va, req, w, rfl, by simp only [CapPcLog.storeOf, hk]; rfl⟩
   | memRead n va req =>
     left
     rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
@@ -95,7 +108,7 @@ theorem CapPcLog.blockedPc (cpu : CPU) (o : Outcome Register RegisterType) (σ �
     (h : blockedStep cpu o σ σ') : CapPcLog.keepsPc σ σ' := by
   cases o with
   | memRead n va req => obtain ⟨-, -, rfl⟩ := h; exact ⟨rfl, rfl⟩
-  | memWrite n va req => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl⟩
+  | memWrite n va req => rcases h with ⟨-, -, rfl⟩ | ⟨-, -, -, rfl⟩ <;> exact ⟨rfl, rfl⟩
   | barrier b => obtain ⟨-, -, rfl⟩ := h; exact ⟨rfl, rfl⟩
   | _ => exact absurd h id
 
@@ -103,7 +116,7 @@ theorem CapPcLog.blockedPc (cpu : CPU) (o : Outcome Register RegisterType) (σ �
 theorem CapPcLog.hartStepPc (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState)
     (h : hartStep cpu m σ m' σ') :
     CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
-      (w : BitVec (8 * n)), σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+      (w : BitVec (8 * n)), σ' = CapPcLog.storeOf σ cpu req.pa n w (akExcl req.access_kind) := by
   unfold hartStep at h
   match m, h with
   | .pure _, ⟨_, _, h⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
@@ -159,7 +172,7 @@ write (with its device's move). -/
 def CapPcLog.stepPc (σ σ' : MState) : Prop :=
   CapPcLog.keepsPc σ σ' ∨
   (∃ (cpu : CPU) (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
-    (w : BitVec (8 * n)), σ' = σ.store cpu req.pa n w (akExcl req.access_kind)) ∨
+    (w : BitVec (8 * n)), σ' = CapPcLog.storeOf σ cpu req.pa n w (akExcl req.access_kind)) ∨
   (∃ (d : DevId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d), σ' = (σ.storeDma pa n w).setDev d s')
 
 /-- **A thread-pool step with the power on** (`MachCSL.primStep`) is one of `stepPc`'s three
@@ -216,7 +229,7 @@ theorem CapPcLog.stepPcLen {σ σ' : MState} (h : CapPcLog.stepPc σ σ') :
     (σ'.log.length = σ.log.length + 1 ∧ ∃ v : Int, RelSiteProvExp.pcLogOf σ' = RelSiteProvExp.pcLogOf σ ++ [v]) := by
   rcases h with ⟨hl, hp⟩ | ⟨cpu, n, va, req, w, rfl⟩ | ⟨d, pa, n, w, s', rfl⟩
   · exact Or.inl ⟨hl, CapPcLog.pcLogOfCongr hl hp⟩
-  · exact Or.inr ⟨by simp, _, CapPcLog.pcLogOfStore _ cpu _ n w _⟩
+  · exact Or.inr ⟨by rw [CapPcLog.storeOf_log]; simp, _, CapPcLog.pcLogOfStore _ cpu _ n w _⟩
   · rw [CapPcLog.pcLogOfDmaDev]
     by_cases hn : n = 0
     · subst hn; exact Or.inl ⟨by simp, by simp⟩
@@ -242,7 +255,7 @@ theorem CapPcLog.hartStepStore (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : 
     (h : hartStep cpu m σ m' σ') :
     CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
       (k : (Outcome.memWrite n va req).ret → SailM Unit) (w : BitVec (8 * n)),
-      m = .impure (.ok (.memWrite n va req)) k ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+      m = .impure (.ok (.memWrite n va req)) k ∧ σ' = CapPcLog.storeOf σ cpu req.pa n w (akExcl req.access_kind) := by
   unfold hartStep at h
   match m, h with
   | .pure _, ⟨_, _, h⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
@@ -260,7 +273,7 @@ theorem CapPcLog.stepStoreOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
       (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
       (k : (Outcome.memWrite n va req).ret → SailM Unit) (w : BitVec (8 * n)),
       t = t₁ ++ .hart gen cpu (.impure (.ok (.memWrite n va req)) k) :: t₂ ∧
-      g'.m = g.m.store cpu req.pa n w (akExcl req.access_kind)) ∨
+      g'.m = CapPcLog.storeOf g.m cpu req.pa n w (akExcl req.access_kind)) ∨
     (∃ (d : DevId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d), g'.m = (g.m.storeDma pa n w).setDev d s') := by
   cases h with
   | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
@@ -510,7 +523,7 @@ theorem CapPcLog.stepLogPc {t t' : List Expr} {g g' : GState} {obs : List Obs}
   rcases CapPcLog.stepStoreOf h hp with ⟨hl, hpc⟩ | ⟨t₁, t₂, gen, cpu, n, va, req, k, w, ht, he⟩ |
     ⟨d, pa, n, w, s', he⟩
   · exact Or.inl ⟨hl, CapPcLog.pcLogOfCongr hl hpc⟩
-  · refine Or.inr (Or.inl ⟨t₁, t₂, gen, cpu, n, va, req, k, ht, by rw [he], ?_⟩)
+  · refine Or.inr (Or.inl ⟨t₁, t₂, gen, cpu, n, va, req, k, ht, by rw [he, CapPcLog.storeOf_log], ?_⟩)
     rw [he, CapPcLog.pcLogOfStore]
   · rw [he, CapPcLog.pcLogOfDmaDev]
     by_cases hn : n = 0
@@ -569,17 +582,15 @@ the machine's pc log: nothing for a non-appending step; for an appending one the
 store of the agent's own hart thread (`R-log` names the author, `hartThreadIs` the program `H cpu`)
 whose exclusivity is the label's (`storeLbl`) and whose pc is the pf hart's (`SimRel.pool`), or a
 disk entry (`-1`). -/
-theorem CapPcLog.oneStepPc {g0 : GState} {c c' : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)}
+theorem CapPcLog.oneStepPcCore {g0 : GState} {c c' : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)}
     {t t' : List Expr} {g g' : GState} {n : Nat} {κ : List Obs} {i : Nat} {l : Wlabel}
     {k : MachOfPf.SKind} {m : Nat} {obs : List Obs}
     (hp0 : g0.pow = false) (hg0 : g0.gen = 0)
     (hR : MachOfPf.SimRel c st t g) (hreach : MachOfPf.MRun n ([Expr.power], g0) κ (t, g))
-    (hR' : MachOfPf.SimRel c' (st ++ [(i, l)]) t' g') (hk : MachOfPf.kindOk c i l c' k)
+    (hL' : g'.m.log = g.m.log ++ (if TsoShadow.lbWrites l then [i] else [])) (hk : MachOfPf.kindOk c i l c' k)
     (hm : MachOfPf.MRun m (t, g) obs (t', g')) (hle : m ≤ 1) :
     RelSiteProvExp.pcLogOf g'.m =
       RelSiteProvExp.pcLogOf g.m ++ (RelSiteProvPc.recPc ⟨c, i, l, k⟩).toList := by
-  have hL' := CapPcLog.simLog hR'
-  rw [CapPcLog.stAuthorsSnoc, ← CapPcLog.simLog hR] at hL'
   cases hw : TsoShadow.lbWrites l with
   | false =>
     rw [hw, if_neg Bool.false_ne_true, List.append_nil] at hL'
@@ -630,6 +641,25 @@ theorem CapPcLog.oneStepPc {g0 : GState} {c c' : Wpcfg Pexv6 Efab} {st : List (N
       simp only [RelSiteProvPc.recPc, hlb, if_true, diskAgent, hdisk, Option.elim,
         RelSiteProvPc.pcOfSt, ite_self]
       rfl
+
+/-- **One recorded pf step simulated by its machine run** (route P, D5: at most one step, or a step
+and the silent landing of the store it issued, `MachOfPf.MRunPcTail`) appends exactly its `recPc`. -/
+theorem CapPcLog.oneStepPc {g0 : GState} {c c' : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)}
+    {t t' : List Expr} {g g' : GState} {n : Nat} {κ : List Obs} {i : Nat} {l : Wlabel}
+    {k : MachOfPf.SKind} {m : Nat} {obs : List Obs}
+    (hp0 : g0.pow = false) (hg0 : g0.gen = 0)
+    (hR : MachOfPf.SimRel c st t g) (hreach : MachOfPf.MRun n ([Expr.power], g0) κ (t, g))
+    (hR' : MachOfPf.SimRel c' (st ++ [(i, l)]) t' g') (hk : MachOfPf.kindOk c i l c' k)
+    (hm : MachOfPf.MRun m (t, g) obs (t', g')) (hle : MachOfPf.MRunPcTail m (t, g) (t', g')) :
+    RelSiteProvExp.pcLogOf g'.m =
+      RelSiteProvExp.pcLogOf g.m ++ (RelSiteProvPc.recPc ⟨c, i, l, k⟩).toList := by
+  have hL' := CapPcLog.simLog hR'
+  rw [CapPcLog.stAuthorsSnoc, ← CapPcLog.simLog hR] at hL'
+  rcases hle with hle | ⟨⟨t1, g1⟩, o1, hm1, hlog, hpc, -⟩
+  · exact CapPcLog.oneStepPcCore hp0 hg0 hR hreach hL' hk hm hle
+  · simp only at hlog hpc
+    rw [CapPcLog.pcLogOfCongr hlog hpc]
+    exact CapPcLog.oneStepPcCore hp0 hg0 hR hreach (hlog.symm.trans hL') hk hm1 (Nat.le_refl 1)
 
 /-! ## The disk kind: a block of machine steps -/
 
@@ -827,11 +857,11 @@ theorem CapPcLog.readAtPrimedOf {fok : Image → List Wmsg → Nat → Int → L
     (hR : PfStepTsoMem.rmem cf st σ) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ)
     (ha2 : CapRelSite.pcLogAgree r σ) (ha3 : WbPrimed.relArmed r)
     (hp : cf.pcLog[p]? = some m) (hv : (msgByte m (paZ pa)).isSome) (hram : inRam pa 1)
-    (hcoh : (σ.hr j).coh pa = p + 1) :
+    (hcoh : (σ.hr j).coh pa = p + 1) (heg : σ.llog = List.range' 1 σ.log.length) :
     ∃ cf', WbPrimed.cfgRel cf cf' ∧ ∃ m', cf'.pcLog[p]? = some m' ∧ m'.wmPa = m.wmPa ∧
       m'.wmData = m.wmData ∧ m'.wmTid = m.wmTid ∧ readAt cf'.pcLog cf' st σ j pa p m' := by
   obtain ⟨cf', hrel, hsite⟩ := CapRelSite.relSiteWCrelOf h h0 σ hD ha2 ha3
   exact ⟨cf', hrel, WbPrimed.readAtPrimed cf'.pcLog cf cf' st σ j pa p m hR hrel hD hsite
-    (List.prefix_refl _) hp hv hram hcoh⟩
+    (List.prefix_refl _) hp hv hram hcoh heg⟩
 
 end Weak

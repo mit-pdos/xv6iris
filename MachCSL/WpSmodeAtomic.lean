@@ -428,7 +428,7 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
   iframe HmConf Hfrag
   isplitl [HAUw]
   · unfold amoAU
-    iapply exclReadAU_wand _ 4 _ _ $$ HAUw
+    iapply exclReadAU_wand _ _ 4 _ _ $$ HAUw
     inext
     iintro %w HW Hf
     iframe

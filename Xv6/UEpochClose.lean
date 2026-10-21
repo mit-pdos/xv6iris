@@ -193,7 +193,7 @@ theorem uslotCells_q (K : Nat) : ∀ sl : List (Nat × KSlot),
     simp only [List.flatMap_nil, Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
   | p :: sl => by
     iintro H
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨⟨%Hs, Hp, -⟩, H⟩
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨⟨%Hs, %L, Hp, -, -⟩, H⟩
     rw [List.flatMap_cons]
     iapply BigSepL.bigSepL_append.2
     isplitl [Hp]
@@ -209,7 +209,8 @@ theorem uslotCells_q (K : Nat) : ∀ sl : List (Nat × KSlot),
 /-- The record's text cells as quarters. -/
 theorem utextCells_q (K : Nat) (T : List PAddr) :
     ([∗list] a ∈ T, ∃ (x : HEnt) (H : Hist),
-      pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ K⌝) ⊢
+      pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗
+        (⌜x.t = 0⌝ ∨ ∃ q : Nat, landedAt x.t q ∗ ⌜q ≤ K⌝)) ⊢
       [∗list] a ∈ T, qCell (GF := GF) a := by
   apply BigSepL.bigSepL_mono
   intro k a _

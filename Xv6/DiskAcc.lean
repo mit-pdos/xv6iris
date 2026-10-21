@@ -517,32 +517,140 @@ driver's `kctx` -- which carries `ownCtx cpu curCtx` -- is in hand.  That
 last step cannot happen inside the accessor, because the accessor runs
 before the instruction rule and never sees the kernel context. -/
 
+/-- Two halves of one window agree on the histories (the `UEpochArm.histBytes_agree` argument). -/
+theorem DiskAcc.halves_agree (pa : PAddr) (dqs dqs' : Nat → DFrac) (Hs Hs' : Nat → Hist) : ∀ n : Nat,
+    ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dqs j} Hs j) ∗
+      ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dqs' j} Hs' j) ⊢@{IProp GF}
+      ⌜∀ j, j < n → Hs j = Hs' j⌝ ∗
+      ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dqs j} Hs j) ∗
+      ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dqs' j} Hs' j)
+  | 0 => by
+    iintro ⟨H1, H2⟩
+    iframe H1 H2
+    ipureintro
+    intro j hj
+    omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨H1, H2⟩
+    icases BigSepL.bigSepL_snoc.1 $$ H1 with ⟨H1, A1⟩
+    icases BigSepL.bigSepL_snoc.1 $$ H2 with ⟨H2, A2⟩
+    icases DiskAcc.halves_agree pa dqs dqs' Hs Hs' n $$ [H1 H2] with ⟨%h, H1, H2⟩
+    · iframe H1 H2
+    ihave %hn := pointsTo_agree $$ [A1 A2]
+    · iframe A1 A2
+    isplitr
+    · ipureintro
+      intro j hj
+      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h' | rfl
+      · exact h j h'
+      · exact hn
+    isplitl [H1 A1]
+    · iapply BigSepL.bigSepL_snoc.2
+      iframe
+    · iapply BigSepL.bigSepL_snoc.2
+      iframe
+
+theorem DiskAcc.histBytes_agreeD (pa : PAddr) (n : Nat) (dqs dqs' : Nat → DFrac) (Hs Hs' : Nat → Hist) :
+    histBytes (GF := GF) pa n dqs Hs ∗ histBytes pa n dqs' Hs' ⊢
+      ⌜∀ j, j < n → Hs j = Hs' j⌝ ∗ histBytes pa n dqs Hs ∗ histBytes pa n dqs' Hs' := by
+  unfold histBytes
+  exact DiskAcc.halves_agree pa dqs dqs' Hs Hs' n
+
 /-- Joining the two halves of a shared cell into the `own 1` raw window a
 store asks for. -/
 theorem dmaHalf_join (pa : PAddr) (n : Nat) (w0 : BitVec (8 * n)) (Hs' : Nat → Hist) :
     dmaHalfAt (GF := GF) pa n w0 ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs' ⊢
       ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs := by
   unfold dmaHalfAt
+  iintro ⟨⟨%Hs, Hb, %_, _⟩, Hb'⟩
+  iexists Hs
+  iapply histBytes_join_half pa n Hs Hs'
+  iframe Hb Hb'
+
+/-- ... keeping what the invariant's half knew of the heads (route P, D15′). -/
+theorem dmaHalf_joinH (pa : PAddr) (n : Nat) (w0 : BitVec (8 * n)) (Hs' : Nat → Hist) :
+    dmaHalfAt (GF := GF) pa n w0 ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs' ⊢
+      ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ ⌜headsAre Hs n w0⌝ ∗
+        dmaHeads Hs n := by
+  unfold dmaHalfAt
+  iintro ⟨⟨%Hs, Hb, %hh, #Hh⟩, Hb'⟩
+  iexists Hs
+  iframe Hh
+  isplitl [Hb Hb']
+  · iapply histBytes_join_half pa n Hs Hs'
+    iframe Hb Hb'
+  · ipureintro; exact hh
+
+/-- The raw (uncertified) half joined with the driver's half. -/
+theorem rawHalf_join (pa : PAddr) (n : Nat) (w0 : BitVec (8 * n)) (Hs' : Nat → Hist) :
+    rawHalfAt (GF := GF) pa n w0 ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs' ⊢
+      ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs := by
+  unfold rawHalfAt
   iintro ⟨⟨%Hs, Hb, %_⟩, Hb'⟩
   iexists Hs
   iapply histBytes_join_half pa n Hs Hs'
   iframe Hb Hb'
 
-/-- Splitting the window a store returned back into the invariant's half
-(now at the value stored) and the driver's half. -/
-theorem dmaHalf_split (pa : PAddr) (n : Nat) (t : Nat) (ag : Agent) (Hs : Nat → Hist)
+/-- Splitting the window a store returned back into the invariant's RAW half (now at the value
+stored; its head is the store's, pending -- route P) and the driver's half. -/
+theorem rawHalf_split (pa : PAddr) (n : Nat) (t : Nat) (ag : Agent) (Hs : Nat → Hist)
     (w : BitVec (8 * n)) :
     histBytes (GF := GF) pa n (fun _ => DFrac.own 1) (pushed Hs t ag w) ⊢
-      dmaHalfAt pa n w ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t ag w) := by
+      rawHalfAt pa n w ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t ag w) := by
   iintro H
   icases histBytes_split_half pa n (pushed Hs t ag w) $$ H with ⟨H1, H2⟩
-  isplitl [H1]
-  · unfold dmaHalfAt
-    iexists (pushed Hs t ag w)
-    iframe H1
-    ipureintro
-    exact headsAre_pushed Hs t ag n w
-  · iexact H2
+  iframe H2
+  unfold rawHalfAt
+  iexists (pushed Hs t ag w)
+  iframe H1
+  ipureintro
+  exact headsAre_pushed Hs t ag n w
+
+/-- **The staged cell certified** (D15′): the driver's half names the ring store `t`, whose landing
+certificate makes every head of the cell landed. -/
+theorem rawHalf_certify (pa : PAddr) (n : Nat) (w w' : BitVec (8 * n)) (t p : Nat) (ag : Agent)
+    (Hs : Nat → Hist) :
+    rawHalfAt (GF := GF) pa n w ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t ag w') ∗
+      landedAt t p ⊢
+      dmaHalfAt pa n w ∗ histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t ag w') := by
+  unfold rawHalfAt
+  iintro ⟨⟨%Hs0, Hb0, %hh⟩, Hb, #Hl⟩
+  icases DiskAcc.histBytes_agreeD pa n _ _ Hs0 (pushed Hs t ag w') $$ [Hb0 Hb] with ⟨%he, Hb0, Hb⟩
+  · iframe
+  iframe Hb
+  unfold dmaHalfAt
+  iexists Hs0
+  iframe Hb0
+  isplitr
+  · ipureintro; exact hh
+  iapply dmaHeads_of_one Hs0 t p n (fun j hj => ⟨_, by rw [he j hj]; rfl, rfl⟩)
+  iexact Hl
+
+/-- **The bump's window, PENDING** (D15′): a certified cell at `wrap16 np` pushed with the bump `t`
+is the stack arm of `availIdxRes`. -/
+theorem idxPend_split (pa : PAddr) (np t : Nat) (ag : Agent) (Hs : Nat → Hist) (ht : t ≠ 0)
+    (hh : headsAre Hs 2 (wrap16 np)) :
+    dmaHeads (GF := GF) Hs 2 ∗
+      histBytes pa 2 (fun _ => DFrac.own 1) (pushed (n := 2) Hs t ag (wrap16 (np + 1))) ⊢
+      availIdxPend pa (np + 1) ∗
+        histBytes pa 2 (fun _ => DFrac.own (1 : Qp).half) (pushed (n := 2) Hs t ag (wrap16 (np + 1))) := by
+  iintro ⟨#Hh, H⟩
+  icases histBytes_split_half pa 2 _ $$ H with ⟨H1, H2⟩
+  iframe H2
+  unfold availIdxPend
+  iexists (pushed (n := 2) Hs t ag (wrap16 (np + 1))), t
+  iframe H1
+  isplitr
+  · ipureintro
+    refine ⟨ht, headsAre_pushed Hs t ag 2 _, fun j _ e he => ?_, ?_⟩
+    · simp only [pushed, List.head?_cons, Option.some.injEq] at he
+      rw [← he]
+    · simp only [Nat.add_sub_cancel]
+      exact hh
+  · have e : (fun j => List.tail (pushed (n := 2) Hs t ag (wrap16 (np + 1)) j)) = Hs := rfl
+    rw [e]
+    iexact Hh
 
 /-! ### The geometry and the counters -/
 
@@ -591,14 +699,16 @@ theorem diskProto_avail_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) 
         ⌜lo ≤ np ∧ queueOk st ring lo np ∧ posOk pmap ring lo np ∧ stageOk stg ring lo np ∧
           inflightOff v st ring lo np stg ∧ unreadArmed v st dl nr ring lo np stg sb ∧
           epPend st ring lo np stg ∧ pendFree st sb ring lo np stg⌝ ∗
-        availLease pav np ring ∗ diskPubAuth γ np ∗ diskPubAuthM γ np ∗ posAuth γ pmap ∗
+        availLease pav np ring stg ∗ diskPubAuth γ np ∗ availIdxRes γ (availIdxAt pav) np lo ∗
+        posAuth γ pmap ∗
         diskStageAuth γ stg ∗ ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) ∗
         (∀ (np' : Nat) (ring' : Nat → Nat) (pmap' : List Nat) (stg' : Option Nat),
           ⌜lo ≤ np' ∧ queueOk st ring' lo np' ∧ posOk pmap' ring' lo np' ∧
             stageOk stg' ring' lo np' ∧ inflightOff v st ring' lo np' stg' ∧
             unreadArmed v st dl nr ring' lo np' stg' sb ∧ epPend st ring' lo np' stg' ∧
             pendFree st sb ring' lo np' stg'⌝ -∗
-          availLease pav np' ring' -∗ diskPubAuth γ np' -∗ diskPubAuthM γ np' -∗
+          availLease pav np' ring' stg' -∗ diskPubAuth γ np' -∗
+          availIdxRes γ (availIdxAt pav) np' lo -∗
           posAuth γ pmap' -∗ diskStageAuth γ stg' -∗
           ([∗list] i ∈ List.range NUM, headAuth γ i (st i)) -∗ diskProto γ v) := by
   subst hav
@@ -666,31 +776,73 @@ theorem headTok_state (γ : DiskNames) (st : Nat → HState) (i : Nat) (s : HSta
       headTok γ i s -∗ ⌜st i = s⌝ :=
   headTokF_state γ (1 : Qp).half st i s hi
 
-/-! ### One ring cell, borrowed out of `availLease` and put back -/
+/-! ### The staged ring cell, borrowed out of `availLease` and put back -/
 
-theorem availLease_ring_acc (pav : PAddr) (np : Nat) (ring : Nat → Nat) (j : Nat) (hj : j < NUM) :
-    availLease (GF := GF) pav np ring ⊢
-      dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (ring j)) ∗
-      (∀ x : Nat, dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 x) -∗
-        availLease pav np (updN ring j x)) := by
+/-- The cell at the staging slot `np % NUM` (certified or already staged) comes out RAW; it goes
+back raw at the staged value, the stage set. -/
+theorem availLease_stage_acc (pav : PAddr) (np : Nat) (ring : Nat → Nat) (stg : Option Nat) :
+    availLease (GF := GF) pav np ring stg ⊢
+      rawHalfAt (availRingAt pav (np % NUM)) 2 (BitVec.ofNat 16 (ring (np % NUM))) ∗
+      (∀ xi : Nat × Nat, rawHalfAt (availRingAt pav (np % NUM)) 2 (BitVec.ofNat 16 xi.1) -∗
+        availLease pav np (updN ring (np % NUM) xi.1) (some xi.2)) := by
   unfold availLease
-  iintro ⟨Hidx, Hcells⟩
-  icases bigSepL_upd_acc (GF := GF) (List.range NUM) j j (by rw [List.getElem?_range hj])
-      (fun k => dmaHalfAt (availRingAt pav k) 2 (BitVec.ofNat 16 (ring k)))
-      (fun (x : Nat) k => dmaHalfAt (availRingAt pav k) 2 (BitVec.ofNat 16 (updN ring j x k)))
-      (fun x k jj hjj hne => by
-        have : jj ≠ j := by
+  iintro Hcells
+  icases bigSepL_upd_acc (GF := GF) (List.range NUM) (np % NUM) (np % NUM)
+      (by rw [List.getElem?_range (mod_NUM_lt np)])
+      (fun k => availCell pav np ring stg k)
+      (fun (xi : Nat × Nat) k => availCell pav np (updN ring (np % NUM) xi.1) (some xi.2) k)
+      (fun xi k jj hjj hne => by
+        have : jj ≠ np % NUM := by
           by_cases hk : k < NUM
           · rw [List.getElem?_range hk] at hjj; cases hjj; exact hne
           · rw [List.getElem?_eq_none (by simp; omega)] at hjj; cases hjj
-        rw [updN_ne ring j x jj this]) $$ Hcells with ⟨Hc, Hback⟩
+        have h1 : availStaged np (some xi.2) jj = false := by
+          unfold availStaged; simp [this]
+        rw [availCell_pub _ _ _ _ _ h1]
+        unfold availCell
+        rw [updN_ne ring (np % NUM) xi.1 jj this]
+        split
+        · rename_i h2
+          unfold availStaged at h2
+          simp only [Bool.and_eq_true, beq_iff_eq] at h2
+          exact absurd h2.2 this
+        · rfl) $$ Hcells with ⟨Hc, Hback⟩
+  isplitl [Hc]
+  · unfold availCell
+    split
+    · iexact Hc
+    · iapply rawHalfAt_of_dma; iexact Hc
+  iintro %xi Hx
+  iapply Hback $$ %xi
+  rw [availCell_stg _ _ _ _ _ (by unfold availStaged; simp), updN_self]
+  iexact Hx
+
+/-- At the bump the staged cell comes out raw and goes back CERTIFIED, the stage cleared and the
+published count one up. -/
+theorem availLease_unstage (pav : PAddr) (np : Nat) (ring : Nat → Nat) (i : Nat) :
+    availLease (GF := GF) pav np ring (some i) ⊢
+      rawHalfAt (availRingAt pav (np % NUM)) 2 (BitVec.ofNat 16 (ring (np % NUM))) ∗
+      (dmaHalfAt (availRingAt pav (np % NUM)) 2 (BitVec.ofNat 16 (ring (np % NUM))) -∗
+        availLease pav (np + 1) ring none) := by
+  unfold availLease
+  iintro Hcells
+  icases bigSepL_upd_acc (GF := GF) (List.range NUM) (np % NUM) (np % NUM)
+      (by rw [List.getElem?_range (mod_NUM_lt np)])
+      (fun k => availCell pav np ring (some i) k)
+      (fun (_ : Unit) k => availCell pav (np + 1) ring none k)
+      (fun _ k jj hjj hne => by
+        have : jj ≠ np % NUM := by
+          by_cases hk : k < NUM
+          · rw [List.getElem?_range hk] at hjj; cases hjj; exact hne
+          · rw [List.getElem?_eq_none (by simp; omega)] at hjj; cases hjj
+        rw [availCell_pub _ _ _ _ _ (by unfold availStaged; simp),
+          availCell_pub _ _ _ _ _ (by unfold availStaged; simp [this])]) $$ Hcells with ⟨Hc, Hback⟩
+  rw [availCell_stg _ _ _ _ _ (by unfold availStaged; simp)]
   iframe Hc
-  iintro %x Hx
-  iframe Hidx
-  ihave Hx := (show dmaHalfAt (GF := GF) (availRingAt pav j) 2 (BitVec.ofNat 16 x) ⊢
-      dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (updN ring j x j)) from by
-    rw [updN_self]) $$ Hx
-  iapply Hback $$ %x Hx
+  iintro Hd
+  iapply Hback $$ %()
+  rw [availCell_pub _ _ _ _ _ (by unfold availStaged; simp)]
+  iexact Hd
 
 /-! ### The two stores of `publish` -/
 
@@ -700,10 +852,10 @@ the store opens the invariant; `diskPub γ np` pins the published count
 across it, and the head being FREE is what proves there is room for one
 more position -- a fact the `avail->idx` bump can no longer prove for
 itself, which is why the store RECORDS it in the staged-head ghost
-(`Xv6.stageOk`).  What comes back is the driver's half AT THE RAW TIER
-together with the store's receipts: feed them to
-`MachCSL.ctxBytes_of_pushed` with the hart's `ownCtx` to get the payload's
-context cell at the new value. -/
+(`Xv6.stageOk`).  Route P (D15′): the staged cell goes back into the invariant RAW (its head is the
+store, pending; the device never reads the staged slot), and the driver's half comes back RAW
+with the store's receipts -- the driver keeps it raw across the `+0x186` fence, whose landing
+certificate certifies the cell at the bump (`disk_avail_idx_write`). -/
 theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
     (np : Nat) (stg0 : Option Nat) (w0 h : BitVec 16) (hh : h.toNat < NUM) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗ diskStage γ stg0 ∗
@@ -712,7 +864,7 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
       writeAU cpu (availRingAt pav (np % NUM)) 2 h
         iprop(diskPub γ np ∗ diskStage γ (some h.toNat) ∗ headTok γ h.toNat .inactive ∗
           ∃ (t : Nat) (Hs : Nat → Hist),
-          authoredBy t (hartAgent cpu) ∗ topLb t ∗
+          authoredBy t (hartAgent cpu) ∗ itopLb t ∗
           histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
             (pushed (n := 2) Hs t (hartAgent cpu) h)) := by
   refine BI.Entails.trans ?_ (writeAU_of_own _ _ _ _ _)
@@ -731,25 +883,25 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
   subst hnp
   ihave %hst := headTok_state γ st h.toNat .inactive hh $$ Hheads Htok
   have hroom : np0 < lo + NUM := queueOk_room st ring lo np0 h.toNat hq.2.1 hh hst
-  icases availLease_ring_acc pav np0 ring (np0 % NUM) (mod_NUM_lt np0) $$ Hav with ⟨Hcell, Hring⟩
+  icases availLease_stage_acc pav np0 ring stg $$ Hav with ⟨Hcell, Hring⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  icases dmaHalf_join (availRingAt pav (np0 % NUM)) 2 (BitVec.ofNat 16 (ring (np0 % NUM))) Hs'
+  icases rawHalf_join (availRingAt pav (np0 % NUM)) 2 (BitVec.ofNat 16 (ring (np0 % NUM))) Hs'
       $$ [Hcell Hd] with ⟨%Hs, Hraw⟩
   · iframe Hcell Hd
   iexists Hs
   iframe Hraw
   inext
   iintro %t Hraw #Hau #Ht
-  icases dmaHalf_split (availRingAt pav (np0 % NUM)) 2 t (hartAgent cpu) Hs h $$ Hraw
+  icases rawHalf_split (availRingAt pav (np0 % NUM)) 2 t (hartAgent cpu) Hs h $$ Hraw
     with ⟨Hcell, Hdrv⟩
   imod Hmask
   imod diskStage_update γ stg stg0 (some h.toNat) $$ [HstgA Hstg] with ⟨HstgA, Hstg⟩
   · iframe HstgA Hstg
-  ihave Hcell := (show dmaHalfAt (GF := GF) (availRingAt pav (np0 % NUM)) 2 h ⊢
-      dmaHalfAt (availRingAt pav (np0 % NUM)) 2 (BitVec.ofNat 16 h.toNat) from by
+  ihave Hcell := (show rawHalfAt (GF := GF) (availRingAt pav (np0 % NUM)) 2 h ⊢
+      rawHalfAt (availRingAt pav (np0 % NUM)) 2 (BitVec.ofNat 16 h.toNat) from by
     rw [Xv6.ofNat16_toNat]) $$ Hcell
-  ihave Hav := Hring $$ %h.toNat Hcell
+  ihave Hav := Hring $$ %(h.toNat, h.toNat) Hcell
   ihave Hproto := Hback $$ %np0 %(updN ring (np0 % NUM) h.toNat) %pmap %(some h.toNat)
     %(⟨hq.1, queueOk_setcell st ring lo np0 h.toNat hq.2.1 hroom,
        posOk_setcell pmap ring lo np0 h.toNat hq.2.2.1 hroom,
@@ -770,16 +922,6 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
   iexists t, Hs
   iframe Hau Ht Hdrv
 
-theorem availLease_idx_acc (pav : PAddr) (np : Nat) (ring : Nat → Nat) :
-    availLease (GF := GF) pav np ring ⊢
-      dmaHalfAt (availIdxAt pav) 2 (wrap16 np) ∗
-      (∀ np' : Nat, dmaHalfAt (availIdxAt pav) 2 (wrap16 np') -∗ availLease pav np' ring) := by
-  unfold availLease
-  iintro ⟨Hidx, Hcells⟩
-  iframe Hidx
-  iintro %np' Hidx'
-  iframe Hidx' Hcells
-
 /-- **`disk.avail->idx += 1`** (`virtio_disk_rw`, the `sh` that publishes
 the staged chain).  The cell is shared, so the store opens the invariant;
 BOTH halves of the published count move with it, which is why the payload's
@@ -790,21 +932,31 @@ This store is the PUBLICATION POINT: the new position `np` takes its place
 in the queue accounting.  What it needs, it gets from the staged-head
 ghost the ring store left (`Xv6.stageOk`: there is room, the staging cell
 holds `i`, and no pending position names `i`) and from the driver's
-receipt for `i`, which `disk_publish` has meanwhile armed. -/
+receipt for `i`, which `disk_publish` has meanwhile armed.
+
+Route P (D15′): the payload's `diskPubLb γ np` refutes the index cell's pending arm (the previous
+bump was re-based by its driver), the staged ring cell is certified from the ring store's landing
+certificate (the `+0x186` fence; the driver's raw half of it names the store), and the index cell
+goes back PENDING (the bump `t` over the certified `wrap16 np`) -- re-based by the device's read of
+the top or by the driver after `+0x196` (`disk_idx_rebase`). -/
 theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
-    (np i : Nat) (c : Chain) :
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗ diskStage γ (some i) ∗
-      headTok γ i (.active c) ∗
+    (np i : Nat) (c : Chain) (tr pr : Nat) (Hr : Nat → Hist) (hv : BitVec 16) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗ diskPubLb γ np ∗
+      diskStage γ (some i) ∗ headTok γ i (.active c) ∗
+      histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
+        (pushed (n := 2) Hr tr (hartAgent cpu) hv) ∗ landedAt tr pr ∗
       ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ⊢
       writeAU cpu (availIdxAt pav) 2 (wrap16 (np + 1))
         iprop(diskPub γ (np + 1) ∗ diskStage γ none ∗ headTok γ i (.active c) ∗
+          histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
+            (pushed (n := 2) Hr tr (hartAgent cpu) hv) ∗
           ∃ (t : Nat) (Hs : Nat → Hist),
-          authoredBy t (hartAgent cpu) ∗ topLb t ∗
+          authoredBy t (hartAgent cpu) ∗ itopLb t ∗
           histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
             (pushed (n := 2) Hs t (hartAgent cpu) (wrap16 (np + 1)))) := by
-  refine BI.Entails.trans ?_ (writeAU_of_own _ _ _ _ _)
-  unfold diskInv devInvR writeAUOwn
-  iintro ⟨#Hinv, #Hgeom, Hpub, Hstg, Htok, Hd⟩
+  refine BI.Entails.trans ?_ (writeAU_of_ownT _ _ _ _ _)
+  unfold diskInv devInvR writeAUOwnT
+  iintro ⟨#Hinv, #Hgeom, Hpub, #Hlbp, Hstg, Htok, Hrd, #Hcr, Hd⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_forget curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) $$ Hd
     with ⟨%Hs', Hd⟩
@@ -817,37 +969,54 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
   · iapply diskPub_agree γ np0 np $$ Hpa Hpub
   subst hnp
   ihave %hsg := diskStage_agree γ stg (some i) $$ HstgA Hstg
-  obtain ⟨hi, hroom, hcell, hfresh⟩ := hq.2.2.2.1 i (by rw [hsg])
+  subst hsg
+  obtain ⟨hi, hroom, hcell, hfresh⟩ := hq.2.2.2.1 i rfl
   ihave %hst := headTok_state γ st i (.active c) hi $$ Hheads Htok
   have hact : (st (ring (np0 % NUM))).isActive = true := by
     rw [hcell, hst]; rfl
-  icases availLease_idx_acc pav np0 ring $$ Hav with ⟨Hcell, Hidx⟩
+  -- the index cell is certified: a pending arm would be at `np0 - 1 < np0 ≤` the payload's bound
+  icases availIdxRes_cases γ _ np0 lo $$ HpaM with (⟨Hcell, HpaM⟩ | ⟨%hlt, -, HpaM⟩)
+  rotate_left
+  · ihave %hle := diskPubLb_le γ (np0 - 1) np0 $$ HpaM Hlbp
+    exact absurd hle (by omega)
+  -- the staged ring cell, certified by the ring store's landing
+  icases availLease_unstage pav np0 ring i $$ Hav with ⟨Hrc, Hring⟩
+  icases rawHalf_certify (availRingAt pav (np0 % NUM)) 2 _ hv tr pr (hartAgent cpu) Hr
+    $$ [Hrc Hrd] with ⟨Hrc, Hrd⟩
+  · iframe Hrc Hrd Hcr
+  ihave Hav := Hring $$ Hrc
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  icases dmaHalf_join (availIdxAt pav) 2 (wrap16 np0) Hs' $$ [Hcell Hd] with ⟨%Hs, Hraw⟩
+  icases dmaHalf_joinH (availIdxAt pav) 2 (wrap16 np0) Hs' $$ [Hcell Hd] with ⟨%Hs, Hraw, %hhs, #Hhs⟩
   · iframe Hcell Hd
-  iexists Hs
+  iexists Hs, 0, 0
   iframe Hraw
+  isplitl []
+  · iapply itopLbAt_0
+  isplitl []
+  · iapply topLbAt_0
   inext
-  iintro %t Hraw #Hau #Ht
-  icases dmaHalf_split (availIdxAt pav) 2 t (hartAgent cpu) Hs (wrap16 (np0 + 1)) $$ Hraw
+  iintro %t %ht0 Hraw #Hau #Ht _
+  icases idxPend_split (availIdxAt pav) np0 t (hartAgent cpu) Hs (by omega) hhs $$ [Hraw]
     with ⟨Hcell, Hdrv⟩
+  · iframe Hhs Hraw
   imod Hmask
   imod diskPub_update γ np0 np0 (np0 + 1) $$ [Hpa Hpub] with ⟨Hpa, Hpub⟩
   · iframe Hpa Hpub
-  imod diskPubAuthM_bump γ np0 (np0 + 1) (by omega) $$ HpaM with HpaM
   imod posAuth_append γ pmap (ring (np0 % NUM)) $$ Hpos with Hpos
-  imod diskStage_update γ stg (some i) none $$ [HstgA Hstg] with ⟨HstgA, Hstg⟩
+  imod diskStage_update γ (some i) (some i) none $$ [HstgA Hstg] with ⟨HstgA, Hstg⟩
   · iframe HstgA Hstg
-  ihave Hav := Hidx $$ %(np0 + 1) Hcell
+  ihave HpaM := availIdxRes_pend γ (availIdxAt pav) (np0 + 1) lo (by omega) $$ [Hcell HpaM]
+  · iframe Hcell
+    rw [Nat.add_sub_cancel]; iexact HpaM
   ihave Hproto := Hback $$ %(np0 + 1) %ring %(pmap ++ [ring (np0 % NUM)]) %none
     %(⟨by omega, queueOk_extend st ring lo np0 hq.2.1 (by rw [hcell]; exact hi)
         (by intro p h1 h2; rw [hcell]; exact hfresh p h1 h2) hact,
        posOk_extend pmap ring lo np0 hq.2.2.1, stageOk_none ring lo (np0 + 1),
-       inflightOff_publish v st ring lo np0 i (hsg ▸ hq.2.2.2.1) (hsg ▸ hq.2.2.2.2.1),
-       unreadArmed_publish v st dl nr ring lo np0 i sb hcell (hsg ▸ hq.2.2.2.2.2.1),
-       epPend_publish st ring lo np0 i hcell (hsg ▸ hq.2.2.2.2.2.2.1),
-       pendFree_publish st sb ring lo np0 i hcell (hsg ▸ hq.2.2.2.2.2.2.2)⟩)
+       inflightOff_publish v st ring lo np0 i hq.2.2.2.1 hq.2.2.2.2.1,
+       unreadArmed_publish v st dl nr ring lo np0 i sb hcell hq.2.2.2.2.2.1,
+       epPend_publish st ring lo np0 i hcell hq.2.2.2.2.2.2.1,
+       pendFree_publish st sb ring lo np0 i hcell hq.2.2.2.2.2.2.2⟩)
     Hav Hpa HpaM Hpos HstgA Hheads
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -856,9 +1025,67 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
     iframe Hfrag Hproto
   imod Hcl
   imodintro
-  iframe Hpub Hstg Htok
+  iframe Hpub Hstg Htok Hrd
   iexists t, Hs
   iframe Hau Ht Hdrv
+
+/-- **The bump re-based** (route P, D15′; after the `+0x196` fence): the bump's landing certificate
+turns a still-pending index cell certified (the device may have done it already, at a read of the
+top); the payload gets the bound `diskPubLb γ np` the next bump needs. -/
+theorem disk_idx_rebase [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (np t p : Nat) (ag : Agent)
+    (Hs : Nat → Hist) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗
+      histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
+        (pushed (n := 2) Hs t ag (wrap16 np)) ∗ landedAt t p ⊢
+      |={⊤}=> diskPub γ np ∗ diskPubLb γ np ∗
+        histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
+          (pushed (n := 2) Hs t ag (wrap16 np)) := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, #Hgeom, Hpub, Hd, #Hl⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_avail_acc γ c0 v pav hg.2.1 hg.2.2.2.1 $$ [$Hfr $Hproto]
+    with ⟨%np0, %lo, %ring, %st, %pmap, %stg, %dl, %nr, %sb, %hq, Hav, Hpa, HpaM, Hpos, HstgA,
+      Hheads, Hback⟩
+  ihave %hnp : ⌜np0 = np⌝ $$ [Hpa Hpub]
+  · iapply diskPub_agree γ np0 np $$ Hpa Hpub
+  subst hnp
+  ihave Hx : iprop(|==> (availIdxRes (GF := GF) γ (availIdxAt pav) np0 lo ∗ diskPubLb γ np0 ∗
+      histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
+        (pushed (n := 2) Hs t ag (wrap16 np0)))) $$ [HpaM Hd]
+  · icases availIdxRes_cases γ _ np0 lo $$ HpaM with (⟨Hcell, HpaM⟩ | ⟨%hlt, Hpd, HpaM⟩)
+    · icases diskPubAuthM_lb γ np0 np0 (Nat.le_refl _) $$ HpaM with ⟨HpaM, #Hlb⟩
+      imodintro
+      iframe Hd Hlb
+      iapply availIdxRes_cert; iframe
+    · unfold availIdxPend
+      icases Hpd with ⟨%Hs2, %t2, Hb2, %⟨ht2, htop2, hts2, hbase2⟩, #Hh2⟩
+      icases DiskAcc.histBytes_agreeD (availIdxAt pav) 2 _ _ Hs2 _ $$ [Hb2 Hd] with ⟨%he, Hb2, Hd⟩
+      · iframe
+      imod diskPubAuthM_bump γ (np0 - 1) np0 (by omega) $$ HpaM with HpaM
+      icases diskPubAuthM_lb γ np0 np0 (Nat.le_refl _) $$ HpaM with ⟨HpaM, #Hlb⟩
+      imodintro
+      iframe Hd Hlb
+      iapply availIdxRes_cert
+      iframe HpaM
+      unfold dmaHalfAt
+      iexists Hs2
+      iframe Hb2
+      isplitr
+      · ipureintro; exact htop2
+      iapply dmaHeads_of_one Hs2 t p 2 (fun j hj => ⟨_, by rw [he j hj]; rfl, rfl⟩)
+      iexact Hl
+  imod Hx with ⟨HpaM, #Hlb, Hd⟩
+  ihave Hproto := Hback $$ %np0 %ring %pmap %stg %hq Hav Hpa HpaM Hpos HstgA Hheads
+  ihave Hcl := Hclose $$ [Hfrag Hproto]
+  case' _ =>
+    inext
+    iexists v
+    iframe Hfrag Hproto
+  imod Hcl
+  imodintro
+  iframe Hpub Hlb Hd
 
 /-! ## The lock payload, opened
 
@@ -869,7 +1096,7 @@ writes the avail page. -/
 
 theorem diskRes_open (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId) :
     diskRes (GF := GF) γ pd pav pu ξ ⊢ ∃ (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat),
-      diskPub γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
+      diskPub γ np ∗ diskPubLb γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
       diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
@@ -882,8 +1109,8 @@ theorem diskRes_open (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId) 
 
 theorem diskRes_close (γ : DiskNames) [CurCtx] (pd pav pu : PAddr) (ξ : CtxId)
     (np nr : Nat) (stg : Option Nat) (ring : Nat → Nat) :
-    diskPub (GF := GF) γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗ diskStage γ stg ∗
-      diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
+    diskPub (GF := GF) γ np ∗ diskPubLb γ np ∗ diskReadAt γ nr ∗ diskReadLbAuth γ nr ∗
+      diskStage γ stg ∗ diskDoneLb γ nr ∗ diskPayWm γ nr ξ ∗
       wordAtN ξ aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗
       ctxBytes ξ (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
       ([∗list] j ∈ List.range NUM,
@@ -953,7 +1180,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
     (hle : ts ≤ T) :
     iprop(ctxFloor (GF := GF) ξ T ∗ dmaOwnT pa n w ts) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
   unfold dmaOwnT histBytes
-  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp, #Hau, _⟩⟩
+  iintro ⟨#Hfl, ⟨%Hs, %s, Hraw, _, #Hls, %hp, #Hau, _⟩⟩
   ihave #Hfl2 := ctxFloor_le ξ T ts hle $$ Hfl
   unfold ctxBytes
   iapply (BigSepL.bigSepL_impl (l := List.range n)
@@ -968,7 +1195,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
     cases hx : Hs j with
     | nil => rw [hx] at h0; exact absurd h0 (by simp)
     | cons e He => exact ⟨e, He, rfl⟩
-  have het : e.t = ts := by
+  have het : e.t = s := by
     have h0 := hp.2 j hj
     rw [heq] at h0
     simpa using h0
@@ -985,13 +1212,15 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
   · unfold keyAt
     ileft
     rw [het]
+    unfold chainKey
+    iright
+    iexists diskAgent
+    iframe Hau
+    ileft
     isplit
-    · iexact Hfl2
-    · unfold chainKey
-      iright
-      iexists diskAgent
-      iframe Hau
-      ileft; ipureintro; exact Nat.le_refl _
+    · ipureintro; exact Nat.le_refl _
+    · iexists ts
+      iframe Hls Hfl2
 
 /-- **The chain's windows, taken back whole, at a KNOWN `b->disk`.** -/
 theorem chainLease_claimD_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :
@@ -1025,15 +1254,6 @@ theorem info_status_ram (i : Nat) (hi : i < NUM) : inRam (aInfoStatus i) 1 := by
   have h : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 := by
     unfold NUM at hi; omega
   rcases h with rfl|rfl|rfl|rfl|rfl|rfl|rfl|rfl <;> decide
-
-/-- A context window the driver gives up entirely is a full DMA footprint. -/
-theorem ctxBytes_dmaOwn (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    dmaCert (GF := GF) pa n ∗ ctxBytes ξ pa n (DFrac.own 1) w ⊢ dmaOwn pa n := by
-  iintro ⟨#Hc, Hb⟩
-  icases ctxBytes_forget ξ pa n (DFrac.own 1) w $$ Hb with ⟨%Hs, Hb⟩
-  unfold dmaOwn
-  iexists Hs
-  iframe Hb Hc
 
 /-- Splitting a big separating conjunction in two. -/
 theorem bigSepL_sep2 {A : Type} (l : List A) (F P Q : Nat → A → IProp GF)
@@ -1114,34 +1334,33 @@ theorem diskSlots_split [CurCtx] (γ : DiskNames) (pd : PAddr) :
     (fun _ i => headAuth γ i (stInit i)) (fun _ i => headRes γ pd i (stInit i))
     (fun _ i => slotRes γ curCtx pd i) (fun _ i => diskSlotIn_split γ pd i)
 
-/-- The eight avail-ring cells, split. -/
+/-- The eight avail-ring cells, split (certified windows: route P, the `DRIVER_OK` guard's
+certificates). -/
 theorem diskRing_split [CurCtx] (pav : PAddr) :
     iprop([∗list] j ∈ List.range NUM,
-        ctxBytes (GF := GF) curCtx (availRingAt pav j) 2 (DFrac.own 1)
-          (BitVec.ofNat 16 (ringInit j))) ⊢
+        ctxBytesL (GF := GF) curCtx (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j))) ⊢
       iprop(([∗list] j ∈ List.range NUM,
           dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j))) ∗
         ([∗list] j ∈ List.range NUM,
           ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
             (BitVec.ofNat 16 (ringInit j)))) :=
   bigSepL_sep2 (List.range NUM)
-    (fun _ j => ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1)
-      (BitVec.ofNat 16 (ringInit j)))
+    (fun _ j => ctxBytesL curCtx (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j)))
     (fun _ j => dmaHalfAt (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j)))
     (fun _ j => ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
       (BitVec.ofNat 16 (ringInit j)))
     (fun _ j => ctxBytes_split_dma curCtx (availRingAt pav j) 2
       (BitVec.ofNat 16 (ringInit j)))
 
-/-- The eight used-ring elements: entirely the device's. -/
+/-- The eight used-ring elements: entirely the device's (certified windows). -/
 theorem diskUsed_split [CurCtx] (pu : PAddr) (hpg : inRam pu 4096 ∧ pu.toNat % 4096 = 0) :
     ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pu ⊢
     iprop([∗list] j ∈ List.range NUM,
-        ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) -∗
+        ctxBytesL (GF := GF) curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8))) -∗
       iprop([∗list] j ∈ List.range NUM, dmaOwn (usedElemAt pu j) 8) := by
   iintro #Hr H
   iapply (BigSepL.bigSepL_impl (l := List.range NUM)
-    (Φ := fun _ (j : Nat) => iprop(ctxBytes (GF := GF) curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))))
+    (Φ := fun _ (j : Nat) => iprop(ctxBytesL (GF := GF) curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8))))
     (Ψ := fun _ (j : Nat) => dmaOwn (GF := GF) (usedElemAt pu j) 8)) $$ H
   imodintro
   iintro %k %j %hk Hb
@@ -1149,20 +1368,256 @@ theorem diskUsed_split [CurCtx] (pu : PAddr) (hpg : inRam pu 4096 ∧ pu.toNat %
   ihave #Hc : iprop(dmaCert (GF := GF) (usedElemAt pu j) 8) $$ [Hr]
   · unfold usedElemAt
     iapply dmaCert_page pu (4 + 8 * j) 8 hpg (by unfold NUM at hj; omega) $$ Hr
-  iapply ctxBytes_dmaOwn curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8))
+  iapply ctxBytesL_dmaOwn curCtx (usedElemAt pu j) 8 (0 : BitVec (8 * 8))
   iframe Hb
   iexact Hc
 
-/-- **What `virtio_disk_init` must have in hand at the `DRIVER_OK` store**:
-the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
-`free[i]` byte, the zeroed descriptor), both halves of the published
-count, the handler watermark and the stage, the completion counter, the
-avail page's index and ring cells, the whole used page -- the used-index
-cell already as the invariant's empty write LOG, with a CONTEXT FLOOR past
-the positions of the stores that zeroed it (the handler's entry credential
-`Xv6.diskPayWm` is minted from that floor) -- `disk.used_idx`,
-the three page pointers of `struct disk` -- and the PURE fact that all
-three pages are `kalloc`'d, identity-mapped RAM (`Xv6.pageRw`).
+/-- **The device's windows at the flip** (route P, CP-6z17 PLAN): the avail index and ring cells,
+the used index and the used-ring elements -- as context windows at `own 1` (`flipWins`, what the
+`memset`s leave), and CERTIFIED (`flipWinsL`: the `DRIVER_OK` guard's landing certificates,
+[OWN.131], cashed into the windows' heads). -/
+def flipWins (ξ : CtxId) (pav pu : PAddr) : IProp GF := iprop%
+  ctxBytes ξ (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
+  ([∗list] j ∈ List.range NUM,
+    ctxBytes ξ (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
+  ctxBytes ξ (usedIdxAt pu) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ∗
+  ([∗list] j ∈ List.range NUM, ctxBytes ξ (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8)))
+
+def flipWinsL (ξ : CtxId) (pav pu : PAddr) : IProp GF := iprop%
+  ctxBytesL ξ (availIdxAt pav) 2 (wrap16 0) ∗
+  ([∗list] j ∈ List.range NUM, ctxBytesL ξ (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j))) ∗
+  ctxBytesL ξ (usedIdxAt pu) 2 (0 : BitVec (8 * 2)) ∗
+  ([∗list] j ∈ List.range NUM, ctxBytesL ξ (usedElemAt pu j) 8 (0 : BitVec (8 * 8)))
+
+/-! ### Lending the windows' raw halves to the guarded `DRIVER_OK` store (route P, [OWN.131]) -/
+
+/-- A window's raw half as the store rule's `evPts` list. -/
+def winEv (pa : PAddr) (n : Nat) (Hs : Nat → Hist) : List (PAddr × DFrac × Hist) :=
+  (List.range n).map (fun j => (pa + BitVec.ofNat 64 j, DFrac.own (1 : Qp).half, Hs j))
+
+theorem histBytes_evPts (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
+    histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) Hs ⊣⊢ evPts (winEv pa n Hs) := by
+  unfold histBytes evPts winEv
+  rw [BigSepL.bigSepL_map]
+  exact .rfl
+
+/-- **A lent package**: raw points-to's `ev` on bytes satisfying `A`, and what the step's landing
+certificates for the receipts `ts` (on `ev`'s entries) turn them back into. -/
+def lendPkg (ts : List Nat) (A : PAddr → Prop) (R : IProp GF) : IProp GF := iprop%
+  ∃ ev : List (PAddr × DFrac × Hist), evPts ev ∗ ⌜∀ q ∈ ev, A q.1⌝ ∗
+    (∀ ls' : List (Nat × Nat),
+      ⌜∀ t ∈ ts, (∃ q ∈ ev, ∃ e ∈ q.2.2, e.t = t) → ∃ p, (t, p) ∈ ls'⌝ -∗ evPts ev -∗
+        landedAll ls' -∗ R)
+
+theorem lendPkg_mono (ts ts' : List Nat) (A : PAddr → Prop) (R R' : IProp GF)
+    (hts : ∀ t, t ∈ ts → t ∈ ts') (hR : R ⊢ R') : lendPkg ts A R ⊢ lendPkg ts' A R' := by
+  unfold lendPkg
+  iintro ⟨%ev, Hev, %hA, HK⟩
+  iexists ev
+  iframe Hev
+  isplitr
+  · ipureintro; exact hA
+  iintro %ls' %hc Hev #Hls
+  iapply hR
+  iapply HK $$ %ls' %(fun t ht hq => hc t (hts t ht) hq) Hev Hls
+
+theorem lendPkg_emp (ts : List Nat) (A : PAddr → Prop) : ⊢@{IProp GF} lendPkg ts A iprop(emp) := by
+  unfold lendPkg
+  iexists []
+  isplitl []
+  · unfold evPts; iapply BigSepL.bigSepL_nil.2; iempintro
+  isplitr
+  · ipureintro; intro q hq; cases hq
+  iintro %ls' _ _ _
+  iempintro
+
+theorem lendPkg_sep (ts : List Nat) (A : PAddr → Prop) (R1 R2 : IProp GF) :
+    lendPkg (GF := GF) ts A R1 ∗ lendPkg ts A R2 ⊢ lendPkg ts A iprop(R1 ∗ R2) := by
+  unfold lendPkg
+  iintro ⟨⟨%ev1, Hev1, %hA1, HK1⟩, ⟨%ev2, Hev2, %hA2, HK2⟩⟩
+  iexists ev1 ++ ev2
+  isplitl [Hev1 Hev2]
+  · unfold evPts; iapply BigSepL.bigSepL_append.2; iframe Hev1 Hev2
+  isplitr
+  · ipureintro
+    intro q hq
+    rcases List.mem_append.1 hq with h | h
+    · exact hA1 q h
+    · exact hA2 q h
+  iintro %ls' %hc Hev #Hls
+  unfold evPts
+  icases BigSepL.bigSepL_append.1 $$ Hev with ⟨Hev1, Hev2⟩
+  isplitl [HK1 Hev1]
+  · iapply HK1 $$ %ls' %(fun t ht ⟨q, hq, he⟩ => hc t ht ⟨q, List.mem_append_left _ hq, he⟩) Hev1 Hls
+  · iapply HK2 $$ %ls' %(fun t ht ⟨q, hq, he⟩ => hc t ht ⟨q, List.mem_append_right _ hq, he⟩) Hev2 Hls
+
+/-- A pre-drain window, LENT: its raw half goes to the step, the guard's certificates for its
+heads among `ts` certify it. -/
+theorem ctxBytesPre_lend (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : List Nat)
+    (A : PAddr → Prop) (hA : ∀ j, j < n → A (pa + BitVec.ofNat 64 j)) :
+    ctxBytesPre (GF := GF) ξ pa n w ts ⊢ lendPkg ts A (ctxBytesL ξ pa n w) := by
+  unfold ctxBytesPre lendPkg
+  iintro ⟨%Hs, Hb, %hh, Hc, %ls, #Hls, %hcov⟩
+  iexists (winEv pa n Hs)
+  isplitl [Hb]
+  · iapply (histBytes_evPts pa n Hs).1; iexact Hb
+  isplitr
+  · ipureintro
+    intro q hq
+    unfold winEv at hq
+    obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hq
+    exact hA j (List.mem_range.1 hj)
+  iintro %ls' %hc Hev #Hls'
+  ihave Hb := (histBytes_evPts pa n Hs).2 $$ Hev
+  iapply ctxBytesPre_fin ξ pa n w (ts.filter (fun t => ∃ j, j < n ∧ dmaHeadT Hs j = t)) ls'
+  · intro t ht
+    simp only [List.mem_filter, decide_eq_true_eq] at ht
+    obtain ⟨htm, j, hj, hjt⟩ := ht
+    apply hc t htm
+    have hv := hh j hj
+    cases hx : Hs j with
+    | nil => rw [hx] at hv; cases hv
+    | cons e H =>
+      refine ⟨(pa + BitVec.ofNat 64 j, DFrac.own (1 : Qp).half, Hs j), ?_, e, ?_, ?_⟩
+      · unfold winEv; exact List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩
+      · rw [hx]; exact List.mem_cons_self
+      · rw [← hjt]; simp [dmaHeadT, hx]
+  iframe Hls'
+  unfold ctxBytesPre
+  iexists Hs
+  iframe Hb Hc
+  isplitr
+  · ipureintro; exact hh
+  iexists ls
+  iframe Hls
+  ipureintro
+  intro j hj
+  rcases hcov j hj with h0 | hm | hl
+  · exact Or.inl h0
+  · refine Or.inr (Or.inl ?_)
+    simp only [List.mem_filter, decide_eq_true_eq]
+    exact ⟨hm, j, hj, rfl⟩
+  · exact Or.inr (Or.inr hl)
+
+/-- **A pre-drain package**: receipts `ts` (the hart's own) and a lent package over them. -/
+def prePkg (cpu : CPU) (A : PAddr → Prop) (R : IProp GF) : IProp GF := iprop%
+  ∃ ts : List Nat, lendPkg ts A R ∗ [∗list] t ∈ ts, authoredBy t (hartAgent cpu)
+
+theorem prePkg_sep (cpu : CPU) (A : PAddr → Prop) (R1 R2 : IProp GF) :
+    prePkg (GF := GF) cpu A R1 ∗ prePkg cpu A R2 ⊢ prePkg cpu A iprop(R1 ∗ R2) := by
+  unfold prePkg
+  iintro ⟨⟨%ts1, H1, #A1⟩, ⟨%ts2, H2, #A2⟩⟩
+  iexists ts1 ++ ts2
+  isplitl [H1 H2]
+  · iapply lendPkg_sep
+    isplitl [H1]
+    · iapply lendPkg_mono ts1 _ A R1 R1 (fun t ht => List.mem_append_left _ ht) .rfl; iexact H1
+    · iapply lendPkg_mono ts2 _ A R2 R2 (fun t ht => List.mem_append_right _ ht) .rfl; iexact H2
+  · iapply BigSepL.bigSepL_append.2; iframe A1 A2
+
+theorem prePkg_mono (cpu : CPU) (A : PAddr → Prop) (R R' : IProp GF) (h : R ⊢ R') :
+    prePkg (GF := GF) cpu A R ⊢ prePkg cpu A R' := by
+  unfold prePkg
+  iintro ⟨%ts, H, #Ha⟩
+  iexists ts
+  iframe Ha
+  iapply lendPkg_mono ts ts A R R' (fun _ h => h) h; iexact H
+
+/-- **Before the guarded store**: a context window at `own 1`, its head keys cashed against the
+hart's `ownCtx` and its raw half packed for the lend. -/
+theorem ctxBytes_prePkg (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (A : PAddr → Prop) (hA : ∀ j, j < n → A (pa + BitVec.ofNat 64 j)) :
+    ownCtx (GF := GF) cpu ξ ∗ ctxBytes ξ pa n (DFrac.own 1) w ⊢
+      ownCtx cpu ξ ∗ prePkg cpu A (ctxBytesL ξ pa n w) := by
+  iintro H
+  icases ctxBytes_pre cpu ξ pa n w $$ H with ⟨Hctx, %ts, Hp, #Ha⟩
+  iframe Hctx
+  unfold prePkg
+  iexists ts
+  iframe Ha
+  iapply ctxBytesPre_lend ξ pa n w ts A hA; iexact Hp
+
+theorem ownCtx_prePkg_list (cpu : CPU) (ξ : CtxId) (A : PAddr → Prop) (Φ Ψ : Nat → IProp GF) :
+    ∀ l : List Nat, (∀ j, j ∈ l → ownCtx (GF := GF) cpu ξ ∗ Φ j ⊢ ownCtx cpu ξ ∗ prePkg cpu A (Ψ j)) →
+      ownCtx (GF := GF) cpu ξ ∗ ([∗list] j ∈ l, Φ j) ⊢
+      ownCtx cpu ξ ∗ prePkg cpu A ([∗list] j ∈ l, Ψ j)
+  | [], _ => by
+    iintro ⟨Hctx, -⟩
+    iframe Hctx
+    unfold prePkg
+    iexists []
+    isplitl []
+    · iapply lendPkg_mono [] [] A iprop(emp) _ (fun _ h => h)
+        (by iintro -; iapply BigSepL.bigSepL_nil.2; iempintro)
+      iapply lendPkg_emp
+    · iapply BigSepL.bigSepL_nil.2; iempintro
+  | j :: l, h => by
+    iintro ⟨Hctx, H⟩
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hj, Hl⟩
+    icases h j List.mem_cons_self $$ [Hctx Hj] with ⟨Hctx, Pj⟩
+    · iframe
+    icases ownCtx_prePkg_list cpu ξ A Φ Ψ l (fun k hk => h k (List.mem_cons_of_mem j hk)) $$ [Hctx Hl]
+      with ⟨Hctx, Pl⟩
+    · iframe
+    iframe Hctx
+    iapply prePkg_mono cpu A iprop(Ψ j ∗ [∗list] k ∈ l, Ψ k) _
+      (by iintro H; iapply BigSepL.bigSepL_cons.2; iexact H)
+    iapply prePkg_sep; iframe Pj Pl
+
+/-- The device's windows, all on the queue pages. -/
+def onPages (pd pav pu : PAddr) (a : PAddr) : Prop :=
+  (∃ j, j < 4096 ∧ a = pd + BitVec.ofNat 64 j) ∨ (∃ j, j < 4096 ∧ a = pav + BitVec.ofNat 64 j) ∨
+    (∃ j, j < 4096 ∧ a = pu + BitVec.ofNat 64 j)
+
+theorem DiskAcc.add_ofNat2 (p : PAddr) (a b : Nat) :
+    p + BitVec.ofNat 64 a + BitVec.ofNat 64 b = p + BitVec.ofNat 64 (a + b) := by
+  rw [BitVec.add_assoc, ← BitVec.ofNat_add]
+
+set_option maxHeartbeats 2000000 in
+/-- **The flip's windows, packed for the lend** (route P, [OWN.131]). -/
+theorem flipWins_pre (cpu : CPU) (ξ : CtxId) (pd pav pu : PAddr) :
+    ownCtx (GF := GF) cpu ξ ∗ flipWins ξ pav pu ⊢
+      ownCtx cpu ξ ∗ prePkg cpu (onPages pd pav pu) (flipWinsL ξ pav pu) := by
+  unfold flipWins flipWinsL
+  iintro ⟨Hctx, Hai, Hring, Hui, Hue⟩
+  icases ctxBytes_prePkg cpu ξ (availIdxAt pav) 2 (wrap16 0) (onPages pd pav pu)
+      (fun j hj => Or.inr (Or.inl ⟨2 + j, by omega, by unfold availIdxAt; exact DiskAcc.add_ofNat2 _ _ _⟩))
+    $$ [Hctx Hai] with ⟨Hctx, P1⟩
+  · iframe
+  icases ownCtx_prePkg_list cpu ξ (onPages pd pav pu)
+      (fun j => ctxBytes ξ (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j)))
+      (fun j => ctxBytesL ξ (availRingAt pav j) 2 (BitVec.ofNat 16 (ringInit j)))
+      (List.range NUM) (fun j hj => by
+        have hj' := List.mem_range.1 hj
+        exact ctxBytes_prePkg cpu ξ _ 2 _ (onPages pd pav pu)
+          (fun i hi => Or.inr (Or.inl ⟨4 + 2 * j + i, by unfold NUM at hj'; omega,
+            by unfold availRingAt; exact DiskAcc.add_ofNat2 _ _ _⟩)))
+      $$ [Hctx Hring] with ⟨Hctx, P2⟩
+  · iframe
+  icases ctxBytes_prePkg cpu ξ (usedIdxAt pu) 2 (0 : BitVec (8 * 2)) (onPages pd pav pu)
+      (fun j hj => Or.inr (Or.inr ⟨2 + j, by omega, by unfold usedIdxAt; exact DiskAcc.add_ofNat2 _ _ _⟩))
+    $$ [Hctx Hui] with ⟨Hctx, P3⟩
+  · iframe
+  icases ownCtx_prePkg_list cpu ξ (onPages pd pav pu)
+      (fun j => ctxBytes ξ (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8)))
+      (fun j => ctxBytesL ξ (usedElemAt pu j) 8 (0 : BitVec (8 * 8)))
+      (List.range NUM) (fun j hj => by
+        have hj' := List.mem_range.1 hj
+        exact ctxBytes_prePkg cpu ξ _ 8 _ (onPages pd pav pu)
+          (fun i hi => Or.inr (Or.inr ⟨4 + 8 * j + i, by unfold NUM at hj'; omega,
+            by unfold usedElemAt; exact DiskAcc.add_ofNat2 _ _ _⟩)))
+      $$ [Hctx Hue] with ⟨Hctx, P4⟩
+  · iframe
+  iframe Hctx
+  iapply prePkg_sep; iframe P1
+  iapply prePkg_sep; iframe P2
+  iapply prePkg_sep; iframe P3 P4
+
+/-- **What `virtio_disk_init` must have in hand at the `DRIVER_OK` store**, beside the device's
+windows (`flipWinsL`): the eight descriptor slots (`diskSlotIn`: both halves of the receipt, the
+`free[i]` byte, the zeroed descriptor), both halves of the published count, the handler watermark
+and the stage, the completion counter, `disk.used_idx`, the three page pointers of `struct disk`
+-- and the PURE fact that all three pages are `kalloc`'d, identity-mapped RAM (`Xv6.pageRw`).
 
 The page facts are not derivable from the windows: a `MachCSL.ctxBytes`
 window carries the history of each byte and its key, not the address's
@@ -1170,63 +1625,68 @@ window carries the history of each byte and its key, not the address's
 `Xv6.pageValid` of the pages `kalloc` returned, and they are what makes
 `Xv6.diskGeom` able to hand `virtio_disk_intr` the `MachCSL.kmapId` of
 the used page it reads. -/
-def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
+def diskFlipIn0 [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
   ⌜pageRw pd ∧ pageRw pav ∧ pageRw pu⌝ ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pu ∗
   ([∗list] i ∈ List.range NUM, diskSlotIn γ pd i) ∗
   diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskReadLbAuth γ 0 ∗
   diskStage γ none ∗ diskDoneAuth γ 0 ∗
-  ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
-  ([∗list] j ∈ List.range NUM,
-    ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
-  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ diskBaseKeys curCtx b) ∗
-  ([∗list] j ∈ List.range NUM,
-    ctxBytes curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 0) ∗
   wordPointsTo aDescPtr 8 (DFrac.own 1) pd ∗
   wordPointsTo aAvailPtr 8 (DFrac.own 1) pav ∗
   wordPointsTo aUsedPtr 8 (DFrac.own 1) pu
 
-/-- **The used index's base, KEYED** (what `DiskAcc.DISK_INIT_WM` used to
-assume at FLOOR strength; Rocq's `DiskAvail.used_split_init`, whose floors
-are `lk_floor`s -- "floor or wrote").  The two zeroed bytes of `used->idx`,
-owned at a context, are the invariant's empty write log over tails whose
-heads sit at the two positions the base code `b = chainPair t0 t1` names
-(W8 (f3-gate): each byte's own position, `Xv6.usedTailOk`) -- and the
-context holds a KEY for each (`MachCSL.keyAt`: under its bound, or one of
-its hart's own buffered stores; `Xv6.diskBaseKeys`).  It is NOT a floor: `virtio_disk_init`'s
-`memset` of the used page is the creator's own store and nothing after it
-fences, so its position need not be under the context's bound.  The key
-is enough: a holder that reads the index cashes it at the handler's
-`__sync_synchronize()` (`MachCSL.wp_s_fence_iorw_iorw_pub` drains the
-holder's own store), and the lock's handoffs transport it
-(`MachCSL.ctx_dom_key`); see `Xv6.diskPayFl`. -/
-theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
-    dmaCert (GF := GF) pa 2 ∗ ctxBytes ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
+def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop%
+  diskFlipIn0 γ pd pav pu ∗ flipWinsL curCtx pav pu
+
+/-- **The used index's base, KEYED, its heads LANDED** (what `DiskAcc.DISK_INIT_WM` used to
+assume at FLOOR strength; Rocq's `DiskAvail.used_split_init`).  The two zeroed bytes of
+`used->idx`, a certified window at a context, are the invariant's empty write log over tails whose
+heads sit at the two positions the base code `b = chainPair t0 t1` names (W8 (f3-gate): each
+byte's own position, `Xv6.usedTailOk`), the heads landed (`usedTailLanded b`, route P: the guard's
+certificates) -- and the context holds a KEY for each (`Xv6.diskBaseKeys`). -/
+theorem ctxBytesL_usedIdxKey (ξ : CtxId) (pa : PAddr) :
+    dmaCert (GF := GF) pa 2 ∗ ctxBytesL ξ pa 2 (0 : BitVec (8 * 2)) ⊢
       ∃ b : Nat, usedIdxCell pa b [] ∗ diskBaseKeys ξ b := by
-  unfold ctxBytes usedIdxCell
+  unfold ctxBytesL ctxBytes usedIdxCell dmaHeads histBytes
   simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
     Iris.Algebra.BigOpL.bigOpL_nil]
-  iintro ⟨#Hc, H0, H1, -⟩
+  iintro ⟨#Hc, %Hs, ⟨Hb0, Hb1, -⟩, %hh, ⟨⟨%e0, %q0, %he0, #Hl0⟩, ⟨%e1, %q1, %he1, #Hl1⟩, -⟩, H0, H1, -⟩
   unfold ctxByte
   icases H0 with ⟨%e0, %T0, Hp0, %hv0, #Hk0⟩
   icases H1 with ⟨%e1, %T1, Hp1, %hv1, #Hk1⟩
+  icases histByte_join_half _ _ _ $$ [Hb0 Hp0] with ⟨Hb0, %ha0⟩
+  · iframe Hb0 Hp0
+  icases histByte_join_half _ _ _ $$ [Hb1 Hp1] with ⟨Hb1, %ha1⟩
+  · iframe Hb1 Hp1
+  rw [ha0] at he0
+  rw [ha1] at he1
+  simp only [List.head?_cons, Option.some.injEq] at he0 he1
+  subst he0 he1
   iexists (chainPair e0.t e1.t)
-  isplitl [Hp0 Hp1]
-  · iexists (fun j => if j = 0 then e0 :: T0 else e1 :: T1)
-    rw [usedW_nil, WordHist.hist_nil]
-    unfold histBytes
+  isplitl [Hb0 Hb1]
+  · iexists (fun j => if j = 0 then e0 :: T0 else e1 :: T1), []
+    rw [usedWS_nil, WordHist.hist_nil]
     simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
       Iris.Algebra.BigOpL.bigOpL_nil]
-    isplitl [Hp0 Hp1]
+    isplitl [Hb0 Hb1]
     · simp only [if_true, show (1 : Nat) = 0 ↔ False from by decide, if_false]
-      iframe Hp0 Hp1
+      rw [← ha0, ← ha1]
+      iframe Hb0 Hb1
     isplitl []
     · ipureintro
-      refine ⟨e0.t, e1.t, rfl, fun j hj => ?_⟩
+      refine ⟨⟨e0.t, e1.t, rfl, fun j hj => ?_⟩, rfl, by simp⟩
       rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
       · exact ⟨e0, T0, by simp, by rw [hv0], rfl⟩
       · exact ⟨e1, T1, by simp, by rw [hv1], rfl⟩
-    · iexact Hc
+    isplitl []
+    · unfold landedAll; simp only [usedLands, List.map_nil, List.zip_nil_left]
+      iapply BigSepL.bigSepL_nil.2; iempintro
+    iframe Hc
+    iright
+    unfold usedTailLanded
+    iexists e0.t, e1.t, q0, q1
+    iframe Hl0 Hl1
+    ipureintro; rfl
   · unfold diskBaseKeys
     iexists e0.t, e1.t
     iframe Hk0 Hk1
@@ -1241,7 +1701,7 @@ set_option maxHeartbeats 1000000 in
 /-- **The flip, as a view shift on the protocol.**  The dead arm's
 configuration ghost is frozen at the live `c'` (so no later reset is
 provable), its image authority carries over unchanged, and the driver's
-pages become the live arm's leases. -/
+pages -- certified -- become the live arm's leases. -/
 theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : VirtioCfg)
     (hdead : Virtio.live c = false) (hlive : Virtio.live c' = true)
     (hwce : Virtio.wce c' = false) (hqnum : c'.qnum.toNat = NUM) :
@@ -1256,17 +1716,23 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
     obtain ⟨p1, p2, p3, p4, p5, p6, p7⟩ := hp
     imod diskCfg_freeze γ v.cfg c c' $$ [Hcfg Htok] with #Hfr
     · iframe Hcfg Htok
-    unfold diskFlipIn
-    icases HIn with ⟨%hpg, #Hrc, Hsl, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc, Hai, Hring, Hui, Hue, Hdui, Hq1, Hq2, Hq3⟩
+    unfold diskFlipIn diskFlipIn0 flipWinsL
+    icases HIn with ⟨⟨%hpg, #Hrc, Hsl, Hpa, Hpub, Hnr, Hrl, Hstg, Hnc, Hdui, Hq1, Hq2, Hq3⟩,
+      Hai, Hring, Hui, Hue⟩
     icases diskSlots_split γ c'.desc $$ Hsl with ⟨Hauths, Hrows, Hslots⟩
     icases diskRing_split c'.avail $$ Hring with ⟨HringR, HringC⟩
     ihave HueR := diskUsed_split c'.used ⟨hpg.2.2.1, hpg.2.2.2.1⟩ $$ Hrc Hue
-    icases Hui with ⟨%bb, HuiR, #Hflb⟩
+    have hpgu := hpg.2.2
+    ihave #Hcu : iprop(dmaCert (GF := GF) (usedIdxAt c'.used) 2) $$ [Hrc]
+    · unfold usedIdxAt
+      iapply dmaCert_page c'.used 2 2 ⟨hpgu.1, hpgu.2.1⟩ (by omega) $$ Hrc
+    icases ctxBytesL_usedIdxKey curCtx (usedIdxAt c'.used) $$ [Hcu Hui] with ⟨%bb, HuiR, #Hflb⟩
+    · iframe Hcu Hui
     icases ctxBytes_split_dma curCtx (availIdxAt c'.avail) 2 (wrap16 0) $$ Hai
       with ⟨HaiR, HaiC⟩
     imod diskDoneAuth_lb γ 0 $$ Hnc with ⟨Hnc, #Hlb⟩
     imod diskBase_freeze γ 0 bb $$ Hbs0 with #Hbs
-
+    icases diskPubAuthM_lb γ 0 0 (Nat.le_refl 0) $$ HnpM0 with ⟨HnpM0, #Hplb⟩
     imod diskWordPersist aDescPtr 8 _ c'.desc $$ Hq1 with #Hq1
     imod diskWordPersist aAvailPtr 8 _ c'.avail $$ Hq2 with #Hq2
     imod diskWordPersist aUsedPtr 8 _ c'.used $$ Hq3 with #Hq3
@@ -1293,6 +1759,8 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
       ihave Hsb0 := statusRes_empty (GF := GF) γ stInit (fun _ => SByte.free) (fun _ => rfl)
       ihave Hcr0 := crashRows_none (GF := GF) γ { v with cfg := c' } stInit (fun _ => SByte.free)
         (fun _ => rfl)
+      ihave HnpM0 := availIdxRes_cert γ (availIdxAt c'.avail) 0 0 $$ [HaiR HnpM0]
+      · iframe HaiR HnpM0
       iframe Hm Hauths Hrows Hnc Hpa Hlo0 HnpM0 Hpos0 HstgA0 HuiR Hdn0 Hbs Htp Hnr0 Hsb0 Hcr0
       isplitl [HueR]
       · unfold usedLease
@@ -1301,9 +1769,14 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
           (fun {_ j} => (by rw [ueRes_free] : dmaOwn (GF := GF) (usedElemAt c'.used j) 8 ⊢
             ueRes c'.used j ((fun _ => UElem.free) j))))
         iexact HueR
-      isplitl [HaiR HringR]
+      isplitl [HringR]
       · unfold availLease
-        iframe HaiR HringR
+        iapply (BigSepL.bigSepL_mono_of_forall
+          (Ψ := fun _ (j : Nat) => availCell (GF := GF) c'.avail 0 ringInit none j)
+          (fun {_ j} => (by rw [availCell_pub _ _ _ _ _ rfl] :
+            dmaHalfAt (GF := GF) (availRingAt c'.avail j) 2 (BitVec.ofNat 16 (ringInit j)) ⊢
+              availCell c'.avail 0 ringInit none j)))
+        iexact HringR
       ipureintro
       refine ⟨p6, p7, Nat.le_refl 0, ⟨fun p h1 h2 => absurd h2 (by omega),
           fun p q h1 h2 h3 h4 _ => absurd h2 (by omega)⟩,
@@ -1331,7 +1804,7 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
         exact ⟨rfl, rfl, rfl, hlive, hqnum, hwce, hpg.1, hpg.2.1, hpg.2.2⟩
       unfold diskRes
       iexists 0, 0, none, ringInit
-      iframe Hpub Hnr Hrl Hstg Hdui HaiC HringC Hslots Hlb
+      iframe Hpub Hplb Hnr Hrl Hstg Hdui HaiC HringC Hslots Hlb
       iapply diskPayWm_zero γ curCtx bb
       iframe Hbs Hflb
   · ihave %he := diskCfg_frozen_own_agree γ c c0 $$ Hfr0 Htok
@@ -1342,16 +1815,26 @@ theorem diskProto_flip [CurCtx] (γ : DiskNames) (v : VirtioState) (c c' : Virti
 /-- **The live flip** (`*R(STATUS) = ... | DRIVER_OK`, the last store of
 `virtio_disk_init`): the device goes live, the driver's configuration
 tracker is frozen (so no later reset is provable), and the queue pages it
-has zeroed become the invariant's leases and the lock's payload. -/
+has zeroed become the invariant's leases and the lock's payload.  Route P ([OWN.131], the ONE
+named assumption, xv6 weak-memory bug #1): the accessor is the GUARDED store's (`devWriteAUD`):
+the windows' raw halves `ev` are lent to the step, which hands back the guard's landing
+certificates `drvOkCerts ev ts` for the hart's receipts `ts`; `K` turns them into the certified
+windows. -/
 theorem disk_driver_ok_write [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (w : BitVec 32)
+    (ev : List (PAddr × DFrac × Hist)) (ts : List Nat)
     (hdead : Virtio.live c = false) (hlive : Virtio.live c' = true)
     (hwce : Virtio.wce c' = false) (hqnum : c'.qnum.toNat = NUM)
     (hwr : ∀ v : VirtioState, v.cfg = c →
-      Virtio.write v Virtio.offStatus w = some { v with cfg := c' }) :
-    diskInv (GF := GF) γ ∗ diskCfgOwn γ c ∗ diskFlipIn γ c'.desc c'.avail c'.used ⊢
-      devWriteAU .virtio Virtio.offStatus 4 w (diskFlipOut γ c'.desc c'.avail c'.used) := by
-  unfold diskInv devInvR devWriteAU
-  iintro ⟨#Hinv, Htok, HIn⟩
+      Virtio.write v Virtio.offStatus w = some { v with cfg := c' })
+    (hcc : c'.desc = c.desc ∧ c'.avail = c.avail ∧ c'.used = c.used)
+    (hev : ∀ q ∈ ev, vqPageByte c' q.1) :
+    diskInv (GF := GF) γ ∗ diskCfgOwn γ c ∗ diskFlipIn0 γ c'.desc c'.avail c'.used ∗
+      (∀ ls' : List (Nat × Nat),
+        ⌜∀ t ∈ ts, (∃ q ∈ ev, ∃ e ∈ q.2.2, e.t = t) → ∃ p, (t, p) ∈ ls'⌝ -∗ evPts ev -∗
+          landedAll ls' -∗ flipWinsL curCtx c'.avail c'.used) ⊢
+      devWriteAUD Virtio.offStatus 4 w ev ts (diskFlipOut γ c'.desc c'.avail c'.used) := by
+  unfold diskInv devInvR devWriteAUD
+  iintro ⟨#Hinv, Htok, HIn0, HK⟩
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
   icases diskProto_dead_open γ v c hdead $$ [Hproto Htok] with ⟨%hpure, Hproto, Htok⟩
@@ -1364,12 +1847,24 @@ theorem disk_driver_ok_write [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (w : B
   iframe Hfrag
   isplit
   · ipureintro; rw [hx]; rfl
+  isplit
+  · ipureintro
+    intro q hq
+    have h := hev q hq
+    unfold vqPageByte at h ⊢
+    rw [show (show VirtioState from v).cfg = c from hpure.1, ← hcc.1, ← hcc.2.1, ← hcc.2.2]
+    exact h
   inext
-  iintro %v'' %hwrx Hfrag
+  iintro %v'' %hwrx Hfrag Hev Hcerts
   obtain rfl : ({ v with cfg := c' } : VirtioState) = v'' := Option.some.inj (hx.symm.trans hwrx)
   imod Hmask
-  imod diskProto_flip γ v c c' hdead hlive hwce hqnum $$ [Hproto Htok HIn] with ⟨Hproto, Hout⟩
-  · iframe Hproto Htok HIn
+  unfold drvOkCerts
+  icases Hcerts with ⟨%ls', #Hls', %hcov⟩
+  ihave Hw := HK $$ %ls' %hcov Hev Hls'
+  imod diskProto_flip γ v c c' hdead hlive hwce hqnum $$ [Hproto Htok HIn0 Hw] with ⟨Hproto, Hout⟩
+  · iframe Hproto Htok
+    unfold diskFlipIn
+    iframe HIn0 Hw
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
     inext
@@ -1877,25 +2372,23 @@ the whole context windows of `c.d0/d1/d2/hdr` split into the raw halves of
 `b->data` go over at own 1, and the block's image fragment is deposited in
 the row.
 
-Two premises beyond the ghost state: `kmapStatic` (persistent, from
-`Xv6.kctx_kernelMap`) and the fact that `b->data`'s bytes are kernel data.
-They are what identifies the driver's VIRTUAL addresses with the physical
-ones the device's DMA windows live at -- the driver's `wordAtN`/`byteBuf`
-cells carry a page mapping, the invariant's `dmaOwn` does not. -/
+Route P (D14 (c)): every window the device may read comes in CERTIFIED (`ctxBytesL`: the driver
+cashed its head keys before the `+0x186` fence and the fence's ghost step landed its own stores,
+`Xv6.ctxBytes_pre` / `Xv6.ctxBytesPre_fin`), so the invariant's halves (`dmaHalfAt`, `dmaOwn`)
+carry landed heads. -/
 theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (np : Nat)
-    (bs data : List (BitVec 8)) (hwf : c.wf) (hlen : data.length = BSIZE) (hep : c.ep = np)
+    (bs data : List (BitVec 8)) (hwf : c.wf) (hep : c.ep = np)
     (hctx : c.ctx = curCtx) (hpayw : c.dwr = false → c.payw = bvOfBytes BSIZE data)
-    (hpayr : c.dwr = true → bs = c.pay)
-    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
-    diskInv (GF := GF) γ ∗ kmapStatic ∗ dmaCert c.status 1 ∗ dmaCert c.data BSIZE ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗
+    (hpayr : c.dwr = true → bs = c.pay) :
+    diskInv (GF := GF) γ ∗ dmaCert c.status 1 ∗ dmaCert c.data BSIZE ∗ diskGeom γ pd pav pu ∗ diskPub γ np ∗
       diskStage γ (some c.hd) ∗ headTok γ c.hd .inactive ∗
       headTok γ c.md .inactive ∗ headTok γ c.tl .inactive ∗
-      ctxBytes curCtx (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
-      ctxBytes curCtx (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
-      ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own 1) c.d2 ∗
-      ctxBytes curCtx c.hdrAddr 16 (DFrac.own 1) c.hdr ∗
-      wordAtN curCtx c.status 1 (DFrac.own 1) 0xff#8 ∗
-      byteBuf c.data (DFrac.own 1) data ∗ diskBlock γ c.blk bs ∗
+      ctxBytesL curCtx (descAt pd c.hd) 16 c.d0 ∗
+      ctxBytesL curCtx (descAt pd c.md) 16 c.d1 ∗
+      ctxBytesL curCtx (descAt pd c.tl) 16 c.d2 ∗
+      ctxBytesL curCtx c.hdrAddr 16 c.hdr ∗
+      ctxBytesL curCtx c.status 1 0xff#8 ∗
+      ctxBytesL curCtx c.data BSIZE (bvOfBytes BSIZE data) ∗ diskBlock γ c.blk bs ∗
       crashPermPend γ.cperm c.kq (chainWr c) (List.range (wrNsectors (chainWr c))) ⊢
       |={⊤}=> (diskPub γ np ∗ diskStage γ (some c.hd) ∗ headTok γ c.hd (.active c) ∗
         headTok γ c.md (.member c.hd) ∗ headTok γ c.tl (.member c.hd) ∗
@@ -1904,7 +2397,7 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
         ctxBytes curCtx (descAt pd c.tl) 16 (DFrac.own (1 : Qp).half) c.d2 ∗
         ctxBytes curCtx c.hdrAddr 16 (DFrac.own (1 : Qp).half) c.hdr) := by
   unfold diskInv devInvR
-  iintro ⟨#Hinv, #HS, #Hcst, #Hcda, #Hgeom, Hpub, Hstgd, Htok, Htokm, Htokt, Hd0, Hd1, Hd2, Hhdr, Hstat,
+  iintro ⟨#Hinv, #Hcst, #Hcda, #Hgeom, Hpub, Hstgd, Htok, Htokm, Htokt, Hd0, Hd1, Hd2, Hhdr, Hstat,
     Hbuf, Hblk, Hpend⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_split_dma curCtx (descAt pd c.hd) 16 c.d0 $$ Hd0 with ⟨Hr0, Hc0⟩
@@ -1912,25 +2405,18 @@ theorem disk_publish [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
   icases ctxBytes_split_dma curCtx (descAt pd c.tl) 16 c.d2 $$ Hd2 with ⟨Hr2, Hc2⟩
   icases ctxBytes_split_dma curCtx c.hdrAddr 16 c.hdr $$ Hhdr with ⟨Hrh, Hch⟩
   icases dmaHalfAt_hdr_split c.hdrAddr c $$ Hrh with ⟨Hh0, Hh1, Hh2⟩
-  ihave Hstat2 : iprop(wordPointsTo (GF := GF) c.status 1 (DFrac.own 1) 0xff#8) $$ [Hstat]
-  · iapply (show wordAtN (GF := GF) curCtx c.status 1 (DFrac.own 1) 0xff#8 ⊢
-      wordPointsTo c.status 1 (DFrac.own 1) 0xff#8 from by rw [wordAtN_cur])
-    iexact Hstat
-  ihave Hsraw := wordPointsTo_dmaOwn c.status 1 0xff#8
-    (by rw [show c.status = aInfoStatus c.hd from rfl]; exact info_status_kmapRw c.hd hwf.1)
-      $$ HS Hcst Hstat2
+  ihave Hsraw := ctxBytesL_dmaOwn curCtx c.status 1 0xff#8 $$ [Hcst Hstat]
+  · iframe Hcst Hstat
   ihave Hbw : iprop(bufW (GF := GF) c ∗ bufFree c) $$ [Hbuf]
   · cases hd : c.dwr
     · rw [bufW_read c hd, bufFree_write c hd, hctx, hpayw hd]
-      isplitl [Hbuf]
-      · iapply byteBuf_ctxBytes c.data data BSIZE hlen hkm $$ HS
-        iexact Hbuf
-      · iempintro
+      iframe Hbuf
     · rw [bufW_write c hd, bufFree_read c hd]
       isplitl []
       · iempintro
-      · iapply byteBuf_bufLease c data hlen hkm $$ HS Hcda
-        iexact Hbuf
+      · unfold bufLease
+        iapply ctxBytesL_dmaOwn curCtx c.data BSIZE (bvOfBytes BSIZE data)
+        iframe Hcda Hbuf
   icases Hbw with ⟨Hbw, Hbraw⟩
   ihave Hlease : iprop(chainLease (GF := GF) pd c)
     $$ [Hr0 Hr1 Hr2 Hh0 Hh1 Hh2 Hbw]
@@ -2009,22 +2495,32 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
 
 /-! ### The certificates of the driver's racy reads (W8 (f2-ctx) S3) -/
 
+/-- An entry landed (certificate in the reader's `ls`) at or below the view is visible (route P). -/
+theorem DiskAcc.vis_landed (lp : LandPos) (h : Agent) (tvn : Nat) (e : HEnt) (p : Nat)
+    (ls : List (Nat × Nat)) (hmem : (e.t, p) ∈ ls) (hla : lpAgree ls lp) (hle : p ≤ tvn) :
+    e.visibleP lp h tvn = true := by
+  by_cases h0 : e.t = 0
+  · simp [HEnt.visibleP, h0, hla.1]
+  · exact HEnt.visibleP_of_landed lp h tvn e (hla.2 _ hmem h0) hle
+
 /-- **A read of DMA-written bytes is certified** (the device-key arm): their
-heads are the device's, at a position the reader's view has passed, so the
-read returns them. -/
+heads are the device's write `td`, LANDED at a position `pd` the reader's view has passed (route P:
+the certificate in the reader's `ls`), so the read returns them. -/
 theorem DiskAcc.dma_certs (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent)) (Hs : Nat → Hist)
-    (td : Nat) (htK : td ≤ K) (hh : headsAtT Hs n td) :
-    authoredBy td diskAgent ⊢@{IProp GF} readCertsAt cpu pa n K ts Hs [] := by
+    (td pd : Nat) (hpK : pd ≤ K) (hh : headsAtT Hs n td) :
+    authoredBy td diskAgent ⊢@{IProp GF} readCertsAt cpu pa n K ts [(td, pd)] Hs [] := by
   iintro #Hau
-  iapply readCertsAt_of cpu pa n K ts Hs [] (fun _ e => e.t = td)
-  · intro j e tvn hj hKt _ hr
+  iapply readCertsAt_of cpu pa n K ts [(td, pd)] Hs [] (fun _ e => e.t = td)
+  · intro j e tvn lp hj hKt _ hla hr
     have h0 := hh j hj
     cases hx : Hs j with
     | nil => rw [hx] at h0; cases h0
     | cons e0 H0 =>
       rw [hx] at h0 hr
       simp only [List.head?_cons, Option.map_some, Option.some.injEq] at h0
-      rw [Hist.readEnt_head _ _ e0 H0 (HEnt.visible_of_le _ _ e0 (by omega)) e hr]
+      have hv : e0.visibleP lp (hartAgent cpu) tvn = true :=
+        DiskAcc.vis_landed lp _ tvn e0 pd [(td, pd)] (by rw [h0]; simp) hla (by omega)
+      rw [Hist.readEntP_head _ _ _ e0 H0 hv e hr]
       exact h0
   · imodintro
     iintro %j %e %⟨_, het⟩
@@ -2036,100 +2532,217 @@ theorem DiskAcc.dma_certs (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat �
     iframe Hau
     ileft; ipureintro; exact Or.inl (by unfold diskAgent; exact Nat.le_refl _)
 
-/-- **The reader's certificates for the base heads** (W8 (f3-gate)
-[OWN.62]): at a watermark of zero, a chain certificate (`MachCSL.srcCertAt`)
-for every entry at either position the frozen base code names -- hart 0's
-`memset` zeroes of `used->idx` (`virtio_disk.c`), which reach the reader
-through its running token: the payload's head keys (`Xv6.diskHeadKeys`)
-cashed by `DiskAcc.diskHeadCerts_cash`, whose chain half the lock's
-handoffs carry (`MachCSL.ctx_dom_key`).  Past the base nothing is
-needed. -/
-def DiskAcc.diskHeadCerts (γ : DiskNames) (cpu : CPU) (nr : Nat) : IProp GF :=
+/-- A log entry's stamp and landing position, as the readers' certificate list carries them. -/
+theorem DiskAcc.mem_usedLands (dl : List UsedRec) (sts : List Nat) (q : UsedRec × Nat)
+    (hq : q ∈ dl.zip sts) : (q.2, q.1.2.1) ∈ usedLands dl sts := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hq
+  rw [List.getElem?_zip_eq_some] at hi
+  unfold usedLands
+  rw [List.mem_iff_getElem?]
+  refine ⟨i, ?_⟩
+  rw [List.getElem?_zip_eq_some]
+  refine ⟨hi.2, ?_⟩
+  rw [List.getElem?_map, hi.1]
+  rfl
+
+/-- **The reader's certificates and visibility for the base heads** (W8 (f3-gate) [OWN.62]; route
+P): at a watermark of zero, a chain certificate (`MachCSL.srcCertAt`) for every entry at either
+position the frozen base code names -- hart 0's `memset` zeroes of `used->idx` -- AND their
+VISIBILITY at the view `K`: each is the boot image's, the reader's own (`ts`), or landed at or
+below `K` (`ls`) -- the payload's head keys (`Xv6.diskHeadKeys`) cashed by
+`DiskAcc.diskHeadCerts_cash`.  Past the base nothing is needed. -/
+def DiskAcc.diskHeadCertsT (γ : DiskNames) (cpu : CPU) (nr K : Nat) (ts : List (Nat × Agent))
+    (ls : List (Nat × Nat)) : IProp GF :=
   match nr with
   | 0 => iprop(∃ t0 t1 : Nat, diskBaseFrozen γ (chainPair t0 t1) ∗
-      □ ∀ (a : PAddr) (e : HEnt), ⌜e.t = t0 ∨ e.t = t1⌝ -∗ srcCertAt cpu a e)
-  | _ + 1 => iprop(True)
+      (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = t0 ∨ e.t = t1⌝ -∗ srcCertAt cpu a e) ∗
+      ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗ landedAll ls ∗
+      ⌜∀ t, (t = t0 ∨ t = t1) → t = 0 ∨ (t, hartAgent cpu) ∈ ts ∨ ∃ p, (t, p) ∈ ls ∧ p ≤ K⌝)
+  | _ + 1 => iprop(⌜ts = [] ∧ ls = []⌝)
 
-instance DiskAcc.diskHeadCerts_persistent (γ : DiskNames) (cpu : CPU) (nr : Nat) :
-    Persistent (DiskAcc.diskHeadCerts (GF := GF) γ cpu nr) := by
-  cases nr <;> (unfold DiskAcc.diskHeadCerts; infer_instance)
+instance DiskAcc.diskHeadCertsT_persistent (γ : DiskNames) (cpu : CPU) (nr K : Nat)
+    (ts : List (Nat × Agent)) (ls : List (Nat × Nat)) :
+    Persistent (DiskAcc.diskHeadCertsT (GF := GF) γ cpu nr K ts ls) := by
+  cases nr <;> (unfold DiskAcc.diskHeadCertsT; infer_instance)
 
-/-- **The head keys, cashed against the running token** (`MachCSL.srcCertAt_of_key`). -/
-theorem DiskAcc.diskHeadCerts_cash (γ : DiskNames) (cpu : CPU) (ξ : CtxId) (nr : Nat) :
-    ownCtx (GF := GF) cpu ξ ∗ diskHeadKeys γ nr ξ ⊢ ownCtx cpu ξ ∗ DiskAcc.diskHeadCerts γ cpu nr := by
+def DiskAcc.diskHeadCerts (γ : DiskNames) (cpu : CPU) (nr K : Nat) : IProp GF :=
+  iprop(∃ (ts : List (Nat × Agent)) (ls : List (Nat × Nat)), DiskAcc.diskHeadCertsT γ cpu nr K ts ls)
+
+instance DiskAcc.diskHeadCerts_persistent (γ : DiskNames) (cpu : CPU) (nr K : Nat) :
+    Persistent (DiskAcc.diskHeadCerts (GF := GF) γ cpu nr K) := by
+  unfold DiskAcc.diskHeadCerts; infer_instance
+
+theorem DiskAcc.diskHeadCerts_succ (γ : DiskNames) (cpu : CPU) (nr K : Nat) :
+    ⊢@{IProp GF} DiskAcc.diskHeadCerts γ cpu (nr + 1) K := by
+  unfold DiskAcc.diskHeadCerts DiskAcc.diskHeadCertsT
+  iintro
+  iexists [], []
+  ipureintro; exact ⟨rfl, rfl⟩
+
+theorem DiskAcc.diskHeadCertsT_mono (γ : DiskNames) (cpu : CPU) (nr K K' : Nat)
+    (ts : List (Nat × Agent)) (ls : List (Nat × Nat)) (h : K ≤ K') :
+    DiskAcc.diskHeadCertsT (GF := GF) γ cpu nr K ts ls ⊢ DiskAcc.diskHeadCertsT γ cpu nr K' ts ls := by
+  cases nr with
+  | succ n => exact .rfl
+  | zero =>
+    unfold DiskAcc.diskHeadCertsT
+    iintro ⟨%t0, %t1, #Hb, #Hc, #Hts, #Hls, %hv⟩
+    iexists t0, t1
+    iframe Hb Hc Hts Hls
+    ipureintro
+    intro t ht
+    rcases hv t ht with h0 | hm | ⟨p, hp, hpK⟩
+    · exact Or.inl h0
+    · exact Or.inr (Or.inl hm)
+    · exact Or.inr (Or.inr ⟨p, hp, by omega⟩)
+
+/-- **The head keys, cashed against the running token** (`MachCSL.srcCertAt_of_key`,
+`MachCSL.ownCtx_keys_vis`), at a view at least the one in hand. -/
+theorem DiskAcc.diskHeadCerts_cash (γ : DiskNames) (cpu : CPU) (ξ : CtxId) (nr Kin : Nat) :
+    ownCtx (GF := GF) cpu ξ ∗ diskHeadKeys γ nr ξ ∗ viewLb cpu Kin ⊢
+      ownCtx cpu ξ ∗ ∃ K : Nat, ⌜Kin ≤ K⌝ ∗ viewLb cpu K ∗ DiskAcc.diskHeadCerts γ cpu nr K := by
   cases nr with
   | succ n =>
-    unfold DiskAcc.diskHeadCerts
-    iintro ⟨Hctx, _⟩
+    iintro ⟨Hctx, _, #HK⟩
     iframe Hctx
+    iexists Kin
+    iframe HK
+    isplitr
+    · ipureintro; exact Nat.le_refl _
+    iapply DiskAcc.diskHeadCerts_succ
   | zero =>
-    unfold diskHeadKeys DiskAcc.diskHeadCerts diskBaseKeys
-    iintro ⟨Hctx, ⟨%b, #Hb, %t0, %t1, %hb, #Hk0, #Hk1⟩⟩
+    unfold diskHeadKeys diskBaseKeys
+    iintro ⟨Hctx, ⟨%b, #Hb, %t0, %t1, %hb, #Hk0, #Hk1⟩, #HKin⟩
     subst hb
     icases srcCertAt_of_key cpu ξ t0 $$ [Hctx Hk0] with ⟨Hctx, #C0⟩
     · iframe Hctx; iexact Hk0
     icases srcCertAt_of_key cpu ξ t1 $$ [Hctx Hk1] with ⟨Hctx, #C1⟩
     · iframe Hctx; iexact Hk1
+    icases ownCtx_keys_vis cpu ξ (fun j => if j = 0 then t0 else t1) 2 $$ [Hctx]
+      with ⟨Hctx, %K0, %tsl, %ls, #HK0, #Hts, #Hls, %hcov⟩
+    · iframe Hctx
+      simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
+        Iris.Algebra.BigOpL.bigOpL_nil, if_true, show (1 : Nat) = 0 ↔ False from by decide,
+        if_false]
+      iframe Hk0 Hk1
     iframe Hctx
-    iexists t0, t1
-    iframe Hb
-    imodintro
-    iintro %a %e %h
-    rcases h with h | h
-    · iapply C0 $$ %a %e %h
-    · iapply C1 $$ %a %e %h
+    iexists (max Kin K0)
+    isplitr
+    · ipureintro; exact Nat.le_max_left _ _
+    isplitr
+    · iapply viewLb_max; iframe HKin HK0
+    unfold DiskAcc.diskHeadCerts DiskAcc.diskHeadCertsT
+    iexists tsl, ls, t0, t1
+    iframe Hb Hts Hls
+    isplitr
+    · imodintro
+      iintro %a %e %h
+      rcases h with h | h
+      · iapply C0 $$ %a %e %h
+      · iapply C1 $$ %a %e %h
+    ipureintro
+    intro t ht
+    have hc : ∀ j, j < 2 → (if j = 0 then t0 else t1) = 0 ∨
+        ((if j = 0 then t0 else t1), hartAgent cpu) ∈ tsl ∨
+        ∃ p, ((if j = 0 then t0 else t1), p) ∈ ls ∧ p ≤ max Kin K0 := by
+      intro j hj
+      rcases hcov j hj with h0 | hm | ⟨p, hp, hpK⟩
+      · exact Or.inl h0
+      · exact Or.inr (Or.inl hm)
+      · exact Or.inr (Or.inr ⟨p, hp, by omega⟩)
+    rcases ht with rfl | rfl
+    · simpa using hc 0 (by omega)
+    · simpa using hc 1 (by omega)
 
-/-- **A read of `used->idx` is certified** (W8 (f3-gate) [OWN.62], replacing
-the device-ring exemption): an entry it may return is a device write (the
-device-key arm, `NCPU ≤ e.tid`), or -- only at a watermark of zero, when no
-device write is visible yet -- a tail head, which the reader's head
-certificates cover. -/
+/-- **A read of `used->idx` is certified** (W8 (f3-gate) [OWN.62]; route P): an entry it may return
+is a device write (the device-key arm, `NCPU ≤ e.tid`), or -- only at a watermark of zero, when no
+device write is visible yet -- a tail head, which the reader's head certificates cover; past the base
+a log entry IS visible (its landing position is under the view). -/
 theorem DiskAcc.usedIdx_certs (γ : DiskNames) (cpu : CPU) (pu : PAddr) (K nr b : Nat) (dl : List UsedRec)
-    (Hold : Nat → Hist) (htail : usedTailOk b Hold) (hbK : usedBaseLe b K)
+    (sts : List Nat) (Hold : Nat → Hist) (ts : List (Nat × Agent)) (ls0 ls : List (Nat × Nat))
+    (htail : usedTailOk b Hold) (hlen : dl.length = sts.length) (h0s : 0 ∉ sts)
+    (hls : ∀ q ∈ usedLands dl sts, q ∈ ls) (hls0 : ∀ q ∈ ls0, q ∈ ls)
     (hmem : nr = 0 ∨ ∃ (m t hd ep : Nat), (m, t, hd, ep) ∈ dl ∧ nr ≤ m ∧ t ≤ K) :
-    diskBaseFrozen (GF := GF) γ b ∗ DiskAcc.diskHeadCerts γ cpu nr ⊢
-      readCertsAt cpu (usedIdxAt pu) 2 K [] ((usedW dl).hist Hold) [] := by
+    diskBaseFrozen (GF := GF) γ b ∗ DiskAcc.diskHeadCertsT γ cpu nr K ts ls0 ⊢
+      readCertsAt cpu (usedIdxAt pu) 2 K ts ls ((usedWS dl sts).hist Hold) [] := by
   obtain ⟨t0, t1, hb, hh⟩ := htail
   subst hb
-  obtain ⟨u0, u1, hu, hu0, hu1⟩ := hbK
-  obtain ⟨rfl, rfl⟩ := chainPair_inj hu
   iintro ⟨#Hb, #Hc⟩
-  iapply readCertsAt_of cpu _ 2 K [] _ []
+  -- the base's visibility, when it is needed
+  ihave %hv0 : ⌜nr = 0 → ∀ t, (t = t0 ∨ t = t1) → t = 0 ∨ (t, hartAgent cpu) ∈ ts ∨
+      ∃ p, (t, p) ∈ ls ∧ p ≤ K⌝ $$ [Hb Hc]
+  · cases nr with
+    | succ n => ipureintro; intro h; cases h
+    | zero =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hc with ⟨%v0, %v1, #Hb', -, -, -, %hv⟩
+      ihave %heq := diskBaseFrozen_agree γ _ _ $$ Hb Hb'
+      obtain ⟨rfl, rfl⟩ := chainPair_inj heq
+      ipureintro
+      intro _ t ht
+      rcases hv t ht with h0 | hm | ⟨p, hp, hpK⟩
+      · exact Or.inl h0
+      · exact Or.inr (Or.inl hm)
+      · exact Or.inr (Or.inr ⟨p, hls0 _ hp, hpK⟩)
+  iapply readCertsAt_of cpu _ 2 K ts ls _ []
     (fun _ e => e.tid = diskAgent ∨ (nr = 0 ∧ (e.t = t0 ∨ e.t = t1)))
-  · intro j e tvn hj hK _ hr
-    unfold Hist.readEnt at hr
-    rw [WordHist.find?_hist] at hr
-    cases hf : (usedW dl).find? (WEnt.visible (hartAgent cpu) tvn) with
+  · intro j e tvn lp hj hK hau hla hr
+    have hl : ∀ q ∈ dl.zip sts, lp q.2 = some q.1.2.1 := by
+      intro q hq
+      have hq0 : q.2 ≠ 0 := by
+        intro h0
+        apply h0s
+        rw [← h0]
+        exact (List.of_mem_zip hq).2
+      exact hla.2 _ (hls _ (DiskAcc.mem_usedLands dl sts q hq)) hq0
+    unfold Hist.readEntP at hr
+    rw [WordHist.find?_histP, usedWS_findP dl sts lp cpu tvn hl] at hr
+    cases hf : (dl.zip sts).reverse.find? (fun q => decide (q.1.2.1 ≤ tvn)) with
     | some x =>
       rw [hf] at hr
       simp only [Option.map_some, Option.some_or, Option.some.injEq] at hr
       left
-      have hx := List.mem_of_find?_eq_some hf
-      unfold usedW at hx
-      obtain ⟨r, _, rfl⟩ := List.mem_map.1 (List.mem_reverse.1 hx)
       rw [← hr]; rfl
     | none =>
       rw [hf] at hr
       simp only [Option.map_none, Option.none_or] at hr
       obtain ⟨e', H, hH, _, het⟩ := hh j hj
-      have hle : e'.t ≤ tvn := by
-        rw [het]; unfold usedHeadPos; split <;> omega
-      rw [hH, List.find?_cons, HEnt.visible_of_le _ _ _ hle] at hr
+      -- past the base a log entry is visible: so the base
+      have hnr : nr = 0 := by
+        rcases hmem with h | ⟨m, t, hd, ep, hin, _, htK⟩
+        · exact h
+        · exfalso
+          obtain ⟨k, hk⟩ := List.getElem?_of_mem hin
+          have hk' : k < sts.length := by
+            have := (List.getElem?_eq_some_iff.1 hk).1; omega
+          have hzm : ((m, t, hd, ep), sts[k]) ∈ dl.zip sts := by
+            rw [List.mem_iff_getElem?]
+            exact ⟨k, by rw [List.getElem?_zip_eq_some]; exact ⟨hk, List.getElem?_eq_getElem hk'⟩⟩
+          have := List.find?_eq_none.1 hf _ (List.mem_reverse.2 hzm)
+          simp only [decide_eq_true_eq] at this
+          exact this (by omega)
+      have hvis : e'.visibleP lp (hartAgent cpu) tvn = true := by
+        have htj : e'.t = t0 ∨ e'.t = t1 := by
+          rw [het]; unfold usedHeadPos; split
+          · exact Or.inl rfl
+          · exact Or.inr rfl
+        rcases hv0 hnr _ htj with h0 | hm | ⟨p, hp, hpK⟩
+        · simp [HEnt.visibleP, h0, hla.1]
+        · apply HEnt.visibleP_of_own
+          refine hau _ hm j hj e' ?_ rfl
+          show e' ∈ WordHist.hist (usedWS dl sts) Hold j
+          unfold WordHist.hist
+          rw [hH]
+          simp
+        · exact DiskAcc.vis_landed lp _ tvn e' p ls hp hla (by omega)
+      rw [hH, List.find?_cons, hvis] at hr
       simp only [Option.some.injEq] at hr
       subst hr
       right
-      refine ⟨?_, ?_⟩
-      · rcases hmem with h | ⟨m, t, hd, ep, hin, _, htK⟩
-        · exact h
-        · exfalso
-          have hnone := List.find?_eq_none.1 hf (usedEnt (m, t, hd, ep))
-            (by unfold usedW; exact List.mem_reverse.2 (List.mem_map.2 ⟨_, hin, rfl⟩))
-          rw [usedEnt_visible] at hnone
-          simp only [decide_eq_true_eq] at hnone
-          exact hnone (by omega)
-      · rw [het]; unfold usedHeadPos; split
-        · exact Or.inl rfl
-        · exact Or.inr rfl
+      refine ⟨hnr, ?_⟩
+      rw [het]; unfold usedHeadPos; split
+      · exact Or.inl rfl
+      · exact Or.inr rfl
   · imodintro
     iintro %j %e %⟨hj, hP⟩
     ileft
@@ -2139,8 +2752,8 @@ theorem DiskAcc.usedIdx_certs (γ : DiskNames) (cpu : CPU) (pu : PAddr) (K nr b 
       ipureintro
       exact Or.inr (Or.inl (by rw [htid]; exact Nat.le_refl _))
     · subst hnr
-      unfold DiskAcc.diskHeadCerts
-      icases Hc with ⟨%v0, %v1, #Hb', #Hcert⟩
+      unfold DiskAcc.diskHeadCertsT
+      icases Hc with ⟨%v0, %v1, #Hb', #Hcert, -, -, -⟩
       ihave %heq := diskBaseFrozen_agree γ _ _ $$ Hb Hb'
       obtain ⟨rfl, rfl⟩ := chainPair_inj heq
       iapply Hcert $$ %_ %e %ht
@@ -2151,23 +2764,23 @@ published, and `m` is at least the handler's watermark -- which is what
 makes `disk.used_idx != disk.used->idx` mean `nr < m`, and so licenses the
 reads of the used element and of the status byte at position `nr`.
 
-`diskWm γ nr K` is the TSO credential the read CONSUMES: `K` is a bound
-the hart's floor has reached, and it has passed the write that published
-`nr` (and the stores that zeroed the page); that is what makes
-`disk.used_idx != disk.used->idx` mean `nr < m`.
+`diskWm γ nr K` is the credential the read CONSUMES: `K` is a bound the hart's view has reached,
+and it has passed the LANDING position of the write that published `nr`; at the base the reader's
+head certificates make the zeroing stores visible (route P).
 
 The read also PRODUCES the next one.  `MachCSL.readAUr` names the view
 `F` the load read at (`MachCSL.rviewLb cpu F`), and the log entry the
-answer came from is at a position at or below `F` -- the disk is not this
+answer came from LANDED at or below `F` -- the disk is not this
 hart, so an entry above `F` is invisible to it.  So `diskWm γ m F` comes
 out beside the answer, and the `__sync_synchronize()` of the loop body
 turns the `rviewLb cpu F` into the floor `MachCSL.viewLb cpu F` that the
 element and status reads need. -/
 theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
-    (K nr : Nat) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    (K nr : Nat) (ts : List (Nat × Agent)) (ls0 : List (Nat × Nat))
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ kmapStatic ∗ diskReadAt γ nr ∗ diskWm γ nr K ∗
-      DiskAcc.diskHeadCerts γ cpu nr ⊢
-      readAUr cpu (usedIdxAt pu) 2 K [] (fun w =>
+      DiskAcc.diskHeadCertsT γ cpu nr K ts ls0 ⊢
+      readAUr cpu (usedIdxAt pu) 2 K ts (fun w =>
         iprop(diskReadAt γ nr ∗ ∃ m F : Nat, ⌜w = wrap16 m ∧ nr ≤ m⌝ ∗ diskDoneLb γ m ∗
           rviewLb cpu F ∗ diskWm γ m F)) := by
   unfold diskInv devInvR readAUr
@@ -2175,37 +2788,127 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   obtain ⟨hgd, hga, hgu, hgl, hgq⟩ := hg
   subst hgu
-  isplitl []
-  · exact BigSepL.bigSepL_nil_intro
+  -- the head certificates' persistent pieces
+  ihave #Hts : iprop([∗list] p ∈ ts, authoredBy (GF := GF) p.1 p.2) $$ [Hhc]
+  · cases nr with
+    | succ n =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hhc with %⟨rfl, -⟩
+      iapply BigSepL.bigSepL_nil.2; iempintro
+    | zero =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hhc with ⟨%v0, %v1, -, -, #Hts, -, -⟩
+      iexact Hts
+  ihave #Hls0 : iprop(landedAll (GF := GF) ls0) $$ [Hhc]
+  · cases nr with
+    | succ n =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hhc with %⟨-, rfl⟩
+      unfold landedAll
+      iapply BigSepL.bigSepL_nil.2; iempintro
+    | zero =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hhc with ⟨%v0, %v1, -, -, -, #Hls, -⟩
+      iexact Hls
+  iframe Hts
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
   icases diskProto_usedRead_acc γ c0 v hgl $$ [$Hfr $Hproto]
     with ⟨%b, %nc, %M, %dl, %dl0, %hok, #Hbs, #Htp, Hui, Hdn, Hnc, Hback⟩
-  icases diskWm_base γ nr K $$ Hwm with ⟨%b', #Hbs', %hbK⟩
-  ihave %hbb := diskBaseFrozen_agree γ b b' $$ Hbs Hbs'
-  subst hbb
   ihave %hmem := diskWm_mem γ nr K dl dl0 hok.1 $$ Hdn Hwm
-  icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail, #Hcu⟩
+  icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui
+    with ⟨%Hold, %sts, Hb, %⟨htail, hlen, h0s⟩, #Hlands, #Hcu, #Hdlt⟩
+  -- the base's visibility at `K`, when it is needed (the reader's head certificates)
+  ihave %hv0 : ⌜nr = 0 → ∀ j, j < 2 → ∀ e H, Hold j = e :: H →
+      e.t = 0 ∨ (e.t, hartAgent cpu) ∈ ts ∨ ∃ p, (e.t, p) ∈ ls0 ∧ p ≤ K⌝ $$ [Hbs Hhc]
+  · cases nr with
+    | succ n => ipureintro; intro h; cases h
+    | zero =>
+      unfold DiskAcc.diskHeadCertsT
+      icases Hhc with ⟨%v0, %v1, #Hb', -, -, -, %hv⟩
+      ihave %heq := diskBaseFrozen_agree γ _ _ $$ Hbs Hb'
+      ipureintro
+      intro _ j hj e H hH
+      obtain ⟨u0, u1, hb', hh⟩ := htail
+      rw [hb'] at heq
+      obtain ⟨rfl, rfl⟩ := chainPair_inj heq
+      obtain ⟨e', H', hH', _, het⟩ := hh j hj
+      rw [hH] at hH'
+      obtain ⟨rfl, rfl⟩ := List.cons.inj hH'
+      apply hv
+      rw [het]; unfold usedHeadPos; split
+      · exact Or.inl rfl
+      · exact Or.inr rfl
+  have hls : ∀ q ∈ usedLands dl sts, q ∈ usedLands dl sts ++ ls0 := fun q hq => List.mem_append_left _ hq
+  have hls0 : ∀ q ∈ ls0, q ∈ usedLands dl sts ++ ls0 := fun q hq => List.mem_append_right _ hq
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold), none, []
+  iexists (fun _ => DFrac.own 1), ((usedWS dl sts).hist Hold), none, [], (usedLands dl sts ++ ls0)
   iframe Hb
-  isplit
-  · ipureintro
-    exact fun j hj => usedIdxCell_ne_nil b dl Hold htail j hj
+  isplitl []
+  · unfold landedAll
+    iapply BigSepL.bigSepL_append.2
+    iframe Hlands Hls0
+  isplitl []
+  · -- every byte has a readable entry: a published write past the base, else the tails
+    ipureintro
+    intro j hj
+    rcases hmem with hz | ⟨m, t, hd, ep, hin, _, htK⟩
+    · obtain ⟨u0, u1, _, hh⟩ := htail
+      obtain ⟨e, H, hH, _, _⟩ := hh j hj
+      refine ⟨e, ?_, ?_⟩
+      · show e ∈ WordHist.hist (usedWS dl sts) Hold j
+        unfold WordHist.hist; rw [hH]; simp
+      · rcases hv0 hz j hj e H hH with h0 | hm | ⟨p, hp, hpK⟩
+        · exact Or.inl h0
+        · exact Or.inr (Or.inr (Or.inr hm))
+        · exact Or.inr (Or.inr (Or.inl ⟨p, hls0 _ hp, hpK⟩))
+    · obtain ⟨k, hk⟩ := List.getElem?_of_mem hin
+      have hk' : k < sts.length := by
+        have := (List.getElem?_eq_some_iff.1 hk).1; omega
+      have hzm : ((m, t, hd, ep), sts[k]) ∈ dl.zip sts := by
+        rw [List.mem_iff_getElem?]
+        exact ⟨k, by rw [List.getElem?_zip_eq_some]; exact ⟨hk, List.getElem?_eq_getElem hk'⟩⟩
+      refine ⟨WEnt.proj j (⟨sts[k], diskAgent, wrap16 m⟩ : WEnt 2), ?_, ?_⟩
+      · show _ ∈ WordHist.hist (usedWS dl sts) Hold j
+        unfold WordHist.hist usedWS
+        refine List.mem_append_left _ (List.mem_map.2 ⟨_, List.mem_reverse.2
+          (List.mem_map.2 ⟨_, hzm, rfl⟩), rfl⟩)
+      · exact Or.inr (Or.inr (Or.inl ⟨t, hls _ (DiskAcc.mem_usedLands dl sts _ hzm), htK⟩))
   isplitl []
   · simp only [rdIn]; iempintro
   isplitl []
   · unfold rdCompBytes
     exact BigSepL.bigSepL_nil_intro
   isplitl []
-  · iapply DiskAcc.usedIdx_certs γ cpu c0.used K nr b dl Hold htail hbK hmem
+  · iapply DiskAcc.usedIdx_certs γ cpu c0.used K nr b dl sts Hold ts ls0 _ htail hlen h0s hls hls0 hmem
     iframe Hbs Hhc
   inext
-  iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb _
+  iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _
   imod Hmask
+  have hl : ∀ q ∈ dl.zip sts, lp q.2 = some q.1.2.1 := by
+    intro q hq
+    have hq0 : q.2 ≠ 0 := by
+      intro h0
+      apply h0s
+      rw [← h0]
+      exact (List.of_mem_zip hq).2
+    exact hla.2 _ (hls _ (DiskAcc.mem_usedLands dl sts q hq)) hq0
+  have hvis : (∃ x ∈ dl, x.2.1 ≤ tvn) ∨
+      ∀ j, j < 2 → ∀ e H, Hold j = e :: H → e.visibleP lp (hartAgent cpu) tvn = true := by
+    rcases hmem with hz | ⟨m, t, hd, ep, hin, _, htK⟩
+    · right
+      intro j hj e H hH
+      rcases hv0 hz j hj e H hH with h0 | hm | ⟨p, hp, hpK⟩
+      · simp [HEnt.visibleP, h0, hla.1]
+      · apply HEnt.visibleP_of_own
+        refine hauth _ hm j hj e ?_ rfl
+        show e ∈ WordHist.hist (usedWS dl sts) Hold j
+        unfold WordHist.hist; rw [hH]; simp
+      · exact DiskAcc.vis_landed lp _ tvn e p _ (hls0 _ hp) hla (by omega)
+    · exact Or.inl ⟨(m, t, hd, ep), hin, show t ≤ tvn by omega⟩
   obtain ⟨m, hwm, hmm, hdom⟩ :=
-    usedIdx_read dl Hold b cpu tvn w htail (usedBaseLe_mono hbK hKt) hok.2.2.2.1 hrd
+    usedIdx_readP dl sts Hold b cpu tvn lp w htail hlen hl hvis hok.2.2.2.1 hrd
   have hmle : m ≤ nc + 1 := by
     rcases hmm with hz | ⟨t, hd, ep, ht, _⟩
     · omega
@@ -2215,15 +2918,14 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
     · omega
     · exact Nat.le_trans hnm0 (hdom (m0, t, hd, ep) hmt (Nat.le_trans htK hKt))
   imod diskDoneAuth_cash γ M m $$ Hnc with ⟨Hnc, #Hlb⟩
-  ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold htail $$ [Hb Hcu]
-  · iframe Hb Hcu
+  ihave Hui := usedIdxCell_intro (usedIdxAt c0.used) b dl Hold sts htail hlen h0s $$ [Hb Hlands Hcu Hdlt]
+  · iframe Hb Hlands Hcu Hdlt
   have hach : m = 0 ∨ ∃ r ∈ dl, m ≤ r.1 := by
     rcases hmm with hz | ⟨t, hd, ep, ht, _⟩
     · exact Or.inl hz
     · exact Or.inr ⟨(m, t, hd, ep), ht, Nat.le_refl _⟩
-  -- the credential for the NEXT read: the entry the answer came from sits
-  -- at a position THIS load's view has passed, so the fence that follows
-  -- takes the hart's floor past it
+  -- the credential for the NEXT read: the entry the answer came from LANDED at a position THIS
+  -- load's view has passed, so the fence that follows takes the hart's floor past it
   imod doneAuth_sync γ dl0 dl hok.1 $$ Hdn with Hdn
   ihave ⟨Hdn, #Hwm2⟩ : iprop(doneAuth γ dl ∗ diskWm γ m tvn) $$ [Hdn]
   · unfold diskWm
@@ -2232,7 +2934,6 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
       isplitl []
       · iexists b
         iframe Hbs
-        ipureintro; exact usedBaseLe_mono hbK hKt
       · ileft; ipureintro; exact hz
     · obtain ⟨k, hk⟩ := List.getElem?_of_mem ht
       icases doneRec_get γ dl k (m, t, hd, ep) hk $$ Hdn with ⟨Hdn, #Hrec⟩
@@ -2240,7 +2941,6 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
       isplitl []
       · iexists b
         iframe Hbs
-        ipureintro; exact usedBaseLe_mono hbK hKt
       · iright
         iexists k, m, t, hd, ep
         iframe Hrec
@@ -2980,6 +3680,7 @@ theorem disk_collect [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
     $$ [Hbuf Hbw]
   · cases hdw : c.dwr
     · isimp only [bufW_read c hdw, hctx] at Hbw
+      iapply ctxBytesL_ctxBytes
       iexact Hbw
     · isimp only [bufDone_read c ts hdw] at Hbuf
       icases Hbuf with ⟨%t', %hle, Hb⟩
@@ -3020,13 +3721,13 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
   icases diskProto_status_acc γ q c0 v c (nr + 1) t nr hwf (by omega) hg.2.2.2.1
       $$ [$Hfr Hproto Htok $Hdone Hnr] with ⟨%ts, %hts, Hrow, Hback⟩
   · iframe Hproto Htok Hnr
-  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp, #Hau, #Hcert⟩
+  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, %sd, Hb, #Htlb, #Hls, %hp, #Hau, #Hcert⟩
   obtain ⟨e, HT, heq⟩ : ∃ (e : HEnt) (HT : Hist), Hs 0 = e :: HT := by
     have h0 := hp.2 0 (by omega)
     cases hx : Hs 0 with
     | nil => rw [hx] at h0; exact absurd h0 (by simp)
     | cons e HT => exact ⟨e, HT, rfl⟩
-  have het : e.t = ts := by
+  have het : e.t = sd := by
     have h0 := hp.2 0 (by omega)
     rw [heq] at h0
     simpa using h0
@@ -3036,39 +3737,37 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     simpa using h0
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), Hs, []
+  iexists (fun _ => DFrac.own 1), Hs, [], [(sd, ts)]
   iframe Hb
+  isplitl []
+  · iapply BigSepL.bigSepL_singleton.2; iexact Hls
   isplit
   · ipureintro
     intro j hj
     have : j = 0 := by omega
     rw [this, heq]
-    simp
+    exact ⟨e, List.mem_cons_self, Or.inr (Or.inr (Or.inl ⟨ts, by rw [het]; simp, by omega⟩))⟩
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []
-  · iapply DiskAcc.dma_certs cpu c.status 1 K [] Hs ts (by omega) hp.2
+  · iapply DiskAcc.dma_certs cpu c.status 1 K [] Hs sd ts (by omega) hp.2
     iexact Hau
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hb _
+  iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth Hb _
   imod Hmask
   have hw : w = 0#8 := by
-    have hvis : e.visible (hartAgent cpu) tvn = true :=
-      HEnt.visible_of_le _ _ e (by omega)
+    have hvis : e.visibleP lp (hartAgent cpu) tvn = true :=
+      DiskAcc.vis_landed lp _ tvn e ts [(sd, ts)] (by rw [het]; simp) hla (by omega)
     have hr0 := hrd 0 (by omega)
-    rw [heq, Hist.read_cons_visible _ _ e HT hvis] at hr0
+    rw [heq, Hist.readP_cons_visible _ _ _ e HT hvis] at hr0
     have : e.v = nthByte w 0 := Option.some.inj hr0
     rw [hev] at this
     rw [← nthByte_one w, ← this, nthByte_one]
   ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts) $$ [Hb]
-  · iapply (show iprop(histBytes (GF := GF) c.status 1 (fun _ => DFrac.own 1) Hs ∗
-        topLb ts ∗ authoredBy ts diskAgent ∗ dmaCert c.status 1) ⊢ dmaOwnT c.status 1 0#8 ts from by
-      unfold dmaOwnT
-      iintro ⟨H, #Ht, #Ha, #Hc⟩
-      iexists Hs
-      iframe H Ht Ha Hc
-      ipureintro; exact hp)
-    iframe Hb Htlb Hau Hcert
+  · unfold dmaOwnT
+    iexists Hs, sd
+    iframe Hb Htlb Hls Hau Hcert
+    ipureintro; exact hp
   icases Hback $$ Hrow with ⟨Hproto, Htok, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -3264,27 +3963,33 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     with ⟨%w8, %ts, %t, %i, %hp, #Hdone, Hrow, Hback⟩
   · iframe Hproto Hnr
   icases dmaOwnT_cases (usedElemAt c0.used (nr % NUM)) 8 w8 ts $$ Hrow
-    with ⟨%Hs, Hb, #Htlb, %hpp, #Hau, #Hcert⟩
+    with ⟨%Hs, %sd, Hb, #Htlb, #Hls, %hpp, #Hau, #Hcert⟩
   icases histBytes_acc_lo4 (usedElemAt c0.used (nr % NUM)) (DFrac.own 1) Hs $$ Hb
     with ⟨Hlo, Hjoin⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), Hs, []
+  iexists (fun _ => DFrac.own 1), Hs, [], [(sd, ts)]
   iframe Hlo
+  isplitl []
+  · iapply BigSepL.bigSepL_singleton.2; iexact Hls
   isplit
   · ipureintro
-    intro j hj hnil
+    intro j hj
     have h0 := hpp.2 j (by omega)
-    rw [hnil] at h0
-    simp at h0
+    cases hx : Hs j with
+    | nil => rw [hx] at h0; exact absurd h0 (by simp)
+    | cons e HT =>
+      rw [hx] at h0
+      simp only [List.head?_cons, Option.map_some, Option.some.injEq] at h0
+      exact ⟨e, List.mem_cons_self, Or.inr (Or.inr (Or.inl ⟨ts, by rw [h0]; simp, by omega⟩))⟩
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []
-  · iapply DiskAcc.dma_certs cpu (usedElemAt c0.used (nr % NUM)) 4 K [] Hs ts (by omega)
+  · iapply DiskAcc.dma_certs cpu (usedElemAt c0.used (nr % NUM)) 4 K [] Hs sd ts (by omega)
       (fun j hj => hpp.2 j (by omega))
     iexact Hau
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hlo _
+  iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth Hlo _
   imod Hmask
   have hweq : w = BitVec.extractLsb' 0 32 w8 := by
     apply bv_eq_of_bytes
@@ -3296,7 +4001,7 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
       cases hx : Hs j with
       | nil => rw [hx] at h0; exact absurd h0 (by simp)
       | cons e HT => exact ⟨e, HT, rfl⟩
-    have het : e.t = ts := by
+    have het : e.t = sd := by
       have h0 := hpp.2 j (by omega)
       rw [heq] at h0
       simpa using h0
@@ -3304,25 +4009,19 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
       have h0 := hpp.1 j (by omega)
       rw [heq] at h0
       simpa using h0
-    have hvis : e.visible (hartAgent cpu) tvn = true :=
-      HEnt.visible_of_le _ _ e (by omega)
+    have hvis : e.visibleP lp (hartAgent cpu) tvn = true :=
+      DiskAcc.vis_landed lp _ tvn e ts [(sd, ts)] (by rw [het]; simp) hla (by omega)
     have hr0 := hrd j hj
-    rw [heq, Hist.read_cons_visible _ _ e HT hvis] at hr0
+    rw [heq, Hist.readP_cons_visible _ _ _ e HT hvis] at hr0
     have hx : e.v = nthByte w j := Option.some.inj hr0
     rw [hev] at hx
     exact hx.symm
   ihave Hb := Hjoin $$ Hlo
   ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w8 ts) $$ [Hb]
-  · iapply (show iprop(histBytes (GF := GF) (usedElemAt c0.used (nr % NUM)) 8
-        (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗ authoredBy ts diskAgent ∗
-          dmaCert (usedElemAt c0.used (nr % NUM)) 8) ⊢
-        dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w8 ts from by
-      unfold dmaOwnT
-      iintro ⟨H, #Ht, #Ha, #Hc⟩
-      iexists Hs
-      iframe H Ht Ha Hc
-      ipureintro; exact hpp)
-    iframe Hb Htlb Hau Hcert
+  · unfold dmaOwnT
+    iexists Hs, sd
+    iframe Hb Htlb Hls Hau Hcert
+    ipureintro; exact hpp
   icases Hback $$ Hrow with ⟨Hproto, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>

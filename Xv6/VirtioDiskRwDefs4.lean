@@ -128,12 +128,12 @@ theorem diskResA_readAt_acc (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (t
       (diskReadAt γ nr -∗ diskReadLbAuth γ nr -∗ diskResA γ pd pav pu ξ tk) := by
   iintro HR
   icases diskResA_open γ pd pav pu ξ tk $$ HR
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, #Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, #Hplb, Hr, Hrl, Hs, Hlb, #Hwmp, Hu, Hidx, Hring, Hsl⟩
   iexists nr
   iframe Hr Hwmp Hrl
   iintro Hr Hrl
   iapply diskResA_close γ pd pav pu ξ tk np nr stg ring
-  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
+  iframe Hp Hplb Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **Taking out a slot the caller holds a QUARTER of.**  The quarter and
 the payload's agree, the two join into the driver's half, and what stays

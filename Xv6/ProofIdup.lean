@@ -307,26 +307,24 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   have hpins : faPins k R1 := ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩
   -- THE OPEN (Rocq 384--487)
   iapply wpLoop_fupd
-  imod idup_open (hlc := hlc) kk hkk s inum $$ [Hbox HR Hshr Hru Hislot] with
-    ⟨%M, %qt, %qn, %n, %g, %lo, %tst, %hfacts, Hhalf, Hst, #Hllb, #Hfl, Hlv, Hisl, Hmir, Hru,
+  imod idup_open (hlc := hlc) kk hkk s inum (hartAgent c) $$ [Hbox HR Hshr Hru Hislot] with
+    ⟨%M, %qt, %qn, %n, %g, %lo, %loS, %tst, %hfacts, Hhalf, Hst, #Hllb, #Hfl, Hlv, Hisl, Hmir, Hru,
       Hcnt, Hclose⟩
   · iframe Hinv Hbox HR Hshr Hru Hislot
   obtain ⟨hMk, hq, hno, hin⟩ := hfacts
   imodintro
   -- the payload's floor, cashed into a view receipt past the stamp
   icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
-  icases ownCtx_floor_view c curCtx tst $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %htK⟩⟩
+  icases ownCtx_visFloor_vis c tst $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, %ts, %ls, #HK, #Hts, #Hls, %hlic⟩⟩
   · iframe Hctx Hfl
   ihave Hk := Hkback $$ Hctx
   icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
   -- +0x18 c.lw a5,8(s1): THE EXACT READ, an accessor step
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M kk tst K [] hkk ⟨_, hMk⟩ htK heqR
+  ihave HAU := iref_readAU_locked (hlc := hlc) c M kk loS tst K ts ls hkk ⟨_, hMk⟩ hlic heqR
     $$ [Hhalf Hst]
-  · iframe Hinv Hhalf Hst
-    iapply BigSepL.bigSepL_nil.2
-    itrivial
+  · iframe Hinv Hts Hls Hhalf Hst
   k_step (wp_s_lw_au c _ ?hs (KA.«idup» + 0x18#64) true 8#12 15#5 9#5 (by decide)
-      (iRef (ientry kk)) ?hb hram hal K [] _)
+      (iRef (ientry kk)) ?hb hram hal K ts _)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $HK $HAU]
   try (case hs => k_norm)
   iintro %w Hk Hpc HΨ
@@ -339,8 +337,8 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1c c.sw a5,8(s1): the member store, the mover inside the SAME opening
-  ihave HAU := idup_store_au (hlc := hlc) c M kk inum qt qn s n g lo tst
-      (idClosed kk s qn inum) hMk hq hno hin
+  ihave HAU := idup_store_au (hlc := hlc) c M kk inum qt qn s n g lo loS tst
+      (idClosed kk s qn inum (hartAgent c)) hMk hq hno hin
     $$ [Hhalf Hst Hlv Hisl Hmir Hru Hcnt Hclose]
   · iframe Hinv Hrinv Hhalf Hst Hllb Hlv Hisl Hmir Hru Hcnt Hclose
   k_step (id_sw_au c _ ?hs2 (KA.«idup» + 0x1c#64) true 8#12 9#5 15#5 (iRef (ientry kk)) ?hb2
@@ -351,7 +349,17 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   case hb2 => k_norm [h9]; exact iRef_sext _
   case hd2 => k_norm [PosNat.succ_val, Xv6.bc_incr, Xv6.bc_incr']
   unfold idClosed
+  icases Hcl with ⟨%tstn, #Hautn, #Hllbn, Hcw⟩
+  -- the new head's KEY (route P, D12‴): minted with the running token, after the store
+  iapply wpLoop_fupd
+  icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
+  imod ctx_key_mint c curCtx tstn $$ [Hctx Hautn Hllbn] with ⟨Hctx, #Hkey⟩
+  · iframe Hctx Hautn Hllbn
+  ihave Hk := Hkback $$ Hctx
+  ihave Hcl := Hcw $$ [Hkey]
+  · unfold visFloor; ileft; iexact Hkey
   icases Hcl with ⟨HR, Hshr, Hnew, Hru1, Hru2⟩
+  imodintro
   -- auipc a0,0x1d ; addi a0,a0,1656 ; jal release
   k_step (wp_s_auipc c _ (KA.«idup» + 0x1e#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

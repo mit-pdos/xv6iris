@@ -38,7 +38,7 @@ theorem devOpStep_or_blocked (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTa
   | choose => exact Or.inl ⟨0, _, _, _, rfl, rfl, rfl⟩
   | dmaRead pa n =>
     obtain ⟨w, hw⟩ := exists_bv_of_bytes n (fun j =>
-      ((σ.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top).getD 0#8)
+      ((σ.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL σ.lp)).getD 0#8)
     refine Or.inl ⟨w, _, _, _, ?_, rfl, rfl, rfl⟩
     intro j hj b hb
     rw [hw j hj, hb]
@@ -432,7 +432,7 @@ theorem machInterp_devRtOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜devRt
   iintro ⟨_, _, Hmm, _, _⟩
   ihave %h := memModel_mmOk _ σ $$ Hmm
   ipureintro
-  exact h.2.2.2.2.1
+  exact h.2.1
 
 /-- Recording a finished task does not move `next`. -/
 theorem machInterp_setRt_done (σ : MState) (d : DevId) (tid : TaskId) :

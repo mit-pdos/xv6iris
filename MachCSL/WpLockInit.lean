@@ -51,7 +51,7 @@ theorem lkZeroW_nil {n : Nat} : lkZeroW ([] : WordHist n) := fun _ h => by cases
 /-! ## The raw words -/
 
 /-- A RESERVED lock's fresh half cells, with the address facts. -/
-def lkInitR (lk : BitVec 64) : IProp GF := iprop%
+def lkInitR [CurCtx] (lk : BitVec 64) : IProp GF := iprop%
   ⌜lockAddrOk lk ∧ lkRsvIn (hlc := hlc) (GF := GF) lk⌝ ∗ lkFreshR lk
 
 /-- **A lock's two raw words** (`locked`, `cpu`) as `initlock` finds them: the
@@ -88,7 +88,9 @@ theorem lkRaw_introR [CurCtx] (lk : BitVec 64) (vlock : BitVec 32) (vcpu : BitVe
   · ipureintro; exact ⟨hok, hm⟩
   iexists [], []
   iframe Hw Hc
-  ipureintro; exact ⟨lkZeroW_nil, lkZeroW_nil⟩
+  isplit
+  · ipureintro; exact ⟨lkZeroW_nil, lkZeroW_nil⟩
+  · unfold lkHeadKey; ileft; ipureintro; rfl
 
 /-- What `initlock` leaves at a reserved lock is fresh. -/
 theorem lkFresh_of_initR [CurCtx] (lk : BitVec 64) : lkInitR (GF := GF) lk ⊢ lkFresh lk := by
@@ -136,7 +138,7 @@ theorem wp_s_sw_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
     isplitl [Hf]
     · iintro Hctx
       unfold lkFreshR
-      icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
+      icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩, #Hkey⟩
       icases wordCellH_cases lk 4 W $$ Hw with ⟨%Hold, Hb, %htail⟩
       icases wordCellH_cases (lk + 16#64) 8 W' $$ Hc with ⟨%HoldW, HbW, %htailW⟩
       iapply writeAU_of_rsv
@@ -157,17 +159,25 @@ theorem wp_s_sw_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       · ipureintro
         exact lkRsv_relFreeZ hm _ W Hold (fun e he => (hW e he).2.2) htail
       inext
-      iintro %t %ht Hb HbW _ _ _
+      iintro %t %ht Hb HbW _ #Hau #Htop
       unfold compBytes
       ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
       ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
       ihave Hw := wordCellH_push lk 4 W Hold htail t (hartAgent cpu') 0#32 $$ Hb
+      imod ctx_key_mint cpu' curCtx t $$ [Hctx] with ⟨Hctx, #Hk⟩
+      · iframe Hctx Hau Htop
       imod Hmask
       imodintro
       iframe Hctx
       iexists (⟨t, hartAgent cpu', 0#32⟩ :: W), W'
       iframe Hw Hc
-      ipureintro; exact ⟨lkZeroW_cons (t := t) hW (Nat.pos_iff_ne_zero.mp ht) cpu', hW'⟩
+      isplit
+      · ipureintro; exact ⟨lkZeroW_cons (t := t) hW (Nat.pos_iff_ne_zero.mp ht) cpu', hW'⟩
+      · unfold lkHeadKey; iright
+        iexists ⟨t, hartAgent cpu', 0#32⟩, W
+        isplit
+        · ipureintro; rfl
+        · unfold lkFloor; iexact Hk
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hf⟩
       ihave Htok := ctxTok_introB cpu' curCtx none false $$ [Hctx Hfrag]
@@ -216,7 +226,7 @@ theorem wp_s_sd_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
     isplitl [Hf]
     · iintro Hctx
       unfold lkFreshR
-      icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
+      icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩, #Hkey⟩
       icases wordCellH_cases lk 4 W $$ Hw with ⟨%HoldW, HbW, %htailW⟩
       icases wordCellH_cases (lk + 16#64) 8 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
       iapply writeAU_of_rsv
@@ -246,7 +256,7 @@ theorem wp_s_sd_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       imodintro
       iframe Hctx
       iexists W, (⟨t, hartAgent cpu', 0#64⟩ :: W')
-      iframe Hw Hc
+      iframe Hw Hc Hkey
       ipureintro; exact ⟨hW, lkZeroW_cons (t := t) hW' (Nat.pos_iff_ne_zero.mp ht) cpu'⟩
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hf⟩
@@ -306,15 +316,50 @@ theorem wp_s_sd_zero_lkInit16 [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
 
 /-! ## The raw words as a function of the context -/
 
+/-- The fresh head's key transports between contexts (D10 (d'')). -/
+instance instCtxMorphLkHeadKey (tier : KTier) (W : WordHist 4) :
+    CtxMorph (GF := GF) (fun ξ => @lkHeadKey hlc GF _ ⟨ξ, tier⟩ W) where
+  morph ξ ξ' := by
+    unfold lkHeadKey
+    iintro ⟨Hd, (%h | ⟨%e, %W2, %h, #H⟩)⟩
+    · imodintro
+      iframe Hd
+      ileft; ipureintro; exact h
+    · imod (instCtxMorphLkFloor (GF := GF) e.t).morph ξ ξ' $$ [Hd H] with ⟨Hd, #H'⟩
+      · iframe Hd; iexact H
+      imodintro
+      iframe Hd
+      iright
+      iexists e, W2
+      iframe H'
+      ipureintro; exact h
+
+/-- A reserved lock's fresh half cells transport (their head's key does). -/
+instance instCtxMorphLkInitR (tier : KTier) (lk : BitVec 64) :
+    CtxMorph (GF := GF) (fun ξ => @lkInitR hlc GF _ _ ⟨ξ, tier⟩ lk) where
+  morph ξ ξ' := by
+    unfold lkInitR lkFreshR
+    iintro ⟨Hd, %ha, %W, %W', Hw, Hc, %hz, Hk⟩
+    imod (instCtxMorphLkHeadKey (GF := GF) tier W).morph ξ ξ' $$ [Hd Hk] with ⟨Hd, Hk⟩
+    · iframe Hd Hk
+    imodintro
+    iframe Hd
+    isplitr
+    · ipureintro; exact ha
+    iexists W, W'
+    iframe Hw Hc Hk
+    ipureintro; exact hz
+
+
 /-- A lock's raw words at a fixed tier: the owned words (a dynamic lock) or
 the context-free half cells (a reserved one). -/
 instance instCtxMorphLkRaw (tier : KTier) (lk : BitVec 64) (vlock : BitVec 32) (vcpu : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => @lkRaw hlc GF _ _ ⟨ξ, tier⟩ lk vlock vcpu) := by
   by_cases hm : lkRsvIn (hlc := hlc) (GF := GF) lk
-  · have e : (fun ξ => @lkRaw hlc GF _ _ ⟨ξ, tier⟩ lk vlock vcpu) = fun _ => lkInitR (GF := GF) lk :=
+  · have e : (fun ξ => @lkRaw hlc GF _ _ ⟨ξ, tier⟩ lk vlock vcpu) = fun ξ => @lkInitR hlc GF _ _ ⟨ξ, tier⟩ lk :=
       funext fun ξ => @lkRaw_rsv hlc GF _ _ ⟨ξ, tier⟩ lk vlock vcpu hm
     rw [e]
-    exact instCtxMorphConst _
+    exact instCtxMorphLkInitR tier lk
   · have e : (fun ξ => @lkRaw hlc GF _ _ ⟨ξ, tier⟩ lk vlock vcpu) = fun ξ =>
         iprop(@wordPointsTo hlc GF _ ⟨ξ, tier⟩ lk 4 (DFrac.own 1) vlock ∗
           @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (lk + 16#64) 8 (DFrac.own 1) vcpu) :=

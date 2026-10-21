@@ -53,7 +53,7 @@ theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
       ⌜∀ j, j ≠ kk → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       itableSlotResLlb curCtx M' ci' kk -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
-    (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
+    itableSlotLiveLlb curCtx kk ∗
     irefSlotsAuth ∗ islPool Mt ∗
     ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc Mt ci j) ⊢
@@ -85,7 +85,6 @@ theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
       iexists ⟨td, false, some (icfgDev, inum), none, a⟩
       iframe Hreg Hllbd Hc Hva
       ipureintro; exact ⟨rfl, rfl, rfl, Nat.le_refl _⟩
-    unfold itableSlotLiveLlb
     iexact Hstk
   imodintro
   iframe Hrun Hrest Hdep Hpinr Htxp Hhold Hictok Hoffr
@@ -314,7 +313,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
       ⌜∀ j, j ≠ kk → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       itableSlotResLlb curCtx M' ci' kk -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
-    (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
+    itableSlotLiveLlb curCtx kk ∗
     icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
     ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
     wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord true) ∗

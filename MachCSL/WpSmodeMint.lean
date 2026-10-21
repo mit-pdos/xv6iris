@@ -123,19 +123,20 @@ theorem wp_s_sd_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
 set_option maxHeartbeats 4000000 in
 /-- `sw rs2, imm(rs1)` that MINTS a 4-byte word cell: the bytes go in as
 the running context's word and come out as a word cell whose floor is the
-store's own position, a key of that context. -/
+store's own position, a key of that context.  Route P: the caller's issue receipt `itopLb T` comes
+back as `⌜T < t⌝` (the store's fresh issue stamp is above every issued one). -/
 theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
-    (old : BitVec 32) :
+    (old : BitVec 32) (T : Nat) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗
-    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗
+    wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗ itopLb T ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          (∃ t : Nat, wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗
+          (∃ t : Nat, ⌜T < t⌝ ∗ wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗
             lkFloor curCtx t) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, Hk, Hpc, #Hcl, Hw, HΦ⟩
+  iintro ⟨HI, Hk, Hpc, #Hcl, Hw, #HT0, HΦ⟩
   have hexec : ∀ (cpu' : CPU) (c : MConf), (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
       SConfAt (GF := GF) curTier c k.root k.sie → c.menvcfg = menvcfgS →
       execSpecPP (GF := GF) cpu' (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
@@ -143,12 +144,12 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
         (pc + instrLen is_rvc)
         iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
           (kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗
-            wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old))
+            wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗ itopLb T))
         iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
-          ∃ t : Nat, wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗
+          ∃ t : Nat, ⌜T < t⌝ ∗ wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗
             lkFloor curCtx t) := by
     intro cpu' c hpin hok' hmenv Φ
-    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, #Hcl, Hw⟩, HΦ⟩
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, #Hcl, Hw, #HT0⟩, HΦ⟩
     ihave Hp := wordPointsTo_phys (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old
       $$ Hcl Hw
     icases pwordPointsTo_cases (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old $$ Hp
@@ -157,21 +158,23 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       $$ Hb with ⟨%Hs, Hb⟩
     have e := execSpecF_sw_au (GF := GF) cpu' (DFrac.own 1) c k.sie k.root hok' pc (pc + instrLen is_rvc)
       imm rs1 rs2 (tpPin cpu' k.regs)
-      iprop(ownCtx cpu' curCtx ∗ ∃ t : Nat,
+      iprop(ownCtx cpu' curCtx ∗ ∃ t : Nat, ⌜T < t⌝ ∗
         wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗ lkFloor curCtx t)
     rw [KCtx.rget_hart cpu cpu' k rs1 hrs1] at e
     iapply (e hram hal Φ)
     iframe HmConf HPC HnextPC HT HF Hcl
     isplitl [Hb]
     · iintro Hctx
-      iapply writeAU_of_own
-      unfold writeAUOwn
+      iapply writeAU_of_ownT
+      unfold writeAUOwnT
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
-      iexists Hs
-      iframe Hb
+      iexists Hs, T, 0
+      iframe Hb HT0
+      isplitl []
+      · iapply topLbAt_0
       inext
-      iintro %t Hb #Hau #Htop
+      iintro %t %hTt Hb #Hau #Htop _
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx
@@ -181,6 +184,8 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       imodintro
       iframe Hctx
       iexists t
+      isplitr
+      · ipureintro; exact hTt
       isplitl [Hb]
       · have hc := wordCell_intro (GF := GF) (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t
           (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) ([] : WordHist 4) (pushed (n := 4) Hs t (hartAgent cpu') (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)))
@@ -201,10 +206,10 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iframe HT HF Hcell
   iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
     iprop(kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗
-      wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old)
-    (fun cpu' => iprop(∃ t : Nat,
+      wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1) old ∗ itopLb T)
+    (fun cpu' => iprop(∃ t : Nat, ⌜T < t⌝ ∗
       wordCell (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 t (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) [] ∗ lkFloor curCtx t))
     hexec)
-  iframe HI Hk Hpc Hcl Hw HΦ
+  iframe HI Hk Hpc Hcl Hw HT0 HΦ
 
 end MachCSL

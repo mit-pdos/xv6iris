@@ -12,8 +12,8 @@ invariant actually asks for:
   (`Chain.hdr`) and the device reads as `type:4`, `reserved:4`, `sector:8`
   (`ctxBytes_hdr_join`);
 * the data buffer, which the driver owns as a `byteBuf` of `BSIZE` bytes
-  and the invariant keeps either as one raw window (`byteBuf_bufLease`,
-  a READ chain's) or as one CONTEXT window at a value
+  and the invariant keeps either as one raw window (a READ chain's, with
+  its heads' certificates: `Xv6.ctxBytesL_dmaOwn` after the fence ghost step) or as one CONTEXT window at a value
   (`byteBuf_ctxBytes` / `ctxBytes_byteBuf`, a WRITE chain's), together
   with the `MachCSL.inRam` facts the round trip needs
   (`byteBuf_inRam`);
@@ -63,6 +63,28 @@ theorem headsAre_glue {k m : Nat} (Hs1 Hs2 : Nat → Hist) (w : BitVec (8 * (k +
       ← nthByte_hi (k := k) (m := m) w (j - k) hj']
     exact h2 (j - k) hj'
 
+/-! ## `dmaHeads`, split -/
+
+theorem dmaHeads_split_at (Hs : Nat → Hist) (k m : Nat) :
+    dmaHeads (GF := GF) Hs (k + m) ⊢ dmaHeads Hs k ∗ dmaHeads (fun j => Hs (k + j)) m := by
+  unfold dmaHeads
+  exact bigSepL_range_split (fun j => iprop(∃ (e : HEnt) (p : Nat),
+    ⌜(Hs j).head? = some e⌝ ∗ (⌜e.t = 0⌝ ∨ landedAt (GF := GF) e.t p))) k m
+
+theorem dmaHeads_congr (Hs Hs' : Nat → Hist) (n : Nat) (h : ∀ j, j < n → Hs j = Hs' j) :
+    dmaHeads (GF := GF) Hs n = dmaHeads Hs' n := by
+  unfold dmaHeads
+  exact BigSepL.bigSepL_eq (fun {_ x} hx => by rw [h x (MachCSL.rangeIdx_lt hx)])
+
+theorem dmaHeads_glue (Hs1 Hs2 : Nat → Hist) (k m : Nat) :
+    dmaHeads (GF := GF) Hs1 k ∗ dmaHeads Hs2 m ⊢ dmaHeads (glueHist k Hs1 Hs2) (k + m) := by
+  rw [dmaHeads_congr Hs1 (glueHist k Hs1 Hs2) k (fun j hj => (glueHist_lo k Hs1 Hs2 j hj).symm),
+    dmaHeads_congr Hs2 (fun j => glueHist k Hs1 Hs2 (k + j)) m
+      (fun j _ => (glueHist_hi k Hs1 Hs2 j).symm)]
+  unfold dmaHeads
+  exact bigSepL_range_join (fun j => iprop(∃ (e : HEnt) (p : Nat),
+    ⌜(glueHist k Hs1 Hs2 j).head? = some e⌝ ∗ (⌜e.t = 0⌝ ∨ landedAt (GF := GF) e.t p))) k m
+
 /-! ## The three DMA windows, split and joined -/
 
 theorem dmaHalfAt_split_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
@@ -70,23 +92,26 @@ theorem dmaHalfAt_split_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
       dmaHalfAt pa k (BitVec.extractLsb' 0 (8 * k) w) ∗
       dmaHalfAt (pa + BitVec.ofNat 64 k) m (BitVec.extractLsb' (8 * k) (8 * m) w) := by
   unfold dmaHalfAt
-  iintro ⟨%Hs, Hb, %hh⟩
+  iintro ⟨%Hs, Hb, %hh, #Hh⟩
   icases histBytes_split_at pa k m (DFrac.own (1 : Qp).half) Hs $$ Hb with ⟨H1, H2⟩
+  icases dmaHeads_split_at Hs k m $$ Hh with ⟨#Hh1, #Hh2⟩
   isplitl [H1]
-  · iexists Hs; iframe H1; ipureintro; exact headsAre_lo Hs w hh
-  · iexists (fun j => Hs (k + j)); iframe H2; ipureintro; exact headsAre_hi Hs w hh
+  · iexists Hs; iframe H1 Hh1; ipureintro; exact headsAre_lo Hs w hh
+  · iexists (fun j => Hs (k + j)); iframe H2 Hh2; ipureintro; exact headsAre_hi Hs w hh
 
 theorem dmaHalfAt_join_at (pa : PAddr) (k m : Nat) (w : BitVec (8 * (k + m))) :
     dmaHalfAt (GF := GF) pa k (BitVec.extractLsb' 0 (8 * k) w) ∗
       dmaHalfAt (pa + BitVec.ofNat 64 k) m (BitVec.extractLsb' (8 * k) (8 * m) w) ⊢
       dmaHalfAt pa (k + m) w := by
   unfold dmaHalfAt
-  iintro ⟨⟨%Hs1, H1, %h1⟩, ⟨%Hs2, H2, %h2⟩⟩
+  iintro ⟨⟨%Hs1, H1, %h1, #Hh1⟩, ⟨%Hs2, H2, %h2, #Hh2⟩⟩
   iexists (glueHist k Hs1 Hs2)
   isplitl [H1 H2]
   · iapply histBytes_glue pa k m (DFrac.own (1 : Qp).half) Hs1 Hs2
     iframe H1 H2
+  isplitr
   · ipureintro; exact headsAre_glue Hs1 Hs2 w h1 h2
+  · iapply dmaHeads_glue Hs1 Hs2 k m; iframe Hh1 Hh2
 
 /-! ## The request header, as the device reads it
 
@@ -189,20 +214,6 @@ theorem diskByteCtx (a : BitVec 64) (v : BitVec 8) :
   icases Hb with ⟨Hb, _⟩
   iexact Hb
 
-/-- **A kernel word is a DMA window**: the whole cell, given up. -/
-theorem wordPointsTo_dmaOwn (va : BitVec 64) (n : Nat) (w : BitVec (8 * n))
-    (hkm : kmapClass (vpnOf va).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ dmaCert va n -∗ wordPointsTo va n (DFrac.own 1) w -∗ dmaOwn va n := by
-  iintro #HS #Hc H
-  ihave #Hid := kmapStatic_rw va hkm $$ HS
-  ihave Hp := wordPointsTo_phys va n (DFrac.own 1) w $$ Hid H
-  unfold pwordPointsTo
-  icases Hp with ⟨%-, Hb⟩
-  unfold dmaOwn
-  icases ctxBytes_forget curCtx va n (DFrac.own 1) w $$ Hb with ⟨%Hs, Hb⟩
-  iexists Hs
-  iframe Hb Hc
-
 /-- A buffer's bytes at the running context. -/
 theorem byteBuf_ctxIdx (a : BitVec 64) (bs : List (BitVec 8))
     (hkm : ∀ j, j < bs.length → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
@@ -286,22 +297,6 @@ theorem bigSepL_range_of_list {A : Type _} {PROP : Type _} [BI PROP] (Φ : Nat �
 section buf
 variable [CurCtx]
 
-/-- **A byte buffer is a DMA window.** -/
-theorem byteBuf_dmaOwn (a : BitVec 64) (n : Nat) (bs : List (BitVec 8)) (hn : bs.length = n)
-    (hkm : ∀ j, j < n → kmapClass (vpnOf (a + BitVec.ofNat 64 j)).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ dmaCert a n -∗ byteBuf a (DFrac.own 1) bs -∗ dmaOwn a n := by
-  iintro #HS #Hcert H
-  ihave Hc := byteBuf_ctxIdx a bs (by rw [hn]; exact hkm) $$ HS H
-  ihave Hc := (show ([∗list] j ↦ b ∈ bs, ctxByte (GF := GF) curCtx (a + BitVec.ofNat 64 j)
-      (DFrac.own 1) b) ⊢ ∃ Hs : Nat → Hist, histBytes a n (fun _ => DFrac.own 1) Hs from by
-    rw [bigSepL_range_of_list
-      (fun j b => ctxByte (GF := GF) curCtx (a + BitVec.ofNat 64 j) (DFrac.own 1) b) bs 0#8, hn]
-    exact histBytes_of_bytes curCtx a (DFrac.own 1) (fun j => bs.getD j 0#8) n) $$ Hc
-  icases Hc with ⟨%Hs, Hc⟩
-  unfold dmaOwn
-  iexists Hs
-  iframe Hc Hcert
-
 /-- **A byte buffer's bytes are DRAM**: `MachCSL.wordPointsTo` carries the
 fact, and the kernel map's identity claim moves it from the physical
 address to the virtual one.  `Xv6.disk_collect` needs it to hand the
@@ -330,15 +325,6 @@ theorem byteBuf_inRam (a : BitVec 64) (bs : List (BitVec 8)) (dq : DFrac)
     ihave Hp := wordPointsTo_phys (a + BitVec.ofNat 64 j) 1 dq b $$ Hid Hj
     icases pwordPointsTo_cases (a + BitVec.ofNat 64 j) 1 dq b $$ Hp with ⟨%hf, -⟩
     exact absurd hf.1 hnr
-
-/-- **The data buffer, handed to the device.** -/
-theorem byteBuf_bufLease (c : Chain) (data : List (BitVec 8)) (hd : data.length = BSIZE)
-    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
-    kmapStatic (GF := GF) ⊢ dmaCert c.data BSIZE -∗ byteBuf c.data (DFrac.own 1) data -∗ bufLease c := by
-  iintro #HS #Hc H
-  unfold bufLease
-  iapply byteBuf_dmaOwn c.data BSIZE data hd hkm $$ HS Hc
-  iexact H
 
 /-- A range-indexed big-op and a list-indexed one, at the same bytes. -/
 theorem ctxBytes_of_list (ξ : CtxId) (a : BitVec 64) (n : Nat) (w : BitVec (8 * n))

@@ -407,19 +407,27 @@ def icSlotRowBare [Icfg] (ξ : CtxId) (tl k : Nat) (oi : IcBid) (c : Nat) : IPro
 cell as a plain ctx cell at 0, the FULL stamp auth and its receipt. -/
 def itableSlotFree [Icfg] [CurCtx] (ξ : CtxId) (k : Nat) : IProp GF :=
   iprop(∃ tst : Nat, wordAtN ξ (iRef (ientry k)) 4 (.own 1) (0#32 : BitVec 32) ∗
-    istmpAuth k 1 tst ∗ topLb tst)
+    istmpAuth k 1 tst ∗ itopLb tst)
 
-/-- A LIVE slot's payload arm: the A6.144 exact-read credential. -/
+/-- A LIVE slot's payload arm: the A6.144 exact-read credential -- route P (design D12‴ (a″)): the
+head's stamp `tst` (an ISSUE receipt) and its KEY at the payload's context (`visFloor ξ tst`: the
+holder's licence for the head, `IcachePinwLw.wp_s_lw_iref_locked`); and, named by the paired stamp
+authority (`istmpAuthL`), the slot's generation stamp `lo` with its key (`visFloor ξ lo`: the read
+credential a reference minted here carries, `credFloor lo tl`). -/
 def itableSlotLive [Icfg] (ξ : CtxId) (k : Nat) : IProp GF :=
-  iprop(∃ tst : Nat, istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor ξ tst)
+  iprop(∃ lo tst : Nat, istmpAuthL k (1 : Qp).half lo tst ∗ itopLb tst ∗ visFloor ξ tst ∗
+    visFloor ξ lo)
 
-/-- ...floor stripped (the release-time form). -/
-def itableSlotLiveLlb [Icfg] (k : Nat) : IProp GF :=
-  iprop(∃ tst : Nat, istmpAuth k (1 : Qp).half tst ∗ topLb tst)
+/-- ...the release-time form (route P: a key is no floor -- nothing to strip; the releaser's key
+travels with the payload's `CtxMorph`). -/
+def itableSlotLiveLlb [Icfg] (ξ : CtxId) (k : Nat) : IProp GF :=
+  iprop(∃ lo tst : Nat, istmpAuthL k (1 : Qp).half lo tst ∗ itopLb tst ∗ visFloor ξ tst ∗
+    visFloor ξ lo)
 
-/-- ...floor stripped and bounded by `tl` (the boot / hooked-release form). -/
-def itableSlotLiveBare [Icfg] (tl k : Nat) : IProp GF :=
-  iprop(∃ tst : Nat, ⌜tst ≤ tl⌝ ∗ istmpAuth k (1 : Qp).half tst ∗ topLb tst)
+/-- ...bounded by `tl` (the boot / hooked-release form). -/
+def itableSlotLiveBare [Icfg] (ξ : CtxId) (tl k : Nat) : IProp GF :=
+  iprop(∃ lo tst : Nat, ⌜tst ≤ tl⌝ ∗ istmpAuthL k (1 : Qp).half lo tst ∗ itopLb tst ∗
+    visFloor ξ tst ∗ visFloor ξ lo)
 
 /-- Rocq's `itable_slot_res`. -/
 def itableSlotRes [Icfg] [CurCtx] (ξ : CtxId) (M : RegMapF (Qp × PosNat))
@@ -437,7 +445,7 @@ def itableSlotResBare [Icfg] [CurCtx] (ξ : CtxId) (tl : Nat) (M : RegMapF (Qp �
   iprop(icSlotRowBare ξ tl k (PartialMap.get? ci k) (icMCount M k) ∗
     match PartialMap.get? M k with
     | none => itableSlotFree ξ k
-    | some _ => itableSlotLiveBare tl k)
+    | some _ => itableSlotLiveBare ξ tl k)
 
 /-- Rocq's `itable_slot_res_llb`: the release-time rows, floors STRIPPED,
 receipt-backed only -- what a holder can hand back after bumping stamps;
@@ -447,12 +455,12 @@ def itableSlotResLlb [Icfg] [CurCtx] (ξ : CtxId) (M : RegMapF (Qp × PosNat))
   iprop(icSlotRowLlb ξ k (PartialMap.get? ci k) (icMCount M k) ∗
     match PartialMap.get? M k with
     | none => itableSlotFree ξ k
-    | some _ => itableSlotLiveLlb k)
+    | some _ => itableSlotLiveLlb ξ k)
 
 theorem itableSlotFree_cur [Icfg] [CurCtx] (k : Nat) :
     itableSlotFree (GF := GF) curCtx k = iprop(∃ tst : Nat,
       wordPointsTo (iRef (ientry k)) 4 (.own 1) (0#32 : BitVec 32) ∗ istmpAuth k 1 tst ∗
-        topLb tst) := rfl
+        itopLb tst) := rfl
 
 /-! ### The arm equations (deviation 2) -/
 
@@ -479,7 +487,7 @@ theorem itableSlotResLlb_some [Icfg] [CurCtx] (ξ : CtxId) (M : RegMapF (Qp × P
     (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) (q : Qp) (n : PosNat)
     (hM : PartialMap.get? M k = some (q, n)) :
     itableSlotResLlb (GF := GF) ξ M ci k =
-      iprop(icSlotRowLlb ξ k (PartialMap.get? ci k) n.val ∗ itableSlotLiveLlb k) := by
+      iprop(icSlotRowLlb ξ k (PartialMap.get? ci k) n.val ∗ itableSlotLiveLlb ξ k) := by
   unfold itableSlotResLlb icMCount; rw [hM]
 
 theorem itableSlotResBare_none [Icfg] [CurCtx] (ξ : CtxId) (tl : Nat) (M : RegMapF (Qp × PosNat))
@@ -492,7 +500,7 @@ theorem itableSlotResBare_some [Icfg] [CurCtx] (ξ : CtxId) (tl : Nat) (M : RegM
     (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) (q : Qp) (n : PosNat)
     (hM : PartialMap.get? M k = some (q, n)) :
     itableSlotResBare (GF := GF) ξ tl M ci k =
-      iprop(icSlotRowBare ξ tl k (PartialMap.get? ci k) n.val ∗ itableSlotLiveBare tl k) := by
+      iprop(icSlotRowBare ξ tl k (PartialMap.get? ci k) n.val ∗ itableSlotLiveBare ξ tl k) := by
   unfold itableSlotResBare icMCount; rw [hM]
 
 /-! ### The row movers -/
@@ -523,12 +531,9 @@ theorem itableSlotRes_ofBare [Icfg] [CurCtx] (ξ : CtxId) (tl : Nat) (M : RegMap
     · iapply icSlotRow_ofBare ξ tl k
       iframe Hrow; iexact Hfl
     · unfold itableSlotLiveBare itableSlotLive
-      icases H with ⟨%tst, %htl, Hst, #Hllb⟩
-      iexists tst
-      iframe Hst
-      isplitr
-      · iexact Hllb
-      · iapply ctxFloor_le ξ tl tst htl; iexact Hfl
+      icases H with ⟨%lo, %tst, %htl, Hst, #Hllb, #Hk, #Hko⟩
+      iexists lo, tst
+      iframe Hst Hllb Hk Hko
 
 /-- Rocq's `itable_slot_res_to_llb`. -/
 theorem itableSlotRes_toLlb [Icfg] [CurCtx] (ξ : CtxId) (M : RegMapF (Qp × PosNat))
@@ -549,9 +554,9 @@ theorem itableSlotRes_toLlb [Icfg] [CurCtx] (ξ : CtxId) (M : RegMapF (Qp × Pos
     isplitl [Hrow]
     · iapply hrow; iexact Hrow
     · unfold itableSlotLive itableSlotLiveLlb
-      icases H with ⟨%tst, Hst, #Hllb, -⟩
-      iexists tst
-      iframe Hst; iexact Hllb
+      icases H with ⟨%lo, %tst, Hst, #Hllb, #Hk, #Hko⟩
+      iexists lo, tst
+      iframe Hst Hllb Hk Hko
 
 /-- Two maps agreeing off `k` give the same row at every other slot. -/
 private theorem itableSlotRes_congr [Icfg] [CurCtx] (ξ : CtxId) (M M' : RegMapF (Qp × PosNat))
@@ -650,9 +655,33 @@ instance icSlotRowBare_morph [Icfg] (tl k : Nat) (oi : IcBid) (c : Nat) :
 instance itableSlotLive_morph [Icfg] (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => itableSlotLive ξ k) := by
   unfold itableSlotLive
+  refine @instCtxMorphExists hlc GF _ _ _ (fun lo => ?_)
   refine @instCtxMorphExists hlc GF _ _ _ (fun tst => ?_)
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor (GF := GF) tst))
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphVisFloor (GF := GF) tst)
+        (instCtxMorphVisFloor (GF := GF) lo)))
+
+instance itableSlotLiveLlb_morph [Icfg] (k : Nat) :
+    CtxMorph (GF := GF) (fun ξ => itableSlotLiveLlb ξ k) := by
+  unfold itableSlotLiveLlb
+  refine @instCtxMorphExists hlc GF _ _ _ (fun lo => ?_)
+  refine @instCtxMorphExists hlc GF _ _ _ (fun tst => ?_)
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphVisFloor (GF := GF) tst)
+        (instCtxMorphVisFloor (GF := GF) lo)))
+
+instance itableSlotLiveBare_morph [Icfg] (tl k : Nat) :
+    CtxMorph (GF := GF) (fun ξ => itableSlotLiveBare ξ tl k) := by
+  unfold itableSlotLiveBare
+  refine @instCtxMorphExists hlc GF _ _ _ (fun lo => ?_)
+  refine @instCtxMorphExists hlc GF _ _ _ (fun tst => ?_)
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphVisFloor (GF := GF) tst)
+          (instCtxMorphVisFloor (GF := GF) lo))))
 
 /-- Rocq's `itable_slot_res_llb_morph`. -/
 instance itableSlotResLlb_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
@@ -662,7 +691,7 @@ instance itableSlotResLlb_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
   rcases PartialMap.get? M k with _ | v
   · exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowLlb_morph (GF := GF) _ _ _) (itableSlotFree_morph (GF := GF) k)
   · dsimp only
-    exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowLlb_morph (GF := GF) _ _ _) (instCtxMorphConst _)
+    exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowLlb_morph (GF := GF) _ _ _) (itableSlotLiveLlb_morph (GF := GF) k)
 
 /-- Rocq's `itable_slot_res_morph`. -/
 instance itableSlotRes_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
@@ -681,7 +710,7 @@ instance itableSlotResBare_morph [Icfg] [CurCtx] (tl : Nat) (M : RegMapF (Qp × 
   rcases PartialMap.get? M k with _ | v
   · exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowBare_morph (GF := GF) _ _ _ _) (itableSlotFree_morph (GF := GF) k)
   · dsimp only
-    exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowBare_morph (GF := GF) _ _ _ _) (instCtxMorphConst _)
+    exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowBare_morph (GF := GF) _ _ _ _) (itableSlotLiveBare_morph (GF := GF) tl k)
 
 /-! ### THE A6.144 RELEASE HOOK's per-row step -/
 
@@ -705,10 +734,9 @@ private theorem itableSlotRow_raise [Icfg] [CurCtx] (ξc : CtxId) (T : Nat) (V :
     · iexact Hllb
     · iexact Hfl
   · unfold itableSlotLiveLlb itableSlotLive
-    icases H with ⟨%tst, Hst, #Hllb2⟩
-    imod ctxStamped_raise ξc (max T tb) tst V g $$ [$Hllb2 $Hpk] with ⟨Hpk, #Hfl2⟩
+    icases H with ⟨%lo, %tst, Hst, #Hllb2, #Hk2, #Hko⟩
     imodintro
-    iexists (max (max T tb) tst)
+    iexists (max T tb)
     iframe Hpk
     isplitl [Hrow]
     · iexists tb
@@ -716,11 +744,8 @@ private theorem itableSlotRow_raise [Icfg] [CurCtx] (ξc : CtxId) (T : Nat) (V :
       isplitr
       · iexact Hllb
       · iexact Hfl
-    · iexists tst
-      iframe Hst
-      isplitr
-      · iexact Hllb2
-      · iexact Hfl2
+    · iexists lo, tst
+      iframe Hst Hllb2 Hk2 Hko
 
 /-- Rocq's `Local itable_rows_raise`: one raise per row, over a list. -/
 private theorem itableRows_raise [Icfg] [CurCtx] (ξc : CtxId) (V : CPU → Nat) (g : Nat)

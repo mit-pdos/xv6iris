@@ -64,7 +64,7 @@ import Weak.AxGraph
 namespace Weak
 
 open MachCSL MachCSL.Stdpp Iris.Std PfStepTsoMem
-open Xv6.AccessDiscipline (custAt chainOkAt hopByteAt xv6Env xv6AccessDisc xv6Rsv)
+open Xv6.AccessDiscipline (custAtP chainOkAtP hopByteAt xv6Env xv6AccessDisc xv6Rsv)
 
 namespace PinTrapFrame
 
@@ -73,8 +73,8 @@ namespace PinTrapFrame
 /-- **(ii) at one position**: the frame byte is not exempt from `chainOkAt` as of `t` — not a
 lock-layer word, a publication word, a live page-table byte, nor an audited racy word. -/
 def frameUnexempt (σ : MState) (pa : PAddr) (t : Nat) : Prop :=
-  (∀ b, custAt σ pa t ≠ .lockw b) ∧ (∀ w, custAt σ pa t ≠ .pub w) ∧ custAt σ pa t ≠ .pte ∧
-    custAt σ pa t ≠ .racy
+  (∀ b, custAtP σ pa t ≠ .lockw b) ∧ (∀ w, custAtP σ pa t ≠ .pub w) ∧ custAtP σ pa t ≠ .pte ∧
+    custAtP σ pa t ≠ .racy
 
 /-- **(ii) NAMED**: the frame byte is unexempt as of every position after the spill `s`. -/
 def frameUnexemptAfter (σ : MState) (pa : PAddr) (s : Nat) : Prop :=
@@ -159,26 +159,43 @@ theorem hopChainLast {m : FlatMem} (hd : memDesc m) {isLk : PAddr → Nat → Pr
 /-- **THE COROLLARY OF `chainOkAt`** (T2, header): if hart `j`'s coherence floor at `pa` names a
 FOREIGN hart's post-power-on entry `e` on a byte unexempt as of `e.t`, then `j` made a hop-byte
 acquire after `e.t` or observed a publication store after `e.t`. -/
-theorem foreignFloorSync (σ : MState) (hC : chainOkAt σ) (hd : memDesc σ.mem) (j : CPU)
-    (pa : PAddr) (H : Hist) (e : HEnt) (hH : σ.mem[pa]? = some H) (he : e ∈ H) (ht0 : e.t ≠ 0)
+theorem foreignFloorSync (σ : MState) (hC : chainOkAtP σ) (hd : memDesc σ.mem) (heo : σ.mem.eagerOn σ.lp)
+    (j : CPU) (pa : PAddr) (H : Hist) (e : HEnt) (hH : σ.mem[pa]? = some H) (he : e ∈ H) (ht0 : e.t ≠ 0)
     (hcoh : e.t = (σ.hr j).coh pa) (hA : e.tid < NCPU) (hne : e.tid ≠ hartAgent j)
     (hu : frameUnexempt σ pa e.t) : hopAcqAfter σ j e.t ∨ pubSeenAfter σ j e.t := by
   obtain ⟨h1, h2, h3, h4⟩ := hu
-  rcases hC j pa H e hH he ht0 hcoh hA hne h1 h2 h3 with hs | ⟨hr, -⟩
+  have hlo : σ.mem.landedOnly σ.lp = σ.mem := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp heo
+  have hlp : σ.lp e.t = some ((σ.hr j).coh pa) := by rw [← hcoh]; exact heo pa H hH e he
+  rcases hC j pa H e hH he ht0 hlp hA hne (by rw [← hcoh]; exact h1) (by rw [← hcoh]; exact h2)
+    (by rw [← hcoh]; exact h3) with hs | ⟨hr, -⟩
   · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v, Hf, hjw, hp, hf, hew, hrc, harm⟩
-    · obtain ⟨hta, b, C, r, hb, hh⟩ := hopChainLast hd hc
+    · rw [hlo] at hc
+      obtain ⟨hta, b, C, r, hb, hh⟩ := hopChainLast hd hc
       exact .inl ⟨b, C, r, a, hta, by simp only [MState.top] at ha ⊢; omega, hb, hh⟩
-    · have hlt : e.t < r := by
+    · have hf' : σ.mem[f]? = some Hf := by
+        have : (xv6Env σ).lm = σ.mem := hlo
+        rw [← this]; exact hf
+      have hrc' : r ≤ (σ.hr j).coh f := by
+        obtain ⟨q, hq, hqle⟩ := hrc
+        have hr' : σ.lp r = some r := heo f Hf hf' _ hew
+        have : (xv6Env σ).lp = σ.lp := rfl
+        rw [this, hr'] at hq
+        cases hq
+        exact hqle
+      have hlt : e.t < r := by
         rcases harm with ⟨-, h⟩ | ⟨a, ha, hc⟩
         · exact h
-        · exact Nat.lt_trans (hopChainLast (m := σ.mem) hd hc).1 ha
-      exact .inr ⟨f, w, r, v, Hf, hjw, hp, hf, hew, hlt, hrc⟩
-  · exact absurd hr h4
+        · have : (xv6Env σ).lm = σ.mem := hlo
+          rw [this] at hc
+          exact Nat.lt_trans (hopChainLast (m := σ.mem) hd hc).1 ha
+      exact .inr ⟨f, w, r, v, Hf, hjw, hp, hf', hew, hlt, hrc'⟩
+  · exact absurd (by rw [hcoh]; exact hr) h4
 
 /-- **THE RESTORE READS ITS SPILL** (state level, header): hart `j`'s load of `pa` at view `tv`
 returns the first visible entry `e0`; `es` is `j`'s own spill; under (ii), (iii) and the three
 window conditions, `e0` IS `es`. -/
-theorem restoreSrcSpill (σ : MState) (hC : chainOkAt σ) (hd : memDesc σ.mem) (j : CPU)
+theorem restoreSrcSpill (σ : MState) (hC : chainOkAtP σ) (hd : memDesc σ.mem) (heo : σ.mem.eagerOn σ.lp)
+    (j : CPU)
     (pa : PAddr) (H : Hist) (hH : σ.mem[pa]? = some H) (es e0 : HEnt) (hes : es ∈ H)
     (hesj : es.tid = hartAgent j) (tv : Nat)
     (hsrc : H.find? (HEnt.visible (hartAgent j) tv) = some e0)
@@ -194,7 +211,7 @@ theorem restoreSrcSpill (σ : MState) (hC : chainOkAt σ) (hd : memDesc σ.mem) 
     have he0 : e0 ∈ H := List.mem_of_find?_eq_some hsrc
     by_cases hown : e0.tid = hartAgent j
     · exact hk3 H e0 hH he0 hown hlt
-    · rcases foreignFloorSync σ hC hd j pa H e0 hH he0 (by omega) (hcoh hown).symm
+    · rcases foreignFloorSync σ hC hd heo j pa H e0 hH he0 (by omega) (hcoh hown).symm
           (hdma H e0 hH he0 hlt) hown (hu e0.t hlt) with h | h
       · exact hk1 (hopAcqAfterMono (Nat.le_of_lt hlt) h)
       · exact hk2 (pubSeenAfterMono (Nat.le_of_lt hlt) h)
@@ -208,7 +225,7 @@ visible entry `e0` of its history (`Hist.readEnt`) at the graph read's stamp `p 
 floor at the byte that stamp when the source is foreign (`cohSrc`'s stamp at the post-state). -/
 def restoreAt (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (σ : MState)
     (j : CPU) (pa : PAddr) (p : Nat) : Prop :=
-  rmem c st σ ∧ xv6AccessDisc σ ∧ c.pcLog <+: log ∧ inRam pa 1 ∧
+  rmem c st σ ∧ σ.llog = List.range' 1 σ.log.length ∧ xv6AccessDisc σ ∧ c.pcLog <+: log ∧ inRam pa 1 ∧
   ∃ (H : Hist) (tv : Nat) (e0 : HEnt), σ.mem[pa]? = some H ∧
     H.find? (HEnt.visible (hartAgent j) tv) = some e0 ∧ e0.t = p + 1 ∧
     (e0.tid ≠ hartAgent j → (σ.hr j).coh pa = p + 1)
@@ -226,7 +243,8 @@ theorem frameRfOfRestore (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab)
     (hk1 : ¬ hopAcqAfter σ j (gwix G Sp)) (hk2 : ¬ pubSeenAfter σ j (gwix G Sp))
     (hk3 : ownClearAfter σ j pa (gwix G Sp)) :
     grfAt G (paZ pa) Sp (hartAgent j, k) := by
-  obtain ⟨hR, hD, hpre, hram, H, tv, e0, hH, hsrc, he0t, hcoh⟩ := hre
+  obtain ⟨hR, heg, hD, hpre, hram, H, tv, e0, hH, hsrc, he0t, hcoh⟩ := hre
+  have heo : σ.mem.eagerOn σ.lp := memEager c st σ hR heg
   have hr := hR.2.2.1
   obtain ⟨v', hv'⟩ := hSpb
   have hgw := gwriteAtGwix G Sp hSp
@@ -246,7 +264,7 @@ theorem frameRfOfRestore (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab)
   rw [gmsgTid G Sp m hgm, Nat.sub_add_cancel (Nat.pos_of_ne_zero hix0)] at hes
   simp only [Option.getD_some] at hes
   rw [← RvwmoXv6Adequacy.rhistGet hr hH] at hes
-  have heq := restoreSrcSpill σ hD.1 (memDescOfRhist hr) j pa H hH ⟨gwix G Sp, Sp.1, v'⟩ e0 hes
+  have heq := restoreSrcSpill σ hD.1 (memDescOfRhist hr) heo j pa H hH ⟨gwix G Sp, Sp.1, v'⟩ e0 hes
     hSpj tv hsrc (fun h => by rw [hcoh h, he0t]) hu hdma hk1 hk2 hk3
   have hp : p + 1 = gwix G Sp := by rw [← he0t, heq]
   exact ⟨p + 1, v, hrd, by rw [hp]; exact hgw⟩
@@ -332,13 +350,16 @@ theorem k3OfWindow (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : Li
 /-- **The boot-order alternative** for the publication arm (proved; see the header's deviation):
 the publication bytes are one-shot (`MachCSL.pubOneShot_of_rsv`, from the reserved regions'
 discipline, `powerInterp_rsvOk`), and a post-power-on store of each of them precedes the spill. -/
-theorem k2OfBoot (σ : MState) (j : CPU) (s : Nat) (hone : rsvAllOk xv6Rsv σ.mem)
+theorem k2OfBoot (σ : MState) (j : CPU) (s : Nat) (hone : rsvAllOk xv6Rsv σ.mem) (heo : σ.mem.eagerOn σ.lp)
     (hboot : ∀ (f : PAddr) (w : CPU) (H : Hist), (xv6Env σ).isPub f w → j ≠ w → σ.mem[f]? = some H →
       ∃ e, e ∈ H ∧ e.t ≠ 0 ∧ e.t ≤ s) :
     ¬ pubSeenAfter σ j s := by
   rintro ⟨f, w, r, v, H, hjw, hp, hf, he, hsr, -⟩
   obtain ⟨e, he', he0, hes⟩ := hboot f w H hp hjw hf
-  have := pubOneShot_of_rsv (wit := slotWit xv6Rsv) (σ := σ) hone f w H _ e hp hf he he'
+  have hf' : (chainEnvAt xv6Rsv KernelRsv.relPcs (slotWit xv6Rsv) σ).lm[f]? = some H := by
+    show (σ.mem.landedOnly σ.lp)[f]? = some H
+    rw [RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp heo]; exact hf
+  have := pubOneShot_of_rsv (wit := slotWit xv6Rsv) (σ := σ) hone f w H _ e hp hf' he he'
     (by simp only; omega) he0
   simp only at this
   omega
@@ -362,7 +383,7 @@ theorem frameRf (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List 
     (hW : FrameWin G σ j pa (gwix G (hartAgent j, w)) w k) (hQ : FrameQuiet G σ j pa w k) :
     WeakRvwmoAcyc.grf G (hartAgent j, w) (hartAgent j, k) := by
   have hR := hre.1
-  have hpre := hre.2.2.1
+  have hpre := hre.2.2.2.1
   exact grfAtGrf G (paZ pa) _ _
     (frameRfOfRestore G log c st σ j pa p k v (hartAgent j, w) hre hwf hlog hrd hSp rfl hSpb hSpx
       hii hiii (k1OfWindow G log c st σ j pa _ w k hR hpre hwf hlog hW hQ)
@@ -469,10 +490,15 @@ theorem frameHoldStores :
 is a kernel-stack byte as of the spill `s` (`MachCSL.ksByteAt`: of `stack0`, or of a page the
 sealed kernel table maps at a `KSTACK(i)`) is unexempt and DMA-free after `s` — the export's
 eleventh conjunct `ksFrameAt`, read at `pa`. -/
-theorem framesOfKs (σ : MState) (hD : xv6AccessDisc σ) {pa : PAddr} {s : Nat}
-    (hks : ksByteAt xv6Rsv σ.mem s pa) : frameUnexemptAfter σ pa s ∧ frameNoDmaAfter σ pa s :=
-  let h := hD.2.2.2.2.2.2.2.2.2.2 pa s hks
-  ⟨h.1, h.2⟩
+theorem framesOfKs (σ : MState) (hD : xv6AccessDisc σ) (heo : σ.mem.eagerOn σ.lp) {pa : PAddr} {s : Nat}
+    (hks : ksByteAt xv6Rsv σ.mem s pa) : frameUnexemptAfter σ pa s ∧ frameNoDmaAfter σ pa s := by
+  have hks' : ksByteAtP xv6Rsv σ.mem σ.lp s pa := by
+    show ksByteAt xv6Rsv (σ.mem.lview σ.lp) s pa
+    rw [FlatMem.lview_eagerOn σ.mem σ.lp heo]; exact hks
+  have h := hD.2.2.2.2.2.2.2.2.2.2 pa s hks'
+  refine ⟨h.1, fun H e hH he hse => h.2 H e hH he ?_⟩
+  rw [HEnt.landedLe_eager _ _ e (heo pa H hH e he)]
+  exact decide_eq_false (by omega)
 
 end PinTrapFrame
 end Weak

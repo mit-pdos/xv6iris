@@ -23,7 +23,7 @@ at (dev, inum).
   fact `ig_pool_mem`);
 * `ref = 1`: `MachCSL.wp_s_sw_mint` on the free slot's payload cell mints a
   `wordCell` at the store's own position `t`, which `irefPinRows_mint` makes
-  the rows at `(t, t)`, with `topLb t` from `ownCtx_key_topLb`; the install
+  the rows at `(t, t)`, with `itopLb t` from `ownCtx_key_itopLb`; the install
   `iref_alloc_pinw_install` moves the window, the fresh `(g, t)` liveness
   generation and the stamp half into the invariant (Rocq's `pinw_arm_write_c`
   + `ctx_wrote_register` + `iref_alloc_pinw_install`);
@@ -206,7 +206,7 @@ theorem ig_rcy_open (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
         (∃ v : BitVec 32, wordPointsTo (iValid (ientry e)) 4 (DFrac.own 1) v) ∗
         (∃ n : BitVec 16, wordPointsTo (iNlink (ientry e)) 2 (DFrac.own 1) n) ∗
         wordPointsTo (iRef (ientry e)) 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
-        istmpAuth e 1 tstp ∗ topLb tstp ∗
+        istmpAuth e 1 tstp ∗ itopLb tstp ∗
         icId fscIc e Qp.quarter false devT inumT ∗ icId fscIc e Qp.quarter false devB inumB ∗
         icPinRest e := by
   iintro #Hesc Hrun Hrow Hslot
@@ -301,13 +301,14 @@ set_option maxHeartbeats 4000000 in
 /-- THE RECYCLE's GHOST BLOCK, after the four stores (deviation 1): the
 pool's take and the identification flip (`icRecycleFlip`), the minted
 window's install at the fresh `(g, t)` generation (`irefPinRows_mint`,
-`ownCtx_key_topLb`, `iref_alloc_pinw_install`), and (b″) the deposit of the
+`ownCtx_key_itopLb`, `iref_alloc_pinw_install`), and (b″) the deposit of the
 header at the new identity (`icRecycleDeposit`).  What comes out is the
 slot's new rows and the minted reference. -/
 theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < NINODE)
     (hM : PartialMap.get? M e = none) (inum : BitVec 32) (l : Ilic)
     (hnib : inum.toNat < 16 * icfgNib) (P : ExtTreeSet Nat compare) (hin : inum.toNat ∈ P)
-    (r : SlotReg IcBid IcX) (T0 tstp t : Nat) (hw : r.win = true) (hx : r.x = some (.icRaw, T0))
+    (r : SlotReg IcBid IcX) (T0 tstp t : Nat) (htp : tstp < t) (hw : r.win = true)
+    (hx : r.x = some (.icRaw, T0))
     (devT inumT devB inumB : BitVec 32) :
     icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst e ∗ igEnv ∗
     ownCtx c curCtx ∗ icRegd e r ∗ vgFloors curCtx r.vd ∗ icCnt e 0 ∗
@@ -316,7 +317,7 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
     wordPointsTo (iValid (ientry e)) 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     (∃ n : BitVec 16, wordPointsTo (iNlink (ientry e)) 2 (DFrac.own 1) n) ∗
     wordCell (iRef (ientry e)) 4 t (BitVec.ofNat 32 1) [] ∗ lkFloor curCtx t ∗
-    istmpAuth e 1 tstp ∗ topLb tstp ∗
+    istmpAuth e 1 tstp ∗ itopLb tstp ∗
     icId fscIc e Qp.quarter false devT inumT ∗ icId fscIc e Qp.quarter false devB inumB ∗
     itableHalf M ∗ islSlot M e ∗ ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst P ∅ ∗
     iname fscIreg fscFs icfgIst inum l ⊢
@@ -325,7 +326,7 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
       islSlot (PartialMap.insert M e (Qp.quarter, PosNat.one)) e ∗
       frzmH inum.toNat false ∗ frzsel e (1 : Qp).half false ∗
       iname fscIreg fscFs icfgIst inum l ∗ icntHalf inum.toNat 1 ∗
-      (∃ tstn : Nat, istmpAuth e (1 : Qp).half tstn ∗ topLb tstn) ∗
+      itableSlotLiveLlb curCtx e ∗
       icId fscIc e (1 : Qp).half true icfgDev inum ∗
       (∃ (T' : Nat) (a : ChainVG), icRegd e ⟨T', false, some (icfgDev, inum), none, a⟩ ∗ icCnt e 1 ∗
         topLb T' ∗ vgFloors curCtx a) ∗
@@ -350,14 +351,13 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   -- the minted window, and its receipt
   ihave Hrows := irefPinRows_mint e (BitVec.ofNat 32 1) t (irefSet_count PosNat.one (by decide))
     $$ Hcell
-  icases ownCtx_key_topLb c curCtx t $$ [Hrun Hkey] with ⟨Hrun, #Hllbt⟩
+  icases ownCtx_key_itopLb c curCtx t $$ [Hrun Hkey] with ⟨Hrun, #Hllbt⟩
   · iframe Hrun; iapply lkFloor_keyAt; iexact Hkey
   -- the install
   imod iref_alloc_pinw_install (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M e inum l Qp.quarter
       tstp t CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' he hM ig_quarter_lt
-    $$ Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0 Hst Hllbp Hllbt Hrows
-    with ⟨Hhalf, Hisl, ⟨%g, Htok, Hlv, Hpend⟩, Hsel, Hlic, Hfoff, Hicnt1, Hru,
-      ⟨%tstn, %hle, Hstn, #Hllbn⟩⟩
+    $$ Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0 Hst Hllbp %htp Hllbt Hrows
+    with ⟨Hhalf, Hisl, ⟨%g, Htok, Hlv, Hpend⟩, Hsel, Hlic, Hfoff, Hicnt1, Hru, Hstn, #Hllbn⟩
   -- the identity cells, whole, into the header's half and two quarters
   ihave Hid : inodeIdent (GF := GF) e (DFrac.own 1) icfgDev inum $$ [Hdev Hinm]
   · unfold inodeIdent
@@ -379,7 +379,10 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   imodintro
   iframe Hrun Hpool Hhalf Hisl Hmir Hsel Hlic Hicnt1 Hgid Hidq2
   isplitl [Hstn]
-  · iexists tstn; iframe Hstn; iexact Hllbn
+  · unfold itableSlotLiveLlb
+    iexists t, t
+    iframe Hstn Hllbn
+    isplit <;> (iapply visFloor_of_lk; iexact Hkey)
   isplitl [Hrd Hc]
   · iexists T', aR; iframe Hrd Hc HvaR; iexact HllbT
   unfold inodeRefb inodeRef irefTokGenlo
@@ -416,7 +419,7 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
       ⌜∀ j, j ≠ e → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       islot2 curCtx fscIc M' ci' e -∗ [∗list] j ∈ List.range NINODE, islot2 curCtx fscIc M' ci' j) ∗
     frzmH inum.toNat false ∗ frzsel e (1 : Qp).half false ∗ icPinRest e ∗ icntHalf inum.toNat 1 ∗
-    (∃ tstn : Nat, istmpAuth e (1 : Qp).half tstn ∗ topLb tstn) ∗
+    itableSlotLiveLlb curCtx e ∗
     icId fscIc e (1 : Qp).half true icfgDev inum ∗
     (∃ (T' : Nat) (a : ChainVG), icRegd e ⟨T', false, some (icfgDev, inum), none, a⟩ ∗ icCnt e 1 ∗
       topLb T' ∗ vgFloors curCtx a) ∗
@@ -446,7 +449,7 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
   ihave Hrows := Hrback $$ %_ %_ %hoff %hoffc [Hrow Hstn]
   · rw [itableSlotResLlb_some curCtx _ _ e Qp.quarter PosNat.one (get?_insert_eq rfl),
       get?_insert_eq rfl, PosNat.one_val]
-    unfold icSlotRowLlb icSlotRow itableSlotLiveLlb
+    unfold icSlotRowLlb icSlotRow
     icases Hrow with ⟨%T', %a, Hrd, Hc, #HllbT, #Hva⟩
     iframe Hstn
     iexists T'
@@ -572,7 +575,8 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
       wordPointsTo (ientry e + 8#64) 4 (DFrac.own 1) (0#32 : BitVec 32) from .rfl) $$ Hcell
   ihave #Hclaim8 := (show kmapId (GF := GF) (iRef (ientry e)) ⊢ kmapId (ientry e + 8#64) from .rfl)
     $$ Hclaim
-  iapply (wp_s_sw_mint c _ (KA.«iget» + 0x78#64) false 8#12 19#5 15#5 (by decide) (0#32 : BitVec 32))
+  iapply (wp_s_sw_mint c _ (KA.«iget» + 0x78#64) false 8#12 19#5 15#5 (by decide) (0#32 : BitVec 32)
+      tstp)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -581,7 +585,7 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
   iframe
   inext_goal
   iapply wpNext_off_intro
-  iintro Hk Hpc ⟨%t, Hwc, #Hkey⟩
+  iintro Hk Hpc ⟨%t, %htp, Hwc, #Hkey⟩
   -- +0x7c sw zero,64(s3) : ip->valid = 0
   ihave Hvld := (show wordPointsTo (GF := GF) (iValid (ientry e)) 4 (DFrac.own 1) v ⊢
       wordPointsTo (ientry e + 64#64) 4 (DFrac.own 1) v from .rfl) $$ Hvld
@@ -591,7 +595,7 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
   -- the ghost block and the close (deviation 1)
   icases kctx_token_acc c _ $$ Hk with ⟨Hrun, Hkback⟩
   iapply wpLoop_fupd
-  imod ig_rcy_ghost c M e he hMe inum l hnib _ hinP r T0 tstp t hw hx devT inumT devB inumB $$
+  imod ig_rcy_ghost c M e he hMe inum l hnib _ hinP r T0 tstp t htp hw hx devT inumT devB inumB $$
       [Hesc Henv Hrun Hrd Hc Hdev Hinm Hvld Hnl Hwc Hkey Hst Hllbp HgidT HgidB Hhalf Hisl Hpool Hlic]
     with ⟨Hrun, Hpool, Hhalf, Hisl, Hmir, Hsel, Hlic, Hicnt, Hstn, Hgid, Hrowr, Href, Hidq⟩
   · iframe Hesc Henv Hrun Hrd Hvd Hc Hnl Hkey Hst Hllbp HgidT HgidB Hhalf Hisl Hpool Hlic

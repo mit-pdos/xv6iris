@@ -233,7 +233,7 @@ persistent bound and the `disk.used_idx` cell -- the three parts the loop
 moves. -/
 def vdisPay (γ : DiskNames) (pd pav : PAddr) : IProp GF := iprop%
   ∃ (np : Nat) (stg : Option Nat) (ring : Nat → Nat),
-    diskPub γ np ∗ diskStage γ stg ∗
+    diskPub γ np ∗ diskPubLb γ np ∗ diskStage γ stg ∗
     ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) ∗
     ([∗list] j ∈ List.range NUM,
       ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own (1 : Qp).half)
@@ -247,7 +247,7 @@ theorem vdisPay_open (γ : DiskNames) (pd pav pu : PAddr) :
   unfold vdisPay
   iintro H
   icases diskRes_open γ pd pav pu curCtx $$ H
-    with ⟨%np, %nr, %stg, %ring, Hp, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
+    with ⟨%np, %nr, %stg, %ring, Hp, #Hplb, Hr, Hrl, Hs, Hlb, Hwmp, Hu, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
@@ -255,7 +255,7 @@ theorem vdisPay_open (γ : DiskNames) (pd pav pu : PAddr) :
   iexists nr
   iframe Hr Hrl Hlb Hwmp Hu
   iexists np, stg, ring
-  iframe Hp Hs Hidx Hring Hsl
+  iframe Hp Hplb Hs Hidx Hring Hsl
 
 theorem vdisPay_close (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
     diskReadAt (GF := GF) γ nr ∗ diskReadLbAuth γ nr ∗ diskDoneLb γ nr ∗
@@ -263,13 +263,13 @@ theorem vdisPay_close (γ : DiskNames) (pd pav pu : PAddr) (nr : Nat) :
       wordPointsTo aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ∗ vdisPay γ pd pav ⊢
       diskRes γ pd pav pu curCtx := by
   unfold vdisPay
-  iintro ⟨Hr, Hrl, Hlb, #Hwmp, Hu, %np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
+  iintro ⟨Hr, Hrl, Hlb, #Hwmp, Hu, %np, %stg, %ring, Hp, #Hplb, Hs, Hidx, Hring, Hsl⟩
   ihave Hu : iprop(wordAtN (GF := GF) curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr)) $$ [Hu]
   · iapply (show wordPointsTo (GF := GF) aUsedIdx 2 (DFrac.own 1) (wrap16 nr) ⊢
       wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 nr) from by rw [wordAtN_cur])
     iexact Hu
   iapply diskRes_close γ pd pav pu curCtx np nr stg ring
-  iframe Hp Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
+  iframe Hp Hplb Hr Hrl Hs Hlb Hwmp Hu Hidx Hring Hsl
 
 /-- **The payload's credential, CASHED at the handler's
 `__sync_synchronize()`.**  The lock's payload carries `Xv6.diskPayWm γ nr
@@ -289,39 +289,51 @@ theorem vdis_fence_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CP
     kctx cpu k ∗ pcIs cpu pc ∗ diskPayWm γ n curCtx ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          (∃ K : Nat, viewLb cpu K ∗ diskWm γ n K ∗ DiskAcc.diskHeadCerts γ cpu n) -∗ wpLoop cpu'))
+          (∃ K : Nat, viewLb cpu K ∗ diskWm γ n K ∗ DiskAcc.diskHeadCerts γ cpu n K) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hi, Hk, Hpc, #Hp, HΦ⟩
   unfold diskPayWm
   icases Hp with ⟨⟨%T, #Hw, #Hfl⟩, #Hhk⟩
-  ihave #Hkey := diskPayFl_key n curCtx T $$ Hfl
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
-  icases DiskAcc.diskHeadCerts_cash γ cpu curCtx n $$ [Hctx Hhk] with ⟨Hctx, #Hhc⟩
-  · iframe Hctx Hhk
-  icases diskVisKey_vis cpu curCtx T $$ [Hctx Hkey] with ⟨Hctx, %K, %ts, #HK, #Hts, %hv⟩
-  · iframe Hctx Hkey
+  -- the view the payload's justification gives (route P: at the base the head keys do the work)
+  icases (show iprop(ownCtx (GF := GF) cpu curCtx ∗ diskPayFl n curCtx T) ⊢
+      iprop(ownCtx cpu curCtx ∗ ∃ K : Nat, viewLb cpu K ∗ ⌜n = 0 ∨ T ≤ K⌝) from by
+    cases n with
+    | zero =>
+      rw [diskPayFl_zero]
+      iintro ⟨Hctx, #Hkey⟩
+      icases diskVisKey_vis cpu curCtx T $$ [Hctx Hkey] with ⟨Hctx, %K, %ts, %ls, #HK, -, -, -⟩
+      · iframe Hctx Hkey
+      iframe Hctx
+      iexists K
+      iframe HK
+      ipureintro; exact Or.inl rfl
+    | succ m =>
+      rw [show diskPayFl (GF := GF) (m + 1) curCtx T = ctxFloor curCtx T from rfl]
+      iintro ⟨Hctx, #Hfl⟩
+      icases ownCtx_floor_view cpu curCtx T $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hTK⟩⟩
+      · iframe Hctx; iexact Hfl
+      iframe Hctx
+      iexists K
+      iframe HK
+      ipureintro; exact Or.inr hTK) $$ [Hctx Hfl] with ⟨Hctx, %K0, #HK0, %hK0⟩
+  · iframe Hctx Hfl
+  icases DiskAcc.diskHeadCerts_cash γ cpu curCtx n K0 $$ [Hctx Hhk HK0] with ⟨Hctx, %K, %hK, #HK, #Hhc⟩
+  · iframe Hctx Hhk HK0
   ihave Hk := Hback $$ Hctx
-  rcases hv with hle | hmem
-  · iapply (wp_s_fence_iorw_iorw cpu k pc is_rvc 0#5 0#5)
-    iframe Hi Hk Hpc
-    inext
-    iapply wpNext_mono $$ HΦ
-    iintro %cpu' HΦ Hk Hpc
-    iapply HΦ $$ Hk Hpc
-    iexists K
-    iframe HK Hhc
-    iapply diskWm_mono γ n n T K (Nat.le_refl n) hle
+  iapply (wp_s_fence_iorw_iorw cpu k pc is_rvc 0#5 0#5)
+  iframe Hi Hk Hpc
+  inext
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HΦ Hk Hpc
+  iapply HΦ $$ Hk Hpc
+  iexists K
+  iframe HK Hhc
+  rcases hK0 with rfl | hTK
+  · icases diskWm_base γ 0 T $$ Hw with ⟨%b, #Hb⟩
+    iapply diskWm_zero γ K b $$ Hb
+  · iapply diskWm_mono γ n n T K (Nat.le_refl n) (by omega)
     iexact Hw
-  · ihave #Hau := BigSepL.bigSepL_mem (Φ := fun p : Nat × Agent => iprop(authoredBy (GF := GF) p.1 p.2))
-      hmem $$ Hts
-    iapply (wp_s_fence_iorw_iorw_pub cpu k hsie pc is_rvc 0#5 0#5 T)
-    iframe Hi Hk Hpc Hau
-    inext
-    iapply wpNext_mono $$ HΦ
-    iintro %cpu' HΦ Hk Hpc #HT
-    iapply HΦ $$ Hk Hpc
-    iexists T
-    iframe HT Hw Hhc
 
 /-- ... and RESTORED.  The hart's floor -- which the loop's
 `__sync_synchronize()` has taken past the view the last `used->idx` read
@@ -341,20 +353,20 @@ theorem vdis_payWm_mk [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CPU)
   iapply diskPayWm_succ
   iexists F
   iframe Hw
-  iapply diskPayFl_of_floor (n + 1) curCtx F $$ Hfl
+  iapply diskPayFl_of_floor n curCtx F $$ Hfl
 
 theorem vdisPay_slot (γ : DiskNames) (pd pav : PAddr) (i : Nat) (hi : i < NUM) :
     vdisPay (GF := GF) γ pd pav ⊢
       slotRes γ curCtx pd i ∗ (slotRes γ curCtx pd i -∗ vdisPay γ pd pav) := by
   unfold vdisPay
-  iintro ⟨%np, %stg, %ring, Hp, Hs, Hidx, Hring, Hsl⟩
+  iintro ⟨%np, %stg, %ring, Hp, #Hplb, Hs, Hidx, Hring, Hsl⟩
   icases BigSepL.bigSepL_mem_acc (Φ := fun i => slotRes (GF := GF) γ curCtx pd i)
       (range_mem i NUM hi) $$ Hsl with ⟨Hi, Hback⟩
   iframe Hi
   iintro Hi'
   ihave Hsl := Hback $$ Hi'
   iexists np, stg, ring
-  iframe Hp Hs Hidx Hring Hsl
+  iframe Hp Hplb Hs Hidx Hring Hsl
 
 /-- The persistent completion bound weakens. -/
 theorem vdis_doneLb_le (γ : DiskNames) (m n : Nat) (h : n ≤ m) :
@@ -858,9 +870,9 @@ theorem vdis_loop (WK : WAKEUP)
   obtain ⟨hram2, hal2, hkm2⟩ := vdis_usedIdx_facts pu hpu
   ihave #Hid3 := kmapStatic_rw (usedIdxAt pu) hkm2 $$ HS
   icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
-  ihave #Hhc1 : DiskAcc.diskHeadCerts (GF := GF) γ cpu (nr + 1) $$ []
-  · unfold DiskAcc.diskHeadCerts; itrivial
-  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu F (nr + 1) heqR $$ [Hinv Hgeom Hnr Hwm1]
+  ihave #Hhc1 : DiskAcc.diskHeadCertsT (GF := GF) γ cpu (nr + 1) F [] [] $$ []
+  · unfold DiskAcc.diskHeadCertsT; ipureintro; exact ⟨rfl, rfl⟩
+  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu F (nr + 1) [] [] heqR $$ [Hinv Hgeom Hnr Hwm1]
   · iframe #; iframe
   k_step (wp_s_lhu_aur cpu _ ?hs (KA.«virtio_disk_intr» + 0x82#64) false 2#12 14#5 14#5
       (by decide) (usedIdxAt pu) ?hb3 hram2 hal2 F [] _)
@@ -1047,6 +1059,8 @@ theorem virtio_disk_intr_proof
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hwmp] with [vdisK_sie k]
   case hs => k_norm [vdisK_sie k]
   iintro Hk Hpc ⟨%Kw, #Hview, #Hwm, #Hhc⟩
+  unfold DiskAcc.diskHeadCerts
+  icases Hhc with ⟨%tsh, %lsh, #Hhc⟩
   -- +0x30  ld a5,16(s1)
   ihave Hup : iprop(wordPointsTo (GF := GF) aUsedPtr 8 DFrac.discard pu) $$ [Hgeom]
   · iapply vdis_geom_used γ pd pav pu
@@ -1066,10 +1080,10 @@ theorem virtio_disk_intr_proof
   obtain ⟨hram0, hal0, hkm0⟩ := vdis_usedIdx_facts pu hpu
   ihave #Hid0 := kmapStatic_rw (usedIdxAt pu) hkm0 $$ HS
   icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
-  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu Kw nr heqR $$ [Hinv Hgeom Hnr Hwm]
+  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu Kw nr tsh lsh heqR $$ [Hinv Hgeom Hnr Hwm]
   · iframe #; iframe
   k_step (wp_s_lhu_aur cpu _ ?hs (KA.«virtio_disk_intr» + 0x36#64) false 2#12 15#5 15#5
-      (by decide) (usedIdxAt pu) ?hb2 hram0 hal0 Kw [] _)
+      (by decide) (usedIdxAt pu) ?hb2 hram0 hal0 Kw tsh _)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hid0 $Hview $HAU3]
     with [vdisK_sie k]
   try (case hs => k_norm [vdisK_sie k])

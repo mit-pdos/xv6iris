@@ -21,7 +21,7 @@ watermark rises to it, the machine's authorship receipt justifies it).  It
 is in general NOT a floor: the hart's own view does not reach its own
 store position. -/
 theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
-    ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ topLb t ⊢ |==>
+    ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ itopLb t ⊢ |==>
       (ownCtx cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t) := by
   iintro ⟨Hctx, #Hau, #Ht⟩
   icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
@@ -67,7 +67,7 @@ theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
       isplit
       · ipureintro; exact hBK
       isplit
-      · iapply topLb_max W t
+      · iapply itopLb_max W t
         isplit
         · iexact HW
         · iexact Ht
@@ -76,11 +76,11 @@ theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
         intro j h hj
         by_cases hjt : j = t
         · subst hjt
-          rw [LawfulPartialMap.get?_insert_eq rfl] at hj
-          exact ⟨Nat.le_max_right _ _, Or.inr (Option.some.inj hj).symm⟩
+          exact Nat.le_max_right _ _
         · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hjt)] at hj
-          obtain ⟨h1, h2⟩ := hok j h hj
-          exact ⟨by omega, h2⟩
+          have := hok j h hj
+          show j ≤ max W t
+          omega
       · unfold dirtyElems
         imodintro
         iintro %j %h %hj

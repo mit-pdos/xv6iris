@@ -190,7 +190,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   iintro %w Hk Hpc Hseen
   case ha => rw [KCtx.rget_ne cpu k 14#5 (by decide) (by decide), ha4]; rfl
   unfold startedSeen
-  icases Hseen with (%hw | ⟨%t, %a, %hw, #Hidx, #Hrv, #HP, #Hgp, #Hvc⟩)
+  icases Hseen with (%hw | ⟨%t, %T, %K1, %a, %⟨hw, hTK⟩, #Hidx, #Hrv, #HP, #Hgp, #Hrc⟩)
   · -- read 0: the fence, and round again
     subst hw
     k_step (wp_s_fence_r_rw cpu _ (KA.«main» + 24#64) false 0#5 0#5)
@@ -210,7 +210,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
     iapply HΦ $$ %v Hk Hpc HP
   · -- read 1: the store is visible; the fence makes it this hart's floor
     subst hw
-    k_step (wp_s_fence_r_rw_floor cpu _ (by simp [hsie]) (KA.«main» + 24#64) false 0#5 0#5 t)
+    k_step (wp_s_fence_r_rw_floor cpu _ (by simp [hsie]) (KA.«main» + 24#64) false 0#5 0#5 K1)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hrv] with [KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc #Hv
     k_step (wp_s_addiw cpu _ (KA.«main» + 28#64) true 0#12 15#5 15#5 (by decide))
@@ -224,7 +224,8 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
     -- the absorb
     icases ms_kctx_ownCtx cpu _ $$ Hk with ⟨Hown, Hk⟩
     iapply wpLoop_fupd
-    imod started_absorb ⊤ γi ξd P cpu t t a (Nat.le_refl t) CoPset.subseteq_top
+    ihave #Hvc := started_vecCerts cpu a t K1 K1 (Nat.le_refl K1) $$ [$Hrc $Hgp $Hv]
+    imod started_absorb ⊤ γi ξd P cpu t T K1 a hTK CoPset.subseteq_top
       $$ [$Hinv $Hidx $Hv $Hown $HP $Hvc] with ⟨Hown, HP'⟩
     imodintro
     ihave Hk := Hk $$ Hown

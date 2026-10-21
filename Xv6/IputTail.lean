@@ -114,6 +114,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- What the non-last close's store hands back (route P, D12‴): the new head's stamp, its
+authorship and issue receipt, and the close, which waits for the head's KEY (minted with the
+running token after the step, `ctx_key_mint`). -/
+def iputTailNePost (c : CPU) : IProp GF :=
+  iprop(∃ tstn : Nat, authoredBy tstn (hartAgent c) ∗ itopLb tstn ∗
+    (visFloor curCtx tstn -∗ iputRin (GF := GF) curCtx ∗ irefSlot (GF := GF)))
+
 /-- The persistent pieces a close uses, off the environment. -/
 theorem iput_tail_env (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
@@ -139,7 +146,7 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     iputEnv Γ γl pd pav pu γil γisl kk ∗ iputTab Mt ci ∗ inodeRef kk q icfgDev inum ∗
       runitAny inum.toNat ∗ ownCtx c curCtx ⊢
     |={⊤}=> ownCtx c curCtx ∗ writeAU c (iRef (ientry kk)) 4 (BitVec.ofNat 32 m.val)
-      iprop(iputRin (GF := GF) curCtx ∗ irefSlot) := by
+      (iputTailNePost (GF := GF) c) := by
   iintro ⟨#Henv, Htab, Href, Hru, Hrun⟩
   icases iput_tail_env Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, #Hinv, #Hesc, #Hrinv⟩
   unfold iputTab
@@ -190,7 +197,7 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   rw [itableSlotRes_some curCtx Mt ci kk qt m.succ hMk, hcik]
   unfold icSlotRowFl icSlotRow itableSlotLive
   icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
-    ⟨%tst, Hst, #Hllbt, #Hflt⟩⟩
+    ⟨%loS, %tst, Hst, #Hllbt, #Hflt, #Hflo⟩⟩
   -- (d): the departing reference's stamps leave the box's count
   unfold liveFracc
   icases Hlf with ⟨%g, %lo, %tl, Hlv, %hlotl, #Hfl⟩
@@ -204,29 +211,35 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   iframe Hrun
   -- the store's accessor
   ihave Hru := (show runitAny (GF := GF) cinum.toNat ⊢ runit false cinum.toNat from .rfl) $$ Hru
-  iapply writeAU_of_own
-  unfold writeAUOwn
+  iapply writeAU_of_ownT
+  unfold writeAUOwnT
   imod iref_close_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk cinum false
-      q qt qrest m g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hqrest
-    $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hisl Hru Hicnt Hst Hllbt with ⟨%hlot, Hpin, Hcl⟩
+      q qt qrest m g lo loS tst (hartAgent c) CoPset.subseteq_top CoPset.subseteq_top hin hMk hqrest
+    $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hisl Hru Hicnt Hst Hllbt with ⟨%hlS, %hlot, Hpin, Hcl⟩
   · unfold irefTokGenlo; iframe
+  subst loS
   icases irefPinRows_push kk (irefWord Mt kk) (BitVec.ofNat 32 m.val) lo tst
       (irefSet_count m hnom) $$ Hpin with ⟨%Hs, Hb, Hpush⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists Hs
-  iframe Hb
+  iexists Hs, tst, 0
+  iframe Hb Hllbt
+  isplitl []
+  · iapply topLbAt_0
   inext
-  iintro %t Hb #Hau #Ht
+  iintro %t %htt Hb #Hau #Ht _
   imod Hmask
-  ihave Hpin := Hpush $$ %t %(hartAgent c) Hb
-  imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Hicnt, ⟨%tstn, %hlon, Hstn, #Hllbn⟩⟩
+  ihave Hpin := Hpush $$ %t %(hartAgent c) %htt Hb
+  imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Hicnt, ⟨%tstn, Hstn, #Hllbn, #Hautn⟩⟩
   · unfold pinwStorePost
-    iexists (max tst t)
-    iframe Hpin
-    iapply topLb_max tst t
-    iframe Hllbt Ht
+    iexists t
+    iframe Hpin Ht Hau
+    ipureintro; exact htt
+  unfold iputTailNePost
   imodintro
+  iexists tstn
+  iframe Hautn Hllbn
+  iintro #Hvfn
   -- the close: the slot's rows at the reduced count
   have hoff : ∀ i, i ≠ kk → PartialMap.get? (PartialMap.insert Mt kk (qrest, m)) i =
       PartialMap.get? Mt i := fun i hi => get?_insert_ne (Ne.symm hi)
@@ -252,8 +265,8 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
       iexists ⟨td', false, r.ident, r.x, aD⟩
       iframe Hrd Hllbd Hc HvaD
       ipureintro; exact ⟨rfl, hx, hid, Nat.le_refl _⟩
-    · iexists tstn
-      iframe Hstn Hllbn
+    · iexists lo, tstn
+      iframe Hstn Hllbn Hvfn Hflo
   isplitr [Hslot1]
   · iapply itableRes2Llb_intro curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev _ ci
       (icMWf_insert Mt kk _ _ hMwf hkk hnom)
@@ -359,8 +372,8 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   ihave #Hpinv := isItable2_pool $$ Hit
   ihave #Hclaims := isItable2_claims $$ Hit
   ihave #Hclaim := irefClaims_at kk hkk $$ Hclaims
-  unfold iputWindow
-  icases Hwin with ⟨Hrback, ⟨%tst, Hst, #Hllbt, #Hflt⟩,
+  unfold iputWindow itableSlotLive
+  icases Hwin with ⟨Hrback, ⟨%loS, %tst, Hst, #Hllbt, #Hflt, -⟩,
     ⟨%x0, %td, %T0, %a, %hx0, Hrd, #Hllbd, #Hva, Hc, Hhdr⟩⟩
   unfold iputRowOpen
   icases Hrow with ⟨Hsback, %hcik, Hrest, Hiu, Hgid, Hicnt, Hmir, Hsel⟩
@@ -405,6 +418,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   ihave Hru := (show runitAny (GF := GF) inum.toNat ⊢ runit false inum.toNat from .rfl) $$ Hru
   imodintro
   -- THE RETIRE STORE's accessor
+  ihave Hst := istmpAuth_of_L kk _ loS tst $$ Hst
   iapply writeAU_of_own
   unfold writeAUOwn
   imod iref_close_last_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
@@ -614,11 +628,23 @@ theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   iintro Hk Hpc
   -- +0x22 c.sw a5,8(s1): THE NON-LAST CLOSE, through the accessor
   k_step (wp_s_sw_au c _ ?hs (KA.«iput» + 0x22#64) true 8#12 9#5 15#5 (iRef (ientry kk)) ?ha
-      hram hal iprop(iputRin (GF := GF) curCtx ∗ irefSlot))
+      hram hal (iputTailNePost (GF := GF) c))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [iput_tail_decr1]
   case ha => k_norm [h9]; rfl
-  iintro Hk Hpc ⟨HRin, Hslot⟩
+  iintro Hk Hpc Hpost'
+  unfold iputTailNePost
+  icases Hpost' with ⟨%tstn, #Hautn, #Hllbn, Hcw⟩
+  -- the new head's KEY (route P, D12‴): minted with the running token, after the store
+  iapply wpLoop_fupd
+  icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
+  imod ctx_key_mint c curCtx tstn $$ [Hctx Hautn Hllbn] with ⟨Hctx, #Hkey⟩
+  · iframe Hctx Hautn Hllbn
+  ihave Hk := Hkback $$ Hctx
+  ihave Hcl := Hcw $$ [Hkey]
+  · unfold visFloor; ileft; iexact Hkey
+  icases Hcl with ⟨HRin, Hslot⟩
+  imodintro
   iapply (iput_tail_exit RH c k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg _ hwf hlocks hK
     ?e2 ?e18 ?e19 ?e20 ?epins) $$ [- $Hk $Hpc $Hit $Hlocked $Harm $HRin $Hslot $Htx $Hframe
       $Hte $Hce $Hret $Hpost]

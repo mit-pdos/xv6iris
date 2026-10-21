@@ -92,7 +92,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
       ⌜∀ j, j ≠ kk → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       itableSlotResLlb curCtx M' ci' kk -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
-    (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
+    itableSlotLiveLlb curCtx kk ∗
     -- R3.4 / F30 (g): the guard's WINDOW, still open: the L1 register half,
     -- its stamp's floor, the count half at 1, the header's cells and pieces
     icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗

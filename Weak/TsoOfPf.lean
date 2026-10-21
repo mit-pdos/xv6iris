@@ -104,16 +104,17 @@ theorem TsoOfPf.readLo (k tvn : Nat) (h : tvn < k) :
 /-! ## 1. G1 — the acquire exclusive pair (TsoMem: floor `top + 1`; WeakMem: floor `t`) -/
 
 /-- TsoMem: an acquire exclusive read followed by its write leaves the floor at the write's
-timestamp `top + 1`, whatever timestamp the read's bytes carried. -/
+LANDING position `ltop + 1` (route P: the exclusive write lands at once), whatever position the
+read's bytes carried. -/
 theorem TsoOfPf.tsoAqPairTv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (pa' : PAddr) (n' : Nat) (w' : BitVec (8 * n')) :
-    ((σ.afterExcl cpu pa n w true).store cpu pa' n' w' true).tv cpu = σ.top + 1 := by
-  simp [HRead.afterExcl, updCpu, MState.top]
+    ((σ.afterExcl cpu pa n w true).storeL cpu pa' n' w').tv cpu = σ.ltop + 1 := by
+  simp [HRead.afterExcl, updCpu, MState.ltop]
 
-/-- TsoMem: any exclusive read moves the read watermark to the top (a later `fence r,_`
+/-- TsoMem: any exclusive read moves the read watermark to the LANDED top (a later `fence r,_`
 raises the floor there; WeakMem's `wVrOld` only reaches the read's timestamps). -/
 theorem TsoOfPf.tsoExclRv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (aq : Bool) : ((σ.afterExcl cpu pa n w aq).hr cpu).rv = σ.top := by
+    (aq : Bool) : ((σ.afterExcl cpu pa n w aq).hr cpu).rv = σ.ltop := by
   simp [HRead.afterExcl, updCpu]
 
 

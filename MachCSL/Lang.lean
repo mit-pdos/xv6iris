@@ -114,12 +114,12 @@ structure MState where
   /-- THE LANDING LOG (route P [OWN.110] [OWN.111], increment P-M1): the issue stamps of the
   stores that have LANDED (entered the global order), in landing order; a stamp's landing
   position is its index + 1 (`MState.lp`), the landing top is the log's length
-  (`MState.ltop`).  Until increment P-M3 the machine lands every store in the step that issues
-  it, so every issued stamp is in the landing log (`MState.sbNil`, `MState.okP`). -/
+  (`MState.ltop`).  A plain store lands after its issue, by `primStep`'s land arm; an exclusive
+  or DMA write lands in the step that issues it. -/
   llog : List Nat := []
   /-- THE STORE BUFFERS (route P, [OWN.113] per-address + fence-epoch): each hart's PENDING
   (issued, not yet landed) plain stores, as (issue stamp, store epoch), oldest first.  Empty
-  at power-on; until increment P-M3 the machine never leaves a store in it (`MState.sbNil`). -/
+  at power-on (a power cycle loses the pending stores). -/
   sb : CPU → List (Nat × Nat) := fun _ => []
   /-- Each hart's current STORE EPOCH ([OWN.113]): bumped by every fence with a W predecessor
   and a W successor (`fenceEpoch`); a buffered store records the epoch it was issued in. -/
@@ -147,21 +147,22 @@ abbrev updCpu {α : Type} (f : CPU → α) (cpu : CPU) (x : α) : CPU → α :=
 abbrev updCpu' {α : Type} (f : DevId → α) (d : DevId) (x : α) : DevId → α :=
   fun d' => if d' = d then x else f d'
 
-/-- After a plain load of `n` bytes at `pa` at view `tvn`: the read side moves,
-nothing else; the coherence floors take the bytes' FOREIGN sources, read off
-the histories (`FlatMem.loadSrcs`). -/
+/-- After a plain load of `n` bytes at `pa` at (landing) view `tvn`: the read side
+moves, nothing else; the coherence floors take the LANDING POSITIONS of the bytes'
+FOREIGN sources, read off the histories over the landing positions
+(`FlatMem.loadSrcsP`; route P: co order is landing order). -/
 abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (tvn : Nat) : MState :=
   { σ with hr := updCpu σ.hr cpu ((σ.hr cpu).afterLoad (hartAgent cpu) pa n tvn
-      (σ.mem.loadSrcs (hartAgent cpu) tvn pa n)) }
+      (σ.mem.loadSrcsP σ.lp (hartAgent cpu) tvn pa n)) }
 
-/-- After an exclusive read of `w` at `pa`: the watermark to the top, the
-floor to the top iff an acquire, the acquire bit recorded, the snapshot
+/-- **THE EXCLUSIVE READ'S EFFECT** (route P): the watermark to the LANDING top, the floor to it
+iff an acquire, the acquire bit recorded, the snapshot (of the LANDED top, `FlatMem.topBytesL`)
 reserved. -/
 abbrev MState.afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : MState :=
-  { σ with tv := updCpu σ.tv cpu (if acq then σ.top else σ.tv cpu),
-           hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.top acq),
+  { σ with tv := updCpu σ.tv cpu (if acq then σ.ltop else σ.tv cpu),
+           hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.ltop acq),
            resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
 
 /-- A blocked exclusive read abandons the hart's own reservation; so does the
@@ -169,33 +170,28 @@ instruction boundary (`hartStep`'s `.pure` arm). -/
 abbrev MState.dropResv (σ : MState) (cpu : CPU) : MState :=
   { σ with resv := updCpu σ.resv cpu none }
 
-/-- After a store of `w` at `pa` by `cpu`: the bytes' histories grow, the
-author log grows, the floor passes the store iff it is the write half of an
-acquire pair, the acquire bit and the reservation clear, and the footprint's
-coherence floors reset (plain AND exclusive: RVWMO ppo rule 2's `po-loc-no-w`
-counts every write of the hart).
-
-Route P, increment P-M1: the store ISSUES AND LANDS in one step -- its stamp
-enters the landing log at once (`llog`), so it is `MState.land ∘ MState.issue`
-(`MState.store_eq_land_issue`) and no store is ever left buffered.  Increment
-P-M2 makes a plain store `issue` only. -/
-abbrev MState.store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) : MState :=
-  { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu),
+/-- **THE EXCLUSIVE WRITE, route P** (an AMO's write half, `sc`, the walker's A/D write-back): it
+lands at once -- inserted below the footprint's pending prefix, co-after every landed entry,
+co-before every pending one -- at the issue stamp `top + 1` and the landing position `ltop + 1`;
+the floor passes it (its LANDING position) iff it is the write half of an acquire pair; the pending
+acquire bit and the reservation clear and the footprint's coherence floors reset (RVWMO ppo
+rule 2's `po-loc-no-w` counts every write of the hart); the store's pc record is `-1`. -/
+abbrev MState.storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
+  { σ with mem := σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) (hartAgent cpu),
            log := σ.log ++ [hartAgent cpu],
            llog := σ.llog ++ [σ.top + 1],
-           pcAt := fun t => if t = σ.top + 1 then
-             (if excl then -1 else (((σ.regs cpu) Register.PC).toNat : Int)) else σ.pcAt t,
-           tv := updCpu σ.tv cpu (if excl && (σ.hr cpu).acq then σ.top + 1 else σ.tv cpu),
+           pcAt := fun t => if t = σ.top + 1 then -1 else σ.pcAt t,
+           tv := updCpu σ.tv cpu (if (σ.hr cpu).acq then σ.ltop + 1 else σ.tv cpu),
            hr := updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n),
            resv := updCpu σ.resv cpu none }
 
-/-- After a fence: the floor per `fencePost`; `fence.i` raises the
-instruction view past the floor and the hart's own last store; a fence with a
-W predecessor and a W successor opens a new store epoch (`fenceEpoch`,
-[OWN.113]). -/
+
+/-- **THE FENCE** (route P): the floor per `fencePost`, its publication the hart's last LANDED
+store (`ownPubL`; a draining fence finds the hart's buffer empty, so it is the hart's last store);
+`fence.i` raises the instruction view past the floor and that store; a fence with a W predecessor
+and a W successor opens a new store epoch (`fenceEpoch`, [OWN.113]). -/
 abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
-  let pub := ownPub (hartAgent cpu) σ.log
+  let pub := ownPubL (hartAgent cpu) σ.log σ.llog
   let tv' := fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv pub
   { σ with tv := updCpu σ.tv cpu tv',
            itv := updCpu σ.itv cpu
@@ -203,20 +199,17 @@ abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
               else σ.itv cpu),
            sbEp := updCpu σ.sbEp cpu (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) }
 
-/-- After a DMA write of `w` at `pa` by the disk: the bytes' histories grow,
-the author log grows; no hart's views move (the device is pinned to the top
-of the order).  It lands at once (its stamp enters the landing log).
+/-- **THE DMA WRITE** (route P): the disk's entry LANDS AT ONCE, inserted below every pending
+entry of its bytes (as `MState.storeL`, by the disk agent); no hart's views move.
 
-A ZERO-BYTE DMA write (`n = 0`) is a NO-OP: no log entry, no history
-change.  RVWMO's global memory order is over the primitive loads and stores
-memory instructions generate, and a zero-byte access generates none (Sail
-has no DMA model; its own `mem_write_value` keeps `0 < width` in the source
-docstring).  An empty entry would be a model artifact: an extra timestamp
-no memory operation owns.  The case split sits inside the two moving
-fields, so every field the store does not move is still definitionally
-`σ`'s. -/
+A ZERO-BYTE DMA write (`n = 0`) is a NO-OP: no log entry, no history change.  RVWMO's global
+memory order is over the primitive loads and stores memory instructions generate, and a
+zero-byte access generates none (Sail has no DMA model; its own `mem_write_value` keeps
+`0 < width` in the source docstring).  The case split sits inside the moving fields, so every
+field the store does not move is still definitionally `σ`'s. -/
 abbrev MState.storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
-  { σ with mem := if n = 0 then σ.mem else σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
+  { σ with mem := if n = 0 then σ.mem else
+               σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent,
            log := if n = 0 then σ.log else σ.log ++ [diskAgent],
            llog := if n = 0 then σ.llog else σ.llog ++ [σ.top + 1],
            pcAt := if n = 0 then σ.pcAt else fun t => if t = σ.top + 1 then -1 else σ.pcAt t }
@@ -226,17 +219,18 @@ theorem MState.storeDma_zero (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8
     (hn : n = 0) : σ.storeDma pa n w = σ := by
   subst hn; rfl
 
-/-- A DMA write of at least one byte appends the disk's entry. -/
+/-- A DMA write of at least one byte lands the disk's entry. -/
 theorem MState.storeDma_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hn : n ≠ 0) : σ.storeDma pa n w =
-      { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
+      { σ with mem := σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent,
                log := σ.log ++ [diskAgent],
                llog := σ.llog ++ [σ.top + 1],
                pcAt := fun t => if t = σ.top + 1 then -1 else σ.pcAt t } := by
   simp only [MState.storeDma, if_neg hn]
 
 theorem MState.storeDma_mem_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hn : n ≠ 0) : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := by
+    (hn : n ≠ 0) : (σ.storeDma pa n w).mem =
+      σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent := by
   simp only [if_neg hn]
 
 theorem MState.storeDma_log_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
@@ -258,10 +252,11 @@ def anyReserve (resv : CPU → Option Resv) (pa : PAddr) (n : Nat) : Prop :=
   ∃ c r, resv c = some r ∧ r.overlaps pa n
 
 /-- What a DMA read of `n` bytes at `pa` may answer: every byte the memory
-covers is its byte at the top of the order, the others are anything (the
-Rocq prototype's `mem_view`). -/
+covers is its byte at the top of the LANDED order (route P: the device sees
+no hart's pending store), the others are anything (the Rocq prototype's
+`mem_view`). -/
 def dmaView (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
-  ∀ j, j < n → ∀ b, (σ.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top = some b → nthByte w j = b
+  ∀ j, j < n → ∀ b, (σ.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL σ.lp) = some b → nthByte w j = b
 
 /-- Update one device's state. -/
 abbrev MState.setDev (σ : MState) (d : DevId) (st : DevSt d) : MState :=
@@ -413,26 +408,19 @@ byte, the landing order is co order), and no hart reserves a byte of its
 footprint (atomicity of the exclusive pairs; the hart's own in-flight
 reservation too, which only delays the landing to its instruction boundary).
 
-A write that lands AT ONCE (an exclusive write; in increment P-M1 every RAM
-write) may overtake only the hart's pending stores of the CURRENT epoch that do
+A write that lands AT ONCE (an exclusive write) may overtake only the hart's pending stores of the CURRENT epoch that do
 not touch its bytes (`MState.landNowOk`; F-P-W1-1, rule 4), and a RELEASE write
 none (`akRel`, rule 6); an exclusive read waits until no pending store of the
 hart touches its footprint (`MState.sbOverlaps`, rule 1); a W→R fence and
 `fence.i` wait for the whole buffer (`fenceDrainsSb`).  Each wait is a
 `blockedStep` arm (the hart retries; the land arm makes progress).
 
-INCREMENT P-M1 (the staging, `PROGRESS-W11F.md` §7): every arm and guard is in
-the step relation, but a RAM store still issues-and-lands in one step
-(`MState.store` = `land ∘ issue`, `MState.store_eq_land_issue`), so every
-buffer stays empty (`MState.sbNil`, the staging conjunct the interpretation
-carries until P-M3 makes plain stores `issue` only and moves the reads to
-landing positions).  INCREMENT P-M2: the interpretation's route-P invariant
-`MState.okP` and its preservation by every step -- by a LANDING without the
-staging conjunct (`MState.okP_land`). -/
+The interpretation's route-P invariant is `MState.okP`; every step keeps it
+(`MState.okP_land`, `MState.okP_issue`, `MState.okP_storeL`, ...). -/
 
 /-- **THE ISSUE of a plain store** (route P): the store's entry, keyed by its
 ISSUE stamp `top + 1`, is pushed on top of the footprint's histories, the
-author log and the issuing pc are recorded as for `MState.store`, and the
+author log and the issuing pc (the hart's `PC`) are recorded, and the
 stamp joins the hart's buffer with the hart's current epoch; it does NOT land
 (no landing position, no view moves).  The footprint's coherence floors reset,
 the acquire bit and the reservation clear. -/
@@ -510,13 +498,6 @@ def MState.readFwd (σ : MState) (cpu : CPU) (tvn : Nat) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) : Prop :=
   ∀ j, j < n → σ.byteFwd cpu tvn (pa + BitVec.ofNat 64 j) = some (nthByte w j)
 
-/-- **THE STAGING CONJUNCT** (route P, increments P-M1/P-M2): every store
-buffer is empty.  It holds of every state the machine reaches while a RAM store
-still issues and lands in one step (`MState.store`); increment P-M3 makes a
-plain store `issue` only and deletes it.  It is closed under a landing on its
-own (`MState.sbNil_land`), so `interp_land` does not rest on it. -/
-def MState.sbNil (σ : MState) : Prop := ∀ c, σ.sb c = []
-
 /-- **THE ROUTE-P MEMORY INVARIANT** (increment P-M2, design §2.1/§2.3; the pure
 part of the interpretation's route-P conjunct): every history is in CO order
 over the landing positions (`histOkP`); every reservation agrees with the
@@ -574,40 +555,13 @@ theorem MState.range'_one_succ (L : Nat) : List.range' 1 (L + 1) = List.range' 1
   have : 1 + 1 * L = L + 1 := by omega
   rw [this]
 
-/-- **THE P-M1 PLAIN STORE IS ISSUE THEN LAND** (the staging is route P with
-eager landing): with no pending entry already at the fresh stamp, a plain
-`MState.store` is the issue of the store followed at once by its landing. -/
-theorem MState.store_eq_land_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hf : ∀ p ∈ σ.sb cpu, p.1 ≠ σ.top + 1) :
-    σ.store cpu pa n w false = (σ.issue cpu pa n w).land cpu (σ.top + 1) := by
-  have hkeep : (σ.sb cpu).filter (fun p => p.1 != σ.top + 1) = σ.sb cpu := by
-    rw [List.filter_eq_self]; intro p hp; simpa using hf p hp
-  have hsb : (σ.sb cpu ++ [(σ.top + 1, σ.sbEp cpu)]).filter (fun p => p.1 != σ.top + 1) = σ.sb cpu := by
-    rw [List.filter_append, hkeep]; simp
-  unfold MState.store MState.issue MState.land
-  congr 1
-  all_goals funext x
-  all_goals first
-    | (by_cases hx : x = cpu <;> simp [updCpu, hx, hsb])
-    | (by_cases hx : x = σ.top + 1 <;> simp [hx])
-
 /-! ### The route-P invariant under every step (increment P-M2)
 
 `MState.okP_land` is THE GATE (design §2.3, plan rev 55 P-M2): a landing keeps the route-P
-invariant with no help from the staging conjunct `MState.sbNil` -- the landing-sensitive
-reservation clause by `landFootOk`'s no-reservation guard, the co order by its lowest-pending
-guard, the buffers by the oldest-epoch guard's membership.  The other steps of the P-M2
-machine keep it given `sbNil` (they still land every store at once). -/
+invariant -- the landing-sensitive reservation clause by `landFootOk`'s no-reservation guard,
+the co order by its lowest-pending guard, the buffers by the oldest-epoch guard's membership. -/
 
-/-- The staging conjunct is closed under a landing on its own. -/
-theorem MState.sbNil_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.sbNil) : (σ.land cpu t).sbNil := by
-  intro c
-  show (if c = cpu then (σ.sb cpu).filter (fun p => p.1 != t) else σ.sb c) = []
-  split
-  · rw [h cpu]; rfl
-  · exact h c
-
-/-- **A LANDING KEEPS THE ROUTE-P INVARIANT** (no staging premise). -/
+/-- **A LANDING KEEPS THE ROUTE-P INVARIANT** . -/
 theorem MState.okP_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) (h : σ.okP) :
     (σ.land cpu t).okP := by
   obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
@@ -701,235 +655,6 @@ theorem MState.okP_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu
     · subst hc; rw [if_pos rfl] at hp; exact hep c p (List.mem_filter.1 hp).1
     · rw [if_neg hc] at hp; exact hep c p hp
 
-/-- Under the staging conjunct every issued stamp has landed. -/
-theorem MState.okP_landed (σ : MState) (h : σ.okP) (hs : σ.sbNil) (t : Nat) (h1 : 1 ≤ t)
-    (h2 : t ≤ σ.top) : t ∈ σ.llog := by
-  obtain ⟨-, -, -, -, -, hph, hsb, -, -⟩ := h
-  by_cases hn : t ∈ σ.llog
-  · exact hn
-  · exfalso
-    obtain ⟨c, hc⟩ := hph t h1 h2 hn
-    obtain ⟨e, he⟩ := (hsb c t).2 ⟨h1, h2, hc, hn⟩
-    rw [hs c] at he; cases he
-
-/-- Under the staging conjunct the landing top is the issue top. -/
-theorem MState.okP_ltop (σ : MState) (h : σ.okP) (hs : σ.sbNil) : σ.ltop = σ.top := by
-  have hnd := h.2.2.2.1
-  have hll := h.2.2.2.2.1
-  apply Nat.le_antisymm
-  · have := nodup_length_le σ.llog (List.range' 1 σ.top) hnd (fun x hx => by
-      have := hll x hx; rw [List.mem_range'_1]; omega)
-    simpa using this
-  · have := nodup_length_le (List.range' 1 σ.top) σ.llog List.nodup_range' (fun x hx => by
-      rw [List.mem_range'_1] at hx; exact σ.okP_landed h hs x hx.1 (by omega))
-    simpa using this
-
-/-- Under the staging conjunct every history entry has landed. -/
-theorem MState.okP_entLanded (σ : MState) (h : σ.okP) (hs : σ.sbNil) (a : PAddr) (H : Hist)
-    (hget : σ.mem[a]? = some H) (e : HEnt) (he : e ∈ H) : (σ.lp e.t).isSome := by
-  have hb := ((h.1 a H hget).2 e he).1
-  by_cases h0 : e.t = 0
-  · rw [h0]; simp [lpOf]
-  · exact (lpOf_isSome_iff σ.llog e.t h0).2 (σ.okP_landed h hs e.t (by omega) hb)
-
-/-- Under the staging conjunct the landed top is the merged head. -/
-theorem MState.okP_topL (σ : MState) (h : σ.okP) (hs : σ.sbNil) (a : PAddr) :
-    (σ.mem[a]?).bind (Hist.topL σ.lp) = (σ.mem[a]?).bind Hist.top := by
-  cases hget : σ.mem[a]? with
-  | none => rfl
-  | some H => exact Hist.topL_eq_top σ.lp H (fun e he => σ.okP_entLanded h hs a H hget e he)
-
-/-- The landed-top reservation clause, from the merged-head one, under the staging conjunct. -/
-theorem MState.okP_resvL_of_top (σ : MState) (h : σ.okP) (hs : σ.sbNil) (resv : CPU → Option Resv)
-    (hr : ∀ c r, resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
-      (σ.mem[a]?).bind Hist.top = some v) :
-    ∀ c r, resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
-      (σ.mem[a]?).bind (Hist.topL σ.lp) = some v := by
-  intro c r hc a v hav
-  rw [σ.okP_topL h hs a]
-  exact hr c r hc a v hav
-
-/-- A store (issued and landed at once, P-M1/P-M2) keeps the invariant. -/
-theorem MState.okP_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) (hno : ¬ othersReserve σ.resv cpu pa n) (h : σ.okP) (hs : σ.sbNil) :
-    (σ.store cpu pa n w excl).okP := by
-  have hlt := σ.okP_ltop h hs
-  have hent := σ.okP_entLanded h hs
-  obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
-  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
-  have hlp' : lpOf (σ.llog ++ [σ.top + 1]) (σ.log.length + 1) = some (σ.llog.length + 1) :=
-    lpOf_snoc_self σ.llog _ (by omega) hfresh
-  have hlogE : ∀ s, 1 ≤ s → s ≤ σ.top → (σ.log ++ [hartAgent cpu])[s - 1]? = σ.log[s - 1]? := by
-    intro s h1 h2
-    rw [List.getElem?_append_left (by simp only [MState.top] at h2; omega)]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro a H hget
-    refine (FlatMem.writeBytes_histOkP_landed σ.mem (lpOf (σ.llog ++ [σ.top + 1])) σ.log pa w
-      (hartAgent cpu) (σ.llog.length + 1) hlp' ?_ a H hget).1
-    intro a' H' hget'
-    have hold := h1 a' H' hget'
-    have hne : ∀ e ∈ H', lpOf (σ.llog ++ [σ.top + 1]) e.t = lpOf σ.llog e.t := fun e he =>
-      lpOf_snoc_ne σ.llog _ e.t (by have := (hold.2 e he).1; simp only [MState.top]; omega)
-    refine ⟨histOkP_append _ _ _ _ (histOkP_congr _ _ _ _ hne hold), fun e he => ?_⟩
-    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (hent a' H' hget' e he)
-    exact ⟨p, by rw [hne e he]; exact hp, Nat.le_succ_of_le (lpOf_le σ.llog e.t p hp)⟩
-  · intro c r hr a v hav
-    simp only [updCpu] at hr
-    by_cases hc : c = cpu
-    · subst hc; simp at hr
-    · rw [if_neg hc] at hr
-      have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
-        intro j hj heq
-        apply hno
-        refine ⟨c, hc, r, hr, j, hj, ?_⟩
-        rw [← heq, hav]; rfl
-      show ((σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))[a]?).bind
-        (Hist.topL (lpOf (σ.llog ++ [σ.top + 1]))) = some v
-      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
-      have hold := h2 c r hr a v hav
-      cases hget : σ.mem[a]? with
-      | none => rw [hget] at hold; cases hold
-      | some H =>
-        rw [hget] at hold
-        simp only [Option.bind_some] at hold ⊢
-        rw [Hist.topL_snoc_ne σ.llog _ H (fun e he heq => by
-          have := ((h1 a H hget).2 e he).1; simp only [MState.top] at heq; omega)]
-        exact hold
-  · intro c
-    obtain ⟨a1, a2, a3, a4⟩ := h3 c
-    show (σ.store cpu pa n w excl).tv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
-      (σ.store cpu pa n w excl).itv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
-      ((σ.store cpu pa n w excl).hr c).bound (σ.llog ++ [σ.top + 1]).length
-    simp only [MState.ltop, MState.top, List.length_append, List.length_singleton] at a1 a2 a3 a4 hlt ⊢
-    by_cases hc : c = cpu
-    · subst hc
-      simp only [updCpu, if_true]
-      refine ⟨?_, by omega, ?_, ?_⟩
-      · split <;> omega
-      · simp only [HRead.resetCoh, HRead.clearAcq]; omega
-      · intro a; simp only [HRead.resetCoh, HRead.clearAcq]; have := a4 a; split <;> omega
-    · simp only [updCpu, hc, if_false]
-      exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
-  · show (σ.llog ++ [σ.top + 1]).Nodup
-    exact List.nodup_append.2 ⟨hnd, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, fun x hx y hy => by
-      simp only [List.mem_singleton] at hy; subst hy; intro hxy; subst hxy; exact hfresh hx⟩
-  · intro s hs'
-    show 1 ≤ s ∧ s ≤ (σ.log ++ [hartAgent cpu]).length
-    simp only [List.length_append, List.length_singleton]
-    rcases List.mem_append.1 hs' with hs' | hs'
-    · have := hll s hs'; simp only [MState.top] at this; omega
-    · simp only [List.mem_singleton] at hs'; subst hs'; simp only [MState.top]; omega
-  · intro s hs1 hs2 hs3
-    have hs3' : s ∉ σ.llog := fun hm => hs3 (List.mem_append_left _ hm)
-    have hne : s ≠ σ.top + 1 := fun he => hs3 (List.mem_append_right _ (List.mem_singleton.2 he))
-    have hs2' : s ≤ σ.top := by
-      simp only [MState.top, List.length_append, List.length_singleton] at hs2 hne ⊢; omega
-    obtain ⟨c, hc⟩ := hph s hs1 hs2' hs3'
-    exact ⟨c, by show (σ.log ++ [hartAgent cpu])[s - 1]? = _; rw [hlogE s hs1 hs2']; exact hc⟩
-  · intro c s
-    show (∃ e, (s, e) ∈ σ.sb c) ↔ (1 ≤ s ∧ s ≤ (σ.log ++ [hartAgent cpu]).length ∧
-      (σ.log ++ [hartAgent cpu])[s - 1]? = some (hartAgent c) ∧ s ∉ σ.llog ++ [σ.top + 1])
-    constructor
-    · intro hm
-      obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 hm
-      refine ⟨a1, by simp only [List.length_append, List.length_singleton]; simp only [MState.top] at a2; omega,
-        by rw [hlogE s a1 a2]; exact a3, fun hm' => ?_⟩
-      rcases List.mem_append.1 hm' with hm' | hm'
-      · exact a4 hm'
-      · rw [List.mem_singleton] at hm'; omega
-    · rintro ⟨a1, a2, a3, a4⟩
-      have hne : s ≠ σ.top + 1 := fun he => a4 (List.mem_append_right _ (List.mem_singleton.2 he))
-      have a2' : s ≤ σ.top := by
-        simp only [MState.top, List.length_append, List.length_singleton] at a2 hne ⊢; omega
-      exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
-        fun hm => a4 (List.mem_append_left _ hm)⟩
-  · exact hord
-  · exact hep
-
-/-- A DMA write (lands at once) keeps the invariant. -/
-theorem MState.okP_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hno : ¬ anyReserve σ.resv pa n) (h : σ.okP) (hs : σ.sbNil) :
-    (σ.storeDma pa n w).okP := by
-  by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  rw [MState.storeDma_of_ne σ pa n w hn]
-  have hent := σ.okP_entLanded h hs
-  obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
-  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
-  have hlp' : lpOf (σ.llog ++ [σ.top + 1]) (σ.log.length + 1) = some (σ.llog.length + 1) :=
-    lpOf_snoc_self σ.llog _ (by omega) hfresh
-  have hlogE : ∀ s, 1 ≤ s → s ≤ σ.top → (σ.log ++ [diskAgent])[s - 1]? = σ.log[s - 1]? := by
-    intro s h1 h2
-    rw [List.getElem?_append_left (by simp only [MState.top] at h2; omega)]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro a H hget
-    refine (FlatMem.writeBytes_histOkP_landed σ.mem (lpOf (σ.llog ++ [σ.top + 1])) σ.log pa w
-      diskAgent (σ.llog.length + 1) hlp' ?_ a H hget).1
-    intro a' H' hget'
-    have hold := h1 a' H' hget'
-    have hne : ∀ e ∈ H', lpOf (σ.llog ++ [σ.top + 1]) e.t = lpOf σ.llog e.t := fun e he =>
-      lpOf_snoc_ne σ.llog _ e.t (by have := (hold.2 e he).1; simp only [MState.top]; omega)
-    refine ⟨histOkP_append _ _ _ _ (histOkP_congr _ _ _ _ hne hold), fun e he => ?_⟩
-    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (hent a' H' hget' e he)
-    exact ⟨p, by rw [hne e he]; exact hp, Nat.le_succ_of_le (lpOf_le σ.llog e.t p hp)⟩
-  · intro c r hr a v hav
-    have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
-      intro j hj heq
-      exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
-    show ((σ.mem.writeBytes pa n w (σ.top + 1) diskAgent)[a]?).bind
-      (Hist.topL (lpOf (σ.llog ++ [σ.top + 1]))) = some v
-    rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
-    have hold := h2 c r hr a v hav
-    cases hget : σ.mem[a]? with
-    | none => rw [hget] at hold; cases hold
-    | some H =>
-      rw [hget] at hold
-      simp only [Option.bind_some] at hold ⊢
-      rw [Hist.topL_snoc_ne σ.llog _ H (fun e he heq => by
-        have := ((h1 a H hget).2 e he).1; simp only [MState.top] at heq; omega)]
-      exact hold
-  · intro c
-    obtain ⟨a1, a2, a3, a4⟩ := h3 c
-    show σ.tv c ≤ (σ.llog ++ [σ.top + 1]).length ∧ σ.itv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
-      (σ.hr c).bound (σ.llog ++ [σ.top + 1]).length
-    simp only [MState.ltop, List.length_append, List.length_singleton] at a1 a2 a3 a4 ⊢
-    exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
-  · show (σ.llog ++ [σ.top + 1]).Nodup
-    exact List.nodup_append.2 ⟨hnd, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, fun x hx y hy => by
-      simp only [List.mem_singleton] at hy; subst hy; intro hxy; subst hxy; exact hfresh hx⟩
-  · intro s hs'
-    show 1 ≤ s ∧ s ≤ (σ.log ++ [diskAgent]).length
-    simp only [List.length_append, List.length_singleton]
-    rcases List.mem_append.1 hs' with hs' | hs'
-    · have := hll s hs'; simp only [MState.top] at this; omega
-    · simp only [List.mem_singleton] at hs'; subst hs'; simp only [MState.top]; omega
-  · intro s hs1 hs2 hs3
-    have hs3' : s ∉ σ.llog := fun hm => hs3 (List.mem_append_left _ hm)
-    have hne : s ≠ σ.top + 1 := fun he => hs3 (List.mem_append_right _ (List.mem_singleton.2 he))
-    have hs2' : s ≤ σ.top := by
-      simp only [MState.top, List.length_append, List.length_singleton] at hs2 hne ⊢; omega
-    obtain ⟨c, hc⟩ := hph s hs1 hs2' hs3'
-    exact ⟨c, by show (σ.log ++ [diskAgent])[s - 1]? = _; rw [hlogE s hs1 hs2']; exact hc⟩
-  · intro c s
-    show (∃ e, (s, e) ∈ σ.sb c) ↔ (1 ≤ s ∧ s ≤ (σ.log ++ [diskAgent]).length ∧
-      (σ.log ++ [diskAgent])[s - 1]? = some (hartAgent c) ∧ s ∉ σ.llog ++ [σ.top + 1])
-    constructor
-    · intro hm
-      obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 hm
-      refine ⟨a1, by simp only [List.length_append, List.length_singleton]; simp only [MState.top] at a2; omega,
-        by rw [hlogE s a1 a2]; exact a3, fun hm' => ?_⟩
-      rcases List.mem_append.1 hm' with hm' | hm'
-      · exact a4 hm'
-      · rw [List.mem_singleton] at hm'; omega
-    · rintro ⟨a1, a2, a3, a4⟩
-      have hne : s ≠ σ.top + 1 := fun he => a4 (List.mem_append_right _ (List.mem_singleton.2 he))
-      have a2' : s ≤ σ.top := by
-        simp only [MState.top, List.length_append, List.length_singleton] at a2 hne ⊢; omega
-      exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
-        fun hm => a4 (List.mem_append_left _ hm)⟩
-  · exact hord
-  · exact hep
-
 /-- A plain load moves only its hart's read side, to a landing view. -/
 theorem MState.okP_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
     (h : σ.okP) : (σ.afterLoad cpu pa n tvn).okP := by
@@ -945,29 +670,9 @@ theorem MState.okP_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat
     · intro a
       simp only [HRead.afterLoad]
       have hs := LoadSrcs.stamp_le _ (hartAgent c) pa n a tvn
-        (fun j _ => FlatMem.loadSrcs_stampAt_le σ.mem (hartAgent c) tvn pa n j)
+        (fun j _ => FlatMem.loadSrcsP_stampAt_le σ.mem σ.lp (hartAgent c) tvn pa n j)
       have := a4 a
       omega
-  · simp only [updCpu, hc, if_false]
-    exact ⟨a1, a2, a3, a4⟩
-
-/-- An exclusive read: its snapshot is the merged head, which is the landed top under the staging
-conjunct; its views go to the issue top, which is the landing top. -/
-theorem MState.okP_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (acq : Bool) (h : σ.okP) (hs : σ.sbNil)
-    (hres : ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
-      r[a]? = some v → (σ.mem[a]?).bind Hist.top = some v) :
-    (σ.afterExcl cpu pa n w acq).okP := by
-  have hlt := σ.okP_ltop h hs
-  have hresL := σ.okP_resvL_of_top h hs _ hres
-  obtain ⟨h1, _, h3, h4⟩ := h
-  refine ⟨h1, hresL, fun c => ?_, h4⟩
-  obtain ⟨a1, a2, a3, a4⟩ := h3 c
-  simp only [MState.ltop, MState.top] at *
-  by_cases hc : c = cpu
-  · subst hc
-    simp only [updCpu, if_true, HRead.afterExcl]
-    exact ⟨by split <;> omega, a2, by dsimp only; omega, a4⟩
   · simp only [updCpu, hc, if_false]
     exact ⟨a1, a2, a3, a4⟩
 
@@ -979,32 +684,6 @@ theorem MState.okP_dropResv (σ : MState) (cpu : CPU) (h : σ.okP) : (σ.dropRes
   split at hr
   · cases hr
   · exact h2 c r hr
-
-/-- A fence: views to at most the landing top (the hart's last store is landed under the
-staging conjunct), the store epoch up. -/
-theorem MState.okP_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : σ.okP) (hs : σ.sbNil) :
-    (σ.fence cpu b).okP := by
-  have hlt := σ.okP_ltop h hs
-  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := h
-  have hpub := ownPub_le (hartAgent cpu) σ.log
-  refine ⟨h1, h2, fun c => ?_, h4, h5, h6, h7, h8, fun c p hp => ?_⟩
-  · obtain ⟨a1, a2, a3, a4⟩ := h3 c
-    obtain ⟨b1, b2, b3, b4⟩ := h3 cpu
-    simp only [MState.ltop, MState.top] at *
-    by_cases hc : c = cpu
-    · subst hc
-      simp only [updCpu, if_true]
-      refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 (by omega), ?_, a3, a4⟩
-      split
-      · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 (by omega)⟩
-      · exact b2
-    · simp only [updCpu, hc, if_false]
-      exact ⟨a1, a2, a3, a4⟩
-  · have := h9 c p hp
-    show p.2 ≤ (if c = cpu then (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) else σ.sbEp c)
-    by_cases hc : c = cpu
-    · subst hc; rw [if_pos rfl]; split <;> omega
-    · rw [if_neg hc]; exact this
 
 /-- A fence moves store epochs up only. -/
 theorem MState.fence_sbEp_ge (σ : MState) (cpu : CPU) (b : barrier_kind) (c : CPU) :
@@ -1060,14 +739,14 @@ theorem MState.okP_boot (σ : MState) (h : bootFacts σ) : σ.okP := by
 /-! ### The plain store's FINAL step and the plain read's reading (increment P-M3a)
 
 Route P's plain store is `MState.issue` (design §2.2; the machine switches to it with the readers,
-`PROGRESS-W11F.md` §9): it keeps the route-P invariant with NO staging premise and no guard -- its
+`PROGRESS-W11F.md` §9): it keeps the route-P invariant with no guard -- its
 entries are PENDING (no landed top moves, so no reservation's agreement does; no view moves), at
 the fresh stamp on top of the footprint's histories (co order: above every pending entry, of a
 smaller stamp, and every landed one), and its stamp joins the hart's buffer at its current epoch.
 A plain read FORWARDS (`MState.byteFwd`); under the invariant that is exactly the co-latest entry
 VISIBLE over landing positions (`MState.byteFwd_eq_readP`). -/
 
-/-- **AN ISSUE KEEPS THE ROUTE-P INVARIANT** (no staging premise, no guard). -/
+/-- **AN ISSUE KEEPS THE ROUTE-P INVARIANT** (no guard). -/
 theorem MState.okP_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (h : σ.okP) : (σ.issue cpu pa n w).okP := by
   obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
@@ -1267,61 +946,15 @@ theorem MState.readFwd_iff (σ : MState) (h : σ.okP) (cpu : CPU) (tvn : Nat) (p
 
 /-! ### The writes that land at once, the exclusive read and the fence, in their route-P form (P-M3b)
 
-The FINAL route-P shapes (design §2.2) of the four steps the P-M2 machine still takes in
-issue-stamp coordinates (`MState.store` with `excl`, `MState.storeDma`, `MState.afterExcl`,
-`MState.fence`): an exclusive or DMA write lands AT ONCE, its entry inserted right below each
+The route-P shapes (design §2.2) of the four steps: an exclusive or DMA write lands AT ONCE, its entry inserted right below each
 footprint byte's pending prefix (`FlatMem.landBytes`, over the landing positions after it) and its
 stamp straight into the landing log; an exclusive read's floor goes to the LANDING top; a fence's
 publication is the hart's last LANDED store (`ownPubL`).  Each keeps the route-P invariant with
-NO staging premise.  The machine switches to them with the readers (`PROGRESS-W11F.md` §9). -/
-
-/-- **THE EXCLUSIVE WRITE, route P** (an AMO's write half, `sc`, the walker's A/D write-back): it
-lands at once -- inserted below the footprint's pending prefix, co-after every landed entry,
-co-before every pending one -- at the issue stamp `top + 1` and the landing position `ltop + 1`;
-the floor passes it (its LANDING position) iff it is the write half of an acquire pair; the pending
-acquire bit and the reservation clear and the footprint's coherence floors reset (as for
-`MState.store`); the store's pc record is `-1`. -/
-abbrev MState.storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
-  { σ with mem := σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) (hartAgent cpu),
-           log := σ.log ++ [hartAgent cpu],
-           llog := σ.llog ++ [σ.top + 1],
-           pcAt := fun t => if t = σ.top + 1 then -1 else σ.pcAt t,
-           tv := updCpu σ.tv cpu (if (σ.hr cpu).acq then σ.ltop + 1 else σ.tv cpu),
-           hr := updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n),
-           resv := updCpu σ.resv cpu none }
-
-/-- **THE DMA WRITE, route P**: lands at once (as `MState.storeL`, by the disk; a zero-byte DMA
-write is a no-op, as for `MState.storeDma`). -/
-abbrev MState.storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
-  { σ with mem := if n = 0 then σ.mem else
-               σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent,
-           log := if n = 0 then σ.log else σ.log ++ [diskAgent],
-           llog := if n = 0 then σ.llog else σ.llog ++ [σ.top + 1],
-           pcAt := if n = 0 then σ.pcAt else fun t => if t = σ.top + 1 then -1 else σ.pcAt t }
-
-/-- **THE EXCLUSIVE READ'S EFFECT, route P**: the watermark to the LANDING top, the floor to it iff
-an acquire, the acquire bit recorded, the snapshot (of the LANDED top, `FlatMem.topBytesL`)
-reserved. -/
-abbrev MState.afterExclL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (acq : Bool) : MState :=
-  { σ with tv := updCpu σ.tv cpu (if acq then σ.ltop else σ.tv cpu),
-           hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.ltop acq),
-           resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
-
-/-- **THE FENCE, route P**: as `MState.fence`, the publication the hart's last LANDED store
-(`ownPubL`; a draining fence finds the buffer empty, so it is the hart's last store). -/
-abbrev MState.fenceL (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
-  let pub := ownPubL (hartAgent cpu) σ.log σ.llog
-  let tv' := fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv pub
-  { σ with tv := updCpu σ.tv cpu tv',
-           itv := updCpu σ.itv cpu
-             (if fenceIfetch b then max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv pub)
-              else σ.itv cpu),
-           sbEp := updCpu σ.sbEp cpu (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) }
+no premise beyond the step's own guards. -/
 
 /-- A write that lands at once, by agent `g`: the old histories, over the landing positions
 after it, are in co order and landed at most at its position (the core of `okP_storeL` and
-`okP_storeDmaL`). -/
+`okP_storeDma`). -/
 theorem MState.okP_landNow_hist (σ : MState) (g : Agent) (h : σ.okP) :
     ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H →
       histOkP (lpOf (σ.llog ++ [σ.top + 1])) (σ.log ++ [g]) H ∧
@@ -1334,7 +967,7 @@ theorem MState.okP_landNow_hist (σ : MState) (g : Agent) (h : σ.okP) :
   rw [hne e he] at hp
   exact Nat.le_succ_of_le (lpOf_le σ.llog e.t p hp)
 
-/-- **AN EXCLUSIVE WRITE (route P) KEEPS THE ROUTE-P INVARIANT** (no staging premise): another
+/-- **AN EXCLUSIVE WRITE (route P) KEEPS THE ROUTE-P INVARIANT** : another
 hart's reservation is off its footprint (the step's guard), its own clears. -/
 theorem MState.okP_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hno : ¬ othersReserve σ.resv cpu pa n) (h : σ.okP) : (σ.storeL cpu pa n w).okP := by
@@ -1421,19 +1054,19 @@ theorem MState.okP_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : 
       exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
         fun hm => a4 (List.mem_append_left _ hm)⟩
 
-/-- **A DMA WRITE (route P) KEEPS THE ROUTE-P INVARIANT** (no staging premise): no hart reserves
+/-- **A DMA WRITE (route P) KEEPS THE ROUTE-P INVARIANT** : no hart reserves
 a byte of its footprint (the step's guard). -/
-theorem MState.okP_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hno : ¬ anyReserve σ.resv pa n) (h : σ.okP) : (σ.storeDmaL pa n w).okP := by
+theorem MState.okP_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hno : ¬ anyReserve σ.resv pa n) (h : σ.okP) : (σ.storeDma pa n w).okP := by
   by_cases hn : n = 0
   · subst hn; exact h
   have hhist := σ.okP_landNow_hist diskAgent h
-  have eDma : σ.storeDmaL pa n w =
+  have eDma : σ.storeDma pa n w =
       { σ with mem := σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1) diskAgent,
                log := σ.log ++ [diskAgent],
                llog := σ.llog ++ [σ.top + 1],
                pcAt := fun t => if t = σ.top + 1 then -1 else σ.pcAt t } := by
-    simp only [MState.storeDmaL, if_neg hn]
+    simp only [MState.storeDma, if_neg hn]
   rw [eDma]
   obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
   have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
@@ -1502,13 +1135,13 @@ theorem MState.okP_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8
       exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
         fun hm => a4 (List.mem_append_left _ hm)⟩
 
-/-- **AN EXCLUSIVE READ (route P) KEEPS THE ROUTE-P INVARIANT** (no staging premise): its views go
+/-- **AN EXCLUSIVE READ (route P) KEEPS THE ROUTE-P INVARIANT** : its views go
 to the landing top; its snapshot agrees with the LANDED top (`hres`, the step's reading). -/
-theorem MState.okP_afterExclL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+theorem MState.okP_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) (h : σ.okP)
-    (hres : ∀ c r, (σ.afterExclL cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
+    (hres : ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
       r[a]? = some v → (σ.mem[a]?).bind (Hist.topL σ.lp) = some v) :
-    (σ.afterExclL cpu pa n w acq).okP := by
+    (σ.afterExcl cpu pa n w acq).okP := by
   obtain ⟨h1, _, h3, h4⟩ := h
   refine ⟨h1, hres, fun c => ?_, h4⟩
   obtain ⟨a1, a2, a3, a4⟩ := h3 c
@@ -1522,9 +1155,9 @@ theorem MState.okP_afterExclL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
 
 /-- The snapshot of the LANDED top is what an exclusive read (route P) reserves: the reservation
 clause after it, from the reading `FlatMem.topBytesL` and every other hart's reservation. -/
-theorem MState.afterExclL_resv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+theorem MState.afterExcl_resv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) (h : σ.okP) (hn : n < 2 ^ 64) (htop : σ.mem.topBytesL σ.lp pa n w) :
-    ∀ c r, (σ.afterExclL cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
+    ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
       r[a]? = some v → (σ.mem[a]?).bind (Hist.topL σ.lp) = some v := by
   intro c r hr a v hav
   have hr' : (if c = cpu then some (snapOf pa n w) else σ.resv c) = some r := hr
@@ -1538,10 +1171,10 @@ theorem MState.afterExclL_resv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) 
     · rw [snapOf_get?_notin pa n w a hin] at hav; cases hav
   · exact h.2.1 c r hr' a v hav
 
-/-- **A FENCE (route P) KEEPS THE ROUTE-P INVARIANT** (no staging premise): its publication is a
+/-- **A FENCE (route P) KEEPS THE ROUTE-P INVARIANT** : its publication is a
 landing position (`ownPubL_le`). -/
-theorem MState.okP_fenceL (σ : MState) (cpu : CPU) (b : barrier_kind) (h : σ.okP) :
-    (σ.fenceL cpu b).okP := by
+theorem MState.okP_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : σ.okP) :
+    (σ.fence cpu b).okP := by
   obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := h
   have hpub := ownPubL_le (hartAgent cpu) σ.log σ.llog
   refine ⟨h1, h2, fun c => ?_, h4, h5, h6, h7, h8, fun c p hp => ?_⟩
@@ -1563,14 +1196,6 @@ theorem MState.okP_fenceL (σ : MState) (cpu : CPU) (b : barrier_kind) (h : σ.o
     · subst hc; rw [if_pos rfl]; split <;> omega
     · rw [if_neg hc]; exact this
 
-/-- A fence (route P) moves store epochs up only. -/
-theorem MState.fenceL_sbEp_ge (σ : MState) (cpu : CPU) (b : barrier_kind) (c : CPU) :
-    σ.sbEp c ≤ (σ.fenceL cpu b).sbEp c := by
-  show σ.sbEp c ≤ (if c = cpu then (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) else σ.sbEp c)
-  by_cases hc : c = cpu
-  · subst hc; rw [if_pos rfl]; split <;> omega
-  · rw [if_neg hc]; exact Nat.le_refl _
-
 /-! ### `pendOne`, `ctxLanded`, and the step-time readings under a landing (P-M2 vocabulary)
 
 The two invariant notions the store rules (P-M3/P-M7) and the context hop (P-M5/P-M6) will carry
@@ -1589,11 +1214,6 @@ theorem MState.pendOneAt_land (σ : MState) (c cpu : CPU) (t : Nat) (pa : PAddr)
   obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (h j hj H hH e he hne)
   show (lpOf (σ.llog ++ [t]) e.t).isSome
   rw [lpOf_snoc_of_some σ.llog t e.t p hp]; rfl
-
-/-- Under the staging conjunct every footprint satisfies `pendOne`. -/
-theorem MState.pendOneAt_of_sbNil (σ : MState) (h : σ.okP) (hs : σ.sbNil) (cpu : CPU) (pa : PAddr)
-    (n : Nat) : σ.pendOneAt cpu pa n :=
-  fun _ _ H hH e he _ => σ.okP_entLanded h hs _ H hH e he
 
 /-- **`ctxLanded`** (design §2.3) of a context certificate with per-author vector bound `Vb`
 (issue stamps) and release stamp `r`: once `r` has landed at `p`, every store of every author `X`
@@ -1638,19 +1258,53 @@ theorem MState.ctxLandedAt_own (σ : MState) (A : CPU) (s r : Nat)
       ∃ q, q < p ∧ σ.lp t = some q :=
   fun p hp t h1 h2 ht => hlb t r p h1 h2 hsr ht hrA hp
 
-/-- What a DMA read sees, over the LANDED top (route P; P-M3's reading of `dmaRead`). -/
-def dmaViewL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
-  ∀ j, j < n → ∀ b, (σ.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL σ.lp) = some b → nthByte w j = b
+/-! ## NAMED ASSUMPTION [OWN.127]/[OWN.131] (xv6 weak-memory bug #1)
 
-/-- A DMA read's view is step-time: no landing moves it. -/
-theorem dmaView_land (σ : MState) (c : CPU) (t : Nat) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    dmaView (σ.land c t) pa n w ↔ dmaView σ pa n w := Iff.rfl
+`virtio_disk_init` zeroes the three virtqueue pages (`memset` of `desc`, `avail`, `used` at
+`virtio_disk_init+0xf0/+0x102/+0x10c`) and then makes the queue live with the MMIO store
+`STATUS |= DRIVER_OK` (`virtio_disk_init+0x170`) WITHOUT a fence between them.  Under RVWMO +
+the PMAs a RAM store and a later MMIO store of the same hart are unordered without `fence w,o`,
+so the (polling) device may read the pre-zeroing junk (`notes/xv6-weak-memory-bugs.md`, entry 1).
+The machine therefore carries ONE step guard, at that one instruction only: hart 0's MMIO
+store at `virtio_disk_init+0x170` waits until hart 0 has no pending store touching any of the
+three queue pages named in the device's configuration -- as if a `fence w,o` were there.  This
+is STRONGER than RVWMO at that instruction (by design, the owner's ruling; the kernel is
+unchanged, [OWN.4]); no other step of the machine is affected. -/
 
-/-- Under the staging conjunct the merged-head and landed-top DMA views agree. -/
-theorem dmaView_iff_L (σ : MState) (h : σ.okP) (hs : σ.sbNil) (pa : PAddr) (n : Nat)
-    (w : BitVec (8 * n)) : dmaView σ pa n w ↔ dmaViewL σ pa n w := by
-  unfold dmaView dmaViewL
-  simp only [σ.okP_topL h hs]
+/-- The image address of `virtio_disk_init+0x170` (`sw s2,112(a4)`, `STATUS |= DRIVER_OK`):
+`virtio_disk_init = 0x8000592c` in the kernel ELF the language loads (`MachCSL.KernelElf`);
+`Xv6.drvOkPc_eq` checks it against the kernel's symbol table. -/
+def drvOkPc : BitVec 64 := 0x80005a9c#64
+
+/-- The size of one virtqueue page (xv6's `PGSIZE`; each `memset` zeroes one whole page). -/
+def vqPageSize : Nat := 4096
+
+/-- Hart `cpu` has a PENDING store touching one of the three virtqueue pages that the virtio
+device's configuration names (`desc`, `avail`, `used`). -/
+def MState.vqPagesPend (σ : MState) (cpu : CPU) : Prop :=
+  σ.sbOverlaps cpu (show VirtioState from σ.devs.st .virtio).cfg.desc vqPageSize ∨
+  σ.sbOverlaps cpu (show VirtioState from σ.devs.st .virtio).cfg.avail vqPageSize ∨
+  σ.sbOverlaps cpu (show VirtioState from σ.devs.st .virtio).cfg.used vqPageSize
+
+/-- **NAMED ASSUMPTION [OWN.127]/[OWN.131] (xv6 weak-memory bug #1)**: the guard of an MMIO
+store -- hart 0's store at `virtio_disk_init+0x170` (`DRIVER_OK`) waits until hart 0 has no
+pending store to the three virtqueue pages.  Trivially true at every other hart and pc. -/
+def MState.drvOkGuard (σ : MState) (cpu : CPU) : Prop :=
+  cpu.val = 0 → (σ.regs cpu) Register.PC = drvOkPc → ¬ σ.vqPagesPend cpu
+
+/-- With an empty store buffer the guard holds. -/
+theorem MState.drvOkGuard_of_sb_nil (σ : MState) (cpu : CPU) (h : σ.sb cpu = []) :
+    σ.drvOkGuard cpu := by
+  intro _ _ hp
+  rcases hp with ⟨p, hp, _⟩ | ⟨p, hp, _⟩ | ⟨p, hp, _⟩ <;> rw [h] at hp <;> cases hp
+
+/-- Away from hart 0 the guard holds. -/
+theorem MState.drvOkGuard_of_ne (σ : MState) (cpu : CPU) (h : cpu.val ≠ 0) :
+    σ.drvOkGuard cpu := fun h0 => absurd h0 h
+
+/-- Away from the `DRIVER_OK` pc the guard holds. -/
+theorem MState.drvOkGuard_of_pc (σ : MState) (cpu : CPU) (h : (σ.regs cpu) Register.PC ≠ drvOkPc) :
+    σ.drvOkGuard cpu := fun _ hpc => absurd hpc h
 
 /-! ## The per-event step relation -/
 
@@ -1668,22 +1322,30 @@ device and no DRAM byte answers -- has no answer at all.
 
 The memory transactions:
 
+Views are LANDING positions (route P [OWN.110] [OWN.113]: the global order is
+the order in which stores land; `MState.lp`, `MState.ltop`).
+
 * a **fetch** (`AK_ifetch`) reads every byte of the footprint as the hart's
   instruction-cache agent at one view between the hart's instruction view
-  and the top, and moves nothing;
+  and the landing top, over the landed entries (the fetcher never forwards),
+  and moves nothing;
 * a **plain read** (explicit non-exclusive, or a page-table walk) reads as
   the hart at one view between its floor (and the footprint's coherence
-  floors) and the top; the floor stays, the watermark and the footprint's
+  floors) and the landing top, FORWARDING from the hart's own buffer
+  (`MState.readFwd`); the floor stays, the watermark and the footprint's
   coherence floors move;
-* an **exclusive read** (LR, the read half of an AMO) reads at the top,
-  takes the reservation, and moves the floor to the top iff it is an
-  acquire -- unless another hart reserves a byte of the footprint, or a
-  pending store of the hart's own buffer touches it (route P, the
+* an **exclusive read** (LR, the read half of an AMO, the walker's A/D read)
+  reads at the LANDED top, takes the reservation, and moves the floor to the
+  landing top iff it is an acquire -- unless another hart reserves a byte of
+  the footprint, or a pending store of the hart's own buffer touches it (the
   same-address drain `MState.sbOverlaps`), in which case it is blocked
   (`blockedStep`);
-* a **write** appends at the top (`MState.store`; route P increment P-M1: it
-  issues and lands in one step) unless another hart reserves a byte of the
-  footprint, or it would overtake a pending store it must not
+* a **plain write** ISSUES (`MState.issue`): its entry joins the footprint's
+  histories PENDING, its stamp the hart's store buffer; it lands later, by
+  `primStep`'s land arm (`MState.landOk`);
+* an **exclusive write** (an AMO's or SC's write half, the walker's A/D
+  write-back) LANDS AT ONCE (`MState.storeL`) unless another hart reserves a
+  byte of the footprint, or it would overtake a pending store it must not
   (`MState.landNowOk`: one of an earlier fence epoch or one touching its
   bytes, F-P-W1-1; any, for a release write) -- blocked then;
 * a **fence** moves the hart's views and its store epoch (`MState.fence`);
@@ -1691,7 +1353,11 @@ The memory transactions:
   empty (`fenceDrainsSb`; blocked until then).
 
 (The narrow δ1 stale exclusive read and its silent write [OWN.105] are
-RETIRED, [OWN.114]: under route P a failed acquire reads the landed top.) -/
+RETIRED, [OWN.114]: under route P a failed acquire reads the landed top.)
+
+An MMIO store additionally passes `MState.drvOkGuard` -- NAMED ASSUMPTION [OWN.127]/[OWN.131]
+(xv6 weak-memory bug #1): hart 0's `DRIVER_OK` store waits for its pending virtqueue-page
+stores (blocked until then, `blockedStep`); every other MMIO store is unaffected. -/
 abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
     o.ret → MState → Prop :=
   match o with
@@ -1702,25 +1368,28 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
         ∃ w ds', devRead σ.devs req.pa n = some (w, ds') ∧ v = .Ok (w, none) ∧
           σ' = { σ with devs := ds' }) ∨
       (ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧
-        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
-          σ.mem.readBytes (ifetchAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧ σ' = σ) ∨
+        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.itv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧
+          σ.mem.readBytesP σ.lp (ifetchAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧ σ' = σ) ∨
       (ramBytes req.pa n ∧ akPlain req.access_kind = true ∧
-        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
+        ∃ (tvn : Nat) (w : BitVec (8 * n)), σ.tv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧
           (σ.hr cpu).cohOk req.pa n tvn ∧
-          σ.mem.readBytes (hartAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧
+          σ.readFwd cpu tvn req.pa n w ∧ v = .Ok (w, none) ∧
           σ' = σ.afterLoad cpu req.pa n tvn) ∨
       (ramBytes req.pa n ∧ akExcl req.access_kind = true ∧
         ¬ othersReserve σ.resv cpu req.pa n ∧ ¬ σ.sbOverlaps cpu req.pa n ∧
-        ∃ w : BitVec (8 * n), σ.mem.topBytes req.pa n w ∧ v = .Ok (w, none) ∧
+        ∃ w : BitVec (8 * n), σ.mem.topBytesL σ.lp req.pa n w ∧ v = .Ok (w, none) ∧
           σ' = σ.afterExcl cpu req.pa n w (akAcq req.access_kind))
   | .memWrite n _ req => fun v σ' =>
       (devBytes req.pa n ∧
         ∃ w ds', req.value = some w ∧ devWrite σ.devs req.pa n w = some ds' ∧
-          v = .Ok (some true) ∧ σ' = { σ with devs := ds' }) ∨
-      (ramBytes req.pa n ∧
+          v = .Ok (some true) ∧ σ' = { σ with devs := ds' } ∧ σ.drvOkGuard cpu) ∨
+      (ramBytes req.pa n ∧ akExcl req.access_kind = false ∧
+        ∃ w : BitVec (8 * n), req.value = some w ∧
+          v = .Ok (some true) ∧ σ' = σ.issue cpu req.pa n w) ∨
+      (ramBytes req.pa n ∧ akExcl req.access_kind = true ∧
         ∃ w : BitVec (8 * n), req.value = some w ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
           σ.landNowOk cpu req.pa n req.access_kind ∧
-          v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind))
+          v = .Ok (some true) ∧ σ' = σ.storeL cpu req.pa n w)
   | .readRam .. => fun _ _ => False
   | .writeRam .. => fun _ _ => False
   | .barrier b => fun _ σ' => (fenceDrainsSb b = true → σ.sb cpu = []) ∧ σ' = σ.fence cpu b
@@ -1737,12 +1406,13 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
   | .instrAnnounce _ _ => fun _ σ' => σ' = σ
   | .branchAnnounce _ _ => fun _ σ' => σ' = σ
 
-/-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
-reservation -- or (route P) waits for the hart's own pending stores to land:
-an exclusive read for those touching its footprint, a write that lands at
-once for those it may not overtake (`MState.landNowOk`), a draining fence for
+/-- `blockedStep cpu o σ σ'`: an exclusive event `o` is blocked by another
+hart's reservation -- or (route P) waits for the hart's own pending stores to
+land: an exclusive read for those touching its footprint, an exclusive write
+(it lands at once) for those it may not overtake (`MState.landNowOk`), a draining fence for
 all of them; the hart self-loops (the event is retried), a blocked exclusive
-read dropping the hart's own reservation. -/
+read dropping the hart's own reservation.  The one blocked MMIO store is hart 0's
+`DRIVER_OK` store under the NAMED ASSUMPTION [OWN.127]/[OWN.131] (`MState.drvOkGuard`). -/
 abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState) : Prop :=
   match o with
   | .memRead n _ req =>
@@ -1750,9 +1420,11 @@ abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MSt
         (othersReserve σ.resv cpu req.pa n ∨ σ.sbOverlaps cpu req.pa n) ∧
         σ' = σ.dropResv cpu
   | .memWrite n _ req =>
-      (othersReserve σ.resv cpu req.pa n ∨
-        ramBytes req.pa n ∧ ¬ σ.landNowOk cpu req.pa n req.access_kind) ∧
-        σ' = σ
+      (akExcl req.access_kind = true ∧
+        (othersReserve σ.resv cpu req.pa n ∨
+          ramBytes req.pa n ∧ ¬ σ.landNowOk cpu req.pa n req.access_kind) ∧
+        σ' = σ) ∨
+      (devBytes req.pa n ∧ 0 < n ∧ ¬ σ.drvOkGuard cpu ∧ σ' = σ)
   | .barrier b => fenceDrainsSb b = true ∧ σ.sb cpu ≠ [] ∧ σ' = σ
   | _ => False
 

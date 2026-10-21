@@ -295,7 +295,11 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩ := hpure
     ihave %hll := diskLo_agree γ lo' lo $$ Hlo Hlot
     subst lo'
-    ihave %hlt := diskPubLb_le γ np (lo + 1) $$ HnpM Hlb
+    icases availIdxRes_auth γ _ np lo e3 $$ HnpM with ⟨%npc, %hnpc, HnpM, HnpMb⟩
+    ihave %hltc := diskPubLb_le γ npc (lo + 1) $$ HnpM Hlb
+    have hlt : lo + 1 ≤ np := by omega
+    ihave HnpM := HnpMb $$ HnpM
+    ihave HnpM := availIdxRes_pop γ _ np lo $$ HnpM Hlb
     ihave %hrl := posRec_lookup γ pmap lo i $$ Hpos Hrec
     have hri : ring (lo % NUM) = i := by
       have hx := e5.2 lo (Nat.le_refl lo) (by omega)
@@ -1872,16 +1876,15 @@ theorem chainLease_accBuf (pd : PAddr) (c : Chain) (hdw : c.dwr = false) :
   unfold chainLease
   rw [bufW_read c hdw]
   iintro ⟨H0, H1, H2, H3, H4, H5, H6⟩
-  icases ctxBytes_split_raw c.ctx c.data BSIZE c.payw $$ H6 with ⟨%Hs, Hraw, %hh, Hctx⟩
-  isplitl [Hraw]
-  · unfold dmaHalfAt
-    iexists Hs
-    iframe Hraw
-    ipureintro; exact hh
+  icases ctxBytes_split_dma c.ctx c.data BSIZE c.payw $$ H6 with ⟨Hhalf, Hctx⟩
+  iframe Hhalf
   iintro Hhalf
   iframe H0 H1 H2 H3 H4 H5
-  iapply ctxBytes_join_dma c.ctx c.data BSIZE c.payw
-  iframe Hhalf Hctx
+  unfold dmaHalfAt ctxBytesL
+  icases Hhalf with ⟨%Hs, Hraw, %hh, #Hh⟩
+  iexists Hs
+  iframe Hraw Hh Hctx
+  ipureintro; exact hh
 
 /-- **The fetch's reads are pinned.**  Whatever piece of the armed chain
 the device reads, the permit says the chain is still `c`, and the
@@ -3200,17 +3203,20 @@ theorem dmaHalfAt_pinV (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (P : BitVec (8 * n) → IProp GF) (Q : BitVec (8 * n) → Prop) (hQ : Q w) :
     dmaHalfAt pa n w ∗ (dmaHalfAt pa n w -∗ P w) ⊢ dmaReadPinV pa n Q P := by
   unfold dmaReadPinV dmaHalfAt
-  iintro ⟨⟨%Hs, Hb, %hh⟩, Hback⟩
+  iintro ⟨⟨%Hs, Hb, %hh, #Hh⟩, Hback⟩
+  ileft
   iexists (fun _ => DFrac.own (1 : Qp).half), Hs, w
   iframe Hb
   isplit
   · ipureintro; exact hh
   isplit
   · ipureintro; exact hQ
+  isplitl []
+  · unfold dmaHeads; iexact Hh
   iintro Hb2
   iapply Hback
   iexists Hs
-  iframe Hb2
+  iframe Hb2 Hh
   ipureintro; exact hh
 
 /-- **What the `avail->idx` read leaves behind.**  Either the index is
@@ -3252,12 +3258,13 @@ beside the counters and the accounting that ties them together. -/
 theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     (hlive : Virtio.live c0 = true) :
     diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ s ⊢
-      ∃ (np lo : Nat) (ring : Nat → Nat) (st : Nat → HState) (pmap : List Nat),
+      ∃ (np lo : Nat) (ring : Nat → Nat) (st : Nat → HState) (pmap : List Nat) (stg : Option Nat),
         ⌜s.cfg = c0 ∧ c0.qnum.toNat = NUM ∧ s.seen = wrap16 lo ∧ lo ≤ np ∧
-          queueOk st ring lo np ∧ posOk pmap ring lo np⌝ ∗
-        diskLoAuth γ lo ∗ diskPubAuthM γ np ∗ posAuth γ pmap ∗ availLease c0.avail np ring ∗
-        (diskLoAuth γ lo -∗ diskPubAuthM γ np -∗ posAuth γ pmap -∗
-          availLease c0.avail np ring -∗ diskProto γ s) := by
+          queueOk st ring lo np ∧ posOk pmap ring lo np ∧ stageOk stg ring lo np⌝ ∗
+        diskLoAuth γ lo ∗ availIdxRes γ (availIdxAt c0.avail) np lo ∗ posAuth γ pmap ∗
+        availLease c0.avail np ring stg ∗
+        (diskLoAuth γ lo -∗ availIdxRes γ (availIdxAt c0.avail) np lo -∗ posAuth γ pmap -∗
+          availLease c0.avail np ring stg -∗ diskProto γ s) := by
   unfold diskProto
   iintro ⟨#Hfr0, %hc, %pn, %pm, Hpm, %hfr, Harm⟩
   icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
@@ -3271,9 +3278,9 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     unfold diskLive
     icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nr, %sb, %ue, Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnr, Hsb, Hcr, %hpure⟩
     obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩ := hpure
-    iexists np, lo, ring, st, pmap
+    iexists np, lo, ring, st, pmap, stg
     isplitl []
-    · ipureintro; exact ⟨hc0.1, hc0.2.2.1, e2, e3, e4, e5⟩
+    · ipureintro; exact ⟨hc0.1, hc0.2.2.1, e2, e3, e4, e5, e5b⟩
     iframe Hlo HnpM Hpos Hav
     iintro Hlo' HnpM' Hpos' Hav'
     isplitl []
@@ -3292,6 +3299,32 @@ theorem diskProto_open_queue (γ : DiskNames) (c0 : VirtioCfg) (s : VirtioState)
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩
 
+/-- The answer at a device-visible count `npc` (`lo ≤ npc`; position `lo` published when `lo <
+npc`), the count's authority kept. -/
+theorem availAnswer_at (γ : DiskNames) (st : Nat → HState) (ring : Nat → Nat) (pmap : List Nat)
+    (lo np npc : Nat) (hq : queueOk st ring lo np) (hp : posOk pmap ring lo np) (hle : lo ≤ npc)
+    (hnp : npc ≤ np) :
+    diskPubAuthM (GF := GF) γ npc ∗ posAuth γ pmap ⊢
+      diskPubAuthM γ npc ∗ posAuth γ pmap ∗ availAnswer γ lo (wrap16 npc) := by
+  iintro ⟨HnpM, Hpos⟩
+  unfold availAnswer
+  by_cases hnp' : npc = lo
+  · iframe HnpM Hpos
+    ileft
+    ipureintro
+    rw [hnp', extract16_self]
+  · have hlt : lo + 1 ≤ npc := by omega
+    obtain ⟨hlti, _⟩ := queueOk_head st ring lo np hq (by omega)
+    icases diskPubAuthM_lb γ npc (lo + 1) hlt $$ HnpM with ⟨HnpM, #Hlb⟩
+    icases posRec_get γ pmap lo (ring (lo % NUM))
+        (hp.2 lo (Nat.le_refl lo) (by omega)) $$ Hpos with ⟨Hpos, #Hrec⟩
+    iframe HnpM Hpos
+    iright
+    iexists (ring (lo % NUM))
+    isplitl []
+    · ipureintro; exact hlti
+    iframe Hlb Hrec
+
 /-- **The `avail->idx` pin.**  The invariant's half of the cell pins it to
 `wrap16 np`; what the read leaves in the loop's context is the ANSWER: if
 `np = lo` the queue is empty, and otherwise two PERSISTENT facts that
@@ -3306,41 +3339,92 @@ theorem leaseV_avail_pin (γ : DiskNames) (c0 : VirtioCfg) (lo : Nat) (v s' : Vi
   icases bodyKnow_live γ v lo c0 hlv $$ HC with ⟨Hlot, #Hfr0, %hp⟩
   obtain ⟨hsn, hcfg, hlive, hqnum⟩ := hp
   icases diskProto_open_queue γ c0 s' hlive $$ [$Hfr0 $HR]
-    with ⟨%np, %lo', %ring, %st, %pmap, %hq, Hlo, HnpM, Hpos, Hav, Hback⟩
+    with ⟨%np, %lo', %ring, %st, %pmap, %stg, %hq, Hlo, HnpM, Hpos, Hav, Hback⟩
   ihave %hll := diskLo_agree γ lo' lo $$ Hlo Hlot
   subst lo'
-  icases availLease_idx c0.avail np ring $$ Hav with ⟨Hidx, Havb⟩
+  obtain ⟨_, _, _, hlonp, hqo, hpo, _⟩ := hq
   rw [hcfg, availIdxAt_eq c0]
-  iapply dmaHalfAt_pinV (availIdxAt c0.avail) 2 (wrap16 np)
-    (fun w => iprop(diskProto γ s' ∗ (bodyKnow γ v lo c0 ∗ availAnswer γ lo w)))
-    (fun _ => True) trivial
-  iframe Hidx
-  iintro Hidx2
-  ihave Hav2 := Havb $$ Hidx2
-  ihave Hans : iprop(diskPubAuthM γ np ∗ posAuth γ pmap ∗ availAnswer γ lo (wrap16 np))
-      $$ [HnpM Hpos]
-  · unfold availAnswer
-    by_cases hnp : np = lo
-    · iframe HnpM Hpos
-      ileft
-      ipureintro
-      rw [hnp, extract16_self]
-    · have hlt : lo + 1 ≤ np := by omega
-      obtain ⟨hlti, _⟩ := queueOk_head st ring lo np hq.2.2.2.2.1 (by omega)
-      icases diskPubAuthM_lb γ np (lo + 1) hlt $$ HnpM with ⟨HnpM, #Hlb⟩
-      icases posRec_get γ pmap lo (ring (lo % NUM))
-          (hq.2.2.2.2.2.2 lo (Nat.le_refl lo) (by omega)) $$ Hpos with ⟨Hpos, #Hrec⟩
-      iframe HnpM Hpos
-      iright
-      iexists (ring (lo % NUM))
-      isplitl []
-      · ipureintro; exact hlti
-      iframe Hlb Hrec
-  icases Hans with ⟨HnpM, Hpos, Hans⟩
-  isplitl [Hback Hlo HnpM Hpos Hav2]
-  · iapply Hback $$ Hlo HnpM Hpos Hav2
-  · iframe Hans
-    iapply bodyKnow_mk γ v lo c0 hsn hcfg hlive hqnum $$ Hfr0 Hlot
+  unfold availIdxRes
+  icases HnpM with (⟨Hidx, HnpM⟩ | ⟨%hlt, Hpd, HnpM⟩)
+  · -- certified: the pin is the value `wrap16 np`
+    iapply dmaHalfAt_pinV (availIdxAt c0.avail) 2 (wrap16 np)
+      (fun w => iprop(diskProto γ s' ∗ (bodyKnow γ v lo c0 ∗ availAnswer γ lo w)))
+      (fun _ => True) trivial
+    iframe Hidx
+    iintro Hidx2
+    icases availAnswer_at γ st ring pmap lo np np hqo hpo hlonp (Nat.le_refl np) $$ [HnpM Hpos]
+      with ⟨HnpM, Hpos, Hans⟩
+    · iframe
+    isplitl [Hback Hlo HnpM Hpos Hav Hidx2]
+    · iapply Hback $$ Hlo [HnpM Hidx2] Hpos Hav
+      ileft; iframe
+    · iframe Hans
+      iapply bodyKnow_mk γ v lo c0 hsn hcfg hlive hqnum $$ Hfr0 Hlot
+  · -- the bump PENDING: the stack pin (base `np - 1`, or the landed top `np`)
+    unfold availIdxPend dmaReadPinV
+    icases Hpd with ⟨%Hs, %t, Hb, %⟨ht0, htop, hts, hbase⟩, #Hh⟩
+    iright
+    iexists (fun _ => DFrac.own (1 : Qp).half), Hs, t, wrap16 (np - 1), wrap16 np
+    iframe Hb
+    isplitr
+    · ipureintro; exact ⟨ht0, htop, hts, hbase⟩
+    isplitr
+    · ipureintro; exact ⟨trivial, trivial⟩
+    isplitr
+    · unfold dmaHeads; iexact Hh
+    isplit
+    · -- the base answer: the invariant stays pending
+      iintro Hb2
+      icases availAnswer_at γ st ring pmap lo np (np - 1) hqo hpo (by omega) (by omega)
+        $$ [HnpM Hpos] with ⟨HnpM, Hpos, Hans⟩
+      · iframe
+      imodintro
+      isplitl [Hback Hlo HnpM Hpos Hav Hb2]
+      · iapply Hback $$ Hlo [HnpM Hb2] Hpos Hav
+        iright
+        iframe HnpM
+        isplitr
+        · ipureintro; exact hlt
+        iexists Hs, t
+        iframe Hb2 Hh
+        ipureintro; exact ⟨ht0, htop, hts, hbase⟩
+      · iframe Hans
+        iapply bodyKnow_mk γ v lo c0 hsn hcfg hlive hqnum $$ Hfr0 Hlot
+    · -- the top answer: the store LANDED, so the cell is certified again
+      iintro %p #Hlt Hb2
+      imod diskPubAuthM_bump γ (np - 1) np (by omega) $$ HnpM with HnpM
+      icases availAnswer_at γ st ring pmap lo np np hqo hpo hlonp (Nat.le_refl np) $$ [HnpM Hpos]
+        with ⟨HnpM, Hpos, Hans⟩
+      · iframe
+      imodintro
+      isplitl [Hback Hlo HnpM Hpos Hav Hb2]
+      · iapply Hback $$ Hlo [HnpM Hb2] Hpos Hav
+        ileft
+        iframe HnpM
+        unfold dmaHalfAt
+        iexists Hs
+        iframe Hb2
+        isplitr
+        · ipureintro; exact htop
+        unfold dmaHeads
+        iapply (BigSepL.bigSepL_impl (l := List.range 2)
+          (Φ := fun _ (j : Nat) => iprop(∃ (e : HEnt) (p' : Nat), ⌜((Hs j).tail).head? = some e⌝ ∗
+            (⌜e.t = 0⌝ ∨ landedAt (GF := GF) e.t p')))) $$ Hh
+        imodintro
+        iintro %k %j %hk -
+        have hj : j < 2 := MachCSL.rangeIdx_lt hk
+        have h1 := htop j hj
+        cases hH : Hs j with
+        | nil => rw [hH] at h1; cases h1
+        | cons e H =>
+          iexists e, p
+          isplitr
+          · ipureintro; rfl
+          iright
+          rw [hts j hj e (by rw [hH]; rfl)]
+          iexact Hlt
+      · iframe Hans
+        iapply bodyKnow_mk γ v lo c0 hsn hcfg hlive hqnum $$ Hfr0 Hlot
 
 /-- **The ring-cell pin.**  The loop knows position `lo` is published and
 which head it names, so the cell's value is determined; the invariant's
@@ -3358,17 +3442,21 @@ theorem leaseV_ring_pin (γ : DiskNames) (c0 : VirtioCfg) (lo : Nat) (v s' : Vir
   icases Hans with ⟨%hbad | ⟨%i, %hi, #Hlb, #Hrec⟩⟩
   · exact absurd hbad hne
   icases diskProto_open_queue γ c0 s' hlive $$ [$Hfr0 $HR]
-    with ⟨%np, %lo', %ring, %st, %pmap, %hq, Hlo, HnpM, Hpos, Hav, Hback⟩
+    with ⟨%np, %lo', %ring, %st, %pmap, %stg, %hq, Hlo, HnpM, Hpos, Hav, Hback⟩
   ihave %hll := diskLo_agree γ lo' lo $$ Hlo Hlot
   subst lo'
-  ihave %hlt := diskPubLb_le γ np (lo + 1) $$ HnpM Hlb
+  icases availIdxRes_auth γ _ np lo hq.2.2.2.1 $$ HnpM with ⟨%npc, %hnpc, HnpM, HnpMb⟩
+  ihave %hltc := diskPubLb_le γ npc (lo + 1) $$ HnpM Hlb
+  have hlt : lo + 1 ≤ np := by omega
+  ihave HnpM := HnpMb $$ HnpM
   ihave %hrl := posRec_lookup γ pmap lo i $$ Hpos Hrec
   have hri : ring (lo % NUM) = i := by
-    have hx := hq.2.2.2.2.2.2 lo (Nat.le_refl lo) (by omega)
+    have hx := hq.2.2.2.2.2.1.2 lo (Nat.le_refl lo) (by omega)
     rw [hrl] at hx
     exact (Option.some.inj hx).symm
   obtain ⟨hlti, _⟩ := queueOk_head st ring lo np hq.2.2.2.2.1 (by omega)
-  icases availLease_cell c0.avail np ring (lo % NUM) (mod_NUM_lt lo) $$ Hav with ⟨Hcell, Havb⟩
+  icases availLease_cell c0.avail np ring stg (lo % NUM) (mod_NUM_lt lo)
+      (availStaged_pub np lo stg ring hq.2.2.2.2.2.2 (by omega)) $$ Hav with ⟨Hcell, Havb⟩
   rw [hcfg, hsn, availRingAt_eq c0 (wrap16 lo) hqnum, wrap16_mod8]
   iapply dmaHalfAt_pinV (availRingAt c0.avail (lo % NUM)) 2
     (BitVec.ofNat 16 (ring (lo % NUM)))

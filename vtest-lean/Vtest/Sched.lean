@@ -352,8 +352,7 @@ theorem showsB_sound (o : Observation) (res : Option (RunRes (TRun t))) (h : sho
 /-- Did this run end at a thread with no transition, having typed exactly
 the test's input? -/
 def stuckB : Option (RunRes (TRun t)) → Bool
-  | some (.stuck r) => decide (obsIn r.obs = t.uartInput) && r.pool.any errorNode &&
-      allCpus.all (fun c => (r.x.sb c).isEmpty)
+  | some (.stuck r) => decide (obsIn r.obs = t.uartInput) && r.pool.any errorNode
   | _ => false
 
 theorem stuckB_sound (res : Option (RunRes (TRun t))) (h : stuckB res = true) : RunNoStepAt t := by
@@ -361,7 +360,7 @@ theorem stuckB_sound (res : Option (RunRes (TRun t))) (h : stuckB res = true) : 
   split at h
   · rename_i r
     simp only [Bool.and_eq_true, decide_eq_true_eq] at h
-    exact r.noStep h.1.1 h.1.2 h.2
+    exact r.noStep h.1 h.2
   · exact absurd h (by simp)
 
 /-- THE SINGLE-HART THEOREM (Rocq `run_shows`): if the run under `cfg`

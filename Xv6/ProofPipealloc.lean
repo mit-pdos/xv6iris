@@ -702,7 +702,9 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     rw [KCtx.rget_withRegs']
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     rfl
-  iintro Hk Hpc ⟨Hpp0, %te, %hlote, #Htop, #Hent⟩
+  iintro Hk Hpc ⟨Hpp0, %te, %hlote, #Htop, #Hent, #Hfte, #Hau⟩
+  ihave #Hfte := (show keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx te ⊢ lkFloor (GF := GF) curCtx te
+    from .rfl) $$ Hfte
   -- the pipe is born, registered by the receipts of `f0->pipe = pi`
   icases kctx_rsvEq cI _ $$ Hk with ⟨%heqR, Hk⟩
   -- the pipe page's stack-free receipt (mcslrec (3) X1-c): its lock word's byte 0 is owned outright
@@ -718,26 +720,31 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     imodintro
     iframe Hmem Hmm Hlw Hr
   iintro ⟨Hlw, #Hrcpt⟩
-  ihave #Hreg : lkDynReg (GF := GF) pi (max lo lc) $$ []
+  ihave #Hreg : lkDynReg (GF := GF) pi (max lo lc) te $$ []
   · unfold lkDynReg
-    iexists entsList (fnode k0 + 16#64) 8 te (hartAgent cI) pi, te
+    iexists entsList (fnode k0 + 16#64) 8 te (hartAgent cI) pi
     isplit
     · ipureintro; exact hlote
-    unfold hopRegAt
     isplit
-    · iexact Htop
-    isplit
-    · iapply entsAt_list $$ Hent
-    isplit
-    · ipureintro
-      refine ⟨?_, hal⟩
-      rw [heqR]
-      exact pa_slotWit k0 hk0 te (hartAgent cI) pi
-    · iexact Hrcpt
+    · unfold hopRegAt
+      isplit
+      · iexact Htop
+      isplit
+      · iapply entsAt_list $$ Hent
+      isplit
+      · ipureintro
+        refine ⟨?_, hal⟩
+        rw [heqR]
+        exact pa_slotWit k0 hk0 te (hartAgent cI) pi
+      · iexact Hrcpt
+    · -- the registration's deposit: the creator authored it (design I3′)
+      iapply Lock.regDep_nil cI te
+      unfold lkRegLic
+      iright; ileft; iexact Hau
   iapply wpLoop_fupd
-  imod (kctx_newPipe cI _ pi hpv hokL lo lc _ bs hbs) $$ [Hk Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack]
+  imod (kctx_newPipe cI _ pi hpv hokL lo lc te _ bs hbs) $$ [Hk Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack]
     with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
-  · iframe Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack Hg Hflo Hflc Hreg
+  · iframe Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack Hg Hflo Hflc Hreg Hfte
     iexact Hk
   imodintro
   -- *f1: type, readable = 0, writable = 1, pipe

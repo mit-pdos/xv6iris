@@ -523,7 +523,7 @@ theorem lockHalf_some_dead (γl : GName) (γp : PipeNames) (i : CPU) (b : Bool) 
 theorem lockedCore_dead (γl : GName) (γp : PipeNames) (i : CPU) :
     lockedCore (GF := GF) γl i -∗ pipeDead γl γp -∗ False := by
   unfold lockedCore
-  iintro ⟨%B, Hf, _⟩ Hd
+  iintro ⟨%B, %pB, Hf, _⟩ Hd
   iapply (lockHalf_some_dead γl γp i true B) $$ Hf Hd
 
 /-- THE reclamation step.  The last closer arrives with a receipt for each end
@@ -557,9 +557,9 @@ Persistent, so every holder of either end shares it.  Built via
 to open it is a resource (a reference, or the lock token). -/
 def isPipe (γl : GName) (γp : PipeNames) (pi : BitVec 64) : IProp GF := iprop%
   ⌜lockAddrOk pi⌝ ∗ ⌜pageValid pi ∧ ¬ lkRsvIn (hlc := hlc) (GF := GF) pi⌝ ∗ kmapId pi ∗ kmapId (pi + 16#64) ∗
-  ∃ (lo lc : Nat) (Vb : CPU → Nat),
-    inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb ∨ pipeDead γl γp)) ∗
-    lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx
+  ∃ (lo lc : Nat) (Vb : CPU → Nat) (te : Nat),
+    inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb te ∨ pipeDead γl γp)) ∗
+    lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx ∗ lkFloor curCtx te
 
 instance isPipe_persistent (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     Persistent (isPipe (GF := GF) γl γp pi) := by unfold isPipe; infer_instance
@@ -598,9 +598,9 @@ theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     isPipe (GF := GF) γl γp pi -∗
     lockOpenable γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) := by
   unfold isPipe
-  iintro ⟨%hok, %hpv, #Hm1, #Hm2, %lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hg⟩
-  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc Vb hok hpv.2)
-    $$ Hm1 Hm2 Hinv Hflo Hflc Hvf Hg
+  iintro ⟨%hok, %hpv, #Hm1, #Hm2, %lo, %lc, %Vb, %te, #Hinv, #Hflo, #Hflc, #Hvf, #Hg, #Hfte⟩
+  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc Vb te hok hpv.2)
+    $$ Hm1 Hm2 Hinv Hflo Hflc Hvf Hg Hfte
 
 end
 

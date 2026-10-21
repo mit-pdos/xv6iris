@@ -99,12 +99,14 @@ instance instCtxMorphCpuOwn [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : 
   @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCpuCells _ _ _ _ _ _ _) (instCtxMorphConst _)
 
 /-- The table's per-byte keys. -/
-instance instCtxMorphKptKeys (tier : KTier) (t : PTree) (fl : Nat → Nat → Nat) :
-    CtxMorph (GF := GF) (fun ξ => @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl) :=
-  ctxMorph_bigSepL (t.entries 2)
-    (fun i (_ : BitVec 64 × BitVec 64) ξ => iprop([∗list] j ∈ List.range 8, keyAt (GF := GF) era ξ (fl i j)))
-    (fun i _ => ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt (GF := GF) era ξ (fl i j))
-      (fun _ _ => instCtxMorphKeyAt _))
+instance instCtxMorphKptKeys (tier : KTier) (t : PTree) (fl : Nat → Nat → Nat) (fr : Nat → Nat) :
+    CtxMorph (GF := GF) (fun ξ => @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl fr) :=
+  @instCtxMorphSep hlc GF _ _ _
+    (ctxMorph_bigSepL (t.entries 2)
+      (fun i (_ : BitVec 64 × BitVec 64) ξ => iprop([∗list] j ∈ List.range 8, keyAt (GF := GF) era ξ (fl i j)))
+      (fun i _ => ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt (GF := GF) era ξ (fl i j))
+        (fun _ _ => instCtxMorphKeyAt _)))
+    (ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt (GF := GF) era ξ (fr j)) (fun _ _ => instCtxMorphKeyAt _))
 
 /-- The installed kernel table (persistent, but its keys are the context's). -/
 instance instCtxMorphKptOn (tier : KTier) (t : PTree) (M : RegMapF (BitVec 64)) :
@@ -113,8 +115,10 @@ instance instCtxMorphKptOn (tier : KTier) (t : PTree) (M : RegMapF (BitVec 64)) 
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphExists hlc GF _ _
-          (fun (fl : Nat → Nat → Nat) ξ => iprop(kptCore t fl ∗ @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl))
-          (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphKptKeys _ _ _)))))
+          (fun (fl : Nat → Nat → Nat) ξ => iprop(∃ fr : Nat → Nat, kptCore t fl fr ∗ @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl fr))
+          (fun fl => @instCtxMorphExists hlc GF _ _
+            (fun (fr : Nat → Nat) ξ => iprop(kptCore t fl fr ∗ @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl fr))
+            (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphKptKeys _ _ _ _))))))
 
 /-- The hart's kernel-table slot. -/
 instance instCtxMorphKptSlot (tier : KTier) (cpu : CPU) (root : BitVec 44) :

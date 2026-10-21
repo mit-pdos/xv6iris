@@ -27,11 +27,13 @@ theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 (f
   imodintro
   iexists ⟨γb, γd, γc, γg⟩
   unfold ctxStamped ctxAt vecAt
-  iexists ∅
+  iexists ∅, 0
   iframe Hb Hd Hc Hg
   isplit
   · unfold topLb
     iapply topLbAt_0
+  isplit
+  · iapply itopLbAt_0
   isplit
   · ipureintro
     intro k h hk
@@ -75,7 +77,7 @@ theorem ownCtx_boot (E : EraGS) (cpu : CPU) :
   isplit
   · ipureintro; exact Nat.le_refl _
   isplit
-  · iapply topLbAt_0
+  · iapply itopLbAt_0
   isplit
   · ipureintro
     intro k h hk

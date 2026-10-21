@@ -87,14 +87,14 @@ theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :
 /-- **A plain load raises the read watermark, and says so.**  The twin of
 `MachCSL.memModel_load`, which mints the same update but drops the
 receipt. -/
-theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
     (hsrc : loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)
       σ.mem cpu pa n tvn) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗ rviewLbAt E cpu tvn) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) (kptGrow_load σ cpu pa n tvn) id id id
+  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) (kptGrow_load σ cpu pa n tvn) (pubSame_refl _ _) id id
     (fun _ _ => rfl)
     (fun _ => chainEnvAt_ext_load _ _ _ σ cpu pa n tvn)
     (fun _ h => chainLoads_load σ cpu pa n tvn hmm hsrc h) $$ Hrsv
@@ -128,10 +128,11 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
     · iapply MonoNat.lb_own_le (E.rviewName cpu) (.ofNat (max (σ.hr cpu).rv tvn)) (.ofNat tvn)
         (by simp only [MaxNat.le_toNat]; omega)
       iexact Hrlb
-    · iapply topLbAt_le E σ.top tvn htv
+    · iapply topLbAt_le E σ.ltop tvn htv
       unfold topLbAt
       iright
       iexact Htoplb
+
 
 /-- **The acquire edge of a fence**: the floor passes the read watermark,
 so a position the hart has already read past is absorbed. -/
@@ -149,7 +150,7 @@ theorem memModel_fence_acq (σ : MState) (cpu : CPU) (b : barrier_kind)
   iframe Hmm2
   have e : (σ.fence cpu b).tv cpu =
       fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv
-        (ownPub (hartAgent cpu) σ.log) := by
+        (ownPubL (hartAgent cpu) σ.log σ.llog) := by
     simp [updCpu]
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hacq]
@@ -158,6 +159,7 @@ theorem memModel_fence_acq (σ : MState) (cpu : CPU) (b : barrier_kind)
     omega
   iapply viewLbAt_le E cpu ((σ.fence cpu b).tv cpu) T hle
   iexact Hv
+
 
 end memmodel
 
@@ -217,7 +219,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  imod H with ⟨%dqs, %Hs, %o, %cs, Hb, %hne, Ho, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, #Hls, Hb, %hrd0, Ho, Hcs, #Hcert, Hcont⟩
   ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
   · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
     iframe
@@ -226,6 +228,10 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
+  ihave %hla : ⌜lpAgree ls σ.lp⌝ $$ [Hmm Hls]
+  · iapply memModel_landedAll σ ls $$ [Hmm Hls]
+    iframe Hmm
+    iexact Hls
   ihave %hK : ⌜K ≤ σ.tv cpu⌝ $$ [Hmm HK]
   · iapply memModel_viewLb _ σ cpu K $$ [Hmm HK]
     iframe Hmm
@@ -236,20 +242,28 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     iexact Hts
   have hauthors : authorsAre ts n Hs := by
     intro p hp j hj e he het
-    exact histOk_author_eq σ.log (Hs j) (hmm.1 _ _ (hget j hj)) e he p.1 p.2
+    exact histOk_author_eq σ.log (Hs j) (mmOk_hist hmm _ _ (hget j hj)) e he p.1 p.2
       (hau p hp).1 (hau p hp).2 het
-  ihave %hsrc := memModel_readCerts σ cpu req.pa n K ts Hs cs hget hcs hauthors $$ [Hmem Hmm Hcert]
+  ihave %hsrc := memModel_readCerts σ cpu req.pa n K ts ls hla Hs cs hget hcs hauthors $$ [Hmem Hmm Hcert]
   · iframe Hmem Hmm
     iexact Hcert
-  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+  have hP := mmOk_okP hmm
   imodintro
   isplit
   · ipureintro
-    obtain ⟨w, hw⟩ := exists_read_top σ (hartAgent cpu) req.pa n Hs hmm hget hne
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
-      ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hw, rfl, rfl⟩))⟩
+    have hKl : K ≤ σ.ltop := Nat.le_trans hK (mmOk_views hmm cpu).1
+    obtain ⟨w, hw⟩ := exists_readsP_of_readable hla hKl hauthors hrd0
+    have hwb : σ.mem.readBytesP σ.lp (hartAgent cpu) σ.ltop req.pa n w := by
+      intro j hj
+      unfold FlatMem.readP
+      rw [hget j hj, Option.bind_some]
+      exact hw j hj
+    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.ltop, Or.inr (Or.inr (Or.inl
+      ⟨hram, hk, σ.ltop, w, (mmOk_views hmm cpu).1, le_refl _, ?_,
+        (σ.readFwd_iff hP cpu σ.ltop req.pa n w).2 hwb, rfl, rfl⟩))⟩
     intro j _
-    exact (hmm.2.1 cpu).2.2.2 _
+    exact (mmOk_views hmm cpu).2.2.2 _
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
@@ -257,16 +271,18 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
-  · imod memModel_load_rv _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) $$ Hmm with ⟨Hmm, #Hrv⟩
-    have hreads : readsAre (hartAgent cpu) tvn Hs n w' := by
+  · have hreads : readsAreP σ.lp (hartAgent cpu) tvn Hs n w' := by
       intro j hj
-      have := hrd' j hj
-      unfold FlatMem.read at this
+      have := (σ.readFwd_iff hP cpu tvn req.pa n w').1 hrd' j hj
+      unfold FlatMem.readP at this
       rw [hget j hj, Option.bind_some] at this
       exact this
+    obtain ⟨es, ps, hes, hcert⟩ := readEnt_facts σ cpu tvn n Hs w' hreads
+    icases memModel_readEntCerts σ cpu tvn es ps hcert n (Nat.le_refl _) $$ Hmm with ⟨Hmm, #Hrc⟩
+    imod memModel_load_rv _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) $$ Hmm with ⟨Hmm, #Hrv⟩
     imod memModel_rdIssue σ cpu req.pa n tvn Hs w' hget hreads o $$ [Hmm Ho] with ⟨Hmm, Hout⟩
     · iframe Hmm Ho
-    imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hrv Hout Hb Hcs with HΦ
+    imod Hcont $$ %w' %tvn %σ.lp %es %ps %(by omega) %⟨hla, hreads, hes⟩ Hrc %hauthors Hrv Hout Hb Hcs with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
@@ -274,6 +290,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       iexact HΦ
   · rw [hk'.2] at hex'
     exact absurd hex' (by decide)
+
 
 /-! ## The width-2 load stack (`lhu`, the loop test of `virtio_disk_intr`) -/
 

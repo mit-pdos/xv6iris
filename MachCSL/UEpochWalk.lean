@@ -138,9 +138,9 @@ theorem swp_update_and_write_pte_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_intro HmConf
     iapply swp_bind
     iapply (swp_read_pte_exclusive_ctx cpu dq c sie hok addr haddr.1 haddr.2 r0 dqUpt (kLeaf ppn perm a d))
-    iframe HmConf Hfrag Hb
+    iframe HmConf Hctx Hfrag Hb
     inext
-    iintro HmConf Hfrag Hb
+    iintro HmConf Hctx Hfrag Hb
     swp_run 40
     rw [check_leaf_pte39_eq]
     iapply swp_bind

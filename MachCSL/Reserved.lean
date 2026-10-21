@@ -741,6 +741,123 @@ theorem pubClean_store_in {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : 
     (fun j hj heq => rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha))] at hH
   exact hc f w' hf a ha H hH
 
+/-- A write that LANDS AT ONCE (route P: inserted below the pending prefix) off every reserved byte
+keeps every discipline. -/
+theorem rsvAllOk_landBytes_off {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hoff : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) (hok : rsvAllOk rs m) :
+    rsvAllOk rs (m.landBytes lp pa n w t h) := by
+  intro i R hi
+  refine regionOk_congr (fun a ha => FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ ?_) (hok i R hi)
+  intro j hj heq
+  exact hoff j hj (heq ▸ mem_rsvBytes hi ha)
+
+/-- A landed-at-once write into one word of region `R` keeps every discipline if it keeps `R`'s. -/
+theorem rsvAllOk_landBytes_in {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (hnd : (rsvBytes rs).Nodup)
+    {i : Nat} {R : RsvRegion} (hi : rs[i]? = some R) (hw : (pa, n) ∈ R.words)
+    (hR : regionOk m R → regionOk (m.landBytes lp pa n w t h) R) (hok : rsvAllOk rs m) :
+    rsvAllOk rs (m.landBytes lp pa n w t h) := by
+  intro i' R' hi'
+  by_cases hii : i = i'
+  · subst hii
+    rw [hi] at hi'
+    obtain rfl := Option.some.inj hi'
+    exact hR (hok i R hi)
+  · refine regionOk_congr (fun a ha => FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ ?_) (hok i' R' hi')
+    intro j hj heq
+    exact rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha)
+
+theorem pubClean_landBytes_off {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hoff : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) (hc : pubClean rs m) :
+    pubClean rs (m.landBytes lp pa n w t h) := by
+  intro f w' hf a ha H hH
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hf
+  rw [FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ (fun j hj heq => hoff j hj (heq ▸ mem_rsvBytes hi ha))] at hH
+  exact hc f w' hf a ha H hH
+
+theorem pubClean_landBytes_in {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (hnd : (rsvBytes rs).Nodup)
+    {i : Nat} {R : RsvRegion} (hi : rs[i]? = some R) (hw : (pa, n) ∈ R.words)
+    (hnp : ∀ w', R.kind ≠ .pub w') (hc : pubClean rs m) :
+    pubClean rs (m.landBytes lp pa n w t h) := by
+  intro f w' hf a ha H hH
+  obtain ⟨i', hi'⟩ := List.mem_iff_getElem?.1 hf
+  have hii : i ≠ i' := by
+    intro he
+    subst he
+    rw [hi] at hi'
+    obtain rfl := Option.some.inj hi'
+    exact hnp w' rfl
+  rw [FlatMem.landBytes_get?_notin _ _ _ _ _ _ _
+    (fun j hj heq => rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha))] at hH
+  exact hc f w' hf a ha H hH
+
+/-- **The publication words' histories are unchanged** by a step (route P, DESIGN D17′ (R3): what
+every writer but a publication store shows; it keeps `pubClean` and the deposits' facts). -/
+def pubSame (rs : List RsvRegion) (m m' : FlatMem) : Prop :=
+  ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+    m'[a]? = m[a]?
+
+theorem pubSame_refl (rs : List RsvRegion) (m : FlatMem) : pubSame rs m m := fun _ _ _ _ _ => rfl
+
+theorem pubClean_of_same {rs : List RsvRegion} {m m' : FlatMem} (h : pubSame rs m m') (hc : pubClean rs m) :
+    pubClean rs m' := by
+  intro f w hf a ha H hH
+  rw [h f w hf a ha] at hH
+  exact hc f w hf a ha H hH
+
+/-- A store off every region leaves the publication words alone. -/
+theorem pubSame_store_off {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hoff : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) :
+    pubSame rs m (m.writeBytes pa n w t h) := by
+  intro f w' hf a ha
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hf
+  exact FlatMem.writeBytes_get?_notin _ _ _ _ _ _ (fun j hj heq => hoff j hj (heq ▸ mem_rsvBytes hi ha))
+
+/-- A store into a word of a region that is no publication word leaves the publication words alone. -/
+theorem pubSame_store_in {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (hnd : (rsvBytes rs).Nodup)
+    {i : Nat} {R : RsvRegion} (hi : rs[i]? = some R) (hw : (pa, n) ∈ R.words)
+    (hnp : ∀ w', R.kind ≠ .pub w') :
+    pubSame rs m (m.writeBytes pa n w t h) := by
+  intro f w' hf a ha
+  obtain ⟨i', hi'⟩ := List.mem_iff_getElem?.1 hf
+  have hii : i ≠ i' := by
+    intro he
+    subst he
+    rw [hi] at hi'
+    obtain rfl := Option.some.inj hi'
+    exact hnp w' rfl
+  exact FlatMem.writeBytes_get?_notin _ _ _ _ _ _
+    (fun j hj heq => rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha))
+
+theorem pubSame_landBytes_off {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hoff : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) :
+    pubSame rs m (m.landBytes lp pa n w t h) := by
+  intro f w' hf a ha
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hf
+  exact FlatMem.landBytes_get?_notin _ _ _ _ _ _ _ (fun j hj heq => hoff j hj (heq ▸ mem_rsvBytes hi ha))
+
+theorem pubSame_landBytes_in {rs : List RsvRegion} {m : FlatMem} {lp : LandPos} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (hnd : (rsvBytes rs).Nodup)
+    {i : Nat} {R : RsvRegion} (hi : rs[i]? = some R) (hw : (pa, n) ∈ R.words)
+    (hnp : ∀ w', R.kind ≠ .pub w') :
+    pubSame rs m (m.landBytes lp pa n w t h) := by
+  intro f w' hf a ha
+  obtain ⟨i', hi'⟩ := List.mem_iff_getElem?.1 hf
+  have hii : i ≠ i' := by
+    intro he
+    subst he
+    rw [hi] at hi'
+    obtain rfl := Option.some.inj hi'
+    exact hnp w' rfl
+  exact FlatMem.landBytes_get?_notin _ _ _ _ _ _ _
+    (fun j hj heq => rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha))
+
 /-- At power-on no publication word is written. -/
 theorem pubClean_boot {rs : List RsvRegion} (hwf : rsvWf rs) : pubClean rs (imgFlat bootImage) := by
   intro f w hf a ha H hH e he
@@ -860,5 +977,145 @@ theorem kslotHistOkP_insLanded {lp : LandPos} {S : Nat} {d : KSlot} {Hs : Nat �
 `lockWinAt` of the landed view. -/
 abbrev lockWinAtP (ptr : CPU → BitVec 64) (m : FlatMem) (lp : LandPos) (lk : PAddr) (p a : Nat) : Prop :=
   lockWinAt ptr (m.lview lp) lk p a
+
+/-! ### The (A) window of a dynamic lock (route P, [OWN.128], design D16)
+
+A dynamic lock's window is selected by ISSUE stamp and LANDING position: at each byte, the entries
+issued after the registration `te` that sit co-above every entry issued at or before it
+(`takeWhile`; xv6: exactly the lock's post-registration entries), landed by position `a`,
+relabeled to their landing positions.  Pre-registration entries (a reused page's junk, `initlock`'s
+zeros) are excluded by stamp, as before route P; the landing order across the two words is what
+the lock history is read in. -/
+
+/-- **Byte history `H`'s (A) window** up to landing position `a` past registration `te`. -/
+def Hist.winA (lp : LandPos) (te a : Nat) (H : Hist) : Hist :=
+  ((H.takeWhile (fun e => decide (te < e.t))).filter (HEnt.landedLe lp a)).filterMap (HEnt.atLanding lp)
+
+/-- **A spinlock's discipline over the (A) window** at `lk` (lock word at `lk`, owner word at
+`lk + 16`): each byte's (A) window is the byte projection of the word histories `W`/`W'` (labeled
+by landing positions), which form a lock history from free (`lockDiscWin`). -/
+def lockWinA (ptr : CPU → BitVec 64) (m : FlatMem) (lp : LandPos) (lk : PAddr) (te a : Nat) : Prop :=
+  ∃ (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool)) (B : Nat),
+    (∀ j, j < 4 → ∃ H, m[lk + BitVec.ofNat 64 j]? = some H ∧ Hist.winA lp te a H = W.map (WEnt.proj j)) ∧
+    (∀ j, j < 8 → ∃ H, m[lk + 16#64 + BitVec.ofNat 64 j]? = some H ∧
+      Hist.winA lp te a H = W'.map (WEnt.proj j)) ∧
+    lockDiscWin ptr st B W W'
+
+/-- **The lock word reads 0 at the registration** (route P, D16): at each byte of the lock word,
+the co-latest entry ISSUED at or before `te` (merged history) is a zero. -/
+def zeroAtReg (m : FlatMem) (lk : PAddr) (te : Nat) : Prop :=
+  ∀ i, i < 4 → ∃ H, m[lk + BitVec.ofNat 64 i]? = some H ∧
+    (H.find? (fun e => decide (e.t ≤ te))).map HEnt.v = some 0
+
+/-- An element of a `takeWhile` is an element passing the test. -/
+theorem Reserved.mem_takeWhile {α : Type} {p : α → Bool} {x : α} :
+    ∀ {l : List α}, x ∈ l.takeWhile p → x ∈ l ∧ p x = true
+  | [], h => by cases h
+  | y :: l, h => by
+    simp only [List.takeWhile_cons] at h
+    split at h
+    · rename_i hy
+      rcases List.mem_cons.1 h with rfl | h
+      · exact ⟨List.mem_cons_self, hy⟩
+      · obtain ⟨h1, h2⟩ := Reserved.mem_takeWhile h
+        exact ⟨List.mem_cons_of_mem _ h1, h2⟩
+    · cases h
+
+/-- A `takeWhile`-then-`filter` sees only entries passing `f` when `f` covers both the stop test's
+failures and the filter. -/
+theorem Reserved.takeWhile_filter_eq {α : Type} (p q f : α → Bool) (hp : ∀ x, p x = false → f x = true)
+    (hq : ∀ x, q x = true → f x = true) :
+    ∀ H : List α, (H.takeWhile p).filter q = ((H.filter f).takeWhile p).filter q
+  | [] => rfl
+  | x :: H => by
+    have ih := Reserved.takeWhile_filter_eq p q f hp hq H
+    by_cases hpx : p x = true
+    · have e1 : (x :: H).takeWhile p = x :: H.takeWhile p := by simp [hpx]
+      by_cases hfx : f x = true
+      · have e2 : (x :: H).filter f = x :: H.filter f := by simp [hfx]
+        have e3 : (x :: H.filter f).takeWhile p = x :: (H.filter f).takeWhile p := by simp [hpx]
+        rw [e1, e2, e3, List.filter_cons, List.filter_cons, ih]
+      · have hqx : q x = false := by
+          cases h : q x
+          · rfl
+          · exact absurd (hq x h) hfx
+        have e2 : (x :: H).filter f = H.filter f := by simp [List.filter_cons, hfx]
+        rw [e1, e2, List.filter_cons, hqx]
+        simpa using ih
+    · have hpx' : p x = false := by simpa using hpx
+      have hfx := hp x hpx'
+      simp [List.takeWhile_cons, hpx', List.filter_cons, hfx]
+
+/-- `find?` of a test covered by `f` sees only the entries passing `f`. -/
+theorem Reserved.find?_filter_eq {α : Type} (p f : α → Bool) (hp : ∀ x, p x = true → f x = true) :
+    ∀ H : List α, H.find? p = (H.filter f).find? p
+  | [] => rfl
+  | x :: H => by
+    have ih := Reserved.find?_filter_eq p f hp H
+    by_cases hpx : p x = true
+    · simp [List.find?_cons, hpx, List.filter_cons, hp x hpx]
+    · have hpx' : p x = false := by simpa using hpx
+      by_cases hfx : f x = true
+      · simp [List.find?_cons, hpx', List.filter_cons, hfx, ih]
+      · simp [List.find?_cons, hpx', List.filter_cons, hfx, ih]
+
+/-- Relabeling a list of entries landed at or before `a` is the same under a landing function
+that keeps every landed stamp's position. -/
+theorem Reserved.filterMap_atLanding_eq {lp lp' : LandPos} {a : Nat} (h1 : ∀ t q, lp t = some q → lp' t = some q) :
+    ∀ L : Hist, (L.filter (HEnt.landedLe lp a)).filterMap (HEnt.atLanding lp') =
+      (L.filter (HEnt.landedLe lp a)).filterMap (HEnt.atLanding lp)
+  | [] => rfl
+  | e :: L => by
+    have ih := Reserved.filterMap_atLanding_eq (a := a) h1 L
+    rw [List.filter_cons]
+    split
+    · rename_i hl
+      unfold HEnt.landedLe at hl
+      cases hle : lp e.t with
+      | none => rw [hle] at hl; cases hl
+      | some q =>
+        have hx : HEnt.atLanding lp' e = HEnt.atLanding lp e := by
+          unfold HEnt.atLanding; rw [hle, h1 _ _ hle]
+        rw [List.filterMap_cons, List.filterMap_cons, hx, ih]
+    · exact ih
+
+/-- **The (A) window is kept by a route-P step** (pure form): the history keeps its entries at or
+below the issue top `T` in order (`te ≤ T`), and the landing function only grows above `a`. -/
+theorem Hist.winA_keep {lp lp' : LandPos} {te a T : Nat} {H H' : Hist} (hte : te ≤ T)
+    (hf : H'.filter (fun e => decide (e.t ≤ T)) = H.filter (fun e => decide (e.t ≤ T)))
+    (hT : ∀ t q, lp' t = some q → q ≤ a → t ≤ T)
+    (h1 : ∀ t q, lp t = some q → lp' t = some q) (h2 : ∀ t q, lp' t = some q → q ≤ a → lp t = some q) :
+    Hist.winA lp' te a H' = Hist.winA lp te a H := by
+  unfold Hist.winA
+  have hp : ∀ e : HEnt, decide (te < e.t) = false → decide (e.t ≤ T) = true := fun e h => by
+    simp only [decide_eq_false_iff_not, Nat.not_lt] at h
+    exact decide_eq_true (Nat.le_trans h hte)
+  have hq' : ∀ e : HEnt, HEnt.landedLe lp' a e = true → decide (e.t ≤ T) = true := fun e h => by
+    unfold HEnt.landedLe at h
+    cases hl : lp' e.t with
+    | none => rw [hl] at h; cases h
+    | some q =>
+      rw [hl] at h
+      exact decide_eq_true (hT e.t q hl (by simpa using h))
+  have hq : ∀ e : HEnt, HEnt.landedLe lp a e = true → decide (e.t ≤ T) = true := fun e h => by
+    unfold HEnt.landedLe at h
+    cases hl : lp e.t with
+    | none => rw [hl] at h; cases h
+    | some q =>
+      rw [hl] at h
+      exact decide_eq_true (hT e.t q (h1 _ _ hl) (by simpa using h))
+  rw [Reserved.takeWhile_filter_eq _ _ _ hp hq' H', hf, ← Reserved.takeWhile_filter_eq _ _ _ hp hq' H]
+  have hlq : ∀ e : HEnt, HEnt.landedLe lp' a e = HEnt.landedLe lp a e := fun e => by
+    unfold HEnt.landedLe
+    cases hl : lp e.t with
+    | some q => rw [h1 _ _ hl]
+    | none =>
+      cases hl' : lp' e.t with
+      | none => rfl
+      | some q =>
+        simp only [Option.any_some, Option.any_none, decide_eq_false_iff_not, Nat.not_le]
+        exact Nat.lt_of_not_le (fun hc => by have := h2 _ _ hl' hc; rw [hl] at this; cases this)
+  rw [List.filter_congr (fun e _ => hlq e)]
+  exact Reserved.filterMap_atLanding_eq h1 _
 
 end MachCSL

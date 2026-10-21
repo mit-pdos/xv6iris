@@ -33,12 +33,13 @@ local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 
 /-! ## Vocabulary -/
 
-/-- The stamped token: ξ's authorities hung on the position `T`; (W8 (f2-ctx))
-its chain vector `V` and gate `g`, the vector covering every dirty key and
-under the stamp. -/
+/-- The stamped token: ξ's authorities hung on the position `T` (route P,
+design D9: a position of the memory order, `topLb T`); (W8 (f2-ctx)) its
+chain vector `V` and gate `g`, the vector covering every dirty key; the dirty
+keys and the vector under an ISSUE watermark `W` (`itopLb W`). -/
 def ctxStamped (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) : IProp GF := iprop%
-  ∃ D : RegMapF CPU, ctxAt ξ 1 T D ∗ topLb T ∗ ⌜∀ k h, get? D k = some h → k ≤ T⌝ ∗
-    dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ T⌝
+  ∃ (D : RegMapF CPU) (W : Nat), ctxAt ξ 1 T D ∗ topLb T ∗ itopLb W ∗ ⌜∀ k h, get? D k = some h → k ≤ W⌝ ∗
+    dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ W⌝
 
 /-- "ξ is dominated by ξ'" at fraction `q` of ξ's authority; (W8 (f2-ctx))
 ξ's chain vector under ξ''s, and a set gate only under a set gate. -/
@@ -80,15 +81,15 @@ theorem ctxDomAt_intro (ξ ξ' : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) (V 
 
 theorem ctxStamped_cases (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) :
     ctxStamped (GF := GF) ξ T V g ⊢
-      ∃ D : RegMapF CPU, ctxAt ξ 1 T D ∗ topLb T ∗ ⌜∀ k h, get? D k = some h → k ≤ T⌝ ∗
-        dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ T⌝ := by
+      ∃ (D : RegMapF CPU) (W : Nat), ctxAt ξ 1 T D ∗ topLb T ∗ itopLb W ∗ ⌜∀ k h, get? D k = some h → k ≤ W⌝ ∗
+        dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ W⌝ := by
   unfold ctxStamped; iintro H; iexact H
 
-theorem ctxStamped_intro (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) (D : RegMapF CPU) :
-    ctxAt ξ 1 T D ∗ topLb T ∗ ⌜∀ k h, get? D k = some h → k ≤ T⌝ ∗
-      dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ T⌝ ⊢@{IProp GF}
+theorem ctxStamped_intro (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) (D : RegMapF CPU) (W : Nat) :
+    ctxAt ξ 1 T D ∗ topLb T ∗ itopLb W ∗ ⌜∀ k h, get? D k = some h → k ≤ W⌝ ∗
+      dirtyElems era ξ D ∗ vecAt ξ 1 V g ∗ ⌜(∀ k h, get? D k = some h → k ≤ V h) ∧ ∀ h, V h ≤ W⌝ ⊢@{IProp GF}
       ctxStamped ξ T V g := by
-  unfold ctxStamped; iintro H; iexists D; iexact H
+  unfold ctxStamped; iintro H; iexists D, W; iexact H
 
 /-! ## Map facts (the `PartialMap` operations, spelled out: `\` and `∪` on
 `RegMapF` resolve to `Std.ExtTreeMap`'s own instances) -/
@@ -113,6 +114,9 @@ theorem topLb_max (K K' : Nat) : topLb (GF := GF) K ∗ topLb K' ⊢ topLb (max 
   by_cases h : K ≤ K'
   · rw [Nat.max_eq_right h]; iexact H2
   · rw [Nat.max_eq_left (by omega)]; iexact H1
+
+theorem itopLb_max (t t' : Nat) : itopLb (GF := GF) t ∗ itopLb t' ⊢ itopLb (max t t') :=
+  itopLbAt_max _ t t'
 
 theorem viewLb_max (cpu : CPU) (K K' : Nat) :
     viewLb (GF := GF) cpu K ∗ viewLb cpu K' ⊢ viewLb cpu (max K K') := by
@@ -163,18 +167,28 @@ theorem ctxAt_agree (ξ : CtxId) (q1 q2 : Qp) (B1 B2 : Nat) (D1 D2 : RegMapF CPU
 /-! ## The key transport -/
 
 /-- The chain half of a key re-indexes along a vector domination. -/
-theorem chainKey_dom (ξ ξ' : CtxId) (q : Qp) (V : CPU → Nat) (g : Nat) (t : Nat) :
-    vecAt (GF := GF) ξ q V g ∗ vecFloors ξ' V ∗ chainKey era ξ t ⊢ vecAt ξ q V g ∗ chainKey era ξ' t := by
-  iintro ⟨Hv, #Hvf, #Hck⟩
+theorem chainKey_dom (ξ ξ' : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) (V : CPU → Nat) (g : Nat) (t : Nat) :
+    ctxAt (GF := GF) ξ q B D ∗ ctxFloor ξ' B ∗ vecAt ξ q V g ∗ vecFloors ξ' V ∗ chainKey era ξ t ⊢
+      ctxAt ξ q B D ∗ vecAt ξ q V g ∗ chainKey era ξ' t := by
+  iintro ⟨Hat, #HflB, Hv, #Hvf, #Hck⟩
   unfold chainKey
   icases Hck with ⟨%h0 | ⟨%a, #Hau, #Ha⟩⟩
-  · iframe Hv; ileft; ipureintro; exact h0
-  · icases Ha with ⟨%hdev | ⟨%h, %ha, #Hf⟩⟩
-    · iframe Hv; iright; iexists a; iframe Hau; ileft; ipureintro; exact hdev
+  · iframe Hat Hv; ileft; ipureintro; exact h0
+  · icases Ha with ⟨⟨%hdev, %p, #Hp, #Hfl⟩ | ⟨%h, %ha, #Hf⟩⟩
+    · ihave %hpB : ⌜p ≤ B⌝ $$ [Hat Hfl]
+      · iapply ctxAt_floor ξ q B D p $$ [Hat Hfl]
+        iframe Hat
+        iexact Hfl
+      iframe Hat Hv; iright; iexists a; iframe Hau; ileft
+      isplit
+      · ipureintro; exact hdev
+      · iexists p
+        iframe Hp
+        iapply ctxFloor_le ξ' B p hpB $$ HflB
     · ihave %hle : ⌜t ≤ V h⌝ $$ [Hv Hf]
       · iapply vecAt_floor ξ q V g h t $$ [Hv Hf]
         iframe Hv Hf
-      iframe Hv
+      iframe Hat Hv
       iright
       iexists a
       iframe Hau
@@ -190,13 +204,9 @@ theorem ctx_dom_key (ξ ξ' : CtxId) (q : Qp) (t : Nat) :
     ctxDomAt (GF := GF) ξ ξ' q ∗ keyAt era ξ t ⊢ ctxDomAt ξ ξ' q ∗ keyAt era ξ' t := by
   iintro ⟨Hdom, Hkey⟩
   icases ctxDomAt_cases ξ ξ' q $$ Hdom with ⟨%B, %D, Hat, #Hfl, #Hels, #Hkeys, %V, %g, Hv, #Hvf, #Hg⟩
-  icases keyAt_cases _ ξ t $$ Hkey with ⟨⟨#Hcl, #Hck⟩ | ⟨%h, Hd, Hau⟩⟩
-  · ihave %htB : ⌜t ≤ B⌝ $$ [Hat Hcl]
-    · iapply ctxAt_floor ξ q B D t $$ [Hat Hcl]
-      iframe Hat
-      iexact Hcl
-    icases chainKey_dom ξ ξ' q V g t $$ [Hv Hck] with ⟨Hv, #Hck'⟩
-    · iframe Hv Hvf Hck
+  icases keyAt_cases _ ξ t $$ Hkey with ⟨#Hck | ⟨%h, Hd, Hau⟩⟩
+  · icases chainKey_dom ξ ξ' q B D V g t $$ [Hat Hv Hck] with ⟨Hat, Hv, #Hck'⟩
+    · iframe Hat Hv Hvf Hck Hfl
     isplitl [Hat Hv]
     · iapply ctxDomAt_intro ξ ξ' q B D V g
       iframe Hat Hv
@@ -211,10 +221,7 @@ theorem ctx_dom_key (ξ ξ' : CtxId) (q : Qp) (t : Nat) :
       · iexact Hg
     · unfold keyAt
       ileft
-      isplit
-      · iapply ctxFloor_le ξ' B t htB
-        iexact Hfl
-      · iexact Hck'
+      iexact Hck'
   · ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
     · iapply ctxAt_dirty ξ q B D t h $$ [Hat Hd]
       iframe
@@ -420,95 +427,78 @@ theorem ownCtx_floor_view (cpu : CPU) (ξ : CtxId) (lo : Nat) :
     · iexact HK
     · ipureintro; omega
 
-/-- A KEY of the running context is visible to its hart: either it is
-under the bound -- hence under a view receipt of the hart (`K`) -- or it is
-one of the hart's own buffered stores, and the machine's authorship receipt
-(handed out as the singleton bundle `ts`) makes its entries visible to the
-hart at every view.  This is the Rocq `lk_floor_vis`. -/
+/-- A KEY of the running context is visible to its hart (route P, design
+D9): the boot image's, one of the hart's own buffered stores (the machine's
+authorship receipt, handed out as the singleton bundle `ts`, makes its
+entries visible to the hart at every view), or a store LANDED at or below a
+view receipt `K` of the hart (its landing certificate, the singleton `ls`).
+This is the Rocq `lk_floor_vis`. -/
 theorem ownCtx_key_vis (cpu : CPU) (ξ : CtxId) (t : Nat) :
     ownCtx (GF := GF) cpu ξ ∗ keyAt era ξ t ⊢
-      ownCtx cpu ξ ∗ ∃ (K : Nat) (ts : List (Nat × Agent)),
-        viewLb cpu K ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
-        ⌜t ≤ K ∨ (t, hartAgent cpu) ∈ ts⌝ := by
+      ownCtx cpu ξ ∗ ∃ (K : Nat) (ts : List (Nat × Agent)) (ls : List (Nat × Nat)),
+        viewLb cpu K ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗ landedAll ls ∗
+        ⌜t = 0 ∨ (t, hartAgent cpu) ∈ ts ∨ ∃ p, (t, p) ∈ ls ∧ p ≤ K⌝ := by
   iintro ⟨Hctx, #Hkey⟩
-  icases keyAt_cases era ξ t $$ Hkey with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, #Hau⟩⟩
-  · icases ownCtx_floor_view cpu ξ t $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hle⟩⟩
-    · iframe Hctx; iexact Hfl
-    iframe Hctx
-    iexists K, []
-    isplit
-    · iexact HK
+  icases ownCtx_key_land cpu ξ t $$ [Hctx Hkey] with ⟨Hctx, %K, #HK, Hvis⟩
+  · iframe Hctx Hkey
+  iframe Hctx
+  icases Hvis with ⟨%h0 | #Hau | ⟨%p, #Hp, %hp⟩⟩
+  · iexists K, [], []
+    iframe HK
     isplit
     · exact BigSepL.bigSepL_nil_intro
-    · ipureintro; exact Or.inl hle
-  · icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
-    ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
-    · iapply ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
-      iframe Hat
-      iexact Hd
-    have hjust := (hok t h hD).2
-    isplitl [Hat Hch]
-    · iapply ownCtx_intro cpu ξ B K W D
-      iframe Hat Hch
-      isplit
-      · iexact HK
-      isplit
-      · ipureintro; exact hBK
-      isplit
-      · iexact HW
-      isplit
-      · ipureintro; exact hok
-      · iexact Hels
-    · rcases hjust with hle | rfl
-      · iexists K, []
-        isplit
-        · iexact HK
-        isplit
-        · exact BigSepL.bigSepL_nil_intro
-        · ipureintro; exact Or.inl (by omega)
-      · iexists K, [(t, hartAgent h)]
-        isplit
-        · iexact HK
-        isplit
-        · iapply BigSepL.bigSepL_singleton.2
-          iexact Hau
-        · ipureintro; exact Or.inr (by simp)
+    isplit
+    · exact BigSepL.bigSepL_nil_intro
+    · ipureintro; exact Or.inl h0
+  · iexists K, [(t, hartAgent cpu)], []
+    iframe HK
+    isplit
+    · iapply BigSepL.bigSepL_singleton.2
+      iexact Hau
+    isplit
+    · exact BigSepL.bigSepL_nil_intro
+    · ipureintro; exact Or.inr (Or.inl (by simp))
+  · iexists K, [], [(t, p)]
+    iframe HK
+    isplit
+    · exact BigSepL.bigSepL_nil_intro
+    isplit
+    · iapply BigSepL.bigSepL_singleton.2
+      iexact Hp
+    · ipureintro; exact Or.inr (Or.inr ⟨p, by simp, hp⟩)
 
 /-- MANY keys of the running context at once, cashed against ONE view
-receipt (the token's own `K`) and ONE authorship bundle: what a client
+receipt, ONE authorship bundle and ONE certificate list: what a client
 holding a word whose bytes were written at eight different positions
 presents to the read accessor (`WordHist.read_cases_visT`). -/
 theorem ownCtx_keys_vis (cpu : CPU) (ξ : CtxId) (f : Nat → Nat) :
     ∀ n : Nat, ownCtx (GF := GF) cpu ξ ∗ ([∗list] j ∈ List.range n, keyAt era ξ (f j)) ⊢
-      ownCtx cpu ξ ∗ ∃ (K : Nat) (tsl : List (Nat × Agent)),
-        viewLb cpu K ∗ ([∗list] p ∈ tsl, authoredBy p.1 p.2) ∗
-        ⌜∀ j, j < n → f j ≤ K ∨ (f j, hartAgent cpu) ∈ tsl⌝
+      ownCtx cpu ξ ∗ ∃ (K : Nat) (tsl : List (Nat × Agent)) (ls : List (Nat × Nat)),
+        viewLb cpu K ∗ ([∗list] p ∈ tsl, authoredBy p.1 p.2) ∗ landedAll ls ∗
+        ⌜∀ j, j < n → f j = 0 ∨ (f j, hartAgent cpu) ∈ tsl ∨ ∃ p, (f j, p) ∈ ls ∧ p ≤ K⌝
   | 0 => by
     iintro ⟨Hctx, _⟩
-    icases ownCtx_key_vis cpu ξ 0 $$ [Hctx] with ⟨Hctx, %K, %tsl, #HK, #Hts, %h0⟩
+    icases ownCtx_key_vis cpu ξ 0 $$ [Hctx] with ⟨Hctx, %K, %tsl, %ls, #HK, #Hts, #Hls, %h0⟩
     · iframe Hctx
       iapply keyAt_0
     iframe Hctx
-    iexists K, tsl
-    isplit
-    · iexact HK
-    isplit
-    · iexact Hts
-    · ipureintro
-      intro j hj
-      omega
+    iexists K, tsl, ls
+    iframe HK Hts Hls
+    ipureintro
+    intro j hj
+    omega
   | n + 1 => by
     rw [List.range_succ]
     iintro ⟨Hctx, H⟩
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨#H1, #H2⟩
-    icases ownCtx_keys_vis cpu ξ f n $$ [Hctx H1] with ⟨Hctx, %K1, %ts1, #HK1, #Hts1, %h1⟩
+    icases ownCtx_keys_vis cpu ξ f n $$ [Hctx H1] with ⟨Hctx, %K1, %ts1, %ls1, #HK1, #Hts1, #Hls1, %h1⟩
     · iframe Hctx
       iexact H1
-    icases ownCtx_key_vis cpu ξ (f n) $$ [Hctx H2] with ⟨Hctx, %K2, %ts2, #HK2, #Hts2, %h2⟩
+    icases ownCtx_key_vis cpu ξ (f n) $$ [Hctx H2] with ⟨Hctx, %K2, %ts2, %ls2, #HK2, #Hts2, #Hls2, %h2⟩
     · iframe Hctx
       iexact H2
     iframe Hctx
-    iexists (max K1 K2), (ts1 ++ ts2)
+    iexists (max K1 K2), (ts1 ++ ts2), (ls1 ++ ls2)
     isplit
     · iapply viewLb_max cpu K1 K2
       isplit
@@ -519,15 +509,22 @@ theorem ownCtx_keys_vis (cpu : CPU) (ξ : CtxId) (f : Nat → Nat) :
       isplit
       · iexact Hts1
       · iexact Hts2
+    isplit
+    · iapply BigSepL.bigSepL_append.2
+      isplit
+      · iexact Hls1
+      · iexact Hls2
     · ipureintro
       intro j hj
       rcases Nat.lt_succ_iff_lt_or_eq.1 hj with hj | rfl
-      · rcases h1 j hj with h | h
-        · exact Or.inl (by omega)
-        · exact Or.inr (List.mem_append_left _ h)
-      · rcases h2 with h | h
-        · exact Or.inl (by omega)
-        · exact Or.inr (List.mem_append_right _ h)
+      · rcases h1 j hj with h | h | ⟨p, hp, hle⟩
+        · exact Or.inl h
+        · exact Or.inr (Or.inl (List.mem_append_left _ h))
+        · exact Or.inr (Or.inr ⟨p, List.mem_append_left _ hp, by omega⟩)
+      · rcases h2 with h | h | ⟨p, hp, hle⟩
+        · exact Or.inl h
+        · exact Or.inr (Or.inl (List.mem_append_right _ h))
+        · exact Or.inr (Or.inr ⟨p, List.mem_append_right _ hp, by omega⟩)
 
 /-- The bound of the running context rises to any view receipt of its hart. -/
 theorem ctx_absorb (cpu : CPU) (ξ : CtxId) (K' : Nat) :
@@ -553,13 +550,7 @@ theorem ctx_absorb (cpu : CPU) (ξ : CtxId) (K' : Nat) :
     isplit
     · iexact HW
     isplit
-    · ipureintro
-      intro k h hk
-      obtain ⟨h1, h2⟩ := hok k h hk
-      refine ⟨h1, ?_⟩
-      rcases h2 with h2 | h2
-      · exact Or.inl (by omega)
-      · exact Or.inr h2
+    · ipureintro; exact hok
     · iexact Hels
   · unfold ctxFloor
     iright
@@ -568,9 +559,10 @@ theorem ctx_absorb (cpu : CPU) (ξ : CtxId) (K' : Nat) :
 
 /-! ## Stamping -/
 
-/-- A running context stamps: it leaves its hart, hung on a position past
-its bound and its dirty keys; (W8 (f2-ctx)) its own component rises to the
-stamp, and the releasing hart's certificates for the vector come out. -/
+/-- A running context stamps: it leaves its hart, hung on its bound (route
+P, design D9: a position of the memory order); (W8 (f2-ctx)) its own
+component rises over its watermark (its own dirty keys), and the releasing
+hart's certificates for the vector come out. -/
 theorem ctx_stamp (cpu : CPU) (ξ : CtxId) :
     ownCtx (GF := GF) cpu ξ ⊢ |==> ∃ (T : Nat) (V : CPU → Nat) (g : Nat),
       ctxStamped ξ T V g ∗ ctxFloor ξ T ∗ vecCertsAt era V g cpu := by
@@ -580,32 +572,25 @@ theorem ctx_stamp (cpu : CPU) (ξ : CtxId) :
   icases Hch with ⟨%V, %g, Hv, %⟨hcd, hvw⟩, #Hc⟩
   unfold ctxAt
   icases Hat with ⟨Hb, Hd⟩
-  imod MonoNat.own_update _ (.ofNat B) (.ofNat (max B W)) (by simp only [MaxNat.le_toNat]; omega)
-    $$ Hb with ⟨Hb, #Hlb⟩
-  imod vecAt_update ξ V g (fun h => if h = cpu then max (V h) (max B W) else V h) g
+  ihave #Hlb := MonoNat.lb_own_get $$ Hb
+  imod vecAt_update ξ V g (fun h => if h = cpu then max (V h) W else V h) g
     (fun h => by split <;> omega) (Nat.le_refl _) $$ Hv with Hv
   imodintro
-  iexists (max B W), (fun h => if h = cpu then max (V h) (max B W) else V h), g
+  iexists B, (fun h => if h = cpu then max (V h) W else V h), g
   isplitl [Hb Hd Hv]
-  · iapply ctxStamped_intro ξ (max B W) _ g D
+  · iapply ctxStamped_intro ξ B _ g D W
     unfold ctxAt
-    iframe Hb Hd Hv
+    iframe Hb Hd Hv HW
     isplit
-    · iapply topLb_le (max K W) (max B W) (by omega)
-      iapply topLb_max
-      isplit
-      · iapply viewLb_topLb cpu K; iexact HK
-      · iexact HW
+    · iapply topLb_le K B hBK
+      iapply viewLb_topLb cpu K; iexact HK
     isplit
-    · ipureintro
-      intro k h hk
-      have := (hok k h hk).1
-      omega
+    · ipureintro; exact hok
     isplit
     · iexact Hels
     · ipureintro
       refine ⟨fun k h hk => ?_, fun h => ?_⟩
-      · have hkW := (hok k h hk).1
+      · have hkW := hok k h hk
         by_cases hh : h = cpu
         · subst hh; simp only [if_true]; omega
         · simp only [hh, if_false]
@@ -620,33 +605,32 @@ theorem ctx_stamp (cpu : CPU) (ξ : CtxId) :
   · unfold ctxFloor
     iright
     iexact Hlb
-  · iapply vecCertsAt_own era V g cpu (max B W) $$ Hc
+  · iapply vecCertsAt_own era V g cpu W $$ Hc
 
 /-- A stamped context runs on any hart whose view has passed the stamp and
-which holds certificates for its chain vector (W8 (f2-ctx)). -/
+which holds certificates for its chain vector (W8 (f2-ctx); route P: the
+certificates' landing cover makes the vector's foreign entries visible). -/
 theorem ctx_unstamp (cpu : CPU) (ξ : CtxId) (T K : Nat) (V : CPU → Nat) (g : Nat) (hTK : T ≤ K) :
     ctxStamped (GF := GF) ξ T V g ∗ viewLb cpu K ∗ vecCertsAt era V g cpu ⊢ ownCtx cpu ξ := by
   iintro ⟨Hst, #HK, #Hc⟩
-  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
-  iapply ownCtx_intro cpu ξ T K T D
+  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, %W, Hat, #HT, #HW, %hD, #Hels, Hv, %⟨hDV, hVW⟩⟩
+  iapply ownCtx_intro cpu ξ T K W D
   iframe Hat
   isplit
   · iexact HK
   isplit
   · ipureintro; exact hTK
   isplit
-  · iexact HT
+  · iexact HW
   isplit
-  · ipureintro
-    intro k h hk
-    exact ⟨hD k h hk, Or.inl (hD k h hk)⟩
+  · ipureintro; exact hD
   isplit
   · iexact Hels
   · unfold chainTokAt
     iexists V, g
     iframe Hv Hc
     ipureintro
-    exact ⟨fun k h hk => Or.inr (hDV k h hk), hVT⟩
+    exact ⟨fun k h hk => Or.inr (hDV k h hk), hVW⟩
 
 /-- **A STAMPED CONTEXT'S STAMP RISES AT A STORE-ORDER RECEIPT** (Rocq
 `TsoCtx.ctx_stamped_raise`).  A stamped context has no hart, so raising its
@@ -660,27 +644,27 @@ theorem ctxStamped_raise (ξ : CtxId) (T T' : Nat) (V : CPU → Nat) (g : Nat) :
     topLb (GF := GF) T' ∗ ctxStamped ξ T V g ⊢
       |==> (ctxStamped ξ (max T T') V g ∗ ctxFloor ξ T') := by
   iintro ⟨#HT', Hst⟩
-  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, %W, Hat, #HT, #HW, %hD, #Hels, Hv, %⟨hDV, hVW⟩⟩
   unfold ctxAt
   icases Hat with ⟨Hb, Hd⟩
   imod MonoNat.own_update _ (.ofNat T) (.ofNat (max T T')) (by simp only [MaxNat.le_toNat]; omega)
     $$ Hb with ⟨Hb, #Hlb⟩
   imodintro
   isplitl [Hb Hd Hv]
-  · iapply ctxStamped_intro ξ (max T T') V g D
+  · iapply ctxStamped_intro ξ (max T T') V g D W
     unfold ctxAt
-    iframe Hb Hd Hv
+    iframe Hb Hd Hv HW
     isplit
     · iapply topLb_max T T'
       isplit
       · iexact HT
       · iexact HT'
     isplit
-    · ipureintro; intro k h hk; have := hD k h hk; omega
+    · ipureintro; exact hD
     isplit
     · iexact Hels
     · ipureintro
-      exact ⟨hDV, fun h => by have := hVT h; omega⟩
+      exact ⟨hDV, hVW⟩
   · unfold ctxFloor
     iright
     iapply MonoNat.lb_own_le _ (.ofNat (max T T')) (.ofNat T') (by simp only [MaxNat.le_toNat]; omega)
@@ -689,12 +673,12 @@ theorem ctxStamped_raise (ξ : CtxId) (T T' : Nat) (V : CPU → Nat) (g : Nat) :
 /-! ## Registration: the same-hart mints -/
 
 /-- The pure facts a domination body yields against the dominator's
-authority: every key of the dominated set is under the dominator's bound AND
-vector (with its author) or in its dirty set (with the same author). -/
+authority: every key of the dominated set is under the dominator's vector
+(with its author) or in its dirty set (with the same author). -/
 theorem dom_keys_pure (ξ ξ' : CtxId) (q : Qp) (B' : Nat) (D D' : RegMapF CPU) (V' : CPU → Nat) (g' : Nat) :
     ctxAt (GF := GF) ξ' q B' D' ∗ vecAt ξ' q V' g' ∗ dirtyElems era ξ D ∗
       □ (∀ (k : Nat) (h : CPU), ⌜get? D k = some h⌝ -∗ keyAt era ξ' k) ⊢
-      ⌜∀ k h, get? D k = some h → (k ≤ B' ∧ k ≤ V' h) ∨ get? D' k = some h⌝ := by
+      ⌜∀ k h, get? D k = some h → k ≤ V' h ∨ get? D' k = some h⌝ := by
   iintro ⟨Hat, Hv, #Hels, #Hkeys⟩
   iapply BI.pure_forall.2
   iintro %k
@@ -705,21 +689,17 @@ theorem dom_keys_pure (ξ ξ' : CtxId) (q : Qp) (B' : Nat) (D D' : RegMapF CPU) 
   ihave Hkey := Hkeys $$ %k %h %hk
   ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
   icases He with ⟨_, #Hau⟩
-  icases keyAt_cases _ ξ' k $$ Hkey with ⟨⟨#Hcl, #Hck⟩ | ⟨%h', Hd, Hau'⟩⟩
-  · ihave %hkB : ⌜k ≤ B'⌝ $$ [Hat Hcl]
-    · iapply ctxAt_floor ξ' q B' D' k $$ [Hat Hcl]
-      iframe Hat
-      iexact Hcl
-    unfold chainKey
+  icases keyAt_cases _ ξ' k $$ Hkey with ⟨#Hck | ⟨%h', Hd, Hau'⟩⟩
+  · unfold chainKey
     icases Hck with ⟨%h0 | ⟨%a, #Hau2, #Ha⟩⟩
     · ipureintro
-      exact Or.inl ⟨hkB, by omega⟩
+      exact Or.inl (by omega)
     · ihave %hea : ⌜hartAgent h = a⌝ $$ [Hau Hau2]
       · iapply authoredBy_agree k _ _ $$ [Hau Hau2]
         isplit
         · iexact Hau
         · iexact Hau2
-      icases Ha with ⟨%hdev | ⟨%h'', %ha'', #Hf⟩⟩
+      icases Ha with ⟨⟨%hdev, _⟩ | ⟨%h'', %ha'', #Hf⟩⟩
       · exfalso
         rw [← hea] at hdev
         exact absurd hdev (Nat.not_le.2 (hartAgent_lt h))
@@ -729,7 +709,7 @@ theorem dom_keys_pure (ξ ξ' : CtxId) (q : Qp) (B' : Nat) (D D' : RegMapF CPU) 
         · iapply vecAt_floor ξ' q V' g' h'' k $$ [Hv Hf]
           iframe Hv Hf
         ipureintro
-        exact Or.inl ⟨hkB, hle⟩
+        exact Or.inl hle
   · ihave %hD' : ⌜get? D' k = some h'⌝ $$ [Hat Hd]
     · iapply ctxAt_dirty ξ' q B' D' k h' $$ [Hat Hd]
       iframe Hat
@@ -752,7 +732,7 @@ for ξ's vector are certificates for the join --, and the domination body is
 minted.  `B`, `D`, `W`, `V`, `g` are ξ's; ξ's receipts are supplied. -/
 theorem ctx_register (cpu : CPU) (ξ ξ' : CtxId) (B K W : Nat) (D : RegMapF CPU) (V : CPU → Nat) (g : Nat)
     (hBK : B ≤ K) (hok : dirtyOk cpu B W D) (hcd : chainDirtyOk cpu D V) (hvw : ∀ h, V h ≤ W) :
-    ownCtx (GF := GF) cpu ξ' ∗ topLb W ∗ dirtyElems era ξ D ∗ ctxFloor ξ B ∗ viewLb cpu K ∗
+    ownCtx (GF := GF) cpu ξ' ∗ itopLb W ∗ dirtyElems era ξ D ∗ ctxFloor ξ B ∗ viewLb cpu K ∗
       vecCertsAt era V g cpu ⊢ |==>
       (ownCtx cpu ξ' ∗ ctxFloor ξ' B ∗ vecFloors ξ' V ∗ (⌜g = 0⌝ ∨ gateFloor ξ') ∗
        □ (∀ (k : Nat) (h : CPU), ⌜get? D k = some h⌝ -∗ keyAt era ξ' k)) := by
@@ -800,7 +780,7 @@ theorem ctx_register (cpu : CPU) (ξ ξ' : CtxId) (B K W : Nat) (D : RegMapF CPU
     isplit
     · ipureintro; omega
     isplit
-    · iapply topLb_max
+    · iapply itopLb_max
       isplit
       · iexact HW'
       · iexact HW
@@ -809,16 +789,12 @@ theorem ctx_register (cpu : CPU) (ξ ξ' : CtxId) (B K W : Nat) (D : RegMapF CPU
       intro k h hk
       rw [hget] at hk
       split at hk
-      · obtain ⟨h1, h2⟩ := hok' k h hk
-        refine ⟨by omega, ?_⟩
-        rcases h2 with h2 | h2
-        · exact Or.inl (by omega)
-        · exact Or.inr h2
-      · obtain ⟨h1, h2⟩ := hok k h hk
-        refine ⟨by omega, ?_⟩
-        rcases h2 with h2 | h2
-        · exact Or.inl (by omega)
-        · exact Or.inr h2
+      · have := hok' k h hk
+        show k ≤ max W' W
+        omega
+      · have := hok k h hk
+        show k ≤ max W' W
+        omega
     isplit
     · iapply dirtyElems_intro
       imodintro
@@ -957,7 +933,7 @@ theorem ctx_resume (cpu : CPU) (ξ ξ' : CtxId) :
         iframe Hv'
         iexact Hgf
       ipureintro; exact Or.inr h1
-  ihave %hkeys : ⌜∀ k h, get? D k = some h → (k ≤ B' ∧ k ≤ V' h) ∨ get? D' k = some h⌝ $$ [Hat' Hv']
+  ihave %hkeys : ⌜∀ k h, get? D k = some h → k ≤ V' h ∨ get? D' k = some h⌝ $$ [Hat' Hv']
   · iapply dom_keys_pure ξ ξ' 1 B' D D' V' g' $$ [Hat' Hv']
     iframe Hat' Hv'
     isplit
@@ -989,7 +965,7 @@ theorem ctx_resume (cpu : CPU) (ξ ξ' : CtxId) :
       iframe Hv' Hc'
       ipureintro
       exact ⟨hcd', hvw'⟩
-  · iapply ownCtx_intro cpu ξ B' K' (max K' W') D
+  · iapply ownCtx_intro cpu ξ B' K' W' D
     unfold ctxAt
     iframe Hb Hd
     isplit
@@ -997,20 +973,15 @@ theorem ctx_resume (cpu : CPU) (ξ ξ' : CtxId) :
     isplit
     · ipureintro; exact hBK'
     isplit
-    · iapply topLb_max
-      isplit
-      · iapply viewLb_topLb cpu K'; iexact HK'
-      · iexact HW'
+    · iexact HW'
     isplit
     · ipureintro
       intro k h hk
       rcases hkeys k h hk with h1 | h1
-      · exact ⟨by omega, Or.inl h1.1⟩
-      · obtain ⟨h2, h3⟩ := hok' k h h1
-        refine ⟨by omega, ?_⟩
-        rcases h3 with h3 | h3
-        · exact Or.inl h3
-        · exact Or.inr h3
+      · have := hvw' h
+        show k ≤ W'
+        omega
+      · exact hok' k h h1
     isplit
     · iexact Hels
     · unfold chainTokAt
@@ -1020,7 +991,7 @@ theorem ctx_resume (cpu : CPU) (ξ ξ' : CtxId) :
       · ipureintro
         refine ⟨fun k h hk => ?_, fun h => by have := hvw' h; omega⟩
         rcases hkeys k h hk with h1 | h1
-        · exact Or.inr h1.2
+        · exact Or.inr h1
         · exact hcd' k h h1
       · iapply vecCertsAt_le era V' V' g' (max g g') cpu (fun _ => Nat.le_refl _)
           (by rcases hgg' with h0 | h1
@@ -1128,7 +1099,7 @@ theorem ctxDomAt_dom (ξ ξ' ξ'' : CtxId) (q : Qp) :
         iexact Hgf
       ipureintro; exact Or.inr h1
   -- ξ's dirty keys are under ξ''s bound and vector or in ξ''s dirty set
-  ihave %hks : ⌜∀ k h, get? D k = some h → (k ≤ B' ∧ k ≤ V' h) ∨ get? D' k = some h⌝ $$ [Hat' Hv']
+  ihave %hks : ⌜∀ k h, get? D k = some h → k ≤ V' h ∨ get? D' k = some h⌝ $$ [Hat' Hv']
   · iapply dom_keys_pure ξ ξ' _ B' D D' V' g' $$ [Hat' Hv']
     iframe Hat' Hv'
     isplit
@@ -1156,12 +1127,9 @@ theorem ctxDomAt_dom (ξ ξ' ξ'' : CtxId) (q : Qp) :
   isplit
   · imodintro
     iintro %k %h %hk
-    rcases hks k h hk with ⟨hkB, hkV⟩ | hkD
+    rcases hks k h hk with hkV | hkD
     · unfold keyAt
       ileft
-      isplit
-      · iapply ctxFloor_le ξ'' B' k hkB
-        iexact Hfl'
       · ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
         icases He with ⟨_, #Hau⟩
         unfold chainKey
@@ -1217,9 +1185,9 @@ theorem ownCtx_vecCerts (cpu : CPU) (ξ : CtxId) (V' : CPU → Nat) :
 
 /-- **A vector the running hart holds certificates for joins its context's**
 (W8 (f2-ctx)): the chain vector rises over `V'` (each component under a
-store-order receipt `T'`), and the gate over `g'`. -/
+issue receipt `T'`, route P design D9), and the gate over `g'`. -/
 theorem ctx_vecAbsorb (cpu : CPU) (ξ : CtxId) (V' : CPU → Nat) (g' T' : Nat) (hV : ∀ h, V' h ≤ T') :
-    ownCtx (GF := GF) cpu ξ ∗ vecCertsAt era V' g' cpu ∗ topLb T' ⊢
+    ownCtx (GF := GF) cpu ξ ∗ vecCertsAt era V' g' cpu ∗ itopLb T' ⊢
       |==> (ownCtx cpu ξ ∗ vecFloors ξ V' ∗ (⌜g' = 0⌝ ∨ gateFloor ξ)) := by
   iintro ⟨Hctx, #Hc', #HT'⟩
   icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
@@ -1242,15 +1210,16 @@ theorem ctx_vecAbsorb (cpu : CPU) (ξ : CtxId) (V' : CPU → Nat) (g' T' : Nat) 
     isplit
     · ipureintro; exact hBK
     isplit
-    · iapply topLb_max W T'
+    · iapply itopLb_max W T'
       isplit
       · iexact HW
       · iexact HT'
     isplit
     · ipureintro
       intro k h hk
-      obtain ⟨h1, h2⟩ := hok k h hk
-      exact ⟨by omega, h2⟩
+      have := hok k h hk
+      show k ≤ max W T'
+      omega
     isplit
     · iexact Hels
     · unfold chainTokAt
@@ -1299,7 +1268,7 @@ theorem ownCtx_gate (cpu : CPU) (ξ : CtxId) :
       iframe Hv Hc
       ipureintro; exact ⟨hcd, hvw⟩
   · unfold vecCertsAt
-    icases Hc with ⟨_, #Hgc⟩
+    icases Hc with ⟨_, #Hgc, _⟩
     icases Hgc with ⟨%h0 | #Hgp⟩
     · exfalso; omega
     · iexact Hgp
@@ -1334,56 +1303,62 @@ theorem ctx_setGate (cpu : CPU) (ξ : CtxId) :
     isplit
     · ipureintro; exact ⟨hcd, hvw⟩
     · unfold vecCertsAt
-      icases Hc with ⟨#Hl, _⟩
-      iframe Hl
+      icases Hc with ⟨#Hl, _, #Hcov⟩
+      iframe Hl Hcov
       iright; iexact Hgp
 
 /-- Certificates hold at any gate on a hart past the boot gate. -/
 theorem vecCertsAt_gate (V : CPU → Nat) (g g' : Nat) (cpu : CPU) :
     vecCertsAt era V g' cpu ∗ gatePassed cpu ⊢@{IProp GF} vecCertsAt era V g cpu := by
   unfold vecCertsAt
-  iintro ⟨⟨#Hl, _⟩, #Hgp⟩
-  iframe Hl
+  iintro ⟨⟨#Hl, _, #Hcov⟩, #Hgp⟩
+  iframe Hl Hcov
   iright; iexact Hgp
 
-/-- Certificates from a list of lower bounds at one deadline. -/
-theorem vecCertsAt_ofMap (V : CPU → Nat) (g : Nat) (cpu : CPU) (τ : Nat) :
-    ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 cpu τ) ∗ (⌜g = 0⌝ ∨ gatePassed cpu)
-      ⊢@{IProp GF} vecCertsAt era V g cpu := by
+/-- Certificates from a list of lower bounds at one deadline, and a landing
+cover (route P, design D9). -/
+theorem vecCertsAt_ofMap (V : CPU → Nat) (g : Nat) (cpu : CPU) (τ K : Nat) :
+    ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 cpu τ) ∗ (⌜g = 0⌝ ∨ gatePassed cpu) ∗
+      viewLb cpu K ∗ landCovAt era V cpu K ⊢@{IProp GF} vecCertsAt era V g cpu := by
   rw [BigSepL.bigSepL_map]
   unfold vecCertsAt
-  iintro ⟨Hl, Hg⟩
-  iframe Hg
-  iapply BigSepL.bigSepL_mono ?_ $$ Hl
-  intro _ c _
-  iintro #H
-  iexists τ
-  iexact H
+  iintro ⟨Hl, Hg, #HK, #Hcov⟩
+  isplitl [Hl]
+  · iapply BigSepL.bigSepL_mono ?_ $$ Hl
+    intro _ c _
+    iintro #H
+    iexists τ
+    iexact H
+  isplitl [Hg]
+  · iexact Hg
+  · iexists K
+    iframe Hcov
+    iright; iexact HK
 
 /-- A stamped context's certificates as a retime request: each component's
 lower bound, with the stamp's store-order receipt under it. -/
 theorem ctxStamped_rtList (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) (cpu : CPU) :
     ctxStamped (GF := GF) ξ T V g ∗ vecCertsAt era V g cpu ⊢
-      ctxStamped ξ T V g ∗ [∗list] p ∈ cpus.map (fun h => (h, V h)), (∃ τ : Nat, chainLb p.1 p.2 cpu τ) ∗ topLb p.2 := by
+      ctxStamped ξ T V g ∗ [∗list] p ∈ cpus.map (fun h => (h, V h)), (∃ τ : Nat, chainLb p.1 p.2 cpu τ) ∗ itopLb p.2 := by
   iintro ⟨Hst, Hc⟩
-  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, %W, Hat, #HT, #HW, %hD, #Hels, Hv, %⟨hDV, hVW⟩⟩
   isplitl [Hat Hv]
-  · iapply ctxStamped_intro ξ T V g D
-    iframe Hat Hv
+  · iapply ctxStamped_intro ξ T V g D W
+    iframe Hat Hv HW
     isplit
     · iexact HT
     isplit
     · ipureintro; exact hD
     isplit
     · iexact Hels
-    · ipureintro; exact ⟨hDV, hVT⟩
+    · ipureintro; exact ⟨hDV, hVW⟩
   · rw [BigSepL.bigSepL_map]
     unfold vecCertsAt
     icases Hc with ⟨Hl, _⟩
-    ihave Ht : [∗list] c ∈ cpus, topLb (V c) $$ []
+    ihave Ht : [∗list] c ∈ cpus, itopLb (V c) $$ []
     · iapply BigSepL.bigSepL_forall_elim
       iintro %k %c %_
-      iapply topLb_le T (V c) (hVT c) $$ HT
+      iapply itopLbAt_le _ W (V c) (hVW c) $$ HW
     iapply BigSepL.bigSepL_sep_eqv.2
     iframe Hl Ht
 

@@ -320,20 +320,20 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   icases itableSlotRes_acc_upd curCtx M ci j hj $$ Hrows with ⟨Hrow, Hrback⟩
   rw [itableSlotRes_some curCtx M ci j qj nj hMj]
   unfold itableSlotLive
-  icases Hrow with ⟨Hrowfl, ⟨%tst, Hst, #Hllb, #Hfl⟩⟩
-  -- the holder's view is past the payload's floor
+  icases Hrow with ⟨Hrowfl, ⟨%loS, %tst, Hst, #Hllb, #Hfl, #Hflo⟩⟩
+  -- the payload's key on the head, cashed into the holder's licence (route P, D12‴)
   icases kctx_token_acc c _ $$ Hk with ⟨Hrun, Hkback⟩
-  icases ownCtx_floor_view c curCtx tst $$ [Hrun Hfl] with ⟨Hrun, ⟨%K, #HK, %htK⟩⟩
+  icases ownCtx_visFloor_vis c tst $$ [Hrun Hfl] with ⟨Hrun, ⟨%K, %ts, %ls, #HK, #Hts, #Hls, %hlic⟩⟩
   · iframe Hrun Hfl
   ihave Hk := Hkback $$ Hrun
   icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M j tst K [] hj ⟨_, hMj⟩ htK heqR $$ [Hhalf Hst]
-  · iframe Hinv Hhalf Hst
-    iapply BigSepL.bigSepL_nil.2; iempintro
+  ihave HAU := iref_readAU_locked (hlc := hlc) c M j loS tst K ts ls hj ⟨_, hMj⟩ hlic heqR
+    $$ [Hhalf Hst]
+  · iframe Hinv Hts Hls Hhalf Hst
   -- +0x44 c.lw a5,8(s1) : THE EXACT READ
   k_step (wp_s_lw_au c _ ?hs (KA.«iget» + 0x44#64) true 8#12 15#5 9#5 (by decide) (iRef (ientry j)) ?ha
-      hram hal K []
-      (fun w => iprop(⌜w = irefWord M j⌝ ∗ itableHalf M ∗ istmpAuth j (1 : Qp).half tst)))
+      hram hal K ts
+      (fun w => iprop(⌜w = irefWord M j⌝ ∗ itableHalf M ∗ istmpAuthL j (1 : Qp).half loS tst)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   case ha => k_norm [h9]; rfl
   iintro %w Hk Hpc ⟨%hw, Hhalf, Hst⟩
@@ -342,8 +342,8 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   · rw [itableSlotRes_some curCtx M ci j qj nj hMj]
     unfold itableSlotLive
     iframe Hrowfl
-    iexists tst
-    iframe Hst Hllb Hfl
+    iexists loS, tst
+    iframe Hst Hllb Hfl Hflo
   -- +0x46 blez a5 : a live word, falls through
   k_step (wp_s_branch0 c _ (KA.«iget» + 0x46#64) false 8174#13 15#5 (by decide) bop.BGE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hiw, ig_blez_live nj hn31]

@@ -308,7 +308,7 @@ def iputWindow (k : Nat) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 �
       ⌜∀ j, j ≠ k → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗
       itableSlotResLlb curCtx M' ci' k -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
-    (∃ tst : Nat, istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor curCtx tst) ∗
+    itableSlotLive curCtx k ∗
     (∃ (x0 : IcX) (td T0 : Nat) (a : ChainVG), ⌜x0 ≠ .icRaw⌝ ∗
       icRegd k ⟨td, true, some (dev, inum), some (x0, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗ icCnt k 1 ∗
       icHdr fscIc fscFs fscIreg fscCov fscLogst k (some (dev, inum)) x0 curCtx))

@@ -39,16 +39,17 @@ theorem devObsOkB_iff (d : DevId) (s s' : DevSt d) (os : List DevObs) :
   cases d <;> simp [devObsOkB, devObsOk]
 
 /-- `MachCSL.dmaView`, decided. -/
-def dmaViewB (m : FlatMem) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Bool :=
+def dmaViewB (m : FlatMem) (lp : LandPos) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Bool :=
   (List.range n).all fun j =>
-    match (m[pa + BitVec.ofNat 64 j]?).bind Hist.top with
+    match (m[pa + BitVec.ofNat 64 j]?).bind (Hist.topL lp) with
     | some b => nthByte w j == b
     | none => true
 
 theorem dmaViewB_sound (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (h : dmaViewB x.mem pa n w = true) : dmaView x.abs pa n w := by
+    (h : dmaViewB x.mem (vlp x.log.length) pa n w = true) : dmaView x.abs pa n w := by
   intro j hj b hb
-  have hb' : (x.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top = some b := hb
+  rw [XState.abs_lp] at hb
+  have hb' : (x.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL (vlp x.log.length)) = some b := hb
   unfold dmaViewB at h
   rw [List.all_eq_true] at h
   have := h j (List.mem_range.2 hj)
@@ -67,8 +68,8 @@ def devOpExec (gen : Nat) (d : DevId) (ans : Nat) (x : XState) :
   | .get => some (x.dev d, x, [], [])
   | .choose => some (ans, x, [], [])
   | .dmaRead pa n =>
-    let w := gather n fun j => (x.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top
-    if dmaViewB x.mem pa n w then some (w, x, [], []) else none
+    let w := gather n fun j => (x.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL (vlp x.log.length))
+    if dmaViewB x.mem (vlp x.log.length) pa n w then some (w, x, [], []) else none
   | .dmaWrite g pa n w =>
     match g (x.dev d) with
     | some s' =>
@@ -151,7 +152,7 @@ theorem devOpExec_sound (gen : Nat) (d : DevId) (ans : Nat) (x : XState)
               have := (anyReserveB_iff x pa n).2 ha
               rw [hc.2] at this
               exact absurd this (by simp)
-            · exact XState.abs_setDev ..
+            · rw [XState.abs_setDev, XState.abs_storeDma]
           · exact absurd h (by simp)
         · rename_i hram
           simp only [Option.some.injEq, Prod.mk.injEq] at h

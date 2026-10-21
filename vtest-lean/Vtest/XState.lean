@@ -86,6 +86,102 @@ theorem XRegs.file_insert (m : XRegs) (r : Register) (v : RegisterType r) :
   · have hi : r.ctorIdx ≠ r'.ctorIdx := fun e => h (ctorIdx_inj e).symm
     simp [XRegs.file, XRegs.get, XRegs.insert, BootRegs.set, h, Vector.getElem_set_ne _ _ hi]
 
+/-! ## Landing (route P)
+
+The language buffers a plain store (`MState.issue`) and lands it later (`MState.land`, the land
+arm of `primStep`).  The interpreter lands every store in the scheduler step that issues it
+(`Vtest.Pool.stepAt`: the hart's step, then the land arm), and an exclusive or DMA write lands
+in its own step, so between steps no store is pending: the landing log an `XState` denotes is
+`1, …, top` (every issued stamp landed at its own stamp, `vlp`) and every store buffer is empty.
+Neither is stored. -/
+
+/-- The landing positions of a landing log `1, …, k`, computed in constant time. -/
+def vlp (k : Nat) : LandPos := fun t => if t ≤ k then some t else none
+
+theorem lpOf_range'_vlp (k : Nat) : lpOf (List.range' 1 k) = vlp k := funext (lpOf_range'_one k)
+
+theorem range'_snoc_one (k : Nat) : List.range' 1 k ++ [k + 1] = List.range' 1 (k + 1) := by
+  rw [List.range'_concat, Nat.one_mul, Nat.add_comm 1 k]
+
+/-- Every store landed at its own stamp: the landed stores' authors are the author log. -/
+theorem landAuthors_range' (log : List Agent) : landAuthors log (List.range' 1 log.length) = log := by
+  unfold landAuthors
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2
+    simp only [List.getElem_map, List.getElem_range']
+    rw [show 1 + 1 * i - 1 = i by omega, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h2]
+    rfl
+
+/-- Every history entry's stamp is at most `k` (with `k` the top: no entry is above the top --
+what makes the landing of a just-issued store legal, `MState.landFootOk`). -/
+def stampsLe (m : FlatMem) (k : Nat) : Prop :=
+  ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, e.t ≤ k
+
+theorem stampsLe_mono {m : FlatMem} {k k' : Nat} (h : stampsLe m k) (hk : k ≤ k') : stampsLe m k' :=
+  fun a H hH e he => Nat.le_trans (h a H hH e he) hk
+
+theorem stampsLe_getD {m : FlatMem} {k : Nat} (h : stampsLe m k) (a : PAddr) :
+    ∀ e ∈ m.getD a [], e.t ≤ k := by
+  intro e he
+  rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at he
+  cases hm : m[a]? with
+  | none => rw [hm] at he; simp at he
+  | some H => rw [hm] at he; exact h a H hm e he
+
+theorem stampsLe_push {m : FlatMem} {k : Nat} (h : stampsLe m k) (a : PAddr) (e : HEnt) (he : e.t ≤ k) :
+    stampsLe (m.push a e) k := by
+  intro a' H hH x hx
+  by_cases ha : a' = a
+  · subst ha
+    rw [FlatMem.push_get?_eq] at hH
+    cases hH
+    rcases List.mem_cons.1 hx with rfl | hx
+    · exact he
+    · exact stampsLe_getD h a' x hx
+  · rw [FlatMem.push_get?_ne _ _ _ _ ha] at hH
+    exact h a' H hH x hx
+
+theorem stampsLe_pushLanded {m : FlatMem} {k : Nat} (h : stampsLe m k) (lp : LandPos) (a : PAddr)
+    (e : HEnt) (he : e.t ≤ k) : stampsLe (m.pushLanded lp a e) k := by
+  intro a' H hH x hx
+  by_cases ha : a' = a
+  · subst ha
+    rw [FlatMem.pushLanded_get?_eq] at hH
+    cases hH
+    unfold Hist.insLanded at hx
+    rcases List.mem_append.1 hx with hx | hx
+    · exact stampsLe_getD h a' x (List.takeWhile_subset _ hx)
+    · rcases List.mem_cons.1 hx with rfl | hx
+      · exact he
+      · exact stampsLe_getD h a' x (List.dropWhile_subset _ hx)
+  · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha] at hH
+    exact h a' H hH x hx
+
+theorem stampsLe_writeBytes {n : Nat} {m : FlatMem} {k : Nat} (hm : stampsLe m k) (pa : PAddr)
+    (w : BitVec (8 * n)) (h : Agent) : stampsLe (m.writeBytes pa n w (k + 1) h) (k + 1) := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), stampsLe m (k + 1) →
+      stampsLe (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨k + 1, h, nthByte w j⟩) m)
+        (k + 1) := by
+    intro l
+    induction l with
+    | nil => intro m hm; exact hm
+    | cons j l ih => intro m hm; exact ih _ (stampsLe_push hm _ _ (Nat.le_refl _))
+  exact key _ m (stampsLe_mono hm (Nat.le_succ k))
+
+theorem stampsLe_landBytes {n : Nat} {m : FlatMem} {k : Nat} (hm : stampsLe m k) (lp : LandPos)
+    (pa : PAddr) (w : BitVec (8 * n)) (h : Agent) : stampsLe (m.landBytes lp pa n w (k + 1) h) (k + 1) := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), stampsLe m (k + 1) →
+      stampsLe (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨k + 1, h, nthByte w j⟩) m)
+        (k + 1) := by
+    intro l
+    induction l with
+    | nil => intro m hm; exact hm
+    | cons j l ih => intro m hm; exact ih _ (stampsLe_pushLanded hm _ _ _ (Nat.le_refl _))
+  exact key _ m (stampsLe_mono hm (Nat.le_succ k))
+
 /-! ## The state -/
 
 /-- One hart's share of the state. -/
@@ -111,12 +207,10 @@ structure XState where
   rtV : DevRt
   /-- the issuing pc of each store (`MState.pcAt`) -/
   pcAt : Nat → Int
-  /-- the landing log (`MState.llog`, route P) -/
-  llog : List Nat := []
-  /-- the store buffers (`MState.sb`, route P) -/
-  sb : CPU → List (Nat × Nat) := fun _ => []
   /-- the store epochs (`MState.sbEp`, route P) -/
   sbEp : CPU → Nat := fun _ => 0
+  /-- no history entry is above the top (a proof, erased at run time) -/
+  stampOk : stampsLe mem log.length
 
 namespace XState
 
@@ -163,7 +257,8 @@ def setRt (x : XState) : DevId → DevRt → XState
 /-- The device states an `XState` denotes. -/
 def devs (x : XState) : DevStates := ⟨x.dev⟩
 
-/-- THE DENOTATION: the language state an `XState` stands for. -/
+/-- THE DENOTATION: the language state an `XState` stands for (route P: every store landed at
+its own stamp, every store buffer empty). -/
 def abs (x : XState) : MState where
   regs c := (x.hart c).regs.file
   mem := x.mem
@@ -175,9 +270,17 @@ def abs (x : XState) : MState where
   devs := x.devs
   devrt := x.rt
   pcAt := x.pcAt
-  llog := x.llog
-  sb := x.sb
+  llog := List.range' 1 x.log.length
+  sb := fun _ => []
   sbEp := x.sbEp
+
+/-- The landing positions an `XState` denotes. -/
+theorem abs_lp (x : XState) : x.abs.lp = vlp x.log.length := lpOf_range'_vlp _
+
+/-- The landing top an `XState` denotes is its top. -/
+theorem abs_ltop (x : XState) : x.abs.ltop = x.log.length := List.length_range' ..
+
+theorem abs_sb (x : XState) (c : CPU) : x.abs.sb c = [] := rfl
 
 end XState
 
@@ -251,15 +354,19 @@ def afterLoadHR (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : Nat) (sr
 theorem afterLoadHR_eq (hr : HRead) (me : Agent) (pa : PAddr) (n : Nat) (tvn : Nat)
     (srcs : LoadSrcs) : afterLoadHR hr me pa n tvn srcs = hr.afterLoad me pa n tvn srcs := rfl
 
+/-- A plain load's effect (route P: the coherence floors take the sources' landing positions). -/
 def afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) : XState :=
   x.setHart cpu { x.hart cpu with
-    hr := afterLoadHR (x.hart cpu).hr (hartAgent cpu) pa n tvn (x.mem.loadSrcs (hartAgent cpu) tvn pa n) }
+    hr := afterLoadHR (x.hart cpu).hr (hartAgent cpu) pa n tvn
+      (x.mem.loadSrcsP (vlp x.log.length) (hartAgent cpu) tvn pa n) }
 
 theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat) :
     (x.afterLoad cpu pa n tvn).abs = x.abs.afterLoad cpu pa n tvn := by
-  rw [afterLoad, abs_setHart, afterLoadHR_eq]
+  rw [afterLoad, abs_setHart, afterLoadHR_eq, ← abs_lp x]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
+/-- An exclusive read's effect (route P: the watermark, and the floor of an acquire, to the
+landing top). -/
 def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool) :
     XState :=
   x.setHart cpu { x.hart cpu with
@@ -269,7 +376,9 @@ def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n
 
 theorem abs_afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : (x.afterExcl cpu pa n w acq).abs = x.abs.afterExcl cpu pa n w acq := by
-  rw [afterExcl, abs_setHart]
+  have e := abs_ltop x
+  unfold MState.afterExcl
+  rw [e, afterExcl, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def dropResv (x : XState) (cpu : CPU) : XState :=
@@ -279,25 +388,23 @@ theorem abs_dropResv (x : XState) (cpu : CPU) : (x.dropResv cpu).abs = x.abs.dro
   rw [dropResv, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
-def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
-    XState :=
+/-- A PLAIN store, issued and landed at once (route P: `MState.issue`, then the land arm's
+`MState.land` of the same stamp, `Vtest.Pool.stepAt`). -/
+def storeP (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
   let h := x.hart cpu
-  { x.setHart cpu { h with
-      tv := if excl && h.hr.acq then x.log.length + 1 else h.tv,
-      hr := h.hr.clearAcq.resetCoh pa n,
-      resv := none } with
+  let x1 := x.setHart cpu { h with hr := h.hr.clearAcq.resetCoh pa n, resv := none }
+  { x1 with
     mem := x.mem.writeBytes pa n w (x.log.length + 1) (hartAgent cpu),
     log := x.log ++ [hartAgent cpu],
-    llog := x.llog ++ [x.log.length + 1],
-    pcAt := fun t => if t = x.log.length + 1 then
-      (if excl then -1 else ((((x.hart cpu).regs.file) Register.PC).toNat : Int)) else x.pcAt t }
+    pcAt := fun t => if t = x.log.length + 1 then ((h.regs.file Register.PC).toNat : Int) else x.pcAt t,
+    stampOk := by
+      rw [List.length_append, List.length_singleton]
+      exact stampsLe_writeBytes x.stampOk pa w (hartAgent cpu) }
 
-theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) : (x.store cpu pa n w excl).abs = x.abs.store cpu pa n w excl := by
+theorem abs_storeP (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    (x.storeP cpu pa n w).abs = (x.abs.issue cpu pa n w).land cpu (x.log.length + 1) := by
   have h := abs_setHart x cpu { x.hart cpu with
-      tv := if excl && (x.hart cpu).hr.acq then x.log.length + 1 else (x.hart cpu).tv,
-      hr := (x.hart cpu).hr.clearAcq.resetCoh pa n,
-      resv := none }
+      hr := (x.hart cpu).hr.clearAcq.resetCoh pa n, resv := none }
   have hr := congrArg MState.regs h
   have ht := congrArg MState.tv h
   have hi := congrArg MState.itv h
@@ -307,6 +414,60 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · exact hr.trans (updCpu_self _ _)
   · rfl
   · rfl
+  · exact ht.trans (updCpu_self _ _)
+  · exact hi.trans (updCpu_self _ _)
+  · exact hh
+  · exact hv
+  · rfl
+  · rfl
+  · rfl
+  · show List.range' 1 (x.log ++ [hartAgent cpu]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
+    rw [List.length_append, List.length_singleton, range'_snoc_one]
+  · funext c
+    show ([] : List (Nat × Nat)) =
+      updCpu (updCpu (fun _ => ([] : List (Nat × Nat))) cpu ([] ++ [(x.log.length + 1, x.sbEp cpu)])) cpu
+        ((updCpu (fun _ => ([] : List (Nat × Nat))) cpu ([] ++ [(x.log.length + 1, x.sbEp cpu)]) cpu).filter
+          (fun p => p.1 != x.log.length + 1)) c
+    simp only [updCpu, if_pos, List.nil_append, ite_true]
+    split <;> simp
+  · rfl
+
+/-- An EXCLUSIVE write (route P: `MState.storeL`, it lands at once). -/
+def storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
+  let h := x.hart cpu
+  let x1 := x.setHart cpu { h with
+      tv := if h.hr.acq then x.log.length + 1 else h.tv,
+      hr := h.hr.clearAcq.resetCoh pa n,
+      resv := none }
+  { x1 with
+    mem := x.mem.landBytes (vlp (x.log.length + 1)) pa n w (x.log.length + 1) (hartAgent cpu),
+    log := x.log ++ [hartAgent cpu],
+    pcAt := fun t => if t = x.log.length + 1 then -1 else x.pcAt t,
+    stampOk := by
+      rw [List.length_append, List.length_singleton]
+      exact stampsLe_landBytes x.stampOk _ pa w (hartAgent cpu) }
+
+theorem abs_storeL (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    (x.storeL cpu pa n w).abs = x.abs.storeL cpu pa n w := by
+  have h := abs_setHart x cpu { x.hart cpu with
+      tv := if (x.hart cpu).hr.acq then x.log.length + 1 else (x.hart cpu).tv,
+      hr := (x.hart cpu).hr.clearAcq.resetCoh pa n,
+      resv := none }
+  have hr := congrArg MState.regs h
+  have ht := congrArg MState.tv h
+  have hi := congrArg MState.itv h
+  have hh := congrArg MState.hr h
+  have hv := congrArg MState.resv h
+  have hl : lpOf (List.range' 1 x.log.length ++ [x.log.length + 1]) = vlp (x.log.length + 1) := by
+    rw [range'_snoc_one, lpOf_range'_vlp]
+  have e := abs_ltop x
+  unfold MState.storeL
+  rw [e]
+  apply MState.ext'
+  · exact hr.trans (updCpu_self _ _)
+  · show _ = x.mem.landBytes (lpOf (List.range' 1 x.log.length ++ [x.log.length + 1])) pa n w _ _
+    rw [hl]; rfl
+  · rfl
   · exact ht
   · exact hi.trans (updCpu_self _ _)
   · exact hh
@@ -314,7 +475,8 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · rfl
   · rfl
   · rfl
-  · rfl
+  · show List.range' 1 (x.log ++ [hartAgent cpu]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
+    rw [List.length_append, List.length_singleton, range'_snoc_one]
   · rfl
   · rfl
 
@@ -333,18 +495,52 @@ theorem abs_withSbEp (x : XState) (f : CPU → Nat) :
 
 theorem abs_fence (x : XState) (cpu : CPU) (b : barrier_kind) :
     (x.fence cpu b).abs = x.abs.fence cpu b := by
-  rw [fence, abs_withSbEp, abs_setHart]
+  have e : ownPubL (hartAgent cpu) x.abs.log x.abs.llog = ownPub (hartAgent cpu) x.log := by
+    unfold ownPubL
+    rw [show x.abs.llog = List.range' 1 x.log.length from rfl, show x.abs.log = x.log from rfl,
+      landAuthors_range']
+  unfold MState.fence
+  rw [e, fence, abs_withSbEp, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
-/-- A DMA write by the disk (a zero-byte one is a no-op, as `MState.storeDma`). -/
+/-- A DMA write by the disk (route P: it lands at once; a zero-byte one is a no-op, as
+`MState.storeDma`). -/
 def storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
-  { x with mem := if n = 0 then x.mem else x.mem.writeBytes pa n w (x.log.length + 1) diskAgent,
-           log := if n = 0 then x.log else x.log ++ [diskAgent],
-           llog := if n = 0 then x.llog else x.llog ++ [x.log.length + 1],
-           pcAt := if n = 0 then x.pcAt else fun t => if t = x.log.length + 1 then -1 else x.pcAt t }
+  if n = 0 then x else
+  { x with mem := x.mem.landBytes (vlp (x.log.length + 1)) pa n w (x.log.length + 1) diskAgent,
+           log := x.log ++ [diskAgent],
+           pcAt := fun t => if t = x.log.length + 1 then -1 else x.pcAt t,
+           stampOk := by
+             rw [List.length_append, List.length_singleton]
+             exact stampsLe_landBytes x.stampOk _ pa w diskAgent }
 
 theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    (x.storeDma pa n w).abs = x.abs.storeDma pa n w := rfl
+    (x.storeDma pa n w).abs = x.abs.storeDma pa n w := by
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero _ _ _ _ hn]
+    unfold storeDma
+    rw [if_pos hn]
+  · rw [MState.storeDma_of_ne _ _ _ _ hn]
+    unfold storeDma
+    rw [if_neg hn]
+    have hl : lpOf (List.range' 1 x.log.length ++ [x.log.length + 1]) = vlp (x.log.length + 1) := by
+      rw [range'_snoc_one, lpOf_range'_vlp]
+    apply MState.ext'
+    · rfl
+    · show _ = x.mem.landBytes (lpOf (List.range' 1 x.log.length ++ [x.log.length + 1])) pa n w _ _
+      rw [hl]; rfl
+    · rfl
+    · rfl
+    · rfl
+    · rfl
+    · rfl
+    · rfl
+    · rfl
+    · rfl
+    · show List.range' 1 (x.log ++ [diskAgent]).length = List.range' 1 x.log.length ++ [x.log.length + 1]
+      rw [List.length_append, List.length_singleton, range'_snoc_one]
+    · rfl
+    · rfl
 
 end XState
 

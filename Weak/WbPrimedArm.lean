@@ -439,11 +439,12 @@ theorem WbPrimed.ownedUnpubRefutedArmed
     (ha1 : RelSiteProv.relProvExport σ (recPcLog r)) (ha3 : WbPrimed.relArmed r)
     (hR : rmem cN st σ) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ) (hp : cN.pcLog[p]? = some m)
     (hv : (msgByte m (paZ pa)).isSome) (hram : inRam pa 1) (hcoh : (σ.hr j).coh pa = p + 1)
+    (heg : σ.llog = List.range' 1 σ.log.length)
     (hi : m.wmTid = some i) (hiN : i < NCPU) (hij : i ≠ hartAgent j) :
     ∃ cN', WbPrimed.cfgRel cN cN' ∧ ∃ m', cN'.pcLog[p]? = some m' ∧ m'.wmTid = m.wmTid ∧
       (benignAt σ pa (p + 1) ∨ ¬ (m'.wmAk = .WCplain ∧ ¬ wpublished cN'.pcLog m'.wmTid p)) := by
   obtain ⟨cN', hRN, hsite⟩ := WbPrimed.relSiteWCrelArmed h h0 σ ha1 ha3
   exact ⟨cN', hRN, WbPrimed.ownedUnpubRefutedPrimed cN'.pcLog cN cN' st σ j pa p m i hR hRN hD hsite
-    (List.prefix_refl _) hp hv hram hcoh hi hiN hij⟩
+    (List.prefix_refl _) hp hv hram hcoh heg hi hiN hij⟩
 
 end Weak

@@ -81,7 +81,7 @@ theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (s
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
-    exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
+    exclReadAU cpu pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 8 false false true false) Φ := by
@@ -91,7 +91,7 @@ theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (s
   iapply swp_bind
   iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide) r)
   iframe Hfrag
-  iapply exclReadAU_wand pa 8 _ _ $$ HAU
+  iapply exclReadAU_wand cpu pa 8 _ _ $$ HAU
   inext
   iintro %w HΨ Hfrag
   swp_run 60
@@ -108,7 +108,7 @@ theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
-    exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
+    exclReadAU cpu pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
@@ -489,13 +489,14 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_cases HmConf
     swp_run 60
     conf_intro HmConf
-    ihave HAU := kpt_exclReadAU t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) $$ Hkpt
+    icases kpt_exclReadAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) $$ [Hkpt Hctx] with ⟨Hctx, HAU⟩
+    · iframe Hkpt Hctx
     iapply swp_bind
     iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0
       (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w)) false)))
     iframe HmConf Hfrag
     isplitl [HAU]
-    · iapply exclReadAU_wand addr 8 _ _ $$ HAU
+    · iapply exclReadAU_wand cpu addr 8 _ _ $$ HAU
       inext
       iintro %w %hw Hfrag
       iframe Hfrag
@@ -524,8 +525,9 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
         · exact absurd hupd2 (by simp)
       obtain ⟨a2, d2, rfl⟩ := hp2
       swp_run 40
-      ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
-        (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ Hkpt
+      icases kpt_exclWriteAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
+        (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ [Hkpt Hctx] with ⟨Hctx, HW⟩
+      · iframe Hkpt Hctx
       iapply swp_bind
       iapply (swp_write_pte_conditional cpu dq c sie hok addr (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
         (hents _ hmem).1 (hents _ hmem).2 emp)

@@ -114,7 +114,10 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
     iintro Hk Hpc Hwname
     -- sw zero,0(a0): mints the lock word (the address claim is normalised
     -- before the frame, so the persistent claim in the context matches)
-    iapply (wp_s_sw_mint c2 _ (KA.«initlock» + 0xa#64) false 0#12 10#5 0#5 (by decide) vlock) $$ [- $Hk $Hpc]
+    ihave #Hit0 : iprop(itopLb (hlc := hlc) (GF := GF) 0) $$ []
+    · iapply itopLbAt_0
+    iapply (wp_s_sw_mint c2 _ (KA.«initlock» + 0xa#64) false 0#12 10#5 0#5 (by decide) vlock 0)
+      $$ [- $Hk $Hpc]
     rotate_right 1
     k_code (text_instr _ _ _ _ rfl rfl) Htext
     k_norm_g [sext_0, add_0_64, MachCSL.KCtx.rget_zero, extract_zero32]
@@ -147,7 +150,7 @@ theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu 
     ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
     iapply wpNext_mono _ _ _ _ _ $$ HΦ
     iintro %c' HΦ Hk Hpc
-    icases Hlock with ⟨%lo, Hlock, #Hflo⟩
+    icases Hlock with ⟨%lo, %_, Hlock, #Hflo⟩
     icases Hcpu with ⟨%lc, Hcpu, #Hflc⟩
     ihave Hfresh := lkFresh_intro (k.regs 10#5) hok hm lo lc $$ [Hlock Hflo Hcpu Hflc]
     case' _ => iframe Hlock Hcpu; all_goals iframe #

@@ -38,14 +38,14 @@ theorem lock_pay_born_hook [CurCtx] (cpu : CPU) (R Rin : CtxId → IProp GF) [Ct
   imod ownCtx_new cpu curCtx $$ Hrun with ⟨Hrun, ⟨%ξL, HξL⟩⟩
   imod ctx_move Rin cpu curCtx ξL $$ [$Hrun $HξL $HR] with ⟨Hrun, HξL, HR⟩
   imod ctx_stamp cpu ξL $$ HξL with ⟨%T, %V, %g, Hst, -, #Hc⟩
-  icases ctxStamped_cases ξL T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
-  imod ctx_vecAbsorb cpu curCtx V g T hVT $$ [Hrun] with ⟨Hrun, #Hvf, _⟩
+  icases ctxStamped_cases ξL T V g $$ Hst with ⟨%D, %Ws, Hat, #HT, #HWs, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  imod ctx_vecAbsorb cpu curCtx V g Ws hVT $$ [Hrun] with ⟨Hrun, #Hvf, _⟩
   · iframe Hrun
     isplit
     · iexact Hc
-    · iexact HT
-  ihave Hst := ctxStamped_intro ξL T V g D $$ [Hat Hv]
-  · iframe Hat Hv
+    · iexact HWs
+  ihave Hst := ctxStamped_intro ξL T V g D Ws $$ [Hat Hv]
+  · iframe Hat Hv HWs
     isplit
     · iexact HT
     isplit
@@ -111,10 +111,10 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
     exact absurd hm' hm
   · -- a RESERVED lock (W8-β′)
     unfold lkFreshR
-    icases Hfr with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
+    icases Hfr with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩, #Hkey⟩
     imod lock_pay_born_hook cpu R Rdep W (fun e he => (hW e he).2.2) $$ [$Hrun $HR $Hhook]
       with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
-    imod inv_alloc lockN E (lockBodyR γ lk s R Vb) $$ [Hw Hc H1 H2 Hpay] with #Hinv
+    imod inv_alloc lockN E (lockBodyR γ lk s R ((W.head?.map WEnt.t).getD 0) Vb) $$ [Hw Hc H1 H2 Hpay] with #Hinv
     · inext
       unfold lockBodyR
       iexists W, W', none, B
@@ -132,6 +132,8 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
       · ipureintro
         exact ⟨hm, fun e he => ⟨(hW e he).1, (hW e he).2.1, Or.inl (hW e he).2.2⟩,
           fun e he => ⟨(hW' e he).1, (hW' e he).2.1⟩, lkFold_zeros (fun e he => (hW e he).2.2)⟩
+      isplit
+      · ipureintro; exact lkZeroHead_stamp W
       isplitr [H2 Hpay]
       · unfold lkCpuFrag; iempintro
       · ileft
@@ -148,8 +150,10 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
     · iexact Hcl
     isplit
     · iexact Hcl'
-    iexists 0, 0, Vb
+    iexists ((W.head?.map WEnt.t).getD 0), 0, Vb, 0
     iframe Hinv Hvf Hgf
+    isplit
+    · iapply lkHeadKey_floor W $$ Hkey
     isplit
     · unfold lkFloor; iapply keyAt_0
     · unfold lkFloor; iapply keyAt_0

@@ -81,6 +81,33 @@ theorem uslot_heads {K : Nat} {d : KSlot} {Hs : Nat → Hist} (hk : uslotHistOk 
   subst this
   exact hc
 
+/-- **The current word of a slot of the certified record** (route P, D11). -/
+theorem uslot_headsL {K : Nat} {d : KSlot} {Hs : Nat → Hist} {L : List (Nat × Nat)} (hk : uslotHistOkL K d Hs L)
+    {w : BitVec 64} (hw : uHeads8 Hs w) : if d.frozen then w = d.c else uepAD d.c w := by
+  obtain ⟨⟨w0, hw0, hc⟩, -⟩ := hk
+  have := uHeads8_unique hw0 hw
+  subst this
+  exact hc
+
+/-- **A hart's whole-doubleword A/D store, landed past the stamp, keeps the certified record**
+(route P, D11): it goes on top of every byte, its landing certificate joins `L`. -/
+theorem uslotHistOkL_push {K : Nat} {d : KSlot} {Hs : Nat → Hist} {L : List (Nat × Nat)}
+    (h : uslotHistOkL K d Hs L) (hleaf : d.frozen = false) (t q : Nat) (hKq : K < q) (g : Agent) (hg : g < NCPU)
+    (v : BitVec 64) (hv : uepAD d.c v) :
+    uslotHistOkL K d (fun j => (⟨t, g, nthByte (n := 8) v j⟩ : HEnt) :: Hs j) ((t, q) :: L) := by
+  obtain ⟨-, hent⟩ := h
+  refine ⟨⟨v, fun j _ => rfl, by rw [hleaf]; exact hv⟩, fun j hj => ?_⟩
+  obtain ⟨P, x, Q, hPQ, hxv, hxc, hP⟩ := hent j hj
+  refine ⟨⟨t, g, nthByte (n := 8) v j⟩ :: P, x, Q, by show _ :: Hs j = _; rw [hPQ]; rfl, hxv, ?_, fun e he => ?_⟩
+  · rcases hxc with h0 | ⟨q', hq', hle⟩
+    · exact Or.inl h0
+    · exact Or.inr ⟨q', List.mem_cons_of_mem _ hq', hle⟩
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨⟨q, List.mem_cons_self, hKq⟩, hleaf, hg, v, hv, rfl, fun j' _ => List.mem_cons_self⟩
+    · obtain ⟨⟨q', hq', hlt⟩, h1, h2, w, hw, hwv, hall⟩ := hP e he
+      exact ⟨⟨q', List.mem_cons_of_mem _ hq', hlt⟩, h1, h2, w, hw, hwv,
+        fun j' hj' => List.mem_cons_of_mem _ (hall j' hj')⟩
+
 /-- **A hart's whole-doubleword A/D store of a leaf past the stamp keeps the
 slot's discipline.** -/
 theorem uslotHistOk_push {K : Nat} {d : KSlot} {Hs : Nat → Hist} (h : uslotHistOk K d Hs)
@@ -192,9 +219,9 @@ instance (r : BitVec 44) (p : Privilege) : Persistent (PROP := IProp GF) (uptOpe
 
 /-- One slot's cell of the record (`MachCSL.uepCellsE`'s summand). -/
 abbrev uslotCell (K : Nat) (p : Nat × KSlot) : IProp GF := iprop%
-  ∃ Hs : Nat → Hist,
+  ∃ (Hs : Nat → Hist) (L : List (Nat × Nat)),
     ([∗list] j ∈ List.range 8, pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem)
-      (p.2.addr + BitVec.ofNat 64 j) (DFrac.own Qp.quarter) (Hs j)) ∗ ⌜uslotHistOk K p.2 Hs⌝
+      (p.2.addr + BitVec.ofNat 64 j) (DFrac.own Qp.quarter) (Hs j)) ∗ landedAll L ∗ ⌜uslotHistOkL K p.2 Hs L⌝
 
 /-- Two holdings of the same window agree on the histories. -/
 theorem histBytes_agree (pa : PAddr) (dqs dqs' : Nat → DFrac) (Hs Hs' : Nat → Hist) : ∀ n : Nat,
@@ -234,7 +261,7 @@ theorem histBytes_agree (pa : PAddr) (dqs dqs' : Nat → DFrac) (Hs Hs' : Nat �
 theorem uslotCell_sees (K : Nat) (p : Nat × KSlot) (ξ : CtxId) (dq : DFrac) (v : BitVec 64) :
     uslotCell (GF := GF) K p ∗ ctxBytes ξ p.2.addr 8 dq v ⊢
       ⌜if p.2.frozen then v = p.2.c else uepAD p.2.c v⌝ ∗ uslotCell K p ∗ ctxBytes ξ p.2.addr 8 dq v := by
-  iintro ⟨⟨%Hs, Hh, %hk⟩, Hb⟩
+  iintro ⟨⟨%Hs, %L, Hh, #HL, %hk⟩, Hb⟩
   unfold ctxBytes
   icases ctxBytes_hist ξ p.2.addr dq (nthByte (n := 8) v) 8 $$ Hb with ⟨%Hs', Hh', %hh', Wb⟩
   icases histBytes_agree p.2.addr (fun _ => DFrac.own Qp.quarter) (fun _ => dq) Hs Hs' 8 $$ [Hh Hh']
@@ -242,10 +269,10 @@ theorem uslotCell_sees (K : Nat) (p : Nat × KSlot) (ξ : CtxId) (dq : DFrac) (v
   · iframe Hh Hh'
   have hw : uHeads8 Hs v := fun j hj => by rw [hag j hj]; exact (hh' j hj).2
   isplitr
-  · ipureintro; exact uslot_heads hk hw
+  · ipureintro; exact uslot_headsL hk hw
   isplitl [Hh]
-  · iexists Hs
-    iframe Hh
+  · iexists Hs, L
+    iframe Hh HL
     ipureintro; exact hk
   · iapply Wb $$ Hh'
 
@@ -409,27 +436,27 @@ theorem histBytes_agreeH (pa : PAddr) (n : Nat) (dqs dqs' : Nat → DFrac) (Hs H
 
 /-- A slot cell, opened at its address. -/
 theorem uslotCell_open (K : Nat) (p : Nat × KSlot) (a : PAddr) (ha : p.2.addr = a) :
-    uslotCell (GF := GF) K p ⊢ ∃ Hs : Nat → Hist, histBytes a 8 (fun _ => DFrac.own Qp.quarter) Hs ∗
-      ⌜uslotHistOk K p.2 Hs⌝ := by
+    uslotCell (GF := GF) K p ⊢ ∃ (Hs : Nat → Hist) (L : List (Nat × Nat)),
+      histBytes a 8 (fun _ => DFrac.own Qp.quarter) Hs ∗ landedAll L ∗ ⌜uslotHistOkL K p.2 Hs L⌝ := by
   obtain ⟨l, d⟩ := p
   simp only at ha
   subst ha
-  iintro ⟨%Hs, H, %hk⟩
-  iexists Hs
+  iintro ⟨%Hs, %L, H, #HL, %hk⟩
+  iexists Hs, L
   unfold histBytes
-  iframe H
+  iframe H HL
   ipureintro; exact hk
 
 theorem uslotCell_close (K : Nat) (p : Nat × KSlot) (a : PAddr) (ha : p.2.addr = a) (Hs : Nat → Hist)
-    (hk : uslotHistOk K p.2 Hs) :
-    histBytes (GF := GF) a 8 (fun _ => DFrac.own Qp.quarter) Hs ⊢ uslotCell K p := by
+    (L : List (Nat × Nat)) (hk : uslotHistOkL K p.2 Hs L) :
+    landedAll (GF := GF) L ∗ histBytes a 8 (fun _ => DFrac.own Qp.quarter) Hs ⊢ uslotCell K p := by
   obtain ⟨l, d⟩ := p
   simp only at ha
   subst ha
-  iintro H
-  iexists Hs
+  iintro ⟨#HL, H⟩
+  iexists Hs, L
   unfold histBytes at *
-  iframe H
+  iframe H HL
   ipureintro; exact hk
 
 set_option maxHeartbeats 4000000 in
@@ -500,42 +527,48 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
   icases uslotCells_sees e.K ξ req.pa _ w e.slots $$ [Hslots Hb] with ⟨%h0, Hslots, Hb⟩
   · iframe Hslots Hb
   obtain ⟨d0, hd0, hd0a, hd0f⟩ := uep_locate hf hpath h2 h1 h0 hleaf
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
+  -- every owned head is landed or own (the running token), before the bytes are opened
+  ihave %hheads := ctxBytes_heads_vis σ cpu ξ req.pa (DFrac.own Qp.threeQuarters) (nthByte (n := 8) w) 8 $$ [Hmm Hctx Hmem Hb]
+  · unfold ctxBytes
+    iframe
   icases BigSepL.bigSepL_mem_acc (Φ := uslotCell e.K) hd0 $$ Hslots with ⟨Hd0, HslotsC⟩
-  icases uslotCell_open e.K (0, d0) req.pa hd0a $$ Hd0 with ⟨%Hs0, Hh0, %hk0⟩
+  icases uslotCell_open e.K (0, d0) req.pa hd0a $$ Hd0 with ⟨%Hs0, %L0, Hh0, #HL0, %hk0⟩
   icases ctxBytes_histW ξ req.pa 8 _ w $$ Hb with ⟨%Hs', Hh', %hh', Wb⟩
   icases histBytes_agreeH req.pa 8 _ _ Hs0 Hs' $$ [Hh0 Hh'] with ⟨%hag, Hh0, Hh'⟩
   · iframe Hh0 Hh'
   have hw0 : uHeads8 Hs0 w := fun j hj => by rw [hag j hj]; exact (hh' j hj).2
   have hvar : uepAD d0.c w := by
-    have := uslot_heads hk0 hw0
+    have := uslot_headsL hk0 hw0
     rw [hd0f] at this
     exact this
   have hvar' : uepAD d0.c w' := uepAD_trans hvar had
-  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
-  · iapply memModel_mmOk $$ Hmm
   ihave %hget : ⌜histsAt σ.mem req.pa 8 Hs0⌝ $$ [Hmem Hh0]
   · iapply histBytes_valid σ.mem req.pa 8 _ Hs0 $$ [Hmem Hh0]
     iframe
-  have hram : ramBytes req.pa 8 := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs0 j, hget j hj⟩)
+  have hram : ramBytes req.pa 8 := ramBytes_of_cells hmm.1 (fun j hj => ⟨Hs0 j, hget j hj⟩)
   ihave %hK : ⌜e.K ≤ σ.itv cpu⌝ $$ [Hmm Hiv]
   · iapply memModel_iviewLbE σ cpu e.K $$ [Hmm Hiv]
     iframe Hmm
     iexact Hiv
-  have hitv := (hmm.2.1 cpu).2.1
+  have hitv := (mmOk_views hmm cpu).2.1
+  have hltop := mmOk_ltop_le hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.pa 8 ∨ ¬ σ.landNowOk cpu req.pa 8 req.access_kind
-    · exact Or.inr ⟨σ, hno.imp id (fun h => ⟨hram, h⟩), rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, fun h => hno (Or.inl h),
-        Classical.byContradiction (fun h => hno (Or.inr h)), rfl, rfl⟩⟩
+    · exact Or.inr ⟨σ, Or.inl ⟨hk, hno.imp id (fun h => ⟨hram, h⟩), rfl⟩⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inr ⟨hram, hk, w', hv, fun h => hno (Or.inl h),
+        Classical.byContradiction (fun h => hno (Or.inr h)), rfl, rfl⟩)⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, hk', _⟩ | ⟨_, _, w'', hv', hno, hln, rfl, rfl⟩
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+    · rw [hk] at hk'; exact absurd hk' (by decide)
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
     ihave Hh' := uepHistBytes_congr req.pa 8 _ (fun j hj => (hag j hj).symm) $$ Hh'
@@ -543,16 +576,38 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
     · iframe Hh0 Hh'
     ihave %hnr := memModel_notRsv_hist σ req.pa Hs0 8 $$ [Hmm Hfull]
     · iframe
-    imod ctx_store_excl σ cpu ξ req.pa 8 w' r hram hno hnr $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    -- the landed write is a push: every head is landed (the own ones by the same-address drain)
+    have hsb : ¬ σ.sbOverlaps cpu req.pa 8 := fun ⟨q, hq, hs'⟩ => (hln.2 q hq).2 hs'
+    have hP := mmOk_okP hmm
+    have hnotin : σ.top + 1 ∉ σ.llog := fun h => by have := (hP.2.2.2.2.1 _ h).2; omega
+    have hmemEq := FlatMem.landBytes_eq_writeBytes (n := 8) σ.mem (lpOf (σ.llog ++ [σ.top + 1])) req.pa w' (σ.top + 1)
+      (hartAgent cpu) (by rw [lpOf_snoc_self σ.llog (σ.top + 1) (by omega) hnotin]; rfl) (fun j hj x hx => by
+        obtain ⟨e', H, hH, hvis⟩ := hheads j hj
+        rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH] at hx
+        simp only [Option.getD_some, List.head?_cons, Option.some.injEq] at hx
+        subst hx
+        have hle : e'.t ≤ σ.top := ((mmOk_hist hmm _ _ hH).2 e' List.mem_cons_self).1
+        rw [lpOf_snoc_ne σ.llog (σ.top + 1) e'.t (by omega)]
+        rcases hvis with h | h
+        · exact h
+        · exact MState.ownLanded_of_noOverlap σ hP cpu req.pa 8 hsb j hj _ hH e' List.mem_cons_self h)
+    imod ctx_store_excl σ cpu ξ req.pa 8 w' r req.access_kind hram hno (fun j hj => ⟨_, hget j hj⟩) hln hnr
+      $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod histBytes_update σ.mem req.pa 8 Hs0 (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hfull] with ⟨Hmem, Hfull⟩
     icases histBytes_split req.pa 8 _ $$ Hfull with ⟨HhR, HhC⟩
-    have hk0' : uslotHistOk e.K d0 (pushed (n := 8) Hs0 (σ.top + 1) (hartAgent cpu) w') :=
-      uslotHistOk_push hk0 hd0f (σ.top + 1) (by omega) (hartAgent cpu) cpu.isLt w' hvar'
+    -- the write's landing certificate, past the stamp (`K ≤ itv ≤ ltop`)
+    icases memModel_landedGetK _ (σ.storeL cpu req.pa 8 w') (σ.top + 1) (σ.ltop + 1)
+      (lpOf_snoc_self σ.llog (σ.top + 1) (by omega) hnotin) (by omega) $$ Hmm with ⟨Hmm, #Hland⟩
+    have hk0' : uslotHistOkL e.K d0 (pushed (n := 8) Hs0 (σ.top + 1) (hartAgent cpu) w') ((σ.top + 1, σ.ltop + 1) :: L0) :=
+      uslotHistOkL_push hk0 hd0f (σ.top + 1) (σ.ltop + 1) (by omega) (hartAgent cpu) cpu.isLt w' hvar'
     ihave Hb := uepCtxBytes_of_pushed ξ req.pa 8 _ Hs0 (σ.top + 1) (hartAgent cpu) w' $$ [HhC]
     · iframe Hkey HhC
-    ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ hk0' $$ HhR
+    ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ _ hk0' $$ [HhR]
+    · iframe HhR
+      iapply BigSepL.bigSepL_cons.2
+      iframe Hland HL0
     ihave Hslots := HslotsC $$ Hd0
-    ihave Huep := HcloseU $$ %(σ.store cpu req.pa 8 w' true) %k
+    ihave Huep := HcloseU $$ %(σ.storeL cpu req.pa 8 w') %k
       %⟨fun c _ => ⟨rfl, rfl⟩, fun _ => Nat.le_refl _, Or.inl rfl⟩ Hk [Htext Hslots]
     · iexists some e
       isplitr
@@ -563,16 +618,21 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
       ipureintro; exact hf
     imod Hmask
     imodintro
-    rw [hk]
     isplitl [Hregs Hmem Hmm Huep Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa 8 w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm Huep
+    · ihave Hmem := (show genHeapInterp (GF := GF) (σ.mem.writeBytes req.pa 8 w' (σ.top + 1) (hartAgent cpu)) ⊢
+          genHeapInterp (σ.storeL cpu req.pa 8 w').mem from by
+            rw [show (σ.storeL cpu req.pa 8 w').mem =
+              σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) req.pa 8 w' (σ.top + 1) (hartAgent cpu) from rfl,
+              hmemEq]) $$ Hmem
+      iapply Hclose $$ %(σ.storeL cpu req.pa 8 w') %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm Huep
     · iapply swp_ret
       iapply HΦ $$ Hctx Hfrag Hb H2 H1 Hs Hp
   · iintro %Hbk
-    obtain ⟨_, hσ⟩ := Hbk
+    have hσ : σ' = σ := by rcases Hbk with ⟨_, _, h⟩ | ⟨_, _, _, h⟩ <;> exact h
     subst σ'
     ihave Hb := Wb $$ Hh'
-    ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ hk0 $$ Hh0
+    ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ _ hk0 $$ [Hh0]
+    · iframe Hh0 HL0
     ihave Hslots := HslotsC $$ Hd0
     ihave Huep := HcloseU $$ %σ %k %⟨fun c _ => ⟨rfl, rfl⟩, fun _ => Nat.le_refl _, Or.inl rfl⟩ Hk [Htext Hslots]
     · iexists some e

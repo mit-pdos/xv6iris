@@ -27,6 +27,7 @@ with the hart's `ownCtx` (out of `MachCSL.kctx_token_acc`).
 import MachCSL.WpSmodeFrame12b
 import MachCSL.WpDmaCtx
 import MachCSL.WpSmodeFenceFloor2
+import MachCSL.WpSmodeFencePub
 import Xv6.VirtioDiskRwDefs3
 import Xv6.CodeTactics
 import Xv6.AccessDiscipline
@@ -57,6 +58,18 @@ theorem vdrw4_and7 (n : Nat) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+
+/-- The draining fence of P4 (`MachCSL.wp_s_fence_iorw_iorw_pubL`) at the phase's context. -/
+theorem vdrw4_fence_pubL [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (R : RegMap)
+    (pc : BitVec 64) (ts : List Nat) :
+    instr (GF := GF) pc false
+      (instruction.FENCE (0#4, 15#4, 15#4, regidx.Regidx 0#5, regidx.Regidx 0#5)) ∗
+    kctxL lent cpu ((vdrwK k).withRegs R) ∗ pcIs cpu pc ∗ ([∗list] t ∈ ts, authoredBy t (hartAgent cpu)) ∗
+    ▷ wpNext ((vdrwK k).withRegs R).sie ((vdrwK k).withRegs R).proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' ((vdrwK k).withRegs R) -∗ pcIs cpu' (pc + instrLen false) -∗
+          (∃ ls : List (Nat × Nat), landedAll ls ∗ ⌜ls.map Prod.fst = ts⌝) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wp_s_fence_iorw_iorw_pubL cpu ((vdrwK k).withRegs R) (vdrwK_sie k) pc false 0#5 0#5 ts
 
 set_option maxHeartbeats 6000000 in
 /-- **P4.**  From `Xv6.vdrwP3Exit` to `Xv6.vdrwP4Exit`. -/
@@ -105,7 +118,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases diskResA_pub_open γ pd pav pu curCtx (tk3 c.hd c.md c.tl) $$ Hpay
-    with ⟨%np, %x, %stg, Hpub, Hstg, Hidx, Hring, Hclose⟩
+    with ⟨%np, %x, %stg, Hpub, #Hplb, Hstg, Hidx, Hring, Hclose⟩
   obtain ⟨gi, ga, gk⟩ := availRing_facts pav hpav (np % NUM) (mod_NUM_lt np)
   ihave Hidxw := ctxBytes_wordAt (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np)
     ri ra rk $$ HS Hidx
@@ -146,17 +159,29 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   case hd1 => k_norm [h10, vdrw3_nextIdx c.hd hh]
   unfold ringWritePost
   icases HΨ with ⟨Hpub, Hstg, Hth, %tt, %Hs, #Hau, #Ht, Hraw⟩
+  -- the chain's windows, their head keys cashed before the drain (route P, D14 (c)); the ring store
+  -- stays RAW until its certificate (D15′)
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
-  iapply wpLoop_bupd
-  imod ctxBytes_of_pushed cpu curCtx (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half)
-    tt Hs (BitVec.ofNat 16 c.hd) $$ [Hctx Hau Ht Hraw] with ⟨Hctx, Hring⟩
-  · iframe Hctx Hau Ht Hraw
-  imodintro
+  icases vdrw_chain_pre cpu pd c dataBuf hdl hkmc
+      (by rw [show c.status = aInfoStatus c.hd from rfl]; exact info_status_kmapRw c.hd hh)
+    $$ [Hctx HS Hd0 Hd1 Hd2 Hhdr Hist Hdat] with ⟨Hctx, %tsc, Hpre, #Htsc⟩
+  · iframe Hctx HS Hd0 Hd1 Hd2 Hhdr Hist Hdat
   ihave Hk := Hkback $$ Hctx
-  -- +0x186  fence iorw,iorw
-  k_step (wp_s_fence_iorw_iorw cpu _ (KA.«virtio_disk_rw» + 0x186#64) false 0#5 0#5)
+  ihave #Hts : iprop([∗list] t ∈ tsc ++ [tt], authoredBy (GF := GF) t (hartAgent cpu)) $$ []
+  · iapply BigSepL.bigSepL_append.2
+    iframe Htsc
+    iapply BigSepL.bigSepL_singleton.2; iexact Hau
+  -- +0x186  fence iorw,iorw : the drain -- every receipt certified (the fence ghost step)
+  k_step (vdrw4_fence_pubL cpu k _ (KA.«virtio_disk_rw» + 0x186#64) (tsc ++ [tt]))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
+  iintro Hk Hpc ⟨%ls, #Hls, %hls⟩
+  ihave Hwin := vdrw_chain_fin pd c (bvOfBytes BSIZE dataBuf) tsc ls
+      (fun t ht => vdrw_ls_mem _ ls hls t (List.mem_append_left _ ht)) $$ [Hpre Hls]
+  · iframe Hpre Hls
+  obtain ⟨pr, hpr⟩ := vdrw_ls_mem _ ls hls tt (List.mem_append_right _ (List.mem_singleton_self _))
+  ihave #Hcr := landedAll_of_mem ls (tt, pr) hpr $$ Hls
+  unfold vdrwChainL
+  icases Hwin with ⟨Hd0, Hd1, Hd2, Hhdr, Hist, Hdat⟩
   -- +0x18a  ld a4,8(a5)
   ihave Hap : iprop(wordPointsTo (GF := GF) (KA.«disk» + 8#64) 8 DFrac.discard pav) $$ [Hgeom]
   · iapply vdrw4_geom_avail γ pd pav pu
@@ -188,9 +213,8 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · rw [Chain.arm_kq, vdrw_chainWr_arm c wr bno dataBuf np pw curCtx kq hdwr hblk hdl hpw0]
     iexact Hpend
   imod disk_publish γ pd pav pu (c.arm np pw curCtx kq) np
-      dataDisk dataBuf hcwf hdl rfl rfl (fun hd => hpw0 hd) (fun hd => hpw1 hd)
-      hkmc
-    $$ [Hinv HS Hcst Hcda Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hpend]
+      dataDisk dataBuf hcwf rfl rfl (fun hd => hpw0 hd) (fun hd => hpw1 hd)
+    $$ [Hinv Hcst Hcda Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hpend]
     with ⟨Hpub, Hstg, Hth, Htm, Htt, Hc0, Hc1, Hc2, Hch⟩
   · isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_data,
       Chain.arm_status, Chain.arm_hdrAddr, Chain.arm_blk, Chain.arm_d0,
@@ -201,34 +225,50 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     Chain.arm_status, Chain.arm_hdrAddr, Chain.arm_blk, Chain.arm_d0,
     Chain.arm_d1, Chain.arm_d2, Chain.arm_hdr] at Hc0 Hc1 Hc2 Hch
   imodintro
-  -- +0x192  sh a5,2(a4)     avail->idx += 1
+  -- +0x192  sh a5,2(a4)     avail->idx += 1  (the staged ring cell certified by its landing)
   ihave Hidx := wordPointsTo_ctxBytes (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np)
     rk $$ HS Hidxw
-  ihave HAU := vdrw4_idx_write γ pd pav pu cpu np c.hd (c.arm np pw curCtx kq)
-    $$ [Hinv Hgeom Hpub Hstg Hth Hidx]
+  ihave HAU := vdrw4_idx_write γ pd pav pu cpu np c.hd (c.arm np pw curCtx kq) tt pr Hs
+      (BitVec.ofNat 16 c.hd)
+    $$ [Hinv Hgeom Hpub Hplb Hstg Hth Hraw Hcr Hidx]
   · iframe #
     iframe
   k_step (vdrw4_sh_au cpu _ ?hs2 (KA.«virtio_disk_rw» + 0x192#64) false 2#12 14#5 15#5
       (availIdxAt pav) ?hb2 ri ra rk (wrap16 (np + 1)) ?hd2
-      (availIdxWritePost γ pav cpu np c.hd (c.arm np pw curCtx kq)))
+      (availIdxWritePost γ pav cpu np c.hd (c.arm np pw curCtx kq) tt Hs (BitVec.ofNat 16 c.hd)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   try (case hs2 => k_norm)
   iintro Hk Hpc HΨ
   case hb2 => k_norm [vdrw4_availIdx pav]
   case hd2 => k_norm [vdrw4_bump np]
   unfold availIdxWritePost
-  icases HΨ with ⟨Hpub, Hstg, Hth, %t2, %Hs2, #Hau2, #Ht2, Hraw2⟩
+  icases HΨ with ⟨Hpub, Hstg, Hth, Hraw, %t2, %Hs2, #Hau2, #Ht2, Hraw2⟩
+  -- the ring cell's driver half, a context cell again
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
   iapply wpLoop_bupd
+  imod ctxBytes_of_pushed cpu curCtx (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half)
+    tt Hs (BitVec.ofNat 16 c.hd) $$ [Hctx Hau Ht Hraw] with ⟨Hctx, Hring⟩
+  · iframe Hctx Hau Ht Hraw
+  imodintro
+  ihave Hk := Hkback $$ Hctx
+  -- +0x196  fence iorw,iorw : the bump drained, its certificate re-bases the index cell
+  ihave #Hts2 : iprop([∗list] t ∈ [t2], authoredBy (GF := GF) t (hartAgent cpu)) $$ []
+  · iapply BigSepL.bigSepL_singleton.2; iexact Hau2
+  k_step (vdrw4_fence_pubL cpu k _ (KA.«virtio_disk_rw» + 0x196#64) [t2])
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc ⟨%ls2, #Hls2, %hls2⟩
+  obtain ⟨p2, hp2⟩ := vdrw_ls_mem _ ls2 hls2 t2 (List.mem_singleton_self _)
+  ihave #Hc2l := landedAll_of_mem ls2 (t2, p2) hp2 $$ Hls2
+  iapply wpLoop_fupd
+  imod disk_idx_rebase γ pd pav pu (np + 1) t2 p2 (hartAgent cpu) Hs2 $$ [Hinv Hgeom Hpub Hraw2 Hc2l]
+    with ⟨Hpub, #Hplb2, Hraw2⟩
+  · iframe #; iframe
+  icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
   imod ctxBytes_of_pushed cpu curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half)
     t2 Hs2 (wrap16 (np + 1)) $$ [Hctx Hau2 Ht2 Hraw2] with ⟨Hctx, Hidx⟩
   · iframe Hctx Hau2 Ht2 Hraw2
   imodintro
   ihave Hk := Hkback $$ Hctx
-  -- +0x196  fence iorw,iorw
-  k_step (wp_s_fence_iorw_iorw cpu _ (KA.«virtio_disk_rw» + 0x196#64) false 0#5 0#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-  iintro Hk Hpc
   -- +0x19a  lui a5,0x10001 ; +0x19e  sw zero,80(a5)
   k_step (wp_s_lui cpu _ (KA.«virtio_disk_rw» + 0x19a#64) false 0x10001#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -242,7 +282,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   case hb3 => k_norm
   case hd3 => k_norm [KCtx.rget_zero]
   -- the payload, sealed
-  ihave Hpay := Hclose $$ %(np + 1) %c.hd %none Hpub Hstg Hidx Hring
+  ihave Hpay := Hclose $$ %(np + 1) %c.hd %none Hpub Hplb2 Hstg Hidx Hring
   isimp only [← wordAtN_cur] at Hdsk
   ihave Hclaim : iprop(claimRes (GF := GF) γ curCtx pd (c.arm np pw curCtx kq))
     $$ [Hc0 Hc1 Hc2 Hch Hib Hdsk]

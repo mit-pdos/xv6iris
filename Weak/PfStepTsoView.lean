@@ -510,9 +510,23 @@ theorem tsoShadowBound (stamp : CohStamp) (hs : StampOk stamp) (i : Nat) (st : L
 
 /-! ## (4) THE ROWS -/
 
+/-- Under eager landing (route P, design D5: every store landed at once, in issue order) the landing
+log's authors are the issue log. -/
+theorem landAuthorsEager (log : List Agent) : landAuthors log (List.range' 1 log.length) = log := by
+  apply List.ext_getElem
+  · simp [landAuthors]
+  · intro i h1 h2
+    simp only [landAuthors, List.getElem_map, List.getElem_range']
+    rw [show 1 + 1 * i - 1 = i by omega]
+    simp [List.getD, List.getElem?_eq_getElem h2]
+
+theorem ownPubLEager (h : Agent) (log : List Agent) :
+    ownPubL h log (List.range' 1 log.length) = ownPub h log := by
+  unfold ownPubL; rw [landAuthorsEager]
+
 /-- TsoMem's plain-read side conditions at view `tvn` (`evStep`'s plain arm, `Lang.lean`). -/
 def tsoLoadOk (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) : Prop :=
-  σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧ (σ.hr cpu).cohOk pa n tvn
+  σ.tv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧ (σ.hr cpu).cohOk pa n tvn
 
 /-- THE VIEW a hart load reads at: the shadow's MINIMAL legal view
 `max(F, max_{foreign j} t_j)` (`TsoShadow.shTvn`) at the prefix `st`. -/
@@ -580,13 +594,13 @@ theorem loadCohEq (hr : HRead) (coh : Int → Nat) (hc : ∀ pa, hr.coh pa = coh
 FOREIGN-sourced bytes stamped with their source, [OWN.23]) at the minimal view. -/
 theorem loadOwn (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (srcs : LoadSrcs) (f f' : ShFull)
     (hr : hartRel σ cpu f) (hn : srcs.length = n) (hfit : pa.toNat + n < 18446744073709551616)
-    (hsrc : σ.mem.loadSrcs (hartAgent cpu) (shTvn (hartAgent cpu) f.mem (paZ pa) srcs) pa n = srcs)
+    (hsrc : σ.mem.loadSrcsP σ.lp (hartAgent cpu) (shTvn (hartAgent cpu) f.mem (paZ pa) srcs) pa n = srcs)
     (hm : f'.mem = f.mem.load cohSrc (hartAgent cpu) (paZ pa) srcs) (hi : f'.itv = f.itv) :
     hartRel (σ.afterLoad cpu pa n (shTvn (hartAgent cpu) f.mem (paZ pa) srcs)) cpu f' := by
   have hH : (σ.afterLoad cpu pa n (shTvn (hartAgent cpu) f.mem (paZ pa) srcs)).hr cpu =
       (σ.hr cpu).afterLoad (hartAgent cpu) pa n (shTvn (hartAgent cpu) f.mem (paZ pa) srcs)
-        (σ.mem.loadSrcs (hartAgent cpu) (shTvn (hartAgent cpu) f.mem (paZ pa) srcs) pa n) :=
-    if_pos rfl
+        (σ.mem.loadSrcsP σ.lp (hartAgent cpu) (shTvn (hartAgent cpu) f.mem (paZ pa) srcs) pa n) := by
+    simp only [updCpu, if_true]
   rw [hsrc] at hH
   refine ⟨?_, ?_, fun pa' => ?_, ?_, ?_⟩
   · rw [hm]; exact hr.tvEq
@@ -604,8 +618,9 @@ At the shadow's minimal view `tvn`, TsoMem's side conditions hold and the compil
 `MState.afterLoad` lands in `R-view`.  `hsrc` is the per-byte source seam with W2a. -/
 theorem rowLoad (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU) (pa : PAddr) (aq lat : Bool)
     (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc) (hrel : viewRel cohSrc σ st)
-    (hlog : σ.log = stAuthors st) (hfit : pa.toNat + tvs.length < 18446744073709551616)
-    (hsrc : σ.mem.loadSrcs (hartAgent cpu) (minView cohSrc st (hartAgent cpu) (paZ pa) tvs) pa
+    (hlog : σ.log = stAuthors st) (hlt : σ.llog.length = σ.log.length)
+    (hfit : pa.toNat + tvs.length < 18446744073709551616)
+    (hsrc : σ.mem.loadSrcsP σ.lp (hartAgent cpu) (minView cohSrc st (hartAgent cpu) (paZ pa) tvs) pa
       tvs.length = shLoadSrcs (stAuthors st) tvs) :
     tsoLoadOk σ cpu pa tvs.length (minView cohSrc st (hartAgent cpu) (paZ pa) tvs) ∧
     viewRel cohSrc (σ.afterLoad cpu pa tvs.length (minView cohSrc st (hartAgent cpu) (paZ pa) tvs))
@@ -623,8 +638,8 @@ theorem rowLoad (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU) (pa : PAdd
       shTvn (hartAgent cpu) f.mem (paZ pa) (shLoadSrcs (stAuthors st) tvs) := Nat.le_max_left _ _
   refine ⟨⟨?_, ?_, fun j hj => ?_⟩, viewRelStep cohSrc σ _ st cpu _ hrel ?_ ?_⟩
   · rw [hr.tvEq]; exact Nat.le_trans hfl.1 hFT
-  · show _ ≤ σ.log.length
-    rw [hlog]
+  · show _ ≤ σ.llog.length
+    rw [hlt, hlog]
     exact shTvnLe _ _ _ _ _ hb
   · show (σ.hr cpu).coh (pa + BitVec.ofNat 64 j) ≤ _
     rw [hr.cohEq, paZAddFit pa _ j hfit hj]
@@ -636,14 +651,13 @@ theorem rowLoad (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU) (pa : PAdd
 
 /-- The compiled store's read side for its author, against the shadow's store step (`cohSrc`:
 the footprint RESET, [R11.1][OWN.21]; `excl` a parameter, no case split [R14.s3]). -/
-theorem storeOwn (σ : MState) (au : List Nat) (cpu : CPU) (pa : PAddr) (n : Nat)
-    (w : BitVec (8 * n)) (excl : Bool) (f f' : ShFull) (hr : hartRel σ cpu f) (hlog : σ.log = au)
+theorem storeOwn (σ σ' : MState) (au : List Nat) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (excl : Bool) (f f' : ShFull) (hr : hartRel σ cpu f) (hlog : σ.log = au)
     (hfit : pa.toNat + n < 18446744073709551616)
+    (hT : σ'.tv cpu = (if excl && (σ.hr cpu).acq then σ.log.length + 1 else σ.tv cpu))
+    (hH : σ'.hr cpu = ((σ.hr cpu).clearAcq).resetCoh pa n) (hI : σ'.itv cpu = σ.itv cpu)
     (hm : f'.mem = f.mem.store cohSrc au.length excl (paZ pa) n) (hi : f'.itv = f.itv) :
-    hartRel (σ.store cpu pa n w excl) cpu f' := by
-  have hT : (σ.store cpu pa n w excl).tv cpu =
-      (if excl && (σ.hr cpu).acq then σ.log.length + 1 else σ.tv cpu) := if_pos rfl
-  have hH : (σ.store cpu pa n w excl).hr cpu = ((σ.hr cpu).clearAcq).resetCoh pa n := if_pos rfl
+    hartRel σ' cpu f' := by
   refine ⟨?_, ?_, fun pa' => ?_, ?_, ?_⟩
   · rw [hT, hm]
     show _ = (if excl && f.mem.acq then au.length + 1 else f.mem.tv)
@@ -671,44 +685,51 @@ theorem storeOwn (σ : MState) (au : List Nat) (cpu : CPU) (pa : PAddr) (n : Nat
       rw [hany]
       rfl
   · rw [hH, hm]; rfl
-  · rw [hi]; exact hr.itvEq
+  · rw [hI, hi]; exact hr.itvEq
 
-/-- **ROW: hart `LStore`** (`MState.store … false`; `cohSrc`): the footprint's floors RESET, the
-acquire bit cleared, `tv` kept. -/
+/-- **ROW: hart `LStore`** (route P, design D5: the plain store ISSUED and LANDED at once,
+`(σ.issue …).land cpu (top + 1)`; `cohSrc`): the footprint's floors RESET, the acquire bit cleared,
+`tv` kept. -/
 theorem rowStore (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (rl : Bool) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
     (hn : data.length = n) (hrel : viewRel cohSrc σ st) (hlog : σ.log = stAuthors st)
     (hfit : pa.toNat + n < 18446744073709551616) :
-    viewRel cohSrc (σ.store cpu pa n w false)
+    viewRel cohSrc ((σ.issue cpu pa n w).land cpu (σ.top + 1))
       (st ++ [(hartAgent cpu, .LStore rl (paZ pa) data asrc vsrc)]) := by
   subst hn
-  refine viewRelStep cohSrc σ _ st cpu _ hrel ?_ (fun c hc => ⟨if_neg hc, if_neg hc, rfl⟩)
-  exact storeOwn σ (stAuthors st) cpu pa data.length w false _ _ (hrel cpu) hlog hfit rfl rfl
+  refine viewRelStep cohSrc σ _ st cpu _ hrel ?_ (fun c hc => ⟨rfl, if_neg hc, rfl⟩)
+  exact storeOwn σ _ (stAuthors st) cpu pa data.length false _ _ (hrel cpu) hlog hfit
+    (by simp) (by simp only [updCpu, if_true]) rfl rfl rfl
 
-/-- **ROW: `LExStore`** (the SAME `MState.store`, `excl = true`; `cohSrc`): the reset, and the
-floor to `top + 1` iff the pair's read was an acquire. -/
+/-- **ROW: `LExStore`** (route P: `MState.storeL`, landed at once at `ltop + 1`, which is `top + 1`
+under eager landing, design D5; `cohSrc`): the reset, and the floor to `top + 1` iff the pair's
+read was an acquire. -/
 theorem rowExStore (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (rl : Bool) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
     (hn : data.length = n) (hrel : viewRel cohSrc σ st) (hlog : σ.log = stAuthors st)
+    (hlt : σ.llog.length = σ.log.length)
     (hfit : pa.toNat + n < 18446744073709551616) :
-    viewRel cohSrc (σ.store cpu pa n w true)
+    viewRel cohSrc (σ.storeL cpu pa n w)
       (st ++ [(hartAgent cpu, .LExStore rl (paZ pa) data asrc vsrc)]) := by
   subst hn
   refine viewRelStep cohSrc σ _ st cpu _ hrel ?_ (fun c hc => ⟨if_neg hc, if_neg hc, rfl⟩)
-  exact storeOwn σ (stAuthors st) cpu pa data.length w true _ _ (hrel cpu) hlog hfit rfl rfl
+  exact storeOwn σ _ (stAuthors st) cpu pa data.length true _ _ (hrel cpu) hlog hfit
+    (by simp only [MState.storeL, updCpu, if_true, Bool.true_and, MState.ltop, hlt])
+    (by simp only [MState.storeL, updCpu, if_true]) rfl rfl rfl
 
 /-- **ROW: `LExLoad aq`** (`MState.afterExcl`; ANY stamp — `coh` kept, instance-independent
 [R14.2]): `rv := top`, the floor to the top iff an acquire, the acquire bit recorded. -/
 theorem rowExLoad (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU)
     (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (aq : Bool) (base : Int)
     (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc) (hrel : viewRel stamp σ st)
-    (hlog : σ.log = stAuthors st) :
+    (hlog : σ.log = stAuthors st) (hlt : σ.llog.length = σ.log.length) :
     viewRel stamp (σ.afterExcl cpu pa n w aq) (st ++ [(hartAgent cpu, .LExLoad aq base tvs asrc)]) := by
   refine viewRelStep stamp σ _ st cpu _ hrel ?_ (fun c hc => ⟨if_neg hc, if_neg hc, rfl⟩)
   have hr := hrel cpu
-  have hT : (σ.afterExcl cpu pa n w aq).tv cpu = (if aq then σ.log.length else σ.tv cpu) :=
-    if_pos rfl
-  have hH : (σ.afterExcl cpu pa n w aq).hr cpu = (σ.hr cpu).afterExcl σ.log.length aq := if_pos rfl
+  have hT : (σ.afterExcl cpu pa n w aq).tv cpu = (if aq then σ.log.length else σ.tv cpu) := by
+    simp only [MState.afterExcl, updCpu, if_true, MState.ltop, hlt]
+  have hH : (σ.afterExcl cpu pa n w aq).hr cpu = (σ.hr cpu).afterExcl σ.log.length aq := by
+    simp only [MState.afterExcl, updCpu, if_true, MState.ltop, hlt]
   refine ⟨?_, ?_, fun pa' => ?_, ?_, hr.itvEq⟩
   · rw [hT]
     show _ = (if aq then (stAuthors st).length else (tsoShadow stamp st (hartAgent cpu)).mem.tv)
@@ -724,15 +745,20 @@ theorem rowExLoad (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (
 (`emFenceI`'s criterion).  `tv` per `fencePost` (the 10 kinds), `itv` raised at `fence.i` only. -/
 theorem rowFence (stamp : CohStamp) (σ : MState) (st : List (Nat × Wlabel)) (cpu : CPU)
     (b : barrier_kind) (hrel : viewRel stamp σ st) (hlog : σ.log = stAuthors st)
+    (heg : σ.llog = List.range' 1 σ.log.length)
     (hfi : b = .Barrier_RISCV_i → (tsoShadow stamp st (hartAgent cpu)).fiArm = true) :
     viewRel stamp (σ.fence cpu b) (st ++ [(hartAgent cpu, ebarLabel b)]) := by
   refine viewRelStep stamp σ _ st cpu _ hrel ?_ (fun c hc => ⟨if_neg hc, rfl, if_neg hc⟩)
   have hr := hrel cpu
+  have hpub : MachCSL.ownPubL (hartAgent cpu) σ.log σ.llog = MachCSL.ownPub (hartAgent cpu) σ.log := by
+    rw [heg]; exact ownPubLEager (hartAgent cpu) σ.log
   have hT : (σ.fence cpu b).tv cpu = MachCSL.fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu)
-      (σ.hr cpu).rv (MachCSL.ownPub (hartAgent cpu) σ.log) := if_pos rfl
+      (σ.hr cpu).rv (MachCSL.ownPub (hartAgent cpu) σ.log) := by
+    simp only [MState.fence, updCpu, if_true, hpub]
   have hI : (σ.fence cpu b).itv cpu =
       (if fenceIfetch b then max (σ.itv cpu) (MachCSL.fencePost true false (σ.tv cpu) (σ.hr cpu).rv
-        (MachCSL.ownPub (hartAgent cpu) σ.log)) else σ.itv cpu) := if_pos rfl
+        (MachCSL.ownPub (hartAgent cpu) σ.log)) else σ.itv cpu) := by
+    simp only [MState.fence, updCpu, if_true, hpub]
   generalize hf : tsoShadow stamp st (hartAgent cpu) = f at hr hfi ⊢
   refine ⟨?_, ?_, fun pa' => ?_, ?_, ?_⟩
   · rw [hT, hr.tvEq, hr.rvEq, hlog]

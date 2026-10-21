@@ -90,25 +90,31 @@ theorem ufm_ctxBytes_hist (m : FlatMem) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq 
 
 end
 
-/-- Where every byte of the footprint has a well-formed history, the fetch
-agent reads SOME value at the top of the order (every entry is visible
-there). -/
+/-- Where every byte of the footprint has a history, the fetch agent reads SOME value at the
+LANDED top (route P: the fetcher reads landed entries only, and every history keeps its landed
+boot-image entry, `mmOk_img`). -/
 theorem ufm_readBytes_top (σ : MState) (hmm : mmOk σ) (ag : Agent) (pa : PAddr) (n : Nat)
     (h : ufmHist σ.mem pa n) :
-    ∃ w : BitVec (8 * n), σ.mem.readBytes ag σ.top pa n w := by
-  let bs : Nat → BitVec 8 := fun j => ((σ.mem.read ag σ.top (pa + BitVec.ofNat 64 j))).getD 0#8
-  obtain ⟨w, hw⟩ := exists_bv_of_bytes n bs
+    ∃ w : BitVec (8 * n), σ.mem.readBytesP σ.lp ag σ.ltop pa n w := by
+  have hv : ∀ j, j < n → ∃ v, σ.mem.readP σ.lp ag σ.ltop (pa + BitVec.ofNat 64 j) = some v := by
+    intro j hj
+    obtain ⟨e, H, hH⟩ := h j hj
+    obtain ⟨x, hx, hx0⟩ := mmOk_landedEnt hmm hH
+    unfold FlatMem.readP Hist.readP
+    rw [hH, Option.bind_some]
+    cases hf : (e :: H).find? (HEnt.visibleP σ.lp ag σ.ltop) with
+    | none =>
+      exfalso
+      have := List.find?_eq_none.1 hf x hx
+      rw [HEnt.visibleP_of_landed σ.lp ag σ.ltop x (p := 0) hx0 (Nat.zero_le _)] at this
+      exact this rfl
+    | some y => exact ⟨y.v, rfl⟩
+  obtain ⟨w, hw⟩ := exists_bv_of_bytes n
+    (fun j => (σ.mem.readP σ.lp ag σ.ltop (pa + BitVec.ofNat 64 j)).getD 0)
   refine ⟨w, fun j hj => ?_⟩
-  obtain ⟨e, H, hget⟩ := h j hj
-  have hok := hmm.1 _ _ hget
-  have hvis := histOk_top_visible σ.log (e :: H) e hok List.mem_cons_self ag
-  have hrd : σ.mem.read ag σ.top (pa + BitVec.ofNat 64 j) = some e.v := by
-    unfold FlatMem.read
-    rw [hget, Option.bind_some, Hist.read_cons_visible _ _ _ _ hvis]
-  rw [hw j hj, hrd]
-  show some e.v = some ((σ.mem.read ag σ.top (pa + BitVec.ofNat 64 j)).getD 0#8)
-  rw [hrd]
-  rfl
+  rw [hw j hj]
+  obtain ⟨v, hv'⟩ := hv j hj
+  simp only [hv', Option.getD_some]
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
@@ -133,22 +139,22 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hcells : ⌜ufmHist σ.mem req.pa n⌝ $$ [Hmem Hb]
+  ihave %hh : ⌜ufmHist σ.mem req.pa n⌝ $$ [Hmem Hb]
   · iapply ufm_ctxBytes_hist σ.mem ξ req.pa n dq w $$ [Hmem Hb]
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  obtain ⟨w0, hrd⟩ := ufm_readBytes_top σ hmm (ifetchAgent cpu) req.pa n hcells
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 hrd
+  obtain ⟨w0, hrd⟩ := ufm_readBytes_top σ hmm (ifetchAgent cpu) req.pa n hh
+  have hram : ramBytes req.pa n := ramBytes_of_readBytesP hmm.1 hrd
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     exact ⟨.Ok (w0, none), σ, Or.inr (Or.inl
-      ⟨hram, hk, σ.top, w0, (hmm.2.1 cpu).2.1, le_refl _, hrd, rfl, rfl⟩)⟩
+      ⟨hram, hk, σ.ltop, w0, (mmOk_views hmm cpu).2.1, le_refl _, hrd, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
-  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', _, _, _, rfl, hσ⟩ |
+  rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, _, tvn, w', _, _, hrd', rfl, hσ⟩ |
     ⟨_, hpl, _⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · subst σ'

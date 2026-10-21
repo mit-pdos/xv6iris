@@ -496,7 +496,10 @@ theorem CapSync.chainHypsOfSyncPathP (GD : Gdexec) (log : List Wmsg) (c : Wpcfg 
     (hrun : s.sgEntry = s.sgExit ∨ WeakRvwmoGraph.gpo GD.gdG s.sgEntry s.sgExit)
     (hmx : gmem GD.gdG s.sgExit) (hre : CapSync.syncRealizedP GD σ j s) :
     chainHyps GD prev s := by
-  obtain ⟨hR, hD, -, hpre, hp, hv, hram, hcoh⟩ := hrd
+  obtain ⟨hR, hD, -, hpre, hp, hv, hram, hcoh, heg⟩ := hrd
+  have hm := PfStepTsoMem.memEager c st σ hR heg
+  have hlo := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp hm
+  have hlo' : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
   have hr := hR.2.2.1
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hv
   obtain ⟨hpw, hpix⟩ := gwriteAtInv GD.gdG (p + 1) prev hwf.1 hprev
@@ -504,14 +507,17 @@ theorem CapSync.chainHypsOfSyncPathP (GD : Gdexec) (log : List Wmsg) (c : Wpcfg 
   have he : (⟨p + 1, i, v⟩ : HEnt) ∈ TsoOfPf.histOf c.pcImg c.pcLog (paZ pa) := by
     have := RvwmoXv6Adequacy.histOfMem c.pcImg c.pcLog (paZ pa) p m v hp hv
     rwa [hi] at this
-  have h1 : ∀ b, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .lockw b :=
+  have h1 : ∀ b, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .lockw b :=
     fun b hb' => hnb (.inl ⟨b, hb'⟩)
-  have h2 : ∀ w, Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pub w :=
+  have h2 : ∀ w, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pub w :=
     fun w hw => hnb (.inr (.inl ⟨w, hw⟩))
-  have h3 : Xv6.AccessDiscipline.custAt σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
-  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) hcoh.symm hiN hij h1 h2 h3 with hs | hrc
+  have h3 : Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
+  rw [← hcoh] at h1 h2 h3
+  rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) (by rw [hm pa _ hH _ he, hcoh]) hiN hij h1 h2 h3
+    with hs | hrc
   · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v', H', hne, hpub, hf, hew, hrle, harm⟩
-    · obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, b, C, r, hbl, hsh⟩ :=
+    · rw [hlo] at hc
+      obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, b, C, r, hbl, hsh⟩ :=
         RvwmoXv6Adequacy.hopChainSpan hr hc
       simp only at ht1
       obtain ⟨Hb, va, hHb, hmemA⟩ := RvwmoXv6Adequacy.syncHopAcq hsh
@@ -527,12 +533,22 @@ theorem CapSync.chainHypsOfSyncPathP (GD : Gdexec) (log : List Wmsg) (c : Wpcfg 
     · have hlt : p + 1 < r := by
         rcases harm with ⟨-, h⟩ | ⟨a, ha, hc⟩
         · exact h
-        · obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, -⟩ :=
+        · rw [hlo'] at hc
+          obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, -⟩ :=
             RvwmoXv6Adequacy.hopChainSpan (m := σ.mem) hr hc
           simp only at ht1
           omega
-      obtain ⟨W, Y, hW, hrW, hWY, hfc⟩ := hre.2 f w r v' H' hne hpub hf hew (by omega) hrle
+      have hf' : σ.mem[f]? = some H' := by rw [← hlo']; exact hf
+      have hrle' : r ≤ (σ.hr j).coh f := by
+        obtain ⟨q, hq, hle⟩ := hrle
+        have hlr : σ.lp r = some r := hm f H' hf' _ hew
+        have hlr' : (Xv6.AccessDiscipline.xv6Env σ).lp r = some r := hlr
+        rw [hlr'] at hq
+        cases hq
+        exact hle
+      obtain ⟨W, Y, hW, hrW, hWY, hfc⟩ := hre.2 f w r v' H' hne hpub hf' hew (by omega) hrle'
       exact ⟨W, Y, hpw, hW, by rw [hpix]; omega, hWY, .inr hfc⟩
-  · exact absurd (.inr (.inr (.inr hrc))) hnb
+  · rw [hcoh] at hrc
+    exact absurd (.inr (.inr (.inr hrc))) hnb
 
 end Weak

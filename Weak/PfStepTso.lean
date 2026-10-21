@@ -110,7 +110,7 @@ def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
     pfStepFactsT fok TsoShadow.cohSrc st c (hartAgent cpu) l →
     (∀ n va req, o = .memRead n va req → ramBytes req.pa n) →
     (∀ n va req, o = .memWrite n va req → ramBytes req.pa n) →
-    rmem c st σ → viewRel TsoShadow.cohSrc σ st →
+    rmem c st σ → viewRel TsoShadow.cohSrc σ st → σ.llog = List.range' 1 σ.log.length →
     c.pcLog.map Wmsg.wmTid = (stAuthors st).map some →                             -- (2)
     (∀ base tvs, l = .LIFetch base tvs →                                           -- (3)
        ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
@@ -124,11 +124,13 @@ def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
-    ∃ (v : o.ret) (σ' : MState),
-      evStep cpu o σ v σ' ∧
+    ∃ (v : o.ret) (σ1 σ' : MState),
+      evStep cpu o σ v σ1 ∧
+      (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
       (∃ rs' fn' ib', p' = .PHart cpu (k v) rs' fn' ib') ∧
       rmem c' (st ++ [(hartAgent cpu, l)]) σ' ∧
-      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)])
+      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) ∧
+      σ'.llog = List.range' 1 σ'.log.length
 
 /-! ## Helpers -/
 
@@ -218,15 +220,16 @@ theorem loadRow {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
     (pcls : P → Wlabel → Wstate → WmClass) (c c' : Wpcfg P D) (st rest : List (Nat × Wlabel))
     (σ : MState) (cpu : CPU) (pa : PAddr) (aq lat : Bool) (tvs : List (Nat × BitVec 8))
     (asrc : List Dsrc) (w : BitVec (8 * tvs.length)) (hR : rmem c st σ)
-    (hV : viewRel cohSrc σ st) (hA : c.pcLog.map Wmsg.wmTid = (stAuthors st).map some)
+    (hV : viewRel cohSrc σ st) (heg : σ.llog = List.range' 1 σ.log.length)
+    (hA : c.pcLog.map Wmsg.wmTid = (stAuthors st).map some)
     (hstep : wpPfStep pstep pcls (hartAgent cpu) (.LLoad aq lat (paZ pa) tvs asrc) c c')
     (hadj : pairAdjacent (st ++ (hartAgent cpu, .LLoad aq lat (paZ pa) tvs asrc) :: rest))
     (hram : ramBytes pa tvs.length)
     (hw : ∀ j, j < tvs.length → (tvs.map Prod.snd)[j]? = some (nthByte w j))
     (hsca : scaOkT (tsoShadow cohSrc st (hartAgent cpu)).mem c.pcImg c.pcLog (hartAgent cpu)
       (paZ pa) (tvs.map Prod.fst)) :
-    ∃ tvn, σ.tv cpu ≤ tvn ∧ tvn ≤ σ.top ∧ (σ.hr cpu).cohOk pa tvs.length tvn ∧
-      σ.mem.readBytes (hartAgent cpu) tvn pa tvs.length w ∧
+    ∃ tvn, σ.tv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧ (σ.hr cpu).cohOk pa tvs.length tvn ∧
+      σ.readFwd cpu tvn pa tvs.length w ∧
       rmem c' (st ++ [(hartAgent cpu, .LLoad aq lat (paZ pa) tvs asrc)])
         (σ.afterLoad cpu pa tvs.length tvn) ∧
       viewRel cohSrc (σ.afterLoad cpu pa tvs.length tvn)
@@ -254,12 +257,16 @@ theorem loadRow {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
   have hscaM : ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → scaByte c.pcImg c.pcLog (hartAgent cpu)
       (minView cohSrc st (hartAgent cpu) (paZ pa) tvs) (accAddr (paZ pa) j) t :=
     fun j t v hj => scaByteMono _ _ _ _ _ _ _ (hb₀ j t (hfst j t v hj)) hmin' (hvis j t v hj)
+  have hm := PfStepTsoMem.memEager c st σ hR heg
   have hsrc := hsrcOfRhist c st σ cpu pa tvs _ hR hA hram hlb hscaM
+  rw [← PfStepTsoMem.loadSrcsPEager σ.mem σ.lp hm] at hsrc
+  have hlt : σ.llog.length = σ.log.length := by rw [heg]; simp
   obtain ⟨⟨h1, h2, h3⟩, hview⟩ :=
-    rowLoad σ st cpu pa aq lat tvs asrc hV hlog (ramBytesFit hram) hsrc
+    rowLoad σ st cpu pa aq lat tvs asrc hV hlog hlt (ramBytesFit hram) hsrc
   refine ⟨_, h1, h2, h3, ?_,
     (pfFrameRowMem pstep pcls c c' st rest σ _ _ hR hstep (by simp [frameLbl]) hadj).2.2 _ rfl rfl
       rfl rfl, hview⟩
+  rw [PfStepTsoMem.readFwdNil σ cpu (hR.2.2.2.2 cpu), PfStepTsoMem.readBytesPEager σ.mem σ.lp hm]
   exact pfLoadRowMem c st σ cpu (hartAgent cpu) pa (paZ pa) tvs.length tvs _ tvn₀ w hR rfl rfl
     hram rfl (fun j t v hj => ⟨hlb j t v hj, hb₀ j t (hfst j t v hj), hvis j t v hj⟩) hmin'
     (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
@@ -309,7 +316,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     pfStepFactsT fok TsoShadow.cohSrc st c (hartAgent cpu) l →
     (∀ n va req, o = .memRead n va req → ramBytes req.pa n) →
     (∀ n va req, o = .memWrite n va req → ramBytes req.pa n) →
-    rmem c st σ → viewRel TsoShadow.cohSrc σ st →
+    rmem c st σ → viewRel TsoShadow.cohSrc σ st → σ.llog = List.range' 1 σ.log.length →
     c.pcLog.map Wmsg.wmTid = (stAuthors st).map some →
     (∀ base tvs, l = .LIFetch base tvs →
        ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
@@ -323,12 +330,15 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) →
-    ∃ (v : o.ret) (σ' : MState),
-      evStep cpu o σ v σ' ∧
+    ∃ (v : o.ret) (σ1 σ' : MState),
+      evStep cpu o σ v σ1 ∧
+      (σ' = σ1 ∨ (σ1.landOk cpu (σ.top + 1) ∧ σ' = σ1.land cpu (σ.top + 1))) ∧
       (∃ rs' fn' ib', p' = .PHart cpu (k v) rs' fn' ib') ∧
       rmem c' (st ++ [(hartAgent cpu, l)]) σ' ∧
-      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) := by
-  intro hp hstep hadj hfacts hramR hramW hR hV hA hfetch hexl hfn hls hld hfi hsf
+      viewRel TsoShadow.cohSrc σ' (st ++ [(hartAgent cpu, l)]) ∧
+      σ'.llog = List.range' 1 σ'.log.length := by
+  intro hp hstep hadj hfacts hramR hramW hR hV heg hA hfetch hexl hfn hls hld hfi hsf
+  have hm := PfStepTsoMem.memEager c st σ hR heg
   have hlog := logEq c st σ hR hA
   obtain ⟨m', ors, fn', dd, oib, obar, hn, rs', ib', rfl⟩ := nodeOf cpu _ rs fn ib c.pcDev l p' d' hp hld hfn
   have frame : frameLbl l → ∀ σ' : MState, σ'.mem = σ.mem → σ'.log = σ.log → σ'.resv = σ.resv →
@@ -338,8 +348,8 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
   | regRead r => exact absurd hn.1 hls
   | regWrite r v =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    exact ⟨PUnit.unit, σ.setReg cpu r v, rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl rfl,
-      viewRelInert cohSrc σ _ st _ _ (erwInert _) hV (sameReadSetReg σ cpu r v)⟩
+    exact ⟨PUnit.unit, σ.setReg cpu r v, _, rfl, Or.inl rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl rfl,
+      viewRelInert cohSrc σ _ st _ _ (erwInert _) hV (sameReadSetReg σ cpu r v), heg⟩
   | memRead n va req =>
     have hram := hramR n va req rfl
     dsimp only [pnodeStep] at hn
@@ -352,31 +362,34 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
         obtain ⟨q, hq1, hq2, hq3, hq4⟩ := hfetch _ _ rfl
         have hfr := pfFetchRowMemCut c st σ cpu q req.pa (paZ req.pa) n tvs w hR hq3 hq4 rfl hram
           (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
-        refine ⟨.Ok (w, none), σ, Or.inr (Or.inl ⟨hram, hif, q, w, ?_, ?_, hfr, rfl, rfl⟩),
+        refine ⟨.Ok (w, none), σ, σ, Or.inr (Or.inl ⟨hram, hif, q, w, ?_, ?_,
+          (PfStepTsoMem.readBytesPEager σ.mem σ.lp hm _ _ _ _ _).2 hfr, rfl, rfl⟩), Or.inl rfl,
           ⟨_, _, _, rfl⟩, frame trivial σ rfl rfl rfl rfl,
-          viewRelInert cohSrc σ σ st _ _ rfl hV (sameReadRefl σ)⟩
+          viewRelInert cohSrc σ σ st _ _ rfl hV (sameReadRefl σ), heg⟩
         · rw [(hV cpu).itvEq]; exact hq1
-        · show q ≤ σ.log.length
-          rw [lenEq c st σ hR]; exact hq2
+        · show q ≤ σ.llog.length
+          rw [heg]; simp only [List.length_range']; rw [lenEq c st σ hR]; exact hq2
       · -- the PLAIN load
         subst hlen
         obtain ⟨tvn, h1, h2, h3, hrb, hrm, hvr⟩ := loadRow pstepEv pclsEv c c' st rest σ cpu req.pa
-          _ false tvs [] w hR hV hA hstep hadj hram hw hfacts.2.1
+          _ false tvs [] w hR hV heg hA hstep hadj hram hw hfacts.2.1
         have hpl : akPlain req.access_kind = true := by
           have e1 : akIfetch req.access_kind = false := hif
           have e2 : akExcl req.access_kind = false := hlat
           simp [akPlain, e1, e2]
-        exact ⟨.Ok (w, none), _, Or.inr (Or.inr (Or.inl ⟨hram, hpl, tvn, w, h1, h2, h3, hrb, rfl,
-          rfl⟩)), ⟨_, _, _, rfl⟩, hrm, hvr⟩
+        exact ⟨.Ok (w, none), _, _, Or.inr (Or.inr (Or.inl ⟨hram, hpl, tvn, w, h1, h2, h3, hrb, rfl,
+          rfl⟩)), Or.inl rfl, ⟨_, _, _, rfl⟩, hrm, hvr, heg⟩
       · -- the EXCLUSIVE read
         obtain ⟨hoc, hex⟩ := hexl _ _ _ _ rfl
         obtain ⟨htop, hnor, hrm⟩ := pfExLoadRowMem pstepEv pclsEv c c' st rest σ cpu
           (hartAgent cpu) _ (paZ req.pa) tvs _ req.pa n w hR hstep hoc hex hadj rfl rfl hram hlen
           (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
-        exact ⟨.Ok (w, none), _, Or.inr (Or.inr (Or.inr ⟨hram, hlat, hnor,
-          MState.not_sbOverlaps_of_nil _ _ _ _ (hR.2.2.2.2 cpu), w, htop, rfl, rfl⟩)),
+        have hlt : σ.llog.length = σ.log.length := by rw [heg]; simp
+        exact ⟨.Ok (w, none), _, _, Or.inr (Or.inr (Or.inr ⟨hram, hlat, hnor,
+          MState.not_sbOverlaps_of_nil _ _ _ _ (hR.2.2.2.2 cpu), w,
+          (PfStepTsoMem.topBytesLEager σ.mem σ.lp hm _ _ _).2 htop, rfl, rfl⟩)), Or.inl rfl,
           ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
-          rowExLoad cohSrc σ st cpu req.pa n w _ (paZ req.pa) tvs _ hV hlog⟩
+          rowExLoad cohSrc σ st cpu req.pa n w _ (paZ req.pa) tvs _ hV hlog hlt, heg⟩
   | memWrite n va req =>
     have hram := hramW n va req rfl
     dsimp only [pnodeStep] at hn
@@ -395,26 +408,42 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
         · obtain ⟨hnor, hrm⟩ := pfStoreRowMem pstepEv pclsEv c c' st rest σ cpu (hartAgent cpu)
             false _ (paZ req.pa) _ _ _ req.pa n v hR hstep hadj rfl rfl hram hd hb
           have e : akExcl req.access_kind = false := hlat
-          refine ⟨.Ok (some true), σ.store cpu req.pa n v false,
-            Or.inr ⟨hram, v, hval, hnor, MState.landNowOk_of_nil _ _ _ _ _ (hR.2.2.2.2 cpu), rfl, by rw [e]⟩,
-            ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
-            rowStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hfit⟩
+          have hsb0 := hR.2.2.2.2 cpu
+          have hsbE : ((σ.issue cpu req.pa n v).land cpu (σ.top + 1)).sb = σ.sb := by
+            funext c0
+            by_cases hc : c0 = cpu
+            · subst hc; simp [MState.issue, updCpu, hsb0]
+            · simp [MState.land, MState.issue, updCpu, hc]
+          refine ⟨.Ok (some true), σ.issue cpu req.pa n v, (σ.issue cpu req.pa n v).land cpu (σ.top + 1),
+            Or.inr (Or.inl ⟨hram, e, v, hval, rfl, rfl⟩),
+            Or.inr ⟨PfStepTsoMem.landOkIssue σ cpu req.pa n v hm heg hsb0 (Nat.le_of_lt hfit) hnor, rfl⟩,
+            ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl hsbE,
+            rowStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hfit, ?_⟩
+          show σ.llog ++ [σ.top + 1] = List.range' 1 (σ.log ++ [hartAgent cpu]).length
+          rw [heg, List.length_append, List.length_singleton, List.range'_concat]; simp only [MState.top]; congr 2; omega
         · obtain ⟨hnor, hrm⟩ := pfStoreRowMem pstepEv pclsEv c c' st rest σ cpu (hartAgent cpu)
             true _ (paZ req.pa) _ _ _ req.pa n v hR hstep hadj rfl rfl hram hd hb
           have e : akExcl req.access_kind = true := hlat
-          refine ⟨.Ok (some true), σ.store cpu req.pa n v true,
-            Or.inr ⟨hram, v, hval, hnor, MState.landNowOk_of_nil _ _ _ _ _ (hR.2.2.2.2 cpu), rfl,
-              by rw [e]⟩, ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
-            rowExStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hfit⟩
+          have hlt : σ.llog.length = σ.log.length := by rw [heg]; simp
+          have hlen : c.pcLog.length = σ.log.length := lenEq c st σ hR |>.symm
+          refine ⟨.Ok (some true), σ.storeL cpu req.pa n v, σ.storeL cpu req.pa n v,
+            Or.inr (Or.inr ⟨hram, e, v, hval, hnor, MState.landNowOk_of_nil _ _ _ _ _ (hR.2.2.2.2 cpu), rfl,
+              rfl⟩), Or.inl rfl, ⟨_, _, _, rfl⟩, hrm _ ?_ rfl rfl rfl,
+            rowExStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hlt hfit, ?_⟩
+          · show σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) req.pa n v (σ.top + 1) (hartAgent cpu) = _
+            rw [heg]
+            exact PfStepTsoMem.landBytesEager σ.mem c.pcImg c.pcLog σ.log.length hlen hR.2.2.1 req.pa n v _
+          · show σ.llog ++ [σ.top + 1] = List.range' 1 (σ.log ++ [hartAgent cpu]).length
+            rw [heg, List.length_append, List.length_singleton, List.range'_concat]; simp only [MState.top]; congr 2; omega
         · exact absurd hl hls
       · exact hn.elim
   | readRam => exact hn.elim
   | writeRam => exact hn.elim
   | barrier b =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    exact ⟨(), σ.fence cpu b, ⟨fun _ => hR.2.2.2.2 cpu, rfl⟩, ⟨_, _, _, rfl⟩,
+    exact ⟨(), σ.fence cpu b, _, ⟨fun _ => hR.2.2.2.2 cpu, rfl⟩, Or.inl rfl, ⟨_, _, _, rfl⟩,
       frame (ebarFrame b) _ rfl rfl rfl rfl,
-      rowFence cohSrc σ st cpu b hV hlog (fun hb => hfi (by rw [hb]))⟩
+      rowFence cohSrc σ st cpu b hV hlog heg (fun hb => hfi (by rw [hb])), heg⟩
   | cacheOp _ => exact absurd hn.1 hls
   | tlbi _ => exact absurd hn.1 hls
   | translationStart _ => exact absurd hn.1 hls
@@ -429,7 +458,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     exact absurd hl hls
   | instrAnnounce n w =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    refine ⟨(), σ, rfl, ⟨_, _, _, rfl⟩, frame (annFrame n w) σ rfl rfl rfl rfl, ?_⟩
+    refine ⟨(), σ, σ, rfl, Or.inl rfl, ⟨_, _, _, rfl⟩, frame (annFrame n w) σ rfl rfl rfl rfl, ?_, heg⟩
     unfold annLabel
     split
     · exact rowSfenceMarker cohSrc σ st cpu hV (hsf n w rfl ‹_›)
