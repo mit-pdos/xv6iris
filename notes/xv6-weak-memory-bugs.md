@@ -51,15 +51,3 @@ assumption.
 
 If something looks like a bug — i.e. the CODE lacks an ordering RVWMO needs, not merely a proof that cannot see why the code is safe — record it here, and carry a NAMED assumption scoped to exactly that code step (never
 a general assumption for the rest of the proof). The code fixes come later.
-
-## 4. `pipealloc`: a pipe lock's words are used before the page's earlier stores are ordered (ordering gap; probably benign)
-
-* **Where.** `kernel/pipe.c` `pipealloc` → `kalloc` (junk fill `memset(5)` after its `release`), `initlock(&pi->lock)`,
-  `f0->pipe = pi`, … then the creator's first `acquire(&pi->lock)` (`amoswap.w.aq`) — no fence in between.
-* **What RVWMO allows.** `.aq` orders only LATER accesses; the creator's earlier junk-fill stores to the lock's owner
-  word (`lk->cpu`) may still be buffered when its first acquire lands, and land afterwards.
-* **Why it is probably benign.** Another hart gets the pipe only via `fork`, whose lock operations fence the creator's
-  stores first; same-address stores land in order, so the junk is overwritten before anyone else can look.
-* **Fix (not applied).** `__sync_synchronize();` at the end of `pipealloc` (before publishing / first use).
-* **In the theorem.** [OWN.130]: a NAMED assumption scoped to this step (the creator's earlier stores to the lock's
-  words have landed before its first acquire lands). Found 2026-10-20 (finding F-11.1c).

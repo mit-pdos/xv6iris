@@ -1,6 +1,15 @@
 # Route P design — an RVWMO-faithful per-hart STORE BUFFER in MachCSL with a lockstep replay
 
-Design advisor (one-off, advisory: no proofs, no builds, no git/jj), 2026-10-19.  **Revised again 2026-10-19 (rev 56 of
+Design advisor (one-off, advisory: no proofs, no builds, no git/jj), 2026-10-19.  **Revised 2026-10-21 (rev 57 of the plan,
+no review) by the reviser bringing §5–§7 up to date: the P-W3r sweep LANDED (seven of eight rows, 2,533 l.: `SbHoldX` 280 /
+`SbHoldZero` 266 `wlroyyto`, `SbBlocked` 838 / `SbLbFree` 131 `kqsppmrw`, `SbVirtio` 407 `skyowwlm`, `SbHeldPin` 364 / `SbPteCust`
+247 `xuorxlsx`; `Weak.lean:817-823`), row 6g `CapFrame` 588 + `SbOrdWalk.gatedW :597` (F-W2-V-1 (a)) `ozrqruqw`; row 6e → [OWN.136]
+(queue row Q9); the [OWN.122] switch branch at CP-6z27 (RED 12; export flipped; measured +11.9k/−5.8k unmerged, 3.0–5.5k left —
+§5 re-describes it from `../xv6iris-weak-w1/PROGRESS-W11F.md` §11); rulings [OWN.125]–[OWN.136] (supersessions: 128 WITHDRAWN,
+130 → 134, 129/133 → 135) and [OWN.137]/[OWN.138] (row 6h, 2026-10-21: `fetchReplayOk`'s early E2/E3 half NAMED beside
+`fetchLateChained` until A2 — REVISIT item 3; the (r1) own-hart arm 0.2–0.5k): **the ONLY named xv6 assumption is [OWN.131] — the
+`DRIVER_OK` step guard, xv6 weak-memory bug #1 (`notes/xv6-weak-memory-bugs.md`)**; the REVISIT list = [OWN.124] (landed in `SbHoldX`'s
+docstrings), (R2″) [OWN.116] until A4, [OWN.137] until A2.  Σ remaining 13.4–28.1k (mid ≈ 21k), ≈ 86 % by lines (§7).**  **Revised again 2026-10-19 (rev 56 of
 the plan) by the reviser applying review R46 (`notes/weak-allocproc-plan-review-R46.md`, "the LOAD side of route P";
 required changes [R46.1]–[R46.6], suggestions [R46.s1]–[R46.s4], 0 alt — every claim re-verified at the tip, `file:line`
 below; one precision: the registered plain-read arm reads `tvn ≤ σ.top` at the tip (`MachCSL/Lang.lean:1708-1709`, the
@@ -776,7 +785,7 @@ The MMIO store overtaking a buffered RAM store is the one freedom P has that the
 needed a skip for.  **P needs neither (R1) nor (R2) for this; it needs (R3) (fabric ⊆ gmo) for H4.**  [OWN.111]'s
 premise is confirmed.
 
-## 5. Increment plan (rev 56: R45 §5 with [OWN.112]–[OWN.114] applied, then R46 [R46.2]–[R46.6] + [OWN.122]–[OWN.124]; DONE rows kept for the record)
+## 5. Increment plan (rev 57: rev 56's rows + results 2026-10-19 17:53 … 2026-10-21 and [OWN.125]–[OWN.136]; the live sizes are the plan's REMAINING WORK; DONE rows kept for the record)
 
 Lanes: **MCSL** = the serial MachCSL lane (one editor; δ1 is closed at inc 16b, X1 and E4 merged, P0(c) done on a
 scratch branch, so the lane is FREE for P-M1); **Weak** = parallel Weak-only slots.  Worker-hours at the observed rates
@@ -793,24 +802,28 @@ moves at most once), statements of every registered root textually unchanged (di
 | P-M2 | ~~interpretation~~ **DONE — MERGED [rev 56]** (`uusvmmrl`, +1.6k/−0.2k): the `okP` invariant, **`interp_land` PROVED without staging** (the gate), lifting re-proved; `sbNil` staging kept | MCSL | 0 (was 1.1–2.0k) | — | — | ✓ | |
 | P-M3 | ~~lifting + base memModel lemmas~~ **DONE as P-M3a+b — MERGED [rev 56]** (`ouznrlqo`, +1.1k): dual ops, Löb arms, `sbNil` kept; **F-P-M3-1: the flip is inseparable from the readers** → [OWN.122] | MCSL | 0 (was 0.8–1.4k) | — | — | ✓ | |
 | P-M4 | ~~history layer + export sub-definitions over `lp`~~ **DONE as P-M4a/b/c — MERGED [rev 56]** (`uutlwtuz`, +1.54k): `FlatMem.lview`, `stepGrowP`, the export TWINS `xv6AccessDiscP :1547` (`lkCpuReadAtP :1467`, `ksFrameAtP :1539`) + the eager bridge | MCSL | 0 (was 1.5–2.8k) | — | — | ✓ | |
-| **P-M5–8** | **THE SWITCH BRANCH ([OWN.122] (b); RUNNING w1, released by [OWN.123]/[R46.5])**: the switch (plain store = issue; `sbNil`/`landedEager` + issue-stamp conjuncts deleted; the registered read arm `tvn ≤ ltop`; the twins become THE definitions — the flip 1.5–3k), then P-M5 contexts/hops (`memModel_chainHop` with `ctxLanded`, `pendOneOfCtx`), P-M6 locks (release rule from the `epochAt` token, `relAdj`; acquire at the landed top + failed-spin case; `insLanded` AMO postcondition; AMO epoch guard; `lockWinAt`/`lkFold`), P-M7 store/fence/device rules, P-M8 Xv6 fallout + Vtest + docs (`LinkDiscAdequacy`/`RvwmoXv6Adequacy` headers NAME the `holding+0x12` REVISIT [OWN.124]); intermediate states may be RED; strict acceptance ONLY at the end.  NO load-side item enters the branch | MCSL | **5.3–9.8k** | 40–98 | P-M4 ✓ | M− | all registered roots re-proved, statements unchanged, `tcb.sh`, `audit.sh` baseline/opaques unchanged |
-| **Q1–Q8** | **the serial MCSL QUEUE after the branch** (plan REMAINING WORK rows Q1–Q8): Q1 [OWN.115] stuck-on-kernel-fault (+ `spinFenceNext` fold-in) 0.5–1.5k; Q2 M13 `acqExclOk` + clause 13 `lockNzExclAt` [OWN.118] 0.4–0.9k; Q3 walker A/D + DMA `pcAt` −2 stamp 0.1–0.2k; Q4 [OWN.119] load-pc ghost + export 0.3–0.7k; Q5 M12-a 0.3–0.7k; Q6 M12-b 0.4–0.8k [OWN.117]; **Q7 (r1) frame-quiet `∀ j a, ksLiveFrameAtP σ j a → ∀ i ≠ j, ∀ e ∈ σ.sb i, ¬ e.hits a` + (r2) `LkCpuQuiet` (PROGRESS §HEADHOP (a2-lkcpu)) — additive interpretation records on the route-P state [R46.5], 0.5–1.1k**; Q8 `csIssue` export (F-P-W4-1) 0.2–0.4k | MCSL | **2.7–6.3k** (estimates except Q1/Q7) | 21–62 | P-M8 | M | each an append-only export / additive record; `tcb/expected.json` unchanged |
+| **P-M5–8** | **THE SWITCH BRANCH ([OWN.122] (b); w1, RUNNING from CP-6z27 since 2026-10-21 00:44; `../xv6iris-weak-w1/PROGRESS-W11F.md` §11) — [rev 57] re-described.**  DONE on the branch (unmerged; RED 39 → 12): the switch + flip (D1/D2), P-M5 as **D9** (numbers = landing positions, identities = issue stamps; `landCovAt`/`vecCertsAt`; the `landsAboveAtE` ghost — replaces D3 of rev 55/56), P-M6 (D4/D10 `lockRelReady`; F-11.2 `relInsOkM`/`exclRelOk`; the dynamic lock's ISSUE-STAMP window [OWN.134] + "registered by now" [OWN.125] + F-11.1e (b)), P-M7 (D11; D14 (c) disk; `memImg`), P-M8 so far: **the export FLIPPED** (`xv6AccessDisc` := the twins), **the [OWN.131] step guard in the machine** (`MachCSL/Lang.lean:1277-1296` on the branch: `drvOkPc`, `vqPagesPend`, `drvOkGuard` in `evStep`'s MMIO-write arm + `blockedStep`; rule `wp_s_sw_dev_drvOk`), [OWN.126]/[OWN.132] sub-definitions, [OWN.135]'s textual half (`kvmRootLandsLast` REMOVED, root text RESTORED), Weak D5 (`MachOfPf` `m ≤ 2` = P-W5's core), Vtest; measured **+11.9k/−5.8k vs the tip**.  LEFT: D12‴ step 3 (0.3–0.6k) → `DiskAcc` flip + D15 (0.4–0.8k) → DESIGN I3 the readers (0.8–1.3k) → DESIGN D17 the three page-table REDs under [OWN.135] (**1.1–1.7k**, was ≈ 0.3k) → Weak cascade + re-measure (0.3–0.8k) → docs (`LinkDiscAdequacy` header: [OWN.131] the ONLY named assumption; REVISIT [OWN.124]) + THE strict acceptance (0.1–0.3k).  NO load-side item enters the branch | MCSL | **3.0–5.5k LEFT** (total ≈ 15–17.5k vs 5.3–9.8k est.) | 25–60 | P-M4 ✓ | M− | all registered roots re-proved, statements unchanged (the [OWN.135] restoration included), `tcb.sh`, `audit.sh` baseline/opaques unchanged |
+| **Q1–Q9** | **the serial MCSL QUEUE after the branch** (plan REMAINING WORK rows Q1–Q9): Q1 [OWN.115] stuck-on-kernel-fault (+ `spinFenceNext` fold-in) 0.5–1.5k; Q2 M13 `acqExclOk` + clause 13 `lockNzExclAt` [OWN.118] 0.4–0.9k; Q3 walker A/D + DMA `pcAt` −2 stamp 0.1–0.2k; Q4 [OWN.119] load-pc ghost + export 0.3–0.7k; Q5 M12-a 0.3–0.7k; Q6 M12-b 0.4–0.8k [OWN.117]; **Q7 (r1) frame-quiet `∀ j a, ksLiveFrameAtP σ j a → ∀ i ≠ j, ∀ e ∈ σ.sb i, ¬ e.hits a` + (r2) `LkCpuQuiet` (PROGRESS §HEADHOP (a2-lkcpu)) — additive interpretation records on the route-P state [R46.5], 0.5–1.1k**; Q8 `csIssue` export (F-P-W4-1) 0.2–0.4k; **[rev 57] Q9 [OWN.136] the per-hart "release armed" flag (set by `fence rw,w`, cleared by any explicit store/AMO/trap; every release-pc store happens with it set, `LockFacts.relAdj :113`), exported APPEND-ONLY, replaces row 6e's `relRunRealized`; after P-W6/Q1; 0.6–1.4k** | MCSL | **3.3–7.7k** (estimates except Q1/Q7/Q9) | 25–76 | P-M8 | M | each an append-only export / additive record; `tcb/expected.json` unchanged |
 | **P-W1** | ~~`SbCand` …~~ **DONE — MERGED** (`zsqxzoqp`: `Weak/SbCand.lean` 751 l. — `SbEnt`, `SbPol` four laws, `SbPol.epoch` primary / `SbPol.fifo` fallback / `SbPol.leEpoch`, `execWfP`, `execWfOfOld`; `Weak/SbCandLit.lean` 136 l. — `l1MemberSb` under every lawful policy; `LitmusSBAcqP` §5 (+134 l.) — `l4Cat`/`l4NoMemberP` (policy-independent)/`l4MemberX`; `Weak.lean:804-805`).  Findings: **F-P-W1-1** (the AMO's epoch guard, adopted), **O-P-W1-a** (`LFence false×4` = `fence.i` AND the `sfence.vma` marker → P-W6 fetch marker); forwarded-byte label timestamps → P-W2 | Weak | 0 (1,021 l. landed) | — | — | ✓ | |
 | P-W2 | ~~`SbWalk`/`SbReplay`/`SbAgree`~~ **DONE — MERGED [rev 56]** (`xvqkutzu`/`kqnxzksy`/`otywpvqr`; 2,763 l.): `agreeX`/`agreeW3OfX`/`agreeW4OfX`, `memberGwf`, the read arms (`loadArm`, `rdXArm :705`), `valEqX :744`, `ipRefTaint :75`/`ipRefRule :90`, `memberFwdSrc`, `lockBlk`; findings F-P-W2-1 (`irefGe1` not GF-provable → `IrefGF`/`IrefTop` NAMED → M12-a/b), F-P-W2-2, F-P-W2-3, O-P-W2-a | Weak | 0 (was 1.0–1.8k) | — | — | ✓ | |
 | P-W3 | ~~THE GATE + `noStuckP`~~ **DONE modulo its NAMED INPUTS — MERGED [rev 56]** (`LitmusSbStuck` 361, `SbOrd` 1,269, `SbOrdWalk` 757, `LitmusSbStuck2` 239; heads `qxwpnplt`): `noStuckP :1202` modulo `HeadOrd`; H1/H2/H4/H5 PROVED (H4 by (R2″) [OWN.116]); H3 = `HeadOrdRd :251` with (a1) static hops (`SbHeadHop` 306) and (A2) windows (`SbHeadHop2` 551) PROVED; `DevStOrd` DERIVED (`SbDevSt` 587); residue = the per-site named inputs (rows P-W3r below) | Weak | 0 (was 1.3–2.4k) | — | — | ✓ | |
 | P-W4 | ~~kill glue~~ **DONE — MERGED [rev 56]** (`wknttmlq`, `SbKill` 564): class-blind transport (F-6b′-1 (A)), `acqAq`/`relCovers` at the member (6f absorbed), `certSupplyP :461`, `l2ClaimP :507`, `cycleKillAllP`; F-P-W4-1 `csIssue` NAMED → Q8 | Weak | 0 (was 0.8–1.4k) | — | — | ✓ | |
-| **P-W3r-a** | **the `holding+0x12` exemption — F-HH2-1 (a) [OWN.124], REVISIT (owner-flagged)** ([R46.2]; §3.2 `holdCpuPc`/`exemptPc`, `valEqX`'s third clause, `holdCpuTailDies` across `jal mycpu`, the member side from `lkCpuReadAtP :1467` via P-W6) — **RUNNING w3** | Weak | 0.6–1.2k | 5–10 | P-W3 ✓ (member side P-W6) | M | docstring `REVISIT [OWN.124]`; (b) on file |
-| **P-W3r-b** | **`HoldZero`** ([R46.3]; §3.4; `SbHeadHop2.lean:479`) — **RUNNING w3** | Weak | 0.6–1.2k | 4–10 | P-W3 ✓ | M | no MachCSL record |
-| **P-W3r-c** | **`blockedIsCensus`** ([R46.4]; §3.4 (i)) — **RUNNING w2** | Weak | 0.5–1.0k | 4–8 | P-W3 ✓ | M | the boundary of the per-site table, no longer inside (T) |
-| **P-W3r-d** | **the LB-freedom census leaf** ([R46.s1]) — **RUNNING w2** | Weak | 0.05–0.15k | 0.5–1 | — | H | `decide +kernel` |
-| **P-W3r-e** | **`drainLanded` (`PInv` clause) + `DiskDesc` + `VirtioIdx` + `VirtioDesc`** ([R46.6]) | Weak | 0.7–1.5k | 5–12 | P-W3 ✓ | M | |
-| **P-W3r-f** | **`HeldPin`** | Weak | 0.1–0.3k | 1–2 | P-W3 ✓ | M+ | |
-| **P-W3r-g** | **PTE custody at the realized prefix** (Q-6M-PTE (a), [R45.3]) | Weak | 0.3–0.6k | 2–5 | P-W6 | M | |
-| **P-W3r-h** | **`FrameQuiet` + `LkCpuQuiet` Weak glue** from Q7's records through P-W6 | Weak | 0.2–0.4k | 1–3 | Q7, P-W6 | M | |
-| P-W5 | registered W4 re-proof (buffer-empty invariant; stutter/fused arm per P0(c) (6)), M1/M2 re-registration | Weak (after P-M8) | 0.8–1.5k | 6–12 | P-M8 | M+ | `audit --weak --build` 13 roots green |
-| P-W6 | buffered twin W4-P (`rmemP`: `R-sb` (+epochs), `R-lp`), `recRealizedP`; CapF6–10's `readAt` at the member (feeds 6b, 6j E1); **+ a distinct fetch marker for `fence.i` vs the `sfence.vma` marker (O-P-W1-a)**; **+ (T) the label↔pc transport and the state map the per-site inputs read through (`lkCpuReadAtP`/`lockWordDiscAtP` at the top; issue stamps vs `gwix` landing positions — 6a's note)** | Weak | 1.6–2.8k | 11–22 | P-W5, P-W2 | M− | `segRealized`/`readAt` at `SbCand` members |
-| **Σ P** (rev 56) | | | **13.5–26.8k** (MCSL 8.0–16.1k serial = the branch 5.3–9.8k + the queue 2.7–6.3k; Weak 5.5–10.7k = P-W5/P-W6 2.4–4.3k + P-W3r 3.1–6.4k); of rev 55's 13.3–24.0k, 8.5–15.8k LANDED | **≈ 100–245** | | **M** (the branch M−; progress M) | |
+| **P-W3r-a** | ~~the `holding+0x12` exemption~~ **DONE — MERGED [rev 57]** (`wlroyyto`; `Weak/SbHoldX.lean` 280: `holdCpuX :65`/`exemptX :71` — exempt ONLY inside `acquire`, `ra = acquire+0x16`; `holdCpuTaint :81`, `holdCpuShape :100`, `holdCpuRule :155`; the member side `CpuTop` from the P-W6 interface `CpuTopMap` + `lkCpuReadAtP :1467`) | Weak | 0 (was 0.6–1.2k) | — | — | ✓ | **`REVISIT [OWN.124]` in the docstrings `:6,60,252`**; (b) on file |
+| **P-W3r-b** | ~~`HoldZero`~~ **DONE modulo (Z1)–(Z3) — MERGED [rev 57]** (`wlroyyto`; `Weak/SbHoldZero.lean` 266: `cpuNeOfFloor :121`, `holdZeroOf :246` ⇒ `SbHeadHop2.HoldZero :481` from `CpuWordWin :68`/`CpuFloor :75`/`NotHolder :81` → P-W6/6n) | Weak | 0 (was 0.6–1.2k) | — | — | ✓ | no MachCSL record |
+| **P-W3r-c** | ~~`blockedIsCensus`~~ **DONE — MERGED [rev 57]** (`kqsppmrw`; `Weak/SbBlocked.lean` 838: `EpochOk :264`/`DrainOk`, `Hb`/`hbSound`, **`blockedIsCensus :782`**, `headOrdRdOfCensus :819`; F-W2-BC-1) | Weak | 0 (was 0.5–1.0k) | — | — | ✓ | `drainLanded` is a THEOREM here (DR), not a `PInv` clause |
+| **P-W3r-d** | ~~the LB-freedom census leaf~~ **DONE — MERGED [rev 57]** (`kqsppmrw`; `Weak/SbLbFree.lean` 131: `lbFreeStatic :70`, `holding12FrameOnly :104`, `ismapped10RetFree :119`; **F-W2-LB-1** `uvmclear+0x10`'s point is a `PDep` store — a third LB-not-excluded site, never blocked) | Weak | 0 (was 0.05–0.15k) | — | — | ✓ | `decide +kernel` |
+| **P-W3r-e** | ~~`drainLanded` + `DiskDesc` + `VirtioIdx` + `VirtioDesc`~~ **DONE — MERGED [rev 57]** (`skyowwlm`; `Weak/SbVirtio.lean` 407: `CtrLanded :69`, `Hv`/`hvSound :115`, `srcGateOfClsV :172`/`valGateOfClsV :200`; the inputs STATED + consumed `DiskDesc :290`/`VirtioIdx :303`/`VirtioDesc :315` → P-W6; **F-W2-V-1** → `SbOrdWalk.gatedW :597` (a), `ozrqruqw`) | Weak | 0 (was 0.7–1.5k) | — | — | ✓ | |
+| **P-W3r-f** | ~~`HeldPin`~~ **DONE — MERGED [rev 57]** (`xuorxlsx`; `Weak/SbHeldPin.lean` 364: `valGateOfWin :108`, `HeldWinGF :227`, `heldPin :239`, `heldNeverBlocked :298` over `HeldCtx :292`; **F-W3r-f-1**: a GF-level lock-word WINDOW, not the realized-prefix pin — a spinner's failed swap may be unissued) | Weak | 0 (was 0.1–0.3k) | — | — | ✓ | |
+| **P-W3r-g** | ~~PTE custody at the realized prefix~~ **DONE — MERGED [rev 57]** (`xuorxlsx`; `Weak/SbPteCust.lean` 247: `acqHop :84`/`relayAcq :93`, `PteCustSrc :117`, **`pteNeverBlocked :122`**, `walkerSrcLatestC :208`; landed WITHOUT P-W6) | Weak | 0 (was 0.3–0.6k) | — | — | ✓ | |
+| **P-W3r-h** | **`FrameQuiet` + `LkCpuQuiet` Weak glue** from Q7's records through P-W6 (`SbHeadHop2.FrameQuiet :494`) | Weak | 0.2–0.4k | 1–3 | Q7, P-W6 | M | the last P-W3r row |
+| P-W5 | registered W4 re-proof — **[rev 57] its CORE is on the branch (D5: `MachOfPf` `m ≤ 2`, `PfStepTso*`, buffer empty between pf steps)**; what stays: M1/M2 re-registration, `audit --weak --build` 13 roots green | Weak (after P-M8) | 0.3–0.8k (was 0.8–1.5k) | 3–6 | P-M8 | M+ | `audit --weak --build` 13 roots green |
+| P-W6 | buffered twin W4-P (`rmemP`: `R-sb` (+epochs), `R-lp`), `recRealizedP`; CapF6–10's `readAt` at the member (feeds 6b, 6j E1); **+ a distinct fetch marker for `fence.i` vs the `sfence.vma` marker (O-P-W1-a)**; **+ (T) the label↔pc transport and the state map the per-site inputs read through (`lkCpuReadAtP`/`lockWordDiscAtP` at the top; issue stamps vs `gwix` landing positions — 6a's note)**; **[rev 57] + the P-W3r TRANSPORT RESIDUE: `CpuTopMap`, `CpuWordWin`/`CpuFloor`/`NotHolder`, `HeldCtx`/`HeldWinGF`, `PteCustSrc`/`WalkerCustSrc`, `CtrLanded` + `DiskDesc`/`VirtioIdx`/`VirtioDesc`, `CapFrame.floorByteReal` (+0.3–0.8k)** | Weak | 1.9–3.6k | 13–28 | P-W5, P-W2 | M− | `segRealized`/`readAt` at `SbCand` members |
+| **Σ P** (rev 57) | | | **8.7–18.0k** (MCSL 6.3–13.2k serial = the branch's remainder 3.0–5.5k + the queue 3.3–7.7k; Weak 2.4–4.8k = P-W5 0.3–0.8k + P-W6 1.9–3.6k + P-W3r-h 0.2–0.4k); since rev 56: 2.5k of P-W3r LANDED, the branch consumed its estimate (+11.9k unmerged) | **≈ 67–173** | | **M** (the branch M−; progress M) | |
 
+Order ([rev 57]): **finish the switch branch** (w1 from CP-6z27: D12‴ step 3 → `DiskAcc` + D15 → I3 → D17 → cascade → docs → THE strict
+acceptance = P-M8; ≈ 1–3 calendar weeks) → the queue Q1 → … → Q8 → Q9 [OWN.136] ∥ **w2 row 6h + w3 row 6m now** (Weak-only, against the
+tip); after Q1: 6c → 6d; after P-M8: P-W5 (re-registration) → P-W6 (+ the P-W3r transport residue) → P-W3r-h (after Q7) → 6e (after Q9)
+→ 6j → 6n → 7 → 8; after the capstone: A4.  **The ONLY named xv6 assumption is [OWN.131]** (§6).  The rev-56 order follows as the record.
 Order ([rev 56]): **the switch branch now** (w1; [OWN.122]; released by [OWN.123]/[R46.5]) → P-M5 → P-M6 → P-M7 → P-M8
 (ONE strict acceptance; ≈ 3–6 calendar weeks of one slot) → the queue Q1 → … → Q8 ∥ **P-W3r-a + P-W3r-b (w3) and
 P-W3r-c + P-W3r-d (w2) now** → P-W3r-e/f ∥ the unaffected rows 6e/6g/6h/6m (plan REMAINING WORK); 6c/6d after Q1;
@@ -831,6 +844,22 @@ inside the red branch, L — the WP load rules would return values no history ho
   realizes is proof content.  **Trusted base: UNCHANGED** — MachCSL is a proof device for T-alloc-RVWMO (confirmed:
   `MachCSL.*` appears nowhere in the published premises; it enters only through the registered MachCSL-tier roots
   the conclusion cites).  No new named premise; `noStuck` NAMED only as the fallback of P-W3 (WEAKER, [R44.7]).
+  **[rev 57] ONE named xv6 PROGRAM-STEP assumption, and only one — [OWN.127]/[OWN.131], xv6 weak-memory BUG #1
+  (`notes/xv6-weak-memory-bugs.md`; found by the branch, F-11.5):** `virtio_disk_init` zeroes the three queue pages
+  (`+0xf0/+0x102/+0x10c`) and then stores `QUEUE_READY` (`+0x14a`) / `DRIVER_OK` (`+0x170`) to MMIO with NO fence; RVWMO +
+  PMAs order a RAM store before a later MMIO store only through `fence w,o`, so a polling device may read `kalloc` junk
+  (not observable on QEMU-TCG).  Form (G): a STEP GUARD of the proof machine — hart 0's `DRIVER_OK` store waits until the
+  three `memset`s have landed (`MState.drvOkGuard`, `MachCSL/Lang.lean:1292` on the branch, in `evStep`'s MMIO-write arm and
+  `blockedStep`), as if a fence were there, at that one instruction only — STRONGER than RVWMO at that instruction, EQUAL
+  everywhere else; kernel unchanged ([OWN.4]).  Because it is on the MACHINE, every registered root (SC-tier included) is
+  stated over the guarded machine; no root's statement text changes; documented in `LinkDiscAdequacy`'s header, the roots'
+  docstrings, the bug list and the final theorem's docstring (rows P-M8/8).  Bugs #3 (kvminit root store) and #4 (pipealloc
+  lock words) were PROOF GAPS — xv6 is safe there — and were WITHDRAWN with their premises ([OWN.135], [OWN.134]); the
+  general rule [OWN.129] (bug-like ⇒ record + a step-scoped named assumption; fix the code later) stands for future findings.
+  **[rev 57] Named PROGRAM facts (not xv6 bugs; proof premises until A1/A2): `excRetR` [OWN.96], `fetchLateChained` [OWN.101], and
+  now `fetchReplayOk`'s EARLY E2/E3 half [OWN.137] (row 6h F-6h-1: no replay proof under P without O2's lock-hand-off argument;
+  REVISIT item 3, "fix later"; retires with A2, +0.3–0.8k).  [OWN.138] (r1) makes `fetchReplayOk` TRUE again on RWX user pages by
+  a separate own-hart arm for the fetching hart's po-later writes (FAITHFUL; a no-RWX premise rejected).**
   **[R45.7] Of `ioResidueGmo`'s arms the replay uses (R3) and — since P-W3 (F-P-W3-2, [OWN.116]) — the NEW (R2″) (H4/Efab:
   an I/O access po-before a later RAM read is gmo-before it, `GraphFabResidue.ioResidue :123-138`); (R1) is NOT used by
   P.  [rev 56] (R2″) is trusted platform text STRONGER than RVWMO + PMAs, owner-ruled to be removed with (R1) in A4
@@ -864,7 +893,24 @@ inside the red branch, L — the WP load rules would return values no history ho
   (R2) and (R2′) stay (also stronger than the ISA; not P's business).  **[R45.s3]** With D48 (i/o fence bits dropped)
   NO in-tree site is ISA-given — all of (R1) is platform text today; the plan's §B(11b) sentence is corrected.
 
-## 7. Σ remaining and % done (rev 56; see the plan's REMAINING WORK for the live table)
+## 7. Σ remaining and % done (rev 57; see the plan's REMAINING WORK for the live table)
+
+**[rev 57]**  Since rev 56 (2026-10-19 17:53 … 2026-10-21): seven P-W3r rows + row 6g LANDED (`SbHoldX`/`SbHoldZero`/`SbBlocked`/`SbLbFree`/
+`SbVirtio`/`SbHeldPin`/`SbPteCust`/`CapFrame`, 3,121 l. + ≈ 70 modified ≈ **+3.2k gross**, against 2.9–6.0k planned); the switch branch
+advanced CP-6d → CP-6z27 (RED 39 → 12; export flipped; [OWN.131] guard in the machine; [OWN.134]/[OWN.135] landed in part) at a measured
+**+11.9k/−5.8k UNMERGED** — above rev 56's 5.3–9.8k for the whole branch — with **3.0–5.5k left** (D12‴ step 3, `DiskAcc` + D15, I3
+0.8–1.3k, D17 1.1–1.7k, cascade, acceptance); row 6e's MachCSL half became Q9 [OWN.136] (+0.6–1.4k); P-W5 shrank under D5 (−0.5..−0.7k);
+the eight leaves' NAMED realization interfaces moved into P-W6 (+0.3–0.8k).  Under P now: the branch's remainder 3.0–5.5k + Q1–Q9
+3.3–7.7k (MCSL) + P-W5 0.3–0.8k + P-W6 1.9–3.6k + P-W3r-h 0.2–0.4k (Weak) = **8.7–18.0k**; the rest 6c 0.8–1.5, 6d 0.4–0.8, 6e 0.7–1.4,
+6h 0.2–0.5 (RUNNING w2: [OWN.138] (r1) + the [OWN.137] naming; the early half → A2 +0.3–0.8k), 6j 0.8–1.6, 6m 0.3–0.8 (RUNNING w3), 6n 1–2.5,
+7 0.4–0.8, 8 0.1–0.2 = 4.7–10.1k.  **Σ remaining ≈ 13.4–28.1k (mid ≈ 21k; rev 56: 18.9–38.5k / 29k); ≈ 100–255 h (mid ≈ 180 h; the MCSL lane ≈ 1–3 calendar weeks to finish the branch + 2–4 for the
+queue, Weak in parallel).**  DONE recounted at the tip by the rev-53 diff method (plain `diff -ruN` against `~/dev/xv6iris` @ `802a9ab13`,
+EVERY `Weak/Ax*.lean` excluded, NO git/jj; the unmerged branch NOT counted): **+131.1k gross / −8.5k removed / +122.5k net** (MachCSL
++25.3k, Xv6 +11.4k, Vtest +0.1k, Weak non-`Ax` +94.3k).  **% done by lines ≈ 131.1 ÷ (131.1 + 21) ≈ 86 % (range 82 % at 28.1k remaining …
+91 % at 13.4k); net 122.5 ÷ (122.5 + 21) ≈ 85 %**; counting the after-capstone A1/A2/A4 (mid 11.5k) ≈ 80 %; counting the unmerged branch as
+done would read ≈ 87 %.  Read with care: the remaining ≈ 14 % is ONE serial MachCSL lane (finish the branch — I3 and D17 are designs, not
+started — then nine queue items) plus Weak work that cannot finish before it (P-W5/P-W6, P-W3r-h, 6e, 6j, 6n, 7); ≈ 2.7k (CertZ24–34) + ≈ 4–6k
+of `Sil*` consumers are counted as done but superseded-but-green.
 
 **[rev 56]**  Since rev 55: P-M1..P-M4 (MachCSL +5.3k/−1.9k incl. δ1's deletions), P-W2/P-W3/P-W4, `SbDevSt`/`SbHeadHop`/
 `SbHeadHop2`, 6a (glue), 6b′ LANDED — ≈ +14.0k gross — while three things became VISIBLE: the [OWN.122] flip (+1.5–3k,
@@ -901,6 +947,14 @@ leaves.  Read with care: the remaining ≈ 20 % is dominated by ONE serial lane 
 superseded-but-green.
 
 ## 8. Owner questions — ALL RULED (owner format kept as the record; [R45.8] informational items at the end)
+
+**[rev 57]** The twelve rulings [OWN.125]–[OWN.136] (2026-10-20) were asked from the switch branch's findings F-11.1–F-11.6 and row 6e's
+Q-6E-ARM, in the owner format inside `../xv6iris-weak-w1/PROGRESS-W11F.md` §11 and `~/dev/weak-orch/open_questions.txt`; they are
+recorded, tightened, in the plan's §D (rev 57 block) and summarised in this note's header; §6 above carries the one that touches the
+published statement's trusted surroundings ([OWN.131], the ONLY named xv6 assumption).  Supersessions: [OWN.128] WITHDRAWN (the owner had
+answered only Q1 of a two-question menu); [OWN.130] → [OWN.134] (pipealloc SAFE, issue-stamp window, no assumption); [OWN.129] and
+[OWN.133] → [OWN.135] (kvminit SAFE, premise dropped, the page-table conjuncts guarded by `started` landed).  Added 2026-10-21 from row 6h:
+[OWN.137] (a) name `fetchReplayOk`'s early half until A2 + REVISIT, [OWN.138] (r1) own-hart arm.  **OPEN: NONE.**
 
 ### Q-R46-LOADSIDE — RULED [OWN.123] (2026-10-19 ~16:xx): (P) — NO load buffer, in the twin or in MachCSL
 
