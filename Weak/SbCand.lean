@@ -31,8 +31,8 @@ rule 4); `SbPol.leEpoch`: `epoch` is the WEAKEST lawful policy, so it is exactly
 | 5 `[AQ];po;[M]` | an `.aq` AMO does NOT drain: its write lands at its step, overtaking pending same-epoch entries to other bytes (the F44-1 freedom, [OWN.110]); later events follow it | FAITHFUL |
 | 6–8 `.rl`, RCsc | an `.rl` store / AMO waits for an empty buffer; an `.aq` access waits while an own `.rl` entry is pending (`noRl`) | FAITHFUL (xv6 has no `.rl`: `SBAcq.l1NoRl`, `LockFacts.amoCensus`) |
 | 9–13 dependencies | not tracked (as `mstep`, [OWN.109]) | more permissive, unchanged |
-| I/O (PMAs) | `LIo` inert, neither buffered nor draining | FAITHFUL to RVWMO + PMAs (the trusted (R1) is stronger, F-P1) |
-| `fence.i` / `sfence.vma` | the label `LFence false×4` is SHARED by both (`PfStepTsoView` rows); it does not drain here (riscv.cat has no `fence.i`; `sfence.vma` orders no data) | FAITHFUL w.r.t. riscv.cat; the MachCSL design drains at `fence.i` (Zifencei) — P-W6 must keep the candidate's fetch-free view or add a fetch marker (open item O-P-W1-a) |
+| I/O (PMAs) | `LIo` inert, neither buffered nor draining | WEAKER than RVWMO + PMAs on fences with i/o bits (Sail drops them at decode, `notes/sail-gaps.md` SAIL-GAP-1: `fence iorw,iorw` orders no MMIO access here); compensated by the trusted (R1), STRONGER than the spec (QEMU-TCG), kept until the capstone [OWN.142] (F-P1; `notes/rvwmo-spec-audit.md` §4 item 2) |
+| `fence.i` / `sfence.vma` | the label `LFence false×4` is SHARED by both (`PfStepTsoView` rows); it does not drain here (riscv.cat has no `fence.i`; `sfence.vma` orders no data) | FAITHFUL w.r.t. riscv.cat; the MachCSL machine drains at `fence.i` today (STRONGER than Zifencei, EX-FENCEI-1; being made non-draining per [OWN.143]) — P-W6 must keep the candidate's fetch-free view or add a fetch marker (open item O-P-W1-a) |
 
 Deviation from the design text (§1 rows 4–5): the design lets an `.aq` AMO overtake the WHOLE FIFO; that
 would let it overtake a store issued BEFORE a `fence rw,w` (e.g. a critical-section store before

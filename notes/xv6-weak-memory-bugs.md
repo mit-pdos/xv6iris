@@ -18,6 +18,10 @@ RVWMO (riscv.cat) + the RISC-V PMAs allow, why it matters, the fix, and how the 
   Not observable on QEMU (TCG executes harts sequentially; virtio-mmio processes only on `QUEUE_NOTIFY`, and xv6
   fences before every notify). Linux's `writel` / `virtio_wmb` contain exactly the missing barrier.
 * **Fix (not applied).** `__sync_synchronize();` after the three `memset`s (before `QUEUE_READY`/`DRIVER_OK`).
+* **The fix is not checkable by the present model.** The model cannot see fence i/o bits: Sail drops them at decode
+  (`InstsEnd.lean:18299-18314`; `notes/sail-gaps.md` SAIL-GAP-1), so the added `fence iorw,iorw` would be read as
+  `fence rw,rw` and order no RAM store against the MMIO stores. The device-side ordering is supplied by the trusted
+  (R1) instead, which [OWN.142] keeps until the capstone. See `notes/rvwmo-spec-audit.md` §2 row 7 and Q-AUDIT-1.
 * **In the theorem.** [OWN.127]: kernel unchanged; a NAMED header assumption scoped to this code path only ("hart 0's
   three zeroing `memset`s in `virtio_disk_init` have landed before the device's first DMA read after `DRIVER_OK`").
   Found 2026-10-20 by the route-P switch worker (finding F-11.5, `../xv6iris-weak-w1/PROGRESS-W11F.md` §11).

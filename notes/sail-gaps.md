@@ -21,7 +21,7 @@ says. Each entry is to be raised again after the capstone ([OWN.142]).
   * The fix for xv6 bug #1 (a fence before `DRIVER_OK`, `notes/xv6-weak-memory-bugs.md`) cannot be checked by the
     present model.
 * **Example.** `virtio_disk_rw` stores the descriptors, executes `fence iorw,iorw`, then stores `QUEUE_NOTIFY`; the
-  device then reads the descriptors. EX-IO-1 in `notes/rvwmo-spec-audit.md` §5 has the details.
+  device then reads the descriptors. EX-IO-1 in `notes/rvwmo-machine-examples.md` has the details (from `notes/rvwmo-spec-audit.md` §2 row 7).
 * **Ruling.** [OWN.142]: keep (R1) until the capstone. After it, revisit with the NOTIFY-shape spike and with option
   (b): recover the bits from the instruction word and order device accesses faithfully. See
   `notes/rvwmo-spec-audit.md` Q-AUDIT-1.

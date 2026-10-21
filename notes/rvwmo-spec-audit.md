@@ -8,6 +8,11 @@ relies on memory and says so ("from memory, verify").  Spec documents referred t
 chapter ("RVWMO", with its formal `riscv.cat` appendix), Zifencei, Ziccif, the A extension, Zicsr, and the privileged
 ISA (page tables, `sfence.vma`, PMAs).
 
+**Status 2026-10-21 (doc-fix pass).**  Q-AUDIT-1 RULED (a) [OWN.142] (keep (R1) until the capstone; Sail gap recorded
+as SAIL-GAP-1 in `notes/sail-gaps.md`); Q-AUDIT-2 RULED (ii) [OWN.143] (align `fence.i` to Zifencei NOW — non-draining,
+`itv := max itv (max tv (max rv pub))`; this overrides the recommendation (iii) below).  §4 items carry a status tag;
+the plan items (§4 items 4, 5, 8, 10's `plan:344`) are left to the plan reviser.
+
 **Names used throughout (defined once here).**
 * *RVWMO* — the RISC-V weak memory model: a set of axioms on *execution graphs* (memory events, program order `po`,
   reads-from `rf`, per-location write order `co`, one *global memory order* `gmo`); *ppo* = "preserved program order",
@@ -52,7 +57,7 @@ ISA (page tables, `sfence.vma`, PMAs).
    (i) the published theorem describes a QEMU-like platform, not every RVWMO machine, for every UART/PLIC/virtio path;
    (ii) the model cannot, today, tell a correctly fenced MMIO sequence from an unfenced one — the fix recorded for xv6
    weak-memory bug #1 (`fence iorw,iorw` after the `memset`s, `notes/xv6-weak-memory-bugs.md:20`) would be INVISIBLE to
-   the graph model; only (R1) makes the device see the zeroed pages.  Plan item A4 (drop the hart-side (R1) after the
+   the graph model (recorded as SAIL-GAP-1, `notes/sail-gaps.md`, [OWN.142]); only (R1) makes the device see the zeroed pages.  Plan item A4 (drop the hart-side (R1) after the
    capstone) must therefore be paired with a faithful fence-with-i/o-bits rule, or the virtio NOTIFY shape risks a
    stuck replay (§2 row 7, §5 Q1).
 2. **Instruction fetch and `fence.i` have no model in the spec; ours is a hand-written text, stronger in places,
@@ -65,7 +70,8 @@ ISA (page tables, `sfence.vma`, PMAs).
    instruction view (`MState.fence` `Lang.lean:193-200`: `itv := max itv (max tv pub)`, no `rv`) — WEAKER than
    Zifencei's "already visible" clause for foreign code stores the hart has loaded.  Three documents disagree on this
    row (§4).  None of it is unsound (the bridge direction tolerates a weaker machine; E1′ is a stated premise), but
-   `notes/weak-allocproc-routeP-design.md:161` marks the drain FAITHFUL, which is wrong.
+   `notes/weak-allocproc-routeP-design.md:161` marked the drain FAITHFUL, which was wrong (corrected 2026-10-21 to
+   "STRONGER today; being aligned to Zifencei per [OWN.143]"; [OWN.143] makes `fence.i` non-draining and passes `rv`).
 3. **Dependencies: the spec's syntactic-dependency rules (ppo 9–13) are the most intricate part of RVWMO and the
    machine ignores them.**  MachCSL tracks no address/data/control dependency (`Lang.lean:1373-1377`; design
    `routeP-design.md:159`) — WEAKER (more runs), harmless for the theorem ([OWN.109], [OWN.141]) and fatal only for a
@@ -121,14 +127,14 @@ interpreted it (file:line); mark; which rulings/decisions depend on it; implicat
 
 | # | Spec point (cite) | Why confusing / underspecified | Our interpretation (file:line) | Mark | Rulings depending on it | Implication for the final theorem |
 |---|---|---|---|---|---|---|
-| 1 | **Instruction fetch vs data accesses.**  RVWMO ch. "Memory Model": no fetch events; Zifencei: `fence.i` "synchronizes the instruction and data streams", a later fetch sees stores "already visible to the hart" (from memory, verify).  Explanatory appendix: self-modifying code needs `fence.i`; cross-hart needs a data fence + remote `fence.i`. | The spec never says WHEN a fetch happens relative to the hart's loads/stores, whether a fetch may read a store the hart has not yet made visible, nor what "visible to the hart" covers (own buffered stores? foreign stores it has loaded?). | Graph: `gzFetch` (Z1) value, (Z2) E1′ "source gmo-before every own memory event at/after the slot", (Z3) "fresh past `fence.i`, one fill instant" (`GraphFetchSpike.lean:306-318`); contributors = own writes before a `fence.i` site AND rf-sources of the hart's earlier reads (`gzContrib :285-290`).  Machine: fetch reads landed memory at `itv ≤ tvn ≤ ltop`, never forwards (`Lang.lean:1368-1371`); `fence.i` drains the buffer (`TsoMem.lean:863`, `Lang.lean:1395`) and raises `itv` past `tv` and the own last landed store, NOT past the read watermark `rv` (`Lang.lean:193-200`). | Graph text: STRONGER (E1′; no reference model) — TRUSTED TEXT.  Machine drain: STRONGER (EX-FENCEI-1).  Machine `itv` without `rv`: WEAKER than Zifencei's "already visible" (harmless).  Machine does not enforce E1′: WEAKER than our own text (F-A5-1). | [OWN.3] [OWN.6] [OWN.15] [OWN.26] [OWN.35] [OWN.42] [OWN.86] [OWN.101] [OWN.137] [OWN.138] [OWN.139] | The theorem covers user code and `fork→exec` paths only under E1′ (in-order-fetch hardware); an out-of-order-fetch design that lets a later load be satisfied before the fetch's source is visible is outside the quantifier.  Nothing in xv6 relies on `fence.i` as a data fence (EX-FENCEI-1 is not a bug). |
+| 1 | **Instruction fetch vs data accesses.**  RVWMO ch. "Memory Model": no fetch events; Zifencei: `fence.i` "synchronizes the instruction and data streams", a later fetch sees stores "already visible to the hart" (from memory, verify).  Explanatory appendix: self-modifying code needs `fence.i`; cross-hart needs a data fence + remote `fence.i`. | The spec never says WHEN a fetch happens relative to the hart's loads/stores, whether a fetch may read a store the hart has not yet made visible, nor what "visible to the hart" covers (own buffered stores? foreign stores it has loaded?). | Graph: `gzFetch` (Z1) value, (Z2) E1′ "source gmo-before every own memory event at/after the slot", (Z3) "fresh past `fence.i`, one fill instant" (`GraphFetchSpike.lean:306-318`); contributors = own writes before a `fence.i` site AND rf-sources of the hart's earlier reads (`gzContrib :285-290`).  Machine: fetch reads landed memory at `itv ≤ tvn ≤ ltop`, never forwards (`Lang.lean:1368-1371`); `fence.i` drains the buffer (`TsoMem.lean:863`, `Lang.lean:1395`) and raises `itv` past `tv` and the own last landed store, NOT past the read watermark `rv` (`Lang.lean:193-200`). | Graph text: STRONGER (E1′; no reference model) — TRUSTED TEXT.  Machine drain: STRONGER (EX-FENCEI-1).  Machine `itv` without `rv`: WEAKER than Zifencei's "already visible" (harmless).  Machine does not enforce E1′: WEAKER than our own text (F-A5-1). | [OWN.3] [OWN.6] [OWN.15] [OWN.26] [OWN.35] [OWN.42] [OWN.86] [OWN.101] [OWN.137] [OWN.138] [OWN.139] [OWN.143] (align the machine's `fence.i` now: no drain, `itv` past `rv`) | The theorem covers user code and `fork→exec` paths only under E1′ (in-order-fetch hardware); an out-of-order-fetch design that lets a later load be satisfied before the fetch's source is visible is outside the quantifier.  Nothing in xv6 relies on `fence.i` as a data fence (EX-FENCEI-1 is not a bug). |
 | 2 | **Zifencei scope: "the same hart" only.**  `fence.i` orders a hart's OWN stores before its OWN later fetches; cross-hart code publication needs the writer's data fence and the fetching hart's `fence.i` (from memory, verify). | Informal; the interaction "writer's store → reader's acquire → reader's `fence.i` → fetch" is a chain the spec describes in prose only. | `gzContrib` includes rf-sources of the fetching hart's earlier reads, so a foreign code store the hart has observed must be visible to a fetch after `fence.i` (`GraphFetchSpike.lean:285-290`); the fetching hart's acquire raises `tv`, `fence.i` lifts `itv ≥ tv`. | Graph: FAITHFUL.  Machine: see row 1 (`rv` not passed). | [OWN.3] (user text after `exec`), (f3-utext) rows, [OWN.87] | `exec` + user fetch on another hart is covered because xv6's hand-off is a lock release/acquire chain, not because of `fence.i` alone. |
-| 3 | **Ziccif / fetch atomicity.**  Ziccif: a naturally aligned fetch of up to XLEN bits is atomic (from memory, verify); the base ISA leaves a misaligned 4-byte instruction fetch as two halves. | Which bytes a torn fetch may mix is implementation-defined. | Sail `fetch` does one 4-byte read at a 4-aligned pc under `Ext_Ziccif` (`Fetch.lean:253-288`, `PlatformConfig.lean:2157`) else two halfword reads; (Z3) "one fill instant per label"; `textAt4S` covers 2-aligned 4-byte words (Q22, commit f5ba22147). | FAITHFUL (follows Sail + Ziccif). | [OWN.35] (Sail cycle order), Q22 | None beyond Sail's own platform assumptions. |
+| 3 | **Ziccif / fetch atomicity.**  Ziccif: a naturally aligned fetch of up to XLEN bits is atomic (from memory, verify); the base ISA leaves a misaligned 4-byte instruction fetch as two halves. | Which bytes a torn fetch may mix is implementation-defined. | Sail `fetch` does one 4-byte read at a 4-aligned pc under `Ext_Ziccif` (`Fetch.lean:253-288`, `PlatformConfig.lean:2157`) else two halfword reads; (Z3) "one fill instant per label"; `textAt4S` covers 2-aligned 4-byte words (Q22, commit f5ba22147). | FAITHFUL (follows Sail + Ziccif). | [OWN.35] (Sail cycle order), Q22, [OWN.144] (Q1 fetch half (E2): MachCSL guard "a Supervisor-mode, armed, RAM-PC ifetch read is at pa ∈ {PC, PC+2}" + a FAITHFUL Sail-text lemma that the k-th ifetch read of `fetch()` is at pc + 2k) | None beyond Sail's own platform assumptions. |
 | 4 | **Implicit page-table reads.**  Priv. spec, Sv39 "Memory Ordering" prose: implicit reads of PTEs are not ordered w.r.t. explicit stores except by `sfence.vma`; they may be performed early and results cached (TLB); `Svvptc`: invalid→valid becomes visible without `sfence.vma` eventually (from memory, verify). | Pure prose; riscv.cat has no translation events; how an implicit read sits in `gmo` is unspecified. | Walker reads are the hart's PLAIN loads: `Lang.lean:1372-1376` (forward from the buffer, per-byte coherence floors); design `routeP-design.md:162` "FAITHFUL w.r.t. cat"; Sail's TLB (`VmemTlb.lean`, `Ext_Svvptc = true` `PlatformConfig.lean:2225`) sits above. | STRONGER than the priv. prose (walker always sees own PTE stores, never stale beyond Sail's TLB); FAITHFUL w.r.t. riscv.cat IF one treats implicit reads as explicit — a modelling choice. | [OWN.39] [OWN.57] [OWN.66] [OWN.77] [OWN.87] [OWN.89] [OWN.115] [OWN.135] | The page-table export ("after the seal every entry is the sealed value up to A/D") holds for hardware whose walker is at least as coherent as an explicit load.  xv6 fences every table switch (`sfence.vma`), so no xv6 path relies on the strengthening. |
 | 5 | **A/D-bit updates (Svadu).**  Priv. spec: when `ADUE = 1` the hart updates A/D "atomically", as if by an AMO; A-bit updates may be speculative (from memory, verify; [OWN.39] records this). | "Atomic with respect to other accesses to the PTE" is stated, but the update's place in `gmo` relative to the hart's other accesses is not. | Exclusive pair landing at once (`Lang.lean:1377-1381`, `:1389-1392`; design `:163`); Sail `update_and_write_pte` re-reads exclusively and asserts the conditional write succeeds (`Vmem.lean` ≈ :340-370, `internal_error "PTE conditional write failed"`); MachCSL blocks other harts' overlapping stores while the reservation is held (`othersReserve`, W-RSV); premise P2 `emNoDangle` (`Weak/GraphFetchBlocks.lean:87`) excludes dangling exclusive reads. | Pair/atomic: FAITHFUL.  P2: STRONGER than the platform (excludes a real two-hart first-touch race, plan SCOPE :518-522). | [OWN.19] (D19), [OWN.22] [OWN.23] (W-RSV), [OWN.39] | Runs in which two harts race to set A/D on one user PTE are outside the quantifier until P2 is discharged (plan: 0.5–1.5k, unverified). |
 | 6 | **`sfence.vma` / `satp` / ASID.**  Priv. spec: `sfence.vma` orders prior PTE stores before later implicit reads of the same hart; `satp` writes need no fence for the next instruction's translation? (from memory, verify: an `sfence.vma` is required after changing `satp` unless the new table is unused). | Prose; ASID semantics (xv6 uses ASID 0) and the "implicit `sfence.vma`" cases are easy to misread. | Memory no-op (`Lang.lean:1397` `.tlbi`); Sail flushes its TLB (`InstsEnd.lean:18009-18030`); the sfence marker label `LFence false×4` is an inert graph item shared with `fence.i` (`WeakEvInst.lean:159`). | FAITHFUL w.r.t. riscv.cat (no data ordering); the ordering content lives in Sail's TLB flush. | Q7 route (a), [OWN.15], [OWN.87] (custody window `csrw satp` → `csrw satp`) | None for data; user-table facts are pinned to the `satp` switch windows, which is how xv6 actually orders things. |
-| 7 | **I/O ordering vs main memory.**  Unpriv. FENCE: predecessor/successor sets `pr pw pi po`/`sr sw si so`; "device input/output operations are ordered only by the i/o bits" (from memory, verify); PMA chapter: "strongly ordered" I/O channels order I/O against I/O in the same channel only; `menvcfg.FIOM` makes i/o bits imply r/w.  Memory-model appendix condition "(c1)" (as quoted in plan §B(11b)) on dependency edges into I/O. | The spec's prose and `riscv.cat` diverge: `riscv.cat` has no I/O events at all; the prose's "observed by an external device" clause for FENCE has no formal counterpart; whether an MMIO access is a "memory write" (`W`) or an "I/O output" (`O`) for ppo rules 1–5 is not said. | Sail drops the i/o bits (`InstsEnd.lean:18299-18314`; `effective_fence_set` `BaseInsts.lean:568`, FIOM = 0 in xv6, `Xv6/SpecStart.lean:29,40`); I/O labels `LIo` are gmo events but not `R`/`W`, so rules 1–4 give them nothing (`gfenceCovers` `WeakRvwmoGraph.lean:235-239`), rule 5 does (`gacqPo :244`, D52), tagged (c1) dependency edges do ([OWN.17] D50); the rest is the TRUSTED residue (R1)/(R2)/(R2′)/(R3)/(R2″) (`GraphFabResidue.lean:116-143`); MachCSL: MMIO unbuffered at the event, no drain (`Lang.lean:1364-1367`, `:1382-1385`). | Graph model on fences with i/o bits: WEAKER than the spec (admits executions a `fence iorw,iorw` forbids).  Residue: STRONGER than RVWMO + PMAs — TRUSTED TEXT (QEMU-TCG-true).  Rule 5 to I/O: STRONGER (subsumed by (R1)). | [OWN.8] [OWN.12] [OWN.14] [OWN.16] [OWN.17] [OWN.18] [OWN.53] [OWN.116]; A4 (drop (R1)); bug #1 [OWN.127] [OWN.131] | (i) The theorem holds for platforms where every MMIO access is a one-way fence for the issuing hart (QEMU-TCG; many in-order SoCs), not for every RVWMO + PMA machine.  (ii) The model cannot distinguish fenced from unfenced MMIO sequences: the fix for bug #1 is not certifiable without (R1).  (iii) A4 as planned would leave the `fence iorw,iorw; NOTIFY; device reads ring` shape with no graph edge from the ring stores to the device read — the replay's fence head (row H2) waits for the landing, the landing gate waits for the device's stale read, the device read (H4) waits for NOTIFY: a stuck replay unless a fence-with-i/o-bits arm is added.  Verify (`Weak/SbOrd.lean:796,1059`). |
-| 8 | **Interrupt delivery as an event.**  The ISA: interrupts/traps are not memory-ordering points; precise exceptions order the trap entry after prior instructions retire (Sail executes in order). | Where a PLIC pin delivery sits in `gmo`, and whether stores before the trap are visible to the handler's device accesses, is unspecified. | PLIC pin deliveries are I/O-class items in the hart row under (R1)/(R2) (plan §B(11) :2216 ff.: "EVERY RAM store po-before a PLIC pin delivery"); `takeException`/`returnException` are memory no-ops (`Lang.lean:1400-1401`). | Trap/xRET as no-op: FAITHFUL.  Delivery under (R1): STRONGER (an interrupt entry becomes a one-way store fence). | [OWN.8] [OWN.12] [OWN.96] (excRetR) | Handler code may assume all pre-trap stores of the same hart are visible to its MMIO accesses — true on QEMU, not promised by the ISA; xv6's handlers go through locks anyway. |
+| 7 | **I/O ordering vs main memory.**  Unpriv. FENCE: predecessor/successor sets `pr pw pi po`/`sr sw si so`; "device input/output operations are ordered only by the i/o bits" (from memory, verify); PMA chapter: "strongly ordered" I/O channels order I/O against I/O in the same channel only; `menvcfg.FIOM` makes i/o bits imply r/w.  Memory-model appendix condition "(c1)" (as quoted in plan §B(11b)) on dependency edges into I/O. | The spec's prose and `riscv.cat` diverge: `riscv.cat` has no I/O events at all; the prose's "observed by an external device" clause for FENCE has no formal counterpart; whether an MMIO access is a "memory write" (`W`) or an "I/O output" (`O`) for ppo rules 1–5 is not said. | Sail drops the i/o bits (`InstsEnd.lean:18299-18314`; `effective_fence_set` `BaseInsts.lean:568`, FIOM = 0 in xv6, `Xv6/SpecStart.lean:29,40`); I/O labels `LIo` are gmo events but not `R`/`W`, so rules 1–4 give them nothing (`gfenceCovers` `WeakRvwmoGraph.lean:235-239`), rule 5 does (`gacqPo :244`, D52), tagged (c1) dependency edges do ([OWN.17] D50); the rest is the TRUSTED residue (R1)/(R2)/(R2′)/(R3)/(R2″) (`GraphFabResidue.lean:116-143`); MachCSL: MMIO unbuffered at the event, no drain (`Lang.lean:1364-1367`, `:1382-1385`). | Graph model on fences with i/o bits: WEAKER than the spec (admits executions a `fence iorw,iorw` forbids).  Residue: STRONGER than RVWMO + PMAs — TRUSTED TEXT (QEMU-TCG-true).  Rule 5 to I/O: STRONGER (subsumed by (R1)). | [OWN.8] [OWN.12] [OWN.14] [OWN.16] [OWN.17] [OWN.18] [OWN.53] [OWN.116]; A4 (drop (R1)); bug #1 [OWN.127] [OWN.131]; [OWN.142] (keep (R1) until the capstone; SAIL-GAP-1) | (i) The theorem holds for platforms where every MMIO access is a one-way fence for the issuing hart (QEMU-TCG; many in-order SoCs), not for every RVWMO + PMA machine.  (ii) The model cannot distinguish fenced from unfenced MMIO sequences: the fix for bug #1 is not certifiable without (R1).  (iii) A4 as planned would leave the `fence iorw,iorw; NOTIFY; device reads ring` shape with no graph edge from the ring stores to the device read — the replay's fence head (row H2) waits for the landing, the landing gate waits for the device's stale read, the device read (H4) waits for NOTIFY: a stuck replay unless a fence-with-i/o-bits arm is added.  Verify (`Weak/SbOrd.lean:796,1059`). |
+| 8 | **Interrupt delivery as an event.**  The ISA: interrupts/traps are not memory-ordering points; precise exceptions order the trap entry after prior instructions retire (Sail executes in order). | Where a PLIC pin delivery sits in `gmo`, and whether stores before the trap are visible to the handler's device accesses, is unspecified. | PLIC pin deliveries are I/O-class items in the hart row under (R1)/(R2) (plan §B(11) :2216 ff.: "EVERY RAM store po-before a PLIC pin delivery"); `takeException`/`returnException` are memory no-ops (`Lang.lean:1400-1401`). | Trap/xRET as no-op: FAITHFUL.  Delivery under (R1): STRONGER (an interrupt entry becomes a one-way store fence). | [OWN.8] [OWN.12] [OWN.96] (excRetR), [OWN.142]; [OWN.145] (s-a) (a proof-only "interrupts off" ghost record — a control fact, no ordering; EX-TRAP-1) | Handler code may assume all pre-trap stores of the same hart are visible to its MMIO accesses — true on QEMU, not promised by the ISA; xv6's handlers go through locks anyway. |
 | 9 | **DMA / device writes to RAM.**  Outside RVWMO and Sail entirely; the virtio spec requires buffer data visible before the used-ring update; the PMA chapter speaks of coherence of I/O masters only informally (from memory, verify). | Silent. | Disk writes land at once at the top (`MState.storeDma` `Lang.lean:203-215`, zero-byte = no-op [OWN.30]); the disk row's program order is fabric order (`diskFabPo`, N11); used element only after the NOTIFY gate (`usedElemGateOk`, N12); sequential pf disk program [OWN.33]; one device row [OWN.18]. | OUTSIDE-SPEC (device model); sequential program STRONGER than virtio; `diskFabPo` STRONGER for pairs other than data→used-idx. | [OWN.29]–[OWN.34] [OWN.40] [OWN.43] [OWN.53] [OWN.93] | The theorem holds for a device that completes requests one at a time and writes RAM in program order; a device that reorders its DMA writes, or processes two requests concurrently, is outside the quantifier (follow-up after M2 per [OWN.33]). |
 | 10 | **Mixed-size / misaligned accesses.**  Unpriv. "Memory Model" §: single-copy atomicity for naturally aligned accesses ≤ XLEN; misaligned may be split arbitrarily (`Zicclsm` only promises support); riscv.cat is per-access and has no mixed-size semantics; the appendix admits mixed-size is an open area (from memory, verify). | Underspecified by design. | Per-byte `rf` with ONE gmo position per load event (`gloadValue` `WeakRvwmoGraph.lean:300-306`); MachCSL reads all bytes at one view (`Lang.lean:1372-1376`); `candSca` ISA-faithful for aligned accesses (D20); Sail `Zicclsm = true` (`PlatformConfig.lean:2158`). | FAITHFUL for naturally aligned accesses (the kernel); STRONGER for misaligned user accesses (made single-copy atomic). | D20 [OWN.19], N10 | Kernel conclusions unaffected; a user program relying on torn misaligned accesses is modelled more strongly than the ISA promises. |
 | 11 | **AMO `.aq`/`.rl`, rules 5–7.**  riscv.cat: rule 5 `[AQ];po;[M]`, rule 6 `[M];po;[RL]`, rule 7 `[RCsc];po;[RCsc]` with `RCsc = (Acq|Rel|AcqRel) & (EX|X)`; RCpc semantics informal. | RCsc vs RCpc and the "both bits" vs "either bit" reading of rule 7 misled the tree once (D35). | Rule 5 `gacqPo` (successor any `gmem`, incl. I/O — row 7); rule 6 OMITTED; rule 7 `grcsc` with `lbRcsc := aq || rl` ([OWN.54]); machine: `.aq` exclusive read sets the floor to the landed top, its write overtakes only same-epoch, non-overlapping pending entries (design `:155`, F-P-W1-1); `.rl` drains (xv6 has none, `LockFacts.amoCensus :74`). | Rule 7: FAITHFUL (after D35-fix).  Rule 6 omitted: WEAKER (sound direction; vacuous).  Exclusive-read same-address drain: machine STRONGER, harmless (design `:152`). | [OWN.13] [OWN.54] [OWN.110] [OWN.113] [OWN.114] | `acquire` = `amoswap.w.aq` with no trailing fence (`acquire+0x1c`): the whole lock discipline rests on rule 5 being read as "acquire read before everything po-later" — the standard reading. |
@@ -176,7 +182,8 @@ never sees junk descriptors" conclusion.  Recommend a design check before A4 (§
 [OWN.137]–[OWN.139].**  Commits the theorem to E1′ (in-order fetch; a fetch's source precedes every later access of the
 hart) and to (H1) (no forwarding into the fetch).  If the hardware reading is wrong for some core (a load satisfied
 before an older fetch's source is visible), those executions are outside the quantifier: **credibility**.  The
-machine's drain at `fence.i` is a strengthening bridged by proof ([OWN.139] (t3), 2–4k): **proof work**.  The
+machine's drain at `fence.i` is a strengthening bridged by proof ([OWN.139] (t3), 2–4k): **proof work** — [OWN.143]
+removes the drain and passes `rv` into `itv` (re-proving the drain's consumers).  The
 machine not enforcing E1′ and not passing `rv` into `itv` are weaker-machine facts: harmless for the bridge, but
 they falsify any "texts hold by construction" claim (A5 F-A5-1, B5 §3) and they contradict (H2) as written in §B(11):
 **documentation**.  [OWN.138] (r1) and [OWN.139] (t3) chose the FAITHFUL path over scope premises — good for
@@ -225,49 +232,61 @@ first console write).  **Severity: stated scope.**
 1. `notes/weak-allocproc-routeP-design.md:161` (Zifencei row) marks the `fence.i` drain **FAITHFUL**; it is STRONGER
    (Zifencei orders fetches only; `riscv.cat` has no `fence.i` event).  Already called out by
    `notes/rvwmo-machine-examples.md:45-46` and `proposal-A5.md` §8.0 example 3; the design file is unchanged.
+   **FIXED 2026-10-21:** "STRONGER today; being aligned to Zifencei per [OWN.143]".
 2. `routeP-design.md:164` (I/O row) marks MMIO "FAITHFUL to RVWMO + PMAs (appendix (c1); Sail drops the i/o fence
    bits)".  Dropping the bits makes the model WEAKER than the spec on `fence iorw,iorw`/`fence w,o`; the row should say
    so and point to (R1) as the compensating STRONGER text.  Same for `Weak/SbCand.lean:33` ("`LIo` inert …
-   FAITHFUL to RVWMO + PMAs").
+   FAITHFUL to RVWMO + PMAs").  **FIXED 2026-10-21** (design row + SbCand header; both cite SAIL-GAP-1).
 3. `routeP-design.md:162` (`sfence.vma` row) says "FAITHFUL w.r.t. cat"; `riscv.cat` has no implicit accesses, so the
    mark is about a modelling choice (walker reads as explicit loads) that is STRONGER than the privileged prose.
+   **FIXED 2026-10-21.**
 4. Plan §B(11) (`notes/weak-allocproc-plan.md:1920-1922`) states reading (H2) as "`fence.i` completes the hart's
    earlier stores AND READS before later fetches"; the machine passes only `tv` and the own last landed store into
    `itv` (`MachCSL/Lang.lean:193-200`), never the read watermark `rv`; the graph text does include rf-sources
-   (`GraphFetchSpike.lean:285-290`).  Three readings in three places.
+   (`GraphFetchSpike.lean:285-290`).  Three readings in three places.  **OPEN (plan reviser);** [OWN.143] makes the
+   machine pass `rv` too.
 5. Plan §B(11) / `GraphFetchSpike.lean:302-304` present E1′ as the fetch reading; the registered machine does not
    enforce it (fetch cut and data view independent, `Lang.lean:1368-1376`) — B5 [B5.s4] asked for one §B(11) line; not
-   yet there.
+   yet there.  **OPEN (plan reviser).**
 6. `notes/xv6-weak-memory-bugs.md:13,20` records `fence iorw,iorw` as the ordering xv6 lacks and the fix; nothing in
    that note says the tree's model (Sail + graph) cannot see that fence's i/o bits and relies on (R1) instead — a
-   reader would expect the fix to be checkable.  Add a sentence.
+   reader would expect the fix to be checkable.  Add a sentence.  **FIXED 2026-10-21** (cites SAIL-GAP-1).
 7. `notes/rvwmo-machine-examples.md:59-60` points to "pending decision Q-A2-2" (keep/remove the drain); [OWN.140]
    ("first do P", G-pv deferred) left it undecided — the note should say the decision is deferred to after the
-   capstone (A5 §6 M-S2), not pending.
+   capstone (A5 §6 M-S2), not pending.  **SUPERSEDED and FIXED 2026-10-21:** [OWN.143] ruled "align now"; the note
+   says "RULED [OWN.143]: align now".
 8. Plan SCOPE `:553` calls misaligned user accesses "not excluded, not modelled faithfully"; more precisely the
    machine models them as single-copy ATOMIC (one view per access, `Lang.lean:1372-1376`) — STRONGER than the ISA,
-   with Sail's `Zicclsm = true` admitting them.
+   with Sail's `Zicclsm = true` admitting them.  **OPEN (plan reviser).**
 9. `proposal-A5.md` §8.0 cites `kernel/trampoline.S:107` (not in tree; B5 noted); `notes/rvwmo-machine-examples.md:20`
-   gives the right in-tree cite (`Xv6/KernelImage.lean:17614-17615`).
+   gives the right in-tree cite (`Xv6/KernelImage.lean:17614-17615`).  **OPEN** (`proposal-A5.md` lives in
+   `~/dev/weak-orch/weakmach/`, outside the tree).
 10. `routeP-design.md:154` and the SbCand header say `fence iorw,iorw` "= rw,rw in Sail"; the bug list and the
     design's DMA row (`:165`) then argue "xv6's `fence iorw,iorw` before every notify drains, so descriptors are landed
     when the device looks" — true in the MACHINE, but in the GRAPH only via (R1); A4's claim "P replays every xv6 shape
-    using (R3) only" (`plan:344`) needs this shape checked explicitly.
+    using (R3) only" (`plan:344`) needs this shape checked explicitly.  **FIXED 2026-10-21 for the design rows
+    `:154`/`:165`** (they now say "in the GRAPH only via (R1)" and cite EX-IO-1); `plan:344` OPEN (plan reviser).
 
 ---
 
 ## 5. Recommended actions
 
 **Documentation fixes (no owner input needed).**
-* Correct the three marks in `routeP-design.md:161,162,164` and `SbCand.lean:33` per §4 items 1–3.
+* Correct the three marks in `routeP-design.md:161,162,164` and `SbCand.lean:33` per §4 items 1–3.  **DONE 2026-10-21**
+  (the SbCand I/O row is at `:34`).
 * Add to plan §B(11): "the registered machine does not enforce E1′; `fence.i` raises `itv` past `tv` and the own last
-  landed store only (not `rv`); the drain at `fence.i` is a machine strengthening (EX-FENCEI-1)".
+  landed store only (not `rv`); the drain at `fence.i` is a machine strengthening (EX-FENCEI-1)".  **OPEN (plan
+  reviser);** after [OWN.143] lands, the sentence becomes "`fence.i` is non-draining and raises `itv` past `tv`, `rv`
+  and `pub`".
 * Add to `notes/xv6-weak-memory-bugs.md` #1: "the model cannot see fence i/o bits (Sail drops them); the device-side
-  ordering is supplied by the trusted (R1); the proposed fix is therefore not checkable by the present model".
-* Update `rvwmo-machine-examples.md:59-60` (Q-A2-2 deferred to G2-S M-S2) and add this audit's rows 7/8 as
-  EX-IO-1 (fenced NOTIFY shape) and EX-TRAP-1 (pin delivery as a one-way fence).
+  ordering is supplied by the trusted (R1); the proposed fix is therefore not checkable by the present model".  **DONE
+  2026-10-21** (with a SAIL-GAP-1 cross-reference).
+* Update `rvwmo-machine-examples.md:59-60` (now "RULED [OWN.143]: align now", superseding "Q-A2-2 deferred to G2-S
+  M-S2") and add this audit's rows 7/8 as EX-IO-1 (fenced NOTIFY shape) and EX-TRAP-1 (pin delivery as a one-way
+  fence).  **DONE 2026-10-21.**
 * In the final theorem's header, state the platform in plain words: "MMIO accesses act as one-way fences for the
-  issuing hart (QEMU-TCG-like); fetch is in-order (E1′); devices behave as the Lean device programs".
+  issuing hart (QEMU-TCG-like); fetch is in-order (E1′); devices behave as the Lean device programs".  **OPEN** — the
+  final allocproc theorem's header is written by the capstone (W11-F); [OWN.142] confirms the QEMU-like MMIO sentence.
 
 **Design checks before after-capstone items.**
 * Before A4: a read-only spike (S, 1–2 worker-days) on the `fence iorw,iorw; NOTIFY; device descriptor read` shape
@@ -278,6 +297,10 @@ first console write).  **Severity: stated scope.**
 **Owner questions (two).**
 
 ### Q-AUDIT-1 — How should the model treat `fence` i/o bits, and does A4 (dropping (R1)) stay as planned?
+
+**RULED [OWN.142] (2026-10-21): (a) until the capstone** — keep (R1) (header: QEMU-like platform for MMIO); record
+the Sail decode gap (SAIL-GAP-1, `notes/sail-gaps.md`); after the capstone, raise again with the NOTIFY-shape spike
+and option (b).  Example: EX-IO-1 in `notes/rvwmo-machine-examples.md`.
 
 *Where it sits.*  The I/O-ordering trusted text `ioResidueGmo` is the largest stronger-than-spec item in the theorem's
 header; A4 plans to drop its hart-side arm (R1) after the capstone.
@@ -322,6 +345,11 @@ against I/O only; `riscv.cat`: no I/O events; Sail: bits dropped, `FIOM = 0`.
 sentence for I/O paths, otherwise (a) with the header sentence.
 
 ### Q-AUDIT-2 — `fence.i`: keep the machine's drain and the three-way disagreement, or align machine and text now?
+
+**RULED [OWN.143] (2026-10-21): (ii) ALIGN NOW** — MachCSL `fence.i` becomes non-draining, `itv := max itv (max tv
+(max rv pub))`, FAITHFUL to Zifencei; the drain's consumers (`FetchProg` row 6m, F-6m-1, the P-W6 fetch marker,
+[OWN.139] (t3) scope) are re-proved on the MachCSL serial lane.  Supersedes the Q-A2-2 default and the
+recommendation (iii) below.
 
 *Where it sits.*  Row 1 of §2; EX-FENCEI-1; F-A5-1; the (H2) sentence in plan §B(11).
 
