@@ -710,8 +710,11 @@ theorem wp_power [KernelMap]
         iframe Hva
         iapply BigSepL.bigSepL_sep_eqv.2
         iframe Hiv Hrv
-      · ipureintro
-        exact mmOk_boot g₂.m hbf
+      · isplit
+        · ipureintro
+          exact mmOk_boot g₂.m hbf
+        · ipureintro
+          exact resvInv_boot g₂.m hbf
     isplitr [Hwps Hdwps]
     · iexact IH
     · unfold powerFork
