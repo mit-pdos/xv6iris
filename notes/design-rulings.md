@@ -198,6 +198,24 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   fork commit and the compiler merge await the owner's push -- pushed 2026-10-21 (`ls-remote`: both
   branches at the pins), the one blocking item of all three audits closed.
 
+- **The A/D update's step-7 compare (C3, 2026-10-22).**  Owner ruling: after the exclusive
+  re-read, compare the fresh PTE with the walked one; equal → write the bits and proceed; different →
+  walk again (VATP step 7 literally).  Fork commit 7 (`215fdb30`, T5, `notes/model-diffs.md` row 7)
+  does so with a retry bound of 16 and a stuck hart at exhaustion, fork 1's re-check dropped, the
+  language's "a conditional write never fails" unchanged (`notes/model-policy.md` section 8,
+  (14)-(18)).  Two facts the lane established, against the hand-off's expectation that the compare
+  always succeeds in xv6: the kernel table's leaves are mapped with A = D = 0 and set by every hart's
+  hardware, so the compare CAN fail there (two harts first touching one kernel page) and the
+  kernel-table rules prove the re-walk; and MachCSL's exclusive read did not stamp the per-byte
+  coherence floors a plain load stamps, which let a hart re-read a stale entry after reading the
+  head exclusively -- a run no coherent machine has -- and would have made the bound exhaustible in
+  the model under any invariant.  Ruling (19): the exclusive read stamps the floors (register
+  section 5; the TSO header's own RVWMO rule for plain loads, applied to exclusive reads).  With it
+  the re-walk reads the entry the hart still reserves, so at most two walks happen and the kernel
+  page-table invariant is unchanged.  Proof structure: the rules that step through the retry loop
+  live in `MachCSL.WpPtWalkKpt`; the owned-bytes leaves in `MachCSL.WpCtxBytes`; the TLB-hit rules
+  take the miss as an obligation (the cached copy's A/D bits need not match memory's).
+
 ## From `notes/briefs/crash_layer.md`
 
 **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.

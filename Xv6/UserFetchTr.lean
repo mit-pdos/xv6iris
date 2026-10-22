@@ -6,8 +6,8 @@ Rocq `UserFetchCert` §6 / `UserFaultCert` §3 over `CommonWalk`,
 At a user machine (`UstLand`: the byte map a step of the table's tree, the
 TLB sound for the stepped tree), `translate` of an instruction fetch is
 assembled from lane U1-P1's facts -- the lookup (`utlb_lookup_*`), the hit
-(`utlb_hit_denied/_keep/_refresh`), the miss (`uwk_pt_walk`,
-`utlb_miss_err/_ok`), the Svadu write-back (`uwk_upd_none/_write/_keep`),
+(`utlb_hit_denied/_keep/_refresh/_retry`), the miss (`uwk_pt_walk`,
+`utlb_miss_err/_ok`), the Svadu write-back (`uwk_upd_none/_write/_retry`),
 through `utlb_translate_of_hit/_of_miss` -- and its landing is shown to be a
 user machine again: the file moved only at `tlb`, the tree moved only by an
 `A`/`D` write-back of the walked leaf (`ubMemStep_setLeaf`), the TLB sound
@@ -48,6 +48,12 @@ theorem uft_land {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s s2 : UWSt} (
   ⟨hl.wf, ufCfg_of_ro C P s.file s2.file hl.cfg (fun r hr => hf r (by intro e; subst e; revert hr; decide)),
    by rw [hf _ (by decide)]; exact hl.priv, by rw [hf _ (by decide)]; exact hl.ms,
    by rw [hf _ (by decide)]; exact hl.act, ⟨t', hs, ht⟩⟩
+
+/-- A user machine is one whatever the walker's reservation flag (`UstLand` reads only the
+file and the byte map): the state a failed step-7 compare leaves (`uwk_upd_retry`). -/
+theorem UstLand.withRv {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s : UWSt} (hl : UstLand C P t0 mm0 s)
+    (b : Bool) : UstLand C P t0 mm0 { s with rv := b } :=
+  ⟨hl.wf, hl.cfg, hl.priv, hl.ms, hl.act, hl.mem⟩
 
 /-- The fetch's write-back is an `A`/`D` variant of the leaf. -/
 theorem uft_update_AD {lw w x : BitVec 64} (had : pteAD lw w)
@@ -142,7 +148,7 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
       cases hu : uwkUpd w (.InstructionFetch ()) with
       | none =>
         refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
-          _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ rfl false sum hu), ?_⟩
+          _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s addr w _ rfl hu), ?_⟩
         refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]
@@ -151,8 +157,7 @@ theorem uft_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
       | some x =>
         have hadx : pteAD w x := pteAD_trans (pteAD_symm had) (uft_update_AD had hu)
         have hokx := uftLeafOk_AD hok hadx
-        have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w w x x hmem.2 _ rfl false sum hu hok.inv
-          (uft_nonleaf hok) hok.n0 hperm hu
+        have hupd := fun orc => uwk_upd_write ufFoot orc s hwk addr hmem.1 w x hmem.2 _ rfl hu
         refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s _ hdr hdw _ rfl vpn t.base
           _ false sum w addr (some x) (hwalk' orc) (hupd orc), ?_⟩
         have hstep' : UbMemStep P t0 (t.setLeaf 2 vpn x) mm0 (bmWrite s.mm addr 8 x) :=

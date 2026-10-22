@@ -659,15 +659,6 @@ theorem tlb_get_ppn_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVe
   unfold tlb_get_ppn tlbEntryOf trunc Sail.BitVec.truncate zero_extend Sail.BitVec.zeroExtend
   simp
 
-/-- A cached level-0 entry has an empty level mask, so its level is 0. -/
-theorem tlb_get_level_zero (ent : TLB_Entry) (h : ent.levelMask = 0#47) :
-    tlb_get_level 39 ent = 0 := by
-  unfold tlb_get_level; simp only [h]; decide +kernel
-
-theorem tlb_get_level_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44)
-    (pte addr : BitVec 64) : tlb_get_level 39 (tlbEntryOf asid vpn ppn pte addr) = 0 :=
-  tlb_get_level_zero _ rfl
-
 /-- A cached entry matches exactly its own `vpn` (ASID 0, not global), under the
 supervisor-stage lookup (VMID 0, stage `S_Stage`). -/
 theorem match_tlbEntryOf (vpn vpn' : BitVec 27) (ppn : BitVec 44) (pte addr : BitVec 64) :

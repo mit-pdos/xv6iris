@@ -182,6 +182,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior

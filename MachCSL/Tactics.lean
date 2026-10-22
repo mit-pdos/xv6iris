@@ -938,6 +938,7 @@ def specced : List Name :=
    ``LeanRV64D.Functions.check_leaf_pte, ``LeanRV64D.Functions.pte_is_invalid,
    ``LeanRV64D.Functions.check_PTE_permission, ``LeanRV64D.Functions.update_and_write_pte,
    ``LeanRV64D.Functions.translate_TLB_hit, ``LeanRV64D.Functions.translate_TLB_miss,
+   ``LeanRV64D.Functions.translate_TLB_miss_retry,
    ``LeanRV64D.Functions.lookup_TLB, ``LeanRV64D.Functions.add_to_TLB,
    ``LeanRV64D.Functions.translateAddr, ``LeanRV64D.Functions.transform_effective_address,
    ``LeanRV64D.Functions.satp_mode, ``LeanRV64D.Functions.handle_interrupt]

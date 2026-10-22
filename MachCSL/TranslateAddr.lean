@@ -15,6 +15,7 @@ This module holds the translation itself; the effective-address transform
 `MachCSL.Translate`, so the fetch rules do not wait for it.
 -/
 import MachCSL.WpPtWalk
+import MachCSL.WpPtWalkKpt
 import MachCSL.WpSmodePmp
 
 namespace MachCSL

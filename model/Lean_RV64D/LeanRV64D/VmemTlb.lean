@@ -195,6 +195,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -248,22 +249,6 @@ def tlb_get_ppn (sv_width : Nat) (ent : TLB_Entry) (vpn : (BitVec (sv_width - 12
     (m := (if (((sv_width == 32) || (sv_width == 34)) : Bool)
     then 22
     else 44)) (ppn ||| (vpn &&& levelMask)))
-
-/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
-def tlb_get_level (sv_width : Nat) (ent : TLB_Entry) : Nat := Id.run do
-  let bits_per_level := (get_vpn_level_size sv_width)
-  let max_level := (get_root_level sv_width)
-  let level : (level_range sv_width) := 0
-  let loop_l_lower := 1
-  let loop_l_upper := max_level
-  let mut loop_vars := level
-  for l in [loop_l_lower:loop_l_upper:1]i do
-    let level := loop_vars
-    loop_vars :=
-      if (((BitVec.access ent.levelMask ((l *i bits_per_level) -i 1)) == 1#1) : Bool)
-      then l
-      else level
-  (pure loop_vars)
 
 def tlb_get_pbmt (ent : TLB_Entry) : SailM page_based_mem_type := do
   let pte_ext := (ext_bits_of_PTE ent.pte)
@@ -350,7 +335,7 @@ def lookup_TLB (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
     then (pure (some (index, entry)))
     else (pure none))
 
-/-- Type quantifiers: k_ex1173207_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode sv_width), 0
+/-- Type quantifiers: k_ex1173888_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode sv_width), 0
   ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width

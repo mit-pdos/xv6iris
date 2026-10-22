@@ -67,7 +67,7 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
       (memModelAt E (σ.storeDma pa n w) ∗
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) diskAgent
@@ -84,8 +84,11 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_storeDma E σ pa n w c)]
       iexact Hviews
-    · ipureintro
-      exact mmOk_storeDma σ pa n w hram hno hmm
+    · isplit
+      · ipureintro
+        exact mmOk_storeDma σ pa n w hram hno hmm
+      · ipureintro
+        exact resvInv_storeDma σ pa n w hno hri
   · unfold authoredByAt topLbAt
     iframe Hau
     iright

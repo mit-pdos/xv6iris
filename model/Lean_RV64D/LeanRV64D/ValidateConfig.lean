@@ -206,6 +206,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -338,7 +339,7 @@ def require_Sv39 (ext_name : String) : Bool :=
     false)
   else true
 
-/-- Type quantifiers: k_ex1173424_ : Bool -/
+/-- Type quantifiers: k_ex1174133_ : Bool -/
 def check_sha_dependency (name : String) (supported : Bool) : Bool :=
   if ((not supported) : Bool)
   then
@@ -350,7 +351,7 @@ def check_sha_dependency (name : String) (supported : Bool) : Bool :=
     false)
   else true
 
-/-- Type quantifiers: k_ex1173426_ : Bool, k_ex1173425_ : Bool -/
+/-- Type quantifiers: k_ex1174135_ : Bool, k_ex1174134_ : Bool -/
 def check_shgatpa_mode (sv_name : String) (satp_supported : Bool) (hgatp_supported : Bool) : Bool :=
   if ((satp_supported && (not hgatp_supported)) : Bool)
   then
@@ -363,7 +364,7 @@ def check_shgatpa_mode (sv_name : String) (satp_supported : Bool) (hgatp_support
     false)
   else true
 
-/-- Type quantifiers: k_ex1173428_ : Bool, k_ex1173427_ : Bool -/
+/-- Type quantifiers: k_ex1174137_ : Bool, k_ex1174136_ : Bool -/
 def check_shvsatpa_mode (sv_name : String) (satp_supported : Bool) (vsatp_supported : Bool) : Bool :=
   if ((satp_supported && (not vsatp_supported)) : Bool)
   then
@@ -806,7 +807,7 @@ def undefined_pma_check_opts (_ : Unit) : SailM pma_check_opts := do
           ssccptr := ← (undefined_bool ())
           svadu := ← (undefined_bool ()) })
 
-/-- Type quantifiers: k_ex1173429_ : Bool -/
+/-- Type quantifiers: k_ex1174138_ : Bool -/
 def check_pma_regions (regions : (List PMA_Region)) (prev_base : (BitVec 64)) (prev_size : (BitVec 64)) (check_opts : pma_check_opts) (found_valid_svadu_pma : Bool) : Bool := ExceptM.run do
   match regions with
   | [] =>
@@ -1079,7 +1080,7 @@ def check_pmp (_ : Unit) : Bool :=
     valid)
   else valid
 
-/-- Type quantifiers: k_ex1173430_ : Bool -/
+/-- Type quantifiers: k_ex1174139_ : Bool -/
 def check_required_xtval_option (ext_name : String) (name : String) (value : Bool) : Bool :=
   if ((not value) : Bool)
   then
@@ -1965,7 +1966,7 @@ def check_extension_param_constraints (_ : Unit) : Bool :=
     else valid)
   else valid
 
-/-- Type quantifiers: k_ex1173431_ : Bool -/
+/-- Type quantifiers: k_ex1174140_ : Bool -/
 def check_stateen_bit_feature (name : String) (c : CSRBitConfig) (feature_supported : Bool) : Bool :=
   if (((bne c CSRBit_ReadOnlyZero) && (not feature_supported)) : Bool)
   then

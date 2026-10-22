@@ -27,10 +27,15 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   fence with a W-only successor (`fence rw,w`, `w,w`, `r,w`) is a no-op:
   W→W and R→W order come free from the single order.
 * **Exclusive / AMO accesses.**  An exclusive read reads memory at the top
-  and records a *reservation* (a snapshot of the bytes); while a hart holds
-  a reservation, every other hart's store or exclusive read overlapping it
-  is blocked (the hart self-loops).  The paired write appends like any store;
-  an acquire pair (`.aq`) takes the floor past its own append.
+  and records a *reservation* (a snapshot of the bytes); like a plain load
+  at the top it raises the read watermark and stamps the footprint's
+  coherence floors at the top (RVWMO ppo rule 2 applies to it as to a plain
+  load; until 2026-10-22 it left the floors alone, so a plain load after an
+  exclusive read of the same byte could read back in time -- owner ruling
+  2026-10-22, the C3 lane).  While a hart holds a reservation, every other
+  hart's store or exclusive read overlapping it is blocked (the hart
+  self-loops).  The paired write appends like any store; an acquire pair
+  (`.aq`) takes the floor past its own append.
 * **The non-coherent instruction cache.**  A fetch reads at a view at or
   above the hart's *instruction view* `itv`, as an agent that never authors
   a store (no forwarding: a hart's own store to code is not fetched until
@@ -272,8 +277,13 @@ noncomputable def HRead.afterLoad (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat
    fun a => if ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j then tvn else hr.coh a,
    hr.acq⟩
 
-/-- After an exclusive read at the top of the order. -/
-def HRead.afterExcl (hr : HRead) (top : Nat) (acq : Bool) : HRead := ⟨top, hr.coh, acq⟩
+open Classical in
+/-- After an exclusive read of the footprint at the top of the order: the
+watermark and the footprint's coherence floors go to the top, as after a
+plain load at the top (`afterLoad`); the acquire bit is recorded. -/
+noncomputable def HRead.afterExcl (hr : HRead) (pa : PAddr) (n : Nat) (top : Nat) (acq : Bool) :
+    HRead :=
+  ⟨top, fun a => if ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j then top else hr.coh a, acq⟩
 
 /-- Every write consumes the pending acquire. -/
 def HRead.clearAcq (hr : HRead) : HRead := ⟨hr.rv, hr.coh, false⟩

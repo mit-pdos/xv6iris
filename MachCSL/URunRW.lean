@@ -83,7 +83,7 @@ walk of `m >>= f` is the walk of `m` followed by the walk of `f` from where
 built: a sub-lemma per branch, composed (`URunRWDemo.urwDemo_add_sym`).
 -/
 import MachCSL.DecodeBridge
-import MachCSL.WpPtWalkOwn
+import MachCSL.WpCtxBytes
 
 noncomputable section
 
@@ -751,12 +751,12 @@ theorem swp_memRead_plain_ctx_k (cpu : CPU) (R : MemRequest) (ξ : CtxId) (dq : 
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
-    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+    ⟨_, _, tvn, w', htv, htop, hcoh, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu R.pa R.size tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu R.pa R.size tvn htop hcoh $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
@@ -840,8 +840,8 @@ theorem swp_memRead_excl_au_k (cpu : CPU) (R : MemRequest) (acq : Bool)
           rw [h1] at h2
           exact (Option.some.inj h2).symm
         subst hww
-        imod memModel_read_excl _ σ cpu R.pa R.size w' r b (akAcq R.accessKind) hn htop $$ [$Hmm $Hfrag]
-          with ⟨Hmm, Hfrag⟩
+        imod memModel_read_excl _ σ cpu R.pa R.size w' r b (akAcq R.accessKind) hn htop hno
+          $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
         imod Hcont $$ %w' %hheads Hb Hlc with HΦ
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]

@@ -169,7 +169,9 @@ import MachCSL.WpStoreFree4
 import MachCSL.WpSmodeSscratch
 import MachCSL.WpSmodeCycleT
 import MachCSL.WpSmodeSretU
+import MachCSL.WpCtxBytes
 import MachCSL.WpPtWalkOwn
+import MachCSL.WpPtWalkKpt
 import MachCSL.WpSmodeSatpU
 import MachCSL.AdequacyDisk
 import MachCSL.CtxBoot

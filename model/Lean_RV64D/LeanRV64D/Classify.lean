@@ -194,6 +194,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -256,8 +257,8 @@ def num_of_float_class (arg_ : float_class) : Int :=
   | .float_class_snan => 8
   | .float_class_qnan => 9
 
-/-- Type quantifiers: k_ex1170423_ : Nat, List.elem k_ex1170423_ [16, 32, 64, 128] -/
-def float_classify (f : (BitVec k_ex1170423_)) : SailM float_class := do
+/-- Type quantifiers: k_ex1171109_ : Nat, List.elem k_ex1171109_ [16, 32, 64, 128] -/
+def float_classify (f : (BitVec k_ex1171109_)) : SailM float_class := do
   if ((float_is_snan f) : Bool)
   then (pure float_class_snan)
   else

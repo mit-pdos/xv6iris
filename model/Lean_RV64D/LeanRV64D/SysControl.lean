@@ -213,6 +213,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -1563,7 +1564,7 @@ def tval (excinfo : (Option (BitVec 64))) : (BitVec 64) :=
   | .some e => e
   | none => (zeros (n := 64))
 
-/-- Type quantifiers: k_ex1173095_ : Bool -/
+/-- Type quantifiers: k_ex1173781_ : Bool -/
 def track_trap (p : Privilege) (is_interrupt : Bool) (cause : (BitVec 6)) : SailM Unit := do
   (long_csr_write_callback "mstatus" "mstatush" (← (read_mstatus ())))
   match p with

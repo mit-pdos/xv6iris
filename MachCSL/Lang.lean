@@ -94,6 +94,18 @@ left waiting or forced out in any cycle, which covers both of upstream's own
 schedules (the Sail `loop` passes `true` at every step, the C++ harness a
 bounded wait and then `true`); `notes/model-diffs.md` §5 records this.
 
+The exclusive read's coherence floors (owner ruling, 2026-10-22; the C3
+lane, the A/D update's step-7 compare).  An exclusive read now stamps its
+footprint's coherence floors at the top, as a plain load at the top does
+(`MState.afterExcl` passes its footprint to `MachCSL.HRead.afterExcl`).
+Before, it moved only the read watermark, so a later plain load by the same
+hart of a byte it had just read exclusively could pick an older view and
+read back in time, which RVWMO's ppo rule 2 forbids for a load after a load
+of the same byte; a page walk could then re-read a stale PTE after its own
+failed compare, every time, and exhaust the retry bound.  The change only
+narrows the machine: nothing but a plain load's choice of view (`cohOk`)
+reads the floors.
+
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
 interrupt; `MSIP`/`STIP`/`MTIP` are recomputed from `msip` and the timer at
@@ -180,13 +192,13 @@ noncomputable abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n 
     (tvn : Nat) : MState :=
   { σ with hr := updCpu σ.hr cpu ((σ.hr cpu).afterLoad pa n tvn) }
 
-/-- After an exclusive read of `w` at `pa`: the watermark to the top, the
-floor to the top iff an acquire, the acquire bit recorded, the snapshot
-reserved. -/
+/-- After an exclusive read of `w` at `pa`: the watermark and the
+footprint's coherence floors to the top, the floor to the top iff an
+acquire, the acquire bit recorded, the snapshot reserved. -/
 abbrev MState.afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : MState :=
   { σ with tv := updCpu σ.tv cpu (if acq then σ.top else σ.tv cpu),
-           hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.top acq),
+           hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl pa n σ.top acq),
            resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
 
 /-- A blocked exclusive read abandons the hart's own reservation. -/
@@ -409,9 +421,10 @@ The memory transactions:
   floors) and the top; the floor stays, the watermark and the footprint's
   coherence floors move;
 * an **exclusive read** (LR, the read half of an AMO) reads at the top,
-  takes the reservation, and moves the floor to the top iff it is an
-  acquire -- unless another hart reserves a byte of the footprint, in which
-  case it is blocked (`blockedStep`);
+  takes the reservation, stamps the footprint's coherence floors at the
+  top, and moves the floor to the top iff it is an acquire -- unless
+  another hart reserves a byte of the footprint, in which case it is
+  blocked (`blockedStep`);
 * a **write** appends at the top (`MState.store`) unless another hart
   reserves a byte of the footprint (blocked);
 * a **fence** moves the hart's views (`MState.fence`). -/

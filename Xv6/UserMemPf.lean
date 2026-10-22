@@ -79,7 +79,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
         exact hperm.1
       have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
       refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
-        _ false sum w addr none (hwalk' orc) (ume_upd_none_pf ufFoot orc s vpn addr w c false sum), ?_⟩
+        _ false sum w addr none (hwalk' orc) (ume_upd_none_pf ufFoot orc s addr w c), ?_⟩
       refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
         fun ppn pbmt h => ?_, fun f h => by cases h⟩
       · rw [uft_file_tlb_same]
@@ -92,7 +92,8 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
     (sum : Bool) (ent : TLB_Entry) (hslot : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
     (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User false sum (tlbHash vpn) ent .S_Stage ()) = some (r, s', orc)) ∧
+        (translate_TLB_hit 39 0#16 0#14 P.root vpn (umoPf c) .User false sum (tlbHash vpn) ent .S_Stage ()) =
+          some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
@@ -111,7 +112,7 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h
       · intro f hf x hx; cases hf; cases hx
-    exact ⟨_, _, fun orc => ume_hit_denied_pf ufFoot orc s hwk vpn c false sum (ptePpn w) w' addr hok'.inv hperm',
+    exact ⟨_, _, fun orc => ume_hit_denied_pf ufFoot orc s hwk _ vpn c false sum (ptePpn w) w' addr hok'.inv hperm',
       hout⟩
   | true =>
     have hperm : uwkPermOk (umePfAcc c) false w = true := by rw [← hpermEq]; exact hperm'
@@ -125,7 +126,7 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h; exact ⟨rfl, hpage⟩
       · intro f hf; cases hf
-    exact ⟨_, _, fun orc => ume_hit_keep_pf ufFoot orc s hwk vpn c false sum (ptePpn w) w' addr hok'.inv hperm',
+    exact ⟨_, _, fun orc => ume_hit_keep_pf ufFoot orc s hwk _ vpn c false sum (ptePpn w) w' addr hok'.inv hperm',
       hout⟩
 
 /-- **`translate` of a prefetch at a user machine.** -/

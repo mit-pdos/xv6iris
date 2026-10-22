@@ -236,11 +236,12 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 
 | Deviation | Tier | Verdict |
 |---|---|---|
-| fork 1 `2dfb4844`, atomic PTE A/D update (carried since the Rocq era's fork) | **T5** (owner exception, bump decision D3) | keep: `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and `WpPtWalk`/`WpPtWalkOwn` depend on it; the step-7 value compare the spec asks for (and upstream's reviewers asked for on PR #1860) is the recorded residual gap, to be completed in a later lane (decision (2) below) |
+| fork 1 `2dfb4844`, atomic PTE A/D update (carried since the Rocq era's fork) | **T5** (owner exception, bump decision D3) | keep: `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and `WpPtWalk`/`WpPtWalkOwn` depend on it; its recorded residual gap -- the step-7 value compare the spec asks for (and upstream's reviewers asked for on PR #1860) -- was closed by fork 7 on 2026-10-22 (decision (14)) |
 | fork 2 `3fdb4bca`, pins read without the SIG | **T2** | keep: platform fidelity -- the validated platforms' external interrupts come from a PLIC that drives the pins, which upstream (the SIG its only source, the pins private) offers no knob for; relocating the SIG's window would avoid the collision but model a device no platform has; framed for upstream's external-controller direction |
 | fork 3 `69ed097e`, fork 4 `9da94b63` | **T3** | keep; upstream candidates |
 | fork 5 `d2cb43fc`, F/D out of `postlude` | **T1** by a `requires` edit, plus a code edit (two `transformed_instruction` arms dropped) that T1 does not cover: unreachable here twice over -- `transformed_instruction` runs only under `currentlyEnabled Ext_H`, and without `FD_instructions` the `LOAD_FP`/`STORE_FP` constructors do not exist (which is why the edit was needed) | keep; local: in a configuration with H and the F/D instructions the edit changes behaviour (mtinst/htinst get 0), so it is not an upstream candidate |
 | fork 6 `f0ef9813`, `hideleg` ignored without H | **T4** (precedents `mideleg`, `hedeleg`; upstream's own Lean emulator admits the read: `lean_emulator/LeanRiscv.lean:249-264` lists the hypervisor registers "read during reset and interrupt polling even when executing in Machine mode" and initialises `hideleg` with `undefined_Minterrupts ()`) | keep; upstream candidate |
+| fork 7 `215fdb30`, the step-7 compare and bounded re-walk completing fork 1 | **T5** (owner ruling 2026-10-22, decisions (14)-(19); the C3 lane, `local-plan/c3-ad-compare/`) | keep: the spec's compare-and-swap literally; the residual is the retry bound (16) and the stuck hart beyond it, which the kernel-table rules show is never approached (at most two walks, resting on decision (19)); depended on by `WpPtWalkKpt`, `WpPtWalkOwn`, the user tier |
 | compiler: short-circuit, type-level parens (PRs #1750, #1774 open); keyword escape, `termination_by` (ours) | I5 rule | keep until a release contains them; the two of ours are candidates |
 | patches A, B | I7 rule | keep; both meaning-preserving; retire when the backend allows |
 | config items 1-7 | **T0**: 1, 4 (a); 2 -- V off by the platforms' `misa` (all three without V: `core_csrvals` slot 1, QEMU 0x001411AD, JH7110 0x0094112F, CVA6 0x0014112F), B off a platform DISAGREEMENT resolved toward QEMU (the JH7110 and CVA6 report B -- finding 29 for the JH7110, the CVA6 `core_csrvals` capture for CVA6; the kernel never uses it; the cost is the complete U-mode decode image, `MachCSL/UDecode.lean` pins `misa`; owner ruling 2026-10-20); 3 -- H off follows the boards (QEMU virt alone reports H: findings 19/29; the kernel never enters a virtual privilege or touches an H CSR; H on adds the HLV/HSV/HFENCE families to the U-mode decode image, two-stage translation to every walk leaf and the H CSRs to the power-on obligations) and Sdtrig off follows CVA6 (`core_csrprobe` slot 35: `csrr tselect` traps on CVA6, not on QEMU or the JH7110; the kernel never touches a trigger CSR; cost estimated, not measured: trigger checks on every fetch, load, store and AMO leaf, and the trigger file in the power-on obligations), both disagreements ruled 2026-10-20, QEMU/CoreCsrprobe the recorded finding; 5, 6 forced by `config_is_valid` once H and Sdtrig are off; 7 (b): `MachCSL/UMemAmo.lean`'s rules state the pre-0.13 cause, which the spec permits, unvalidated by any capture | keep; item 8 (F and D off, 2026-10-19) withdrawn 2026-10-20; the Sdtrig justification corrected 2026-10-20 (it had said every platform has Sdtrig); the B justification corrected 2026-10-20 (the record fix of the same morning had said every platform reports `misa` without B -- false) |
@@ -278,3 +279,19 @@ audit's record fixes -- the stuck run is finding 32, not 22; the A/D `Ok(false)`
 `internal_error`, a stuck hart, not a retry, and upstream's `write_ram` discards the conditional-write
 result; `sig_hgeip`; fork 5's and fork 6's arguments; `claude-notes/LEAN.md`; patch B's scope; the
 compiler row; the adequacy note's heading -- in one commit.
+
+**Decided by the owner (2026-10-22), closing decision (2)** (the C3 lane; hand-off, memos and log in
+`local-plan/c3-ad-compare/`, outside the repository): (14) the A/D update compares the exclusively
+re-read PTE with the walked one and, on a mismatch, the translation walks again -- the spec's step 7
+literally (fork 7, register row 7); (15) the re-walk is bounded by a named constant,
+`pte_update_max_retries = 16` -- any bound is a modelling choice, recorded as the residual; (16) a
+hart that exhausts the bound is stuck (`internal_error`), narrower than hardware's livelock, which the
+system theorem's "no hart is stuck" then obliges the proofs to rule out; (17) compare only: the
+re-check of fork 1 is dropped (redundant on the equal branch, and not what step 7 says); (18) the
+language's delta 2 ("a conditional write never fails") is unchanged, so fork 1's `Ok(false)` arm stays
+an `internal_error`; (19) an exclusive read stamps its footprint's coherence floors (register section
+5) -- the one semantics change, needed because without it the model let a hart re-read a stale entry
+after its exclusive read and exhaust the bound in a run no coherent machine has; the alternative,
+presetting A and D in the kernel's `mappages` (the liveness plan's R2-D3(a)), is deferred until it is
+needed.  The lane also found that the compare can fail in xv6 (two harts first touching one kernel
+page), so the kernel-table rules cover the re-walk rather than assume the equal branch.

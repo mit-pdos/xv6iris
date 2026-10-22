@@ -1554,6 +1554,13 @@ structure PTW_Output (k_v : Nat) where
 
 abbrev PTW_Result k_v := (Result ((PTW_Output k_v) × ext_ptw) (PTW_Error × ext_ptw))
 
+/-- Type quantifiers: k_v : Int, (is_sv_or_svx4_mode k_v) -/
+inductive PTE_Update_Result (k_v : Nat) where
+  | PTE_Update_Done (_ : (Option (pte_bits k_v)))
+  | PTE_Update_Retry (_ : Unit)
+  deriving Inhabited, BEq, Repr
+  open PTE_Update_Result
+
 abbrev TR_Result k_paddr k_failure :=
   (Result (k_paddr × page_based_mem_type × ext_ptw) (k_failure × ext_ptw))
 

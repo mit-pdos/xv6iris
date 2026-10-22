@@ -415,7 +415,7 @@ theorem utr_translate_split (D : UFoot) (orc : UOrc) (s : UWSt) (asid : BitVec 1
     (stage : TranslationStage) :
     runRW D orc s (translate 39 asid vmid root vpn acc p mxr sum stage ()) =
       (runRW D orc s (lookup_TLB 39 asid vmid vpn stage)).bind (fun r => match r.1 with
-        | some (i, ent) => runRW D r.2.2 r.2.1 (translate_TLB_hit 39 asid vmid vpn acc p mxr sum i ent stage ())
+        | some (i, ent) => runRW D r.2.2 r.2.1 (translate_TLB_hit 39 asid vmid root vpn acc p mxr sum i ent stage ())
         | none => runRW D r.2.2 r.2.1 (do generate_event .EV_TLB_MISS
                                           translate_TLB_miss 39 asid vmid root vpn acc p mxr sum stage ())) := by
   unfold translate
