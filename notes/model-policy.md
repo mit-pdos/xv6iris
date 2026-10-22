@@ -289,9 +289,13 @@ hart that exhausts the bound is stuck (`internal_error`), narrower than hardware
 system theorem's "no hart is stuck" then obliges the proofs to rule out; (17) compare only: the
 re-check of fork 1 is dropped (redundant on the equal branch, and not what step 7 says); (18) the
 language's delta 2 ("a conditional write never fails") is unchanged, so fork 1's `Ok(false)` arm stays
-an `internal_error`; (19) an exclusive read stamps its footprint's coherence floors (register section
+an `internal_error` (the integrator's recommendation, explained to the owner on 2026-10-22 together
+with its rationale and not objected to; recorded as tacit until the owner confirms it explicitly); (19) an exclusive read stamps its footprint's coherence floors (register section
 5) -- the one semantics change, needed because without it the model let a hart re-read a stale entry
-after its exclusive read and exhaust the bound in a run no coherent machine has; the alternative,
+after its exclusive read and exhaust the bound in a run no coherent machine has; RVWMO's rule for an
+explicit load after an LR, and for the page walker's implicit reads a modelling assumption narrower
+than the privileged spec's letter (translation caches may be incoherent until SFENCE.VMA), whose
+consequence is liveness-only (register section 5; audit of 2026-10-22); the alternative,
 presetting A and D in the kernel's `mappages` (the liveness plan's R2-D3(a)), is deferred until it is
 needed.  The lane also found that the compare can fail in xv6 (two harts first touching one kernel
 page), so the kernel-table rules cover the re-walk rather than assume the equal branch.

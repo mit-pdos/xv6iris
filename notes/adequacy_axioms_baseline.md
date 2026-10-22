@@ -16,7 +16,7 @@ when set, and exit non-zero on a regression.  Audited theorems (the 13 of `tools
 the ladder's upper rungs `MachCSL.riscvPowerAdequacy` and `Xv6.xv6PowerAdequacy` (Rocq's CI reports the same
 ladder).
 
-## What a reader must trust (measured by the tools at a31d988e8, the sail-riscv 0.16 tree, Oct 19 2026; the audit and trusted-base checks re-run green by `tools/ci/run_all.sh` after the regeneration of c618d63e7, at 78f851447, 8bfa5fee8 and every later commit, Oct 20 2026, and after the C3 lane's model and memory-model changes at bb793d966, Oct 22 2026, with every count below unchanged; first measured at lean 6fe1eb37b, Sept 30 2026)
+## What a reader must trust (measured by the tools at a31d988e8, the sail-riscv 0.16 tree, Oct 19 2026; the audit and trusted-base checks re-run green by `tools/ci/run_all.sh` after the regeneration of c618d63e7, at 78f851447, 8bfa5fee8 and every later commit, Oct 20 2026, and after the C3 lane's model and memory-model changes at bb793d966, Oct 22 2026, with every certificate count below unchanged and the declaration count of item 5 grown; first measured at lean 6fe1eb37b, Sept 30 2026)
 
 1. **Lean's three axioms** `propext`, `Classical.choice`, `Quot.sound`: every audited theorem uses exactly
    these.
@@ -49,7 +49,7 @@ ladder).
    `get_16_random_bits`, the 67 of the softfloat family) are declared and reached by no audited theorem.
    Since sail-riscv 0.16 (the F/D instruction family and Zkr not compiled: `model/sail-modules.txt`, fork
    commit 5; F and D are advertised, 2026-10-20) the generated model calls none of the unrealised ones at all.
-5. **No `sorryAx` anywhere**: all 85,454 declarations of `MachCSL`/`Xv6` are looked up (Lean 4.32 stores each
+5. **No `sorryAx` anywhere**: all 85,523 declarations of `MachCSL`/`Xv6` (85,454 at the bump) are looked up (Lean 4.32 stores each
    declaration's axioms in its `.olean`, so this is a table scan), and none uses an axiom outside kinds 1-2.
 
 Runtime (native executables, a31d988e8, the agents' container): audit 2.9 s (2.8 s the theorems' cones,
@@ -59,26 +59,28 @@ audit 33 s / 4.6 GB, trusted base 15 s / 3 GB.)  Rocq's pair of `Print Assumptio
 ## The statements' trusted base, against Rocq's report
 
 Rocq numbers: CI run 36625019173 (main 456141b5b, Sept 29), `tcb_report.py --only iris`.  Lean numbers:
-`tools/ci/tcb.sh` at a31d988e8 (sail-riscv 0.16); "image" is `MachCSL/KernelElf.lean` (1345 counted lines of
-1379) + `Xv6/FsImgRaw.lean` (2272 of 2416), the raw kernel ELF and `fs.img`, which Rocq keeps outside `iris/`
-in `kernel-rocq/`.
+`tools/ci/tcb.sh` at 4e21348a4 (the C3 lane merged, Oct 22 2026; at the bump's a31d988e8 the closed
+theorems had 5 lines fewer -- `HRead.afterExcl` grew -- and the four statements that quantify over the
+state interpretation had one declaration and 14 lines fewer: `resvInv`); "image" is
+`MachCSL/KernelElf.lean` (1345 counted lines of 1379) + `Xv6/FsImgRaw.lean` (2272 of 2416), the raw kernel
+ELF and `fs.img`, which Rocq keeps outside `iris/` in `kernel-rocq/`.
 
 | Rocq theorem | files / defs / lines | Lean theorem | files / decls / lines | without the image bytes |
 |---|---|---|---|---|
-| `riscv_power_adequacy` | 18 / 611 / 5342 | `MachCSL.riscvPowerAdequacy` | 26 / 476 / 3972 | 25 / 460 / 2627 |
-| `xv6_power_adequacy_xv6Σ` | 48 / 797 / 6669 | `Xv6.xv6PowerAdequacy` | 110 / 912 / 6688 | 109 / 896 / 5343 |
-| `xv6_fs_adequacy_xv6Σ` | 28 / 499 / 4035 | `Xv6.xv6FsAdequacy_closed` | 42 / 624 / 6050 | 40 / 480 / 2433 |
-| | | `Xv6.xv6FsAdequacy_xv6GF` (still takes `USER`) | 67 / 830 / 7392 | 65 / 686 / 3775 |
-| `union_adequacy_closed` | 24 / 630 / 4627 | `Xv6.unionAdequacyClosed` | 35 / 737 / 6500 | 33 / 593 / 2883 |
-| (not reported) | | `Xv6.unionSyncCutNeg` | 23 / 538 / 5479 | 21 / 394 / 1862 |
-| (not reported) | | `Xv6.unionResults` | 37 / 760 / 6536 | 35 / 616 / 2919 |
-| (no target: `UserProof` is a functor instance) | | `Xv6.userProof` | 40 / 571 / 4446 | 39 / 555 / 3101 |
-| (no Rocq counterpart) | | `Xv6.xv6NiAdequacy` | 50 / 752 / 6713 | 48 / 608 / 3096 |
-| (no Rocq counterpart) | | the other six NI theorems | 48-49 / 734-766 / 6601-6775 | 46-47 / 590-622 / 2984-3158 |
+| `riscv_power_adequacy` | 18 / 611 / 5342 | `MachCSL.riscvPowerAdequacy` | 26 / 477 / 3986 | 25 / 461 / 2641 |
+| `xv6_power_adequacy_xv6Σ` | 48 / 797 / 6669 | `Xv6.xv6PowerAdequacy` | 110 / 913 / 6702 | 109 / 897 / 5357 |
+| `xv6_fs_adequacy_xv6Σ` | 28 / 499 / 4035 | `Xv6.xv6FsAdequacy_closed` | 42 / 624 / 6055 | 40 / 480 / 2438 |
+| | | `Xv6.xv6FsAdequacy_xv6GF` (still takes `USER`) | 67 / 831 / 7406 | 65 / 687 / 3789 |
+| `union_adequacy_closed` | 24 / 630 / 4627 | `Xv6.unionAdequacyClosed` | 35 / 737 / 6505 | 33 / 593 / 2888 |
+| (not reported) | | `Xv6.unionSyncCutNeg` | 23 / 538 / 5484 | 21 / 394 / 1867 |
+| (not reported) | | `Xv6.unionResults` | 37 / 760 / 6541 | 35 / 616 / 2924 |
+| (no target: `UserProof` is a functor instance) | | `Xv6.userProof` | 40 / 572 / 4460 | 39 / 556 / 3115 |
+| (no Rocq counterpart) | | `Xv6.xv6NiAdequacy` | 50 / 752 / 6718 | 48 / 608 / 3101 |
+| (no Rocq counterpart) | | the other six NI theorems | 48-49 / 734-766 / 6606-6780 | 46-47 / 590-622 / 2989-3163 |
 
 Outside the project proper, every Lean statement also reaches the generated Sail model (`LeanRV64D`: 95 of
-the 100 files the model's root loads, 1833 declarations, 32,823 of 80,135 lines) and the Sail library (4 of 9
-files, 88 declarations, 454 of 986 lines).  (At 6fe1eb37b, before sail-riscv 0.16: 84 of 90 files, 1262
+the 100 files the model's root loads, 1836 declarations, 32,829 of 80,236 lines at 4e21348a4; 1833,
+32,823 of 80,135 at the bump) and the Sail library (4 of 9 files, 88 declarations, 454 of 986 lines).  (At 6fe1eb37b, before sail-riscv 0.16: 84 of 90 files, 1262
 declarations, 43,910 of 84,806 lines; the library 5 of 9 files, 399 lines.  The 0.16 moves -- the v1
 concurrency interface out, twelve generated files in -- are listed with their reasons in the commit that
 regenerated `tools/tcb/expected.json`.)  Rocq's footnote for the same: `model-xv6iris/` 4 files,
