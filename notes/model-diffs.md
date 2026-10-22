@@ -31,15 +31,18 @@ Pinned by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`.
 
 | # | Commit | Change | Tier (`notes/model-policy.md` §4) | Why |
 |---|---|---|---|---|
-| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | **T5** spec-motivated strengthening (the owner's named exception, bump decision D3) | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (bump decision D3).  Known gap: the fresh PTE is re-checked but not compared with the value the walk used (the spec's step 7 compares and, on a mismatch, walks again), so if another hart installs a different valid leaf the access uses the walked translation while A/D are set on the new PTE; an open owner decision (section 6).  Depended on by `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and the page-walk leaves (`WpPtWalk`, `WpPtWalkOwn`).  The A/D accesses are exclusive only through their read/write kinds (`Read_RISCV_reserved`/`Write_RISCV_conditional`, which `MachCSL.TsoMem.akExcl` keys on), not under 0.16's `ak_is_exclusive` (`LoadReserved`/`StoreConditional`).  The commit also drops `pmaCheck`'s `assert(not(res_or_con))` for PTE accesses and adds two constant `termination_measure`s (inert in Lean; compiler commit `b72d7e842` emits none).  Audit note (2026-10-20): MachCSL's memory never fails a conditional write (`MachCSL/Lang.lean`'s header, delta 2), so the commit's `Ok(false)` arm -- an `internal_error` ("PTE conditional write failed"), i.e. a STUCK hart, not a retry -- is dead here, and the update's atomicity rests on `TsoMem`'s reservation blocking; the step-7 compare of the later lane closes the walk-to-re-read window only -- hardware's "the conditional write fails, walk again" behaviour is absent by construction (the language's delta 2, and upstream's own `write_ram`, which answers `true` for every `Ok` of `sail_mem_write` and `false` only for an abort: section 5), a pre-bump restriction, not the fork's.  If that lane lets a PTE conditional write fail, the fork's arm must become a re-walk, not the `internal_error`. |
+| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | **T5** spec-motivated strengthening (the owner's named exception, bump decision D3) | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (bump decision D3).  Its known gap -- the fresh PTE was re-checked but not compared with the value the walk used (the spec's step 7 compares and, on a mismatch, walks again), so if another hart installed a different valid leaf the access used the walked translation while A/D were set on the new PTE -- is closed by row 7 (2026-10-22).  Depended on by `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and the page-walk leaves (`WpPtWalk`, `WpPtWalkOwn`).  The A/D accesses are exclusive only through their read/write kinds (`Read_RISCV_reserved`/`Write_RISCV_conditional`, which `MachCSL.TsoMem.akExcl` keys on), not under 0.16's `ak_is_exclusive` (`LoadReserved`/`StoreConditional`).  The commit also drops `pmaCheck`'s `assert(not(res_or_con))` for PTE accesses and adds two constant `termination_measure`s (inert in Lean; compiler commit `b72d7e842` emits none).  Audit note (2026-10-20): MachCSL's memory never fails a conditional write (`MachCSL/Lang.lean`'s header, delta 2), so the commit's `Ok(false)` arm -- an `internal_error` ("PTE conditional write failed"), i.e. a STUCK hart, not a retry -- is dead here, and the update's atomicity rests on `TsoMem`'s reservation blocking; the step-7 compare of row 7 closes the walk-to-re-read window only -- hardware's "the conditional write fails, walk again" behaviour is absent by construction (the language's delta 2, and upstream's own `write_ram`, which answers `true` for every `Ok` of `sail_mem_write` and `false` only for an abort: section 5), a pre-bump restriction, not the fork's.  Row 7's lane left the language as it is (owner decision (18), 2026-10-22), so the arm stays an `internal_error`. |
 | 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` (and, under H, `sig_hgeip`) whether or not the Simple Interrupt Generator is configured. | **T2** platform integration | Platform fidelity: the validated platforms' external interrupts come from a PLIC that drives the pins, and upstream has no knob for that (the SIG is its only external-interrupt source and the pin registers are private; relocating the SIG's window would avoid the collision but model a device no platform has).  Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (bump decision D6). |
 | 3 | `69ed097e` | `MemoryTriggerPayload` carries its value zero-extended to 16 bytes plus its width, instead of an existentially width-indexed vector. | **T3** representation | The Lean backend cannot represent an existentially typed union constructor (the generated model did not elaborate).  `compare_value` computes what it computed before; trigger matching is unchanged.  Sdtrig is disabled in this configuration anyway. |
 | 4 | `9da94b63` | The Zaamo after-trigger tests the result with a pattern (`Retire_Success()`) instead of `==`. | **T3** representation | `ExecutionResult` has no equality in the theorem-prover backends.  Identical behaviour. |
 | 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | **T1** module selection (a `requires` edit), plus a code edit (the two dropped arms) that T1 does not cover: unreachable here twice over (`transformed_instruction` runs only under `currentlyEnabled Ext_H`; without `FD_instructions` the `LOAD_FP`/`STORE_FP` constructors do not exist, which is why the edit was needed); behaviour-changing in a configuration with H and the F/D instructions (mtinst/htinst get 0), hence local, not an upstream candidate | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
 | 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | **T4** bug fix (precedents: `mideleg` ignored without S, `hedeleg` without H; upstream's own Lean emulator notes that H's registers are read without H: `lean_emulator/LeanRiscv.lean:249-264`, "registers read during reset and interrupt polling even when executing in Machine mode", with `hideleg` initialised to `undefined_Minterrupts ()`) | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
+| 7 | `215fdb30` | The A/D-bit update compares the exclusively re-read PTE with the value the walk used and, on a mismatch, the translation walks again (VATP step 7 literally); row 1's re-check is gone. | **T5** spec-motivated strengthening (owner ruling 2026-10-22, completing row 1's exception; `notes/model-policy.md` section 8, decisions (14)-(19)) | The spec's step 7: "Compare pte to the value of the PTE at address a+va.vpn[i]*PTESIZE.  If the values match, set pte.a to 1 and, if the original memory access is a store, also set pte.d to 1.  If the comparison fails, return to step 2."  `update_and_write_pte(sv_width, pteAddr, pte, access, stage, ext_ptw)` (the re-check's `vpn`, `level`, `priv`, `mxr`, `do_sum` dropped) returns `result((PTE_Update_Result('v), ext_ptw), (PTW_Error, ext_ptw))`, `PTE_Update_Done(option(pte))` (written / nothing to do) or `PTE_Update_Retry()`; `translate_TLB_miss` is the self-recursive `translate_TLB_miss_retry(retries, ...)` started at `pte_update_max_retries = 16` (`termination_measure = retries`); `translate_TLB_hit` takes `base_ppn` and on a mismatch with its cached copy falls back to `translate_TLB_miss` (whose `add_to_TLB` replaces the stale slot); row 1's `tlb_get_level` removed.  Sequential execution is unchanged (the re-read returns what the walk read; the compare succeeds).  Concurrent difference from `2dfb4844`: when another hart changed the PTE between the walk's read and the exclusive re-read, the model walks again where `2dfb4844` set A/D on the new PTE and completed the access with the old translation (a different valid leaf) or faulted (a non-leaf pointer); on the TLB-hit path a cached copy that no longer matches memory causes a walk where `2dfb4844` raised a page fault.  Difference from upstream 0.16: row 1's atomic update plus the compare and the re-walk (upstream writes the walk's copy back with a plain write).  Residual (decisions (15), (16)): the spec's loop is unbounded; the model bounds it at 16 retries -- any bound is a modelling choice -- and a hart that exhausts the bound is STUCK (`internal_error`, like the dead `Ok(false)` arm), narrower than hardware's livelock; the kernel-table rules show at most two walks happen (section 5: an exclusive read stamps the coherence floors, so the re-walk reads the reserved entry's current value), so the bound is never approached.  The compare CAN fail in xv6: kernel leaves are mapped with A = D = 0 and every hart's hardware sets the bits, so two harts first touching one kernel page make one of them walk again.  Depended on by `MachCSL.WpPtWalkKpt` (the kernel-table rules through the retry loop), `MachCSL.WpPtWalkOwn` (the owned table; its TLB hit may also retry), the user tier's `UWalk`/`UTlb` equations.  Generated: `Defs.lean` `PTE_Update_Result`; `Vmem.lean` `pte_update_max_retries`, `update_and_write_pte`, `translate_TLB_miss_retry`, `translate_TLB_miss`, `translate_TLB_hit` and their `_mutrec_…_zG_Stagev` copies.  Upstream status: owner decided not to file. |
 
-All six commits are on the public branch (`git ls-remote` shows `refs/heads/xv6` at `f0ef9813`,
-2026-10-21), so a fresh clone checks the pin out.
+The first six commits are on the public branch (`git ls-remote` shows `refs/heads/xv6` at `f0ef9813`,
+2026-10-21); the seventh, `215fdb30`, is on the clone's branch `xv6-c3` and awaits the owner's push
+(`git -C sail-riscv push origin xv6-c3:xv6`; `git ls-remote` must then show `215fdb30`) -- until then
+a fresh clone cannot check the pin out.
 
 ## 2. The compiler fork: `dongjaelee1/sail`, branch `xv6`
 
@@ -60,10 +63,12 @@ Each is conditional and reports itself in the regeneration log.
   a Lean elaboration-time blow-up.
 - **B.** The single-line widths `if (64 = 32 : Bool) then a else b` are folded to `b` (xlen is 64).
   The line-wrapped forms in type signatures (`BitVec (if ( 64` / `= 32 : Bool) then 7 else 14)`) are
-  left as they are: fourteen at this regeneration -- eight in `Vmem.lean`, five in `VmemTlb.lean`,
-  one in `Callbacks0.lean` -- counted by a two-line pattern (a line ending in `( 64` followed by one
-  starting with `= 32`), which the script's single-line count does not see; type-level, reduced by
-  Lean, harmless.  (Two earlier counts, "two" and "three", were wrong.)
+  left as they are: sixteen at this regeneration (fork 7, 2026-10-22) -- ten in `Vmem.lean` (the
+  bump's eight plus the `vmid` width in `translate_TLB_miss_retry` and its `_mutrec_` copy), five in
+  `VmemTlb.lean`, one in `Callbacks0.lean` -- counted by a two-line pattern (a line ending in `( 64`
+  followed by one starting with `= 32`), which the script's single-line count does not see;
+  type-level, reduced by Lean, harmless.  (Two earlier counts, "two" and "three", were wrong; the
+  bump's regeneration had fourteen.)
 - **C.** None needed: Sail now emits `sail_assert`.
 
 ## 4. What is compiled and how it is configured
@@ -167,15 +172,26 @@ Each is conditional and reports itself in the regeneration log.
   reservation predicates) and the failure arm of fork commit 1's A/D update (not compensated:
   section 1, row 1); delta 4's `undefined_*` failures and the `getCycleCount` answer 0 are dead
   here -- the 0.16 model calls neither (`get_cycle_count` has no caller in the generated code).
+- **An exclusive read stamps the coherence floors** (owner, 2026-10-22, with fork commit 7; the
+  C3 lane): `HRead.afterExcl` now stamps its footprint's per-byte coherence floors at the top, as a
+  plain load reading the newest value does (RVWMO's same-address load-load rule: a hart's later load
+  never returns an older store than its earlier load).  Before, an exclusive read raised only the
+  read watermark, so a hart that had just read an entry's newest value exclusively could still read
+  an older value with a plain load -- a run no coherent machine has, invisible until row 7 made the
+  page walker re-read an entry after its exclusive read (every earlier exclusive read was followed by
+  the hart's own store to the same bytes, which store forwarding makes visible).  A narrowing of M3,
+  recorded with the spec's rule; `MachCSL.TsoMem` and `MachCSL.Lang` are trusted-base modules
+  (`tools/tcb/expected.json`).  Whether the privileged spec's ordering of the walker's implicit reads
+  is covered by that rule is the owner's reading; the spec's own step-7 loop assumes it.
 
 ## 6. Open decisions
 
 Decided by the owner 2026-10-19 (`notes/model-policy.md`, section 8); each item is planned work,
 not an open question:
 
-- Fork commit 1 does not compare the fresh PTE with the walked one (section 1, row 1): the
-  recorded gap stays for now; a lane after the bump's leaves completes the update with the spec's
-  step-7 comparison (a fork commit under T5).
+- Fork commit 1's gap (the fresh PTE re-checked, not compared with the walked one) was closed on
+  2026-10-22 by fork commit 7 (section 1, row 7): the owner's ruling is the spec's step-7 compare
+  and re-walk, with the sub-decisions in `notes/model-policy.md` section 8, (14)-(19).
 - The driver's `exit_wait` is nondeterministic since 2026-10-19 (section 5); the WFI leaves cover
   the forced-exit arm as they are ported.
 - Nothing is filed upstream; the project keeps its own fork.
@@ -184,13 +200,12 @@ Decided by the owner 2026-10-20, on the independent audit (`notes/model-policy.m
 decisions (6)-(10)): Sdtrig stays off on the witnessed platform disagreement; item 7 stays; no
 configuration change for the crypto/Zfh advertisements, the `csrr mseccfg` stuck path recorded
 (section 4); the contract changes ratified; the green-set and check-ci rules adopted.  The step-7
-lane (above) starts from section 1 row 1's audit note: the compare closes the walk-to-re-read window
-only, and whether the language should admit a failed conditional write for PTE kinds is part of
-that lane's question.
+lane started from section 1 row 1's audit note; it closed the walk-to-re-read window with the
+compare and left the language's delta 2 as it is (decision (18)).
 
 Decided by the owner 2026-10-20 (later), on a second independent audit (`notes/model-policy.md`,
 section 8, (11)-(13)): B stays off as a platform disagreement resolved toward QEMU; T0(a) gains the
-disagreement rule; the record fixes above.  For the step-7 lane: the fork's `Ok(false)` arm is an
-`internal_error`, so letting a PTE conditional write fail needs a re-walk arm in the fork first.
+disagreement rule; the record fixes above.  For the step-7 lane the fork's `Ok(false)` arm stayed an
+`internal_error` (delta 2 unchanged, decision (18)).
 - F and D were off in the configuration for one day (item 8, 2026-10-19) and are on again since
   2026-10-20 (section 4); Sdtrig stays off, its one device-conformance run a recorded finding.
