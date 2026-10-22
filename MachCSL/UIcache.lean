@@ -53,7 +53,7 @@ theorem uic_memModel_iviewLb (σ : MState) (cpu : CPU) (K : Nat) :
 theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
     memModelAt E σ ⊢@{IProp GF} memModelAt E σ ∗ iviewLbAt E cpu (σ.itv cpu) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   ihave #Hilb := MonoNat.lb_own_get $$ Hi
@@ -67,8 +67,11 @@ theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
         exact ⟨rfl, rfl, rfl⟩
       · iapply hartViewsAt_intro
         iframe Hv Hi Hr
-    · ipureintro
-      exact hmm
+    · isplit
+      · ipureintro
+        exact hmm
+      · ipureintro
+        exact hri
   · unfold iviewLbAt
     iframe Hilb
     iapply topLbAt_le E σ.top _ (hmm.2.1 cpu).2.1
@@ -254,12 +257,12 @@ theorem swp_memRead_plain_x_k (cpu : CPU) (R : MemRequest) (ξ : CtxId) (K : Nat
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
-    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+    ⟨_, _, tvn, w', htv, htop, hcoh, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu R.pa R.size tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu R.pa R.size tvn htop hcoh $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
