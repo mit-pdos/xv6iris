@@ -89,11 +89,12 @@ theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :
 /-- **A plain load raises the read watermark, and says so.**  The twin of
 `MachCSL.memModel_load`, which mints the same update but drops the
 receipt. -/
-theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top) :
+theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+    (hcoh : (σ.hr cpu).cohOk pa n tvn) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗ rviewLbAt E cpu tvn) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -117,8 +118,11 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
       · iapply hartViewsAt_intro
         simp only [updCpu, ite_true, HRead.afterLoad]
         iframe Hv Hi Hr
-    · ipureintro
-      exact mmOk_afterLoad σ cpu pa n tvn htv hmm
+    · isplit
+      · ipureintro
+        exact mmOk_afterLoad σ cpu pa n tvn htv hmm
+      · ipureintro
+        exact resvInv_afterLoad σ cpu pa n tvn hcoh hri
   · unfold rviewLbAt
     isplitl []
     · iapply MonoNat.lb_own_le (E.rviewName cpu) (.ofNat (max (σ.hr cpu).rv tvn)) (.ofNat tvn)
@@ -248,11 +252,11 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n nt : Nat}
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
-    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+    ⟨_, _, tvn, w', htv, htop, hcoh, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
-  · imod memModel_load_rv _ σ cpu req.address n tvn htop $$ Hmm with ⟨Hmm, #Hrv⟩
+  · imod memModel_load_rv _ σ cpu req.address n tvn htop hcoh $$ Hmm with ⟨Hmm, #Hrv⟩
     have hreads : readsAre (hartAgent cpu) tvn Hs n w' := by
       intro j hj
       have := hrd' j hj

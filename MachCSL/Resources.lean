@@ -33,7 +33,9 @@ while the power is on, holds the current era's interpretation: every hart's
 register map agrees pointwise with its register file, the memory heap is
 exactly the machine's byte histories, the mirrors are at the machine's
 values, and the memory-model step invariant `mmOk` holds (the Rocq
-prototype's `mm_ok`/`itv_ok`/`hr_ok`/`resv_ok`).
+prototype's `mm_ok`/`itv_ok`/`hr_ok`/`resv_ok`), and so does the
+reservation invariant `resvInv` (reservations are pairwise disjoint, and a
+reserved byte's latest write is under its holder's coherence floor).
 -/
 import MachCSL.ObsTrace
 import MachCSL.LogEntryDefs
@@ -923,6 +925,194 @@ theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
     · assumption
     · simp at hget
 
+/-! ### The reservation invariant
+
+A pure fact the interpretation carries beside `mmOk` (and kept out of it:
+`mmOk` is part of the top-level statement, `Xv6.xv6TracePure`).  Two
+clauses: the reservations of distinct harts share no byte, and a byte a
+hart reserves has its latest write under that hart's coherence floor.  The
+first is what an exclusive re-read of the bytes the hart reserves needs (no
+other hart blocks it); the second, with the exclusive read stamping the
+floors at the top (`HRead.afterExcl`), is what makes the hart's plain loads
+of them read the head (its snapshot) at every view they may pick. -/
+
+/-- An address outside the footprint is not in the snapshot. -/
+theorem snapOf_get?_notin {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (a : PAddr)
+    (ha : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) : (snapOf pa n w)[a]? = none := by
+  unfold snapOf Mem.writeBytes
+  have key : ∀ (l : List Nat), (∀ j ∈ l, a ≠ pa + BitVec.ofNat 64 j) → ∀ m : Mem,
+      (l.foldl (fun (m : Mem) j => m.insert (pa + BitVec.ofNat 64 j) (nthByte w j)) m : Mem)[a]? =
+        m[a]? := by
+    intro l
+    induction l with
+    | nil => intros; rfl
+    | cons j l ih =>
+      intro hl m
+      simp only [List.foldl_cons]
+      rw [ih (fun j' hj' => hl j' (List.mem_cons_of_mem _ hj')), Std.ExtTreeMap.getElem?_insert]
+      rw [ite_eq_right]
+      intro h
+      exact hl j List.mem_cons_self ((Std.LawfulEqCmp.compare_eq_iff_eq).1 h).symm
+  rw [key _ (fun j hj => ha j (List.mem_range.1 hj)) ∅]
+  simp
+
+/-- A byte of the snapshot is a byte of the footprint. -/
+theorem snapOf_mem {n : Nat} {pa : PAddr} {w : BitVec (8 * n)} {a : PAddr}
+    (h : ((snapOf pa n w)[a]?).isSome) : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
+  refine Classical.byContradiction fun hc => ?_
+  rw [snapOf_get?_notin pa w a (fun j hj heq => hc ⟨j, hj, heq⟩)] at h
+  cases h
+
+/-- No other hart reserves a byte of the footprint: every other hart's
+reservation misses every byte of it. -/
+theorem not_othersReserve_get? {resv : CPU → Option Resv} {cpu : CPU} {pa : PAddr} {n : Nat}
+    (hno : ¬ othersReserve resv cpu pa n) {c : CPU} (hc : c ≠ cpu) {r : Resv} (hr : resv c = some r)
+    {j : Nat} (hj : j < n) : r[pa + BitVec.ofNat 64 j]? = none :=
+  Option.not_isSome_iff_eq_none.1 fun hs => hno ⟨c, hc, r, hr, j, hj, hs⟩
+
+/-- The reservation invariant: reservations of distinct harts are disjoint,
+and a reserved byte's head is under its holder's coherence floor. -/
+def resvInv (σ : MState) : Prop :=
+  (∀ (c c' : CPU) (r r' : Resv), c ≠ c' → σ.resv c = some r → σ.resv c' = some r' →
+    ∀ a : PAddr, (r[a]?).isSome → r'[a]? = none) ∧
+  (∀ (c : CPU) (r : Resv), σ.resv c = some r → ∀ a : PAddr, (r[a]?).isSome →
+    ∀ (e : HEnt) (H : Hist), σ.mem[a]? = some (e :: H) → e.t ≤ (σ.hr c).coh a)
+
+/-- A plain load at a view above the footprint's coherence floors only
+raises the hart's floors. -/
+theorem resvInv_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
+    (hcoh : (σ.hr cpu).cohOk pa n tvn) (h : resvInv σ) : resvInv (σ.afterLoad cpu pa n tvn) := by
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨h1, fun c r hr a ha e H hget => ?_⟩
+  have hle := h2 c r hr a ha e H hget
+  simp only [updCpu]
+  split
+  · rename_i hc
+    subst hc
+    simp only [HRead.afterLoad]
+    split
+    · rename_i hin
+      obtain ⟨j, hj, rfl⟩ := hin
+      exact Nat.le_trans hle (hcoh j hj)
+    · exact hle
+  · exact hle
+
+/-- An exclusive read that no other hart blocks: its snapshot is disjoint
+from the others' reservations, and its footprint's floors go to the top,
+which every entry is under (`mmOk`). -/
+theorem resvInv_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (acq : Bool) (hmm : mmOk σ) (hno : ¬ othersReserve σ.resv cpu pa n) (h : resvInv σ) :
+    resvInv (σ.afterExcl cpu pa n w acq) := by
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨fun c c' r r' hcc' hr hr' a ha => ?_, fun c r hr a ha e H hget => ?_⟩
+  · simp only [updCpu] at hr hr'
+    by_cases hc : c = cpu
+    · subst hc
+      have hc' : c' ≠ c := Ne.symm hcc'
+      simp only [ite_true, Option.some.injEq, hc', ite_false] at hr hr'
+      subst hr
+      obtain ⟨j, hj, rfl⟩ := snapOf_mem ha
+      exact not_othersReserve_get? hno hc' hr' hj
+    · simp only [hc, ite_false] at hr
+      by_cases hc' : c' = cpu
+      · subst hc'
+        simp only [ite_true, Option.some.injEq] at hr'
+        subst hr'
+        apply snapOf_get?_notin
+        intro j hj heq
+        subst heq
+        rw [not_othersReserve_get? hno hc hr hj] at ha
+        cases ha
+      · simp only [hc', ite_false] at hr'
+        exact h1 c c' r r' hcc' hr hr' a ha
+  · simp only [updCpu] at hr ⊢
+    by_cases hc : c = cpu
+    · subst hc
+      simp only [ite_true, Option.some.injEq] at hr
+      subst hr
+      obtain ⟨j, hj, rfl⟩ := snapOf_mem ha
+      have hle : e.t ≤ σ.top := ((hmm.1 _ _ hget).2 e List.mem_cons_self).1
+      rw [ite_eq_left rfl]
+      show e.t ≤ (if ∃ j', j' < n ∧ pa + BitVec.ofNat 64 j = pa + BitVec.ofNat 64 j' then σ.top
+        else (σ.hr c).coh _)
+      rw [ite_eq_left ⟨j, hj, rfl⟩]
+      exact hle
+    · simp only [hc, ite_false] at hr ⊢
+      exact h2 c r hr a ha e H hget
+
+/-- A blocked exclusive read drops the hart's reservation. -/
+theorem resvInv_dropResv (σ : MState) (cpu : CPU) (h : resvInv σ) : resvInv (σ.dropResv cpu) := by
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨fun c c' r r' hcc' hr hr' a ha => ?_, fun c r hr a ha e H hget => ?_⟩
+  · simp only [updCpu] at hr hr'
+    split at hr
+    · cases hr
+    · split at hr'
+      · cases hr'
+      · exact h1 c c' r r' hcc' hr hr' a ha
+  · simp only [updCpu] at hr
+    split at hr
+    · cases hr
+    · exact h2 c r hr a ha e H hget
+
+/-- A hart's store: its own reservation clears, and the other harts'
+reserved bytes are outside the footprint (`¬ othersReserve`), so their
+histories do not move. -/
+theorem resvInv_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (excl : Bool) (hno : ¬ othersReserve σ.resv cpu pa n) (h : resvInv σ) :
+    resvInv (σ.store cpu pa n w excl) := by
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨fun c c' r r' hcc' hr hr' a ha => ?_, fun c r hr a ha e H hget => ?_⟩
+  · simp only [updCpu] at hr hr'
+    split at hr
+    · cases hr
+    · split at hr'
+      · cases hr'
+      · exact h1 c c' r r' hcc' hr hr' a ha
+  · simp only [updCpu] at hr ⊢
+    split at hr
+    · cases hr
+    · rename_i hc
+      simp only [hc, ite_false]
+      have hout : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
+        intro j hj heq
+        subst heq
+        rw [not_othersReserve_get? hno hc hr hj] at ha
+        cases ha
+      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hout] at hget
+      exact h2 c r hr a ha e H hget
+
+/-- The disk's DMA write: no hart reserves a byte of its footprint. -/
+theorem resvInv_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hno : ¬ anyReserve σ.resv pa n) (h : resvInv σ) : resvInv (σ.storeDma pa n w) := by
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨h1, fun c r hr a ha e H hget => ?_⟩
+  have hout : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
+    intro j hj heq
+    subst heq
+    exact hno ⟨c, r, hr, j, hj, ha⟩
+  rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hout] at hget
+  exact h2 c r hr a ha e H hget
+
+/-- A fence moves only views. -/
+theorem resvInv_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : resvInv σ) :
+    resvInv (σ.fence cpu b) := h
+
+/-- The task bookkeeping is not memory. -/
+theorem resvInv_setRt (σ : MState) (d : DevId) (rt : DevRt) (h : resvInv σ) :
+    resvInv (σ.setRt d rt) := h
+
+/-- A device's own move is not memory. -/
+theorem resvInv_setDev (σ : MState) (d : DevId) (st : DevSt d) (h : resvInv σ) :
+    resvInv (σ.setDev d st) := h
+
+/-- A booted machine has no reservations. -/
+theorem resvInv_boot (σ : MState) (h : bootFacts σ) : resvInv σ := by
+  obtain ⟨_, _, hhart, _, _⟩ := h
+  refine ⟨fun c _ r _ _ hr => ?_, fun c r hr => ?_⟩
+  · rw [(hhart c).2.2.2] at hr; cases hr
+  · rw [(hhart c).2.2.2] at hr; cases hr
+
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
 view, read watermark. -/
 def hartViewsAt [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) : IProp GF := iprop%
@@ -944,13 +1134,15 @@ theorem hartViewsAt_intro [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU)
     hartViewsAt E σ cpu := by
   unfold hartViewsAt; iintro H; iexact H
 
-/-- Era `E`'s memory-model mirrors at the machine `σ`. -/
+/-- Era `E`'s memory-model mirrors at the machine `σ`, with the step
+invariant and the reservation invariant. -/
 def memModelAt [MachFixedGS GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
   (E.authName ↪●MAP authMap σ.log) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
   (E.resvName ↪●MAP resvMap σ) ∗
-  ⌜mmOk σ⌝
+  ⌜mmOk σ⌝ ∗
+  ⌜resvInv σ⌝
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by
