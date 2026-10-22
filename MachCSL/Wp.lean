@@ -1301,7 +1301,13 @@ variable [MachFixedGS GF] (E : EraGS)
 
 theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ⌝ := by
   unfold memModelAt
-  iintro ⟨_, _, _, _, %h⟩
+  iintro ⟨_, _, _, _, %h, _⟩
+  ipureintro
+  exact h
+
+theorem memModel_resvInv (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜resvInv σ⌝ := by
+  unfold memModelAt
+  iintro ⟨_, _, _, _, _, %h⟩
   ipureintro
   exact h
 
@@ -1315,13 +1321,16 @@ theorem memModel_setRt (σ : MState) (d : DevId) (rt : DevRt)
       (E.authName ↪●MAP authMap σ.log) ∗
       ([∗list] cpu ∈ cpus, hartViewsAt (GF := GF) E σ cpu) ∗
       (E.resvName ↪●MAP resvMap σ) ∗
-      ⌜mmOk (σ.setRt d rt)⌝) := rfl
+      ⌜mmOk (σ.setRt d rt)⌝ ∗ ⌜resvInv (σ.setRt d rt)⌝) := rfl
   rw [e]
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %h⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %h, %hri⟩
   iframe Htop Hauth Hviews Hresv
-  ipureintro
-  exact mmOk_setRt σ d rt hnext h
+  isplit
+  · ipureintro
+    exact mmOk_setRt σ d rt hnext h
+  · ipureintro
+    exact resvInv_setRt σ d rt hri
 
 theorem memModel_topLb (σ : MState) (K : Nat) :
     memModelAt E σ ∗ topLbAt E K ⊢@{IProp GF} ⌜K ≤ σ.top⌝ := by
@@ -1390,11 +1399,13 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
     iexact Hy
   · iexact Hc'
 
-/-- A plain load moves only the read side of its hart. -/
-theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top) :
+/-- A plain load moves only the read side of its hart (at a view above the
+footprint's coherence floors, as the language's plain read requires). -/
+theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+    (hcoh : (σ.hr cpu).cohOk pa n tvn) :
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -1416,8 +1427,11 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
     · iapply hartViewsAt_intro
       simp only [updCpu, ite_true, HRead.afterLoad]
       iframe Hv Hi Hr
-  · ipureintro
-    exact mmOk_afterLoad σ cpu pa n tvn htv hmm
+  · isplit
+    · ipureintro
+      exact mmOk_afterLoad σ cpu pa n tvn htv hmm
+    · ipureintro
+      exact resvInv_afterLoad σ cpu pa n tvn hcoh hri
 
 /-- A fence moves its hart's data and instruction views (never down), and
 mints the view receipt at the new floor. -/
@@ -1425,7 +1439,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   have hmm' := mmOk_fence σ cpu b hmm
@@ -1456,8 +1470,11 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
       · iapply hartViewsAt_intro
         rw [show ((σ.fence cpu b).hr cpu).rv = (σ.hr cpu).rv from rfl]
         iframe Hv Hi Hr
-    · ipureintro
-      exact hmm'
+    · isplit
+      · ipureintro
+        exact hmm'
+      · ipureintro
+        exact resvInv_fence σ cpu b hri
   · unfold viewLbAt
     iframe Hvlb
     iapply topLbAt_le E σ.top _ htv'
@@ -1488,7 +1505,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -1510,8 +1527,11 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_store_plain E σ cpu pa n w c)]
       iexact Hviews
-    · ipureintro
-      exact mmOk_store σ cpu pa n w false hram hno hmm
+    · isplit
+      · ipureintro
+        exact mmOk_store σ cpu pa n w false hram hno hmm
+      · ipureintro
+        exact resvInv_store σ cpu pa n w false hno hri
   · unfold authoredByAt topLbAt
     iframe Hau
     iright
@@ -1879,12 +1899,12 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n nt : Nat}
   inext
   iintro %v' %σ' %Hev
   rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif, _⟩ |
-    ⟨_, _, tvn, w', htv, htop, _, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
+    ⟨_, _, tvn, w', htv, htop, hcoh, hrd', rfl, rfl⟩ | ⟨_, hex', _⟩
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.address n tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.address n tvn htop hcoh $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]

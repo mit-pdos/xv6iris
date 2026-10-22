@@ -256,16 +256,35 @@ theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat
   rw [afterLoad, abs_setHart, afterLoadHR_eq]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
+/-- The computable form of `HRead.afterExcl` (whose footprint test is
+classical). -/
+def afterExclHR (hr : HRead) (pa : PAddr) (n : Nat) (top : Nat) (acq : Bool) : HRead :=
+  ⟨top,
+   fun a => if (List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) then top else hr.coh a,
+   acq⟩
+
+theorem afterExclHR_eq (hr : HRead) (pa : PAddr) (n : Nat) (top : Nat) (acq : Bool) :
+    afterExclHR hr pa n top acq = hr.afterExcl pa n top acq := by
+  unfold afterExclHR HRead.afterExcl
+  congr 1
+  funext a
+  have : ((List.range n).any (fun j => a == pa + BitVec.ofNat 64 j) = true) ↔
+      ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
+    simp [List.any_eq_true]
+  by_cases h : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
+  · rw [ite_eq_left (this.2 h), ite_eq_left h]
+  · rw [ite_eq_right (fun h' => h (this.1 h')), ite_eq_right h]
+
 def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool) :
     XState :=
   x.setHart cpu { x.hart cpu with
     tv := if acq then x.log.length else (x.hart cpu).tv,
-    hr := (x.hart cpu).hr.afterExcl x.log.length acq,
+    hr := afterExclHR (x.hart cpu).hr pa n x.log.length acq,
     resv := some (snapOf pa n w) }
 
 theorem abs_afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : (x.afterExcl cpu pa n w acq).abs = x.abs.afterExcl cpu pa n w acq := by
-  rw [afterExcl, abs_setHart]
+  rw [afterExcl, abs_setHart, afterExclHR_eq]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def dropResv (x : XState) (cpu : CPU) : XState :=

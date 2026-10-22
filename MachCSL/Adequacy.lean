@@ -490,7 +490,7 @@ theorem powerInterp_mmOk (g : GState) :
     intro h; cases h
   · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
     unfold eraInterp memModelAt
-    icases Hera with ⟨_, _, ⟨_, _, _, _, %hok⟩, _⟩
+    icases Hera with ⟨_, _, ⟨_, _, _, _, %hok, _⟩, _⟩
     ipureintro
     exact fun _ => hok
 
