@@ -7,7 +7,9 @@ switch (the previous table's) and those the window's own fetch caches (the
 installed table's).  A hit on either kind is sound because both tables map
 the TRAMPOLINE page to the same physical page; a hit's `A`/`D` write-back
 goes to the table the entry was cached from (the kernel's shared table,
-through its invariant, or the process's own table, through ownership).
+through its invariant, or the process's own table, through ownership),
+unless the cached copy is stale (the step-7 compare fails), in which case
+the hit walks the installed table, as the miss does.
 `tlbOk2 tk tu` is Rocq's two-table consistency (`tlb_ok_pt2`); `pt2Win` is
 Rocq's window invariant (`tlb_inv_pt2_kprev` / `_kcur`: the kernel side is
 the SHARED `kptOn`, the user side owned), one resource for both directions;
@@ -21,7 +23,8 @@ fact holds again).
 Rocq's §1 case analysis (O1/O2/O3cur/O3prev) is the three branches of
 `MachCSL.swp_translateAddr_via` here: a kernel-entry hit
 (`swp_translate_TLB_hit_kptE`), an owned-entry hit
-(`swp_translate_TLB_hit_own`), and the miss of the installed table.
+(`swp_translate_TLB_hit_own`), and the miss of the installed table; a hit
+whose cached copy is stale falls back to that miss.
 -/
 import Xv6.UptWalkTramp
 import Xv6.UPtWalkaddrLemmas
@@ -329,7 +332,7 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
         (kLeaf ppn perm a' d') ∗ ∃ tlb' : Tlb, Register.tlb ↦ᵣ[cpu] tlb' ∗
         ⌜tlbOk2 tk (t.setLeaf 2 (vpnOf va) (kLeaf ppn perm a' d')) tlb'⌝) ?hit ?miss)
   case hit =>
-    intro mxr do_sum i ent hres Ψ
+    intro mxr do_sum i ent hres hmissH Ψ
     have hadue := hok.2.2.2.2
     rcases tlbOk2_hit tk t tlb htlb (vpnOf va) i ent hres with
       ⟨addr₁, ppn₁, perm₁, a₁, d₁, a₁', d₁', hw₁, hent⟩ | ⟨addr₁, w, w', hw₁, hww, hent⟩
@@ -339,19 +342,24 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
       obtain ⟨rfl, rfl⟩ := kLeaf_inj hkl
       obtain ⟨hi, hget, -⟩ := hres
       iintro ⟨HmConf, Htlb, ⟨#Hkpt, Htok, B2, B1, B0⟩, HΨ⟩
-      iapply (swp_translate_TLB_hit_kptE cpu (DFrac.own 1) c sie hok.phys hadue tk M tlb (vpnOf va) acc hacc
-        mxr do_sum i ent hi hget _ _ _ ak dk a₁' d₁' hwk hent hperm ())
+      iapply (swp_translate_TLB_hit_kptE cpu (DFrac.own 1) c sie hok.phys hadue tk M tlb root (vpnOf va) acc
+        hacc mxr do_sum i ent hi hget _ _ _ ak dk a₁' d₁' hwk hent hperm ())
       iframe HmConf Hkpt Htok Htlb
-      iintro HmConf Htok %tlb' Htlb %hafter
-      iapply HΨ $$ HmConf
-      iframe Hkpt Htok B2 B1
-      iexists a, d
-      iframe B0
-      iexists tlb'
-      iframe Htlb
-      ipureintro
-      rw [uptSetLeaf_self t (vpnOf va) _ _ hrep.1 hw]
-      exact tlbOk2_afterK tk t tlb tlb' htlb (vpnOf va) _ _ _ ak dk hwk hafter
+      isplit
+      · iintro HmConf Htok %tlb' Htlb %hafter
+        iapply HΨ $$ HmConf
+        iframe Hkpt Htok B2 B1
+        iexists a, d
+        iframe B0
+        iexists tlb'
+        iframe Htlb
+        ipureintro
+        rw [uptSetLeaf_self t (vpnOf va) _ _ hrep.1 hw]
+        exact tlbOk2_afterK tk t tlb tlb' htlb (vpnOf va) _ _ _ ak dk hwk hafter
+      · -- the cached copy stale: the miss on `satp`'s table
+        iintro HmConf Htok Htlb
+        iapply (hmissH Ψ)
+        iframe HmConf Htlb Hkpt Htok B2 B1 B0 HΨ
     · -- a hit on a user entry
       rw [hw] at hw₁
       obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hw₁)
@@ -359,18 +367,23 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
       obtain ⟨hi, hget, -⟩ := hres
       rw [uptPtePpn_kLeaf] at hent
       iintro ⟨HmConf, Htlb, ⟨#Hkpt, Htok, B2, B1, B0⟩, HΨ⟩
-      iapply (swp_translate_TLB_hit_own cpu (DFrac.own 1) c sie hok.phys hadue tlb (vpnOf va) acc hacc
+      iapply (swp_translate_TLB_hit_own cpu (DFrac.own 1) c sie hok.phys hadue tlb root (vpnOf va) acc hacc
         mxr do_sum i ent hi hget _ hok0 ppn perm a₁ d₁ a d hent hperm ())
       iframe HmConf Htok B0 Htlb
-      iintro HmConf Htok %a' %d' B0 %tlb' Htlb %hafter
-      iapply HΨ $$ HmConf
-      iframe Hkpt Htok B2 B1
-      iexists a', d'
-      iframe B0
-      iexists tlb'
-      iframe Htlb
-      ipureintro
-      exact tlbOk2_afterU tk t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+      isplit
+      · iintro HmConf Htok %a' %d' B0 %tlb' Htlb %hafter
+        iapply HΨ $$ HmConf
+        iframe Hkpt Htok B2 B1
+        iexists a', d'
+        iframe B0
+        iexists tlb'
+        iframe Htlb
+        ipureintro
+        exact tlbOk2_afterU tk t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+      · -- the cached copy stale: the miss on `satp`'s table
+        iintro HmConf Htok B0 Htlb
+        iapply (hmissH Ψ)
+        iframe HmConf Htlb Hkpt Htok B2 B1 B0 HΨ
   case miss =>
     intro mxr do_sum Ψ
     have hadue := hok.2.2.2.2
