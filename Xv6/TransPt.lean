@@ -26,6 +26,7 @@ Rocq's §1 case analysis (O1/O2/O3cur/O3prev) is the three branches of
 import Xv6.UptWalkTramp
 import Xv6.UPtWalkaddrLemmas
 import MachCSL.WpSmodeSfence
+import MachCSL.WpPtWalkKpt
 
 noncomputable section
 

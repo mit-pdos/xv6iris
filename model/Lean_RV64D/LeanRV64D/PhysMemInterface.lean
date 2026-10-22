@@ -196,6 +196,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -346,7 +347,7 @@ def write_ram_ea (wk : write_kind) (access : (MemoryAccessType mem_payload)) (ap
             num_tag := 0 }) ) : SailM (Mem_request width 0 physaddrbits_len Unit access_kind) )
   (sail_mem_address_announce request)
 
-/-- Type quantifiers: k_ex1172836_ : Bool, width : Nat, width ≥ 0, 0 < width ∧
+/-- Type quantifiers: k_ex1173522_ : Bool, width : Nat, width ≥ 0, 0 < width ∧
   width ≤ max_mem_access -/
 def read_ram (rk : read_kind) (access : (MemoryAccessType mem_payload)) (app_2 : physaddr) (width : Nat) (read_meta : Bool) : SailM ((BitVec (8 * width)) × Unit) := do
   let .Physaddr addr := app_2

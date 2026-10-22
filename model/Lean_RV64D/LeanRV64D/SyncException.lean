@@ -191,6 +191,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -231,7 +232,7 @@ def exception_context (e : ExceptionType) (excinfo : (BitVec 64)) : SailM Except
           excinst_offset := (zeros (n := 5))
           ext := none })
 
-/-- Type quantifiers: k_ex1172956_ : Bool -/
+/-- Type quantifiers: k_ex1173642_ : Bool -/
 def make_exception_context (trap : ExceptionType) (excinfo : (BitVec 64)) (excinfo_is_gva : Bool) (excinfo2 : (Option (BitVec 64))) : ExceptionContext :=
   { trap := trap
     excinfo_is_gva := excinfo_is_gva

@@ -83,7 +83,7 @@ walk of `m >>= f` is the walk of `m` followed by the walk of `f` from where
 built: a sub-lemma per branch, composed (`URunRWDemo.urwDemo_add_sym`).
 -/
 import MachCSL.DecodeBridge
-import MachCSL.WpPtWalkOwn
+import MachCSL.WpCtxBytes
 
 noncomputable section
 

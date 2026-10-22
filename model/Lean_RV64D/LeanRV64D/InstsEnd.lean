@@ -227,6 +227,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -18741,7 +18742,7 @@ def execute_UTYPE (imm : (BitVec 20)) (rd : regidx) (op : uop) : SailM Execution
       | .AUIPC => (pure ((← (get_arch_pc ())) + off))))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: width : Nat, k_ex1173396_ : Bool, k_ex1173395_ : Bool, List.elem width
+/-- Type quantifiers: width : Nat, k_ex1174105_ : Bool, k_ex1174104_ : Bool, List.elem width
   [1, 2, 4, 8] -/
 def execute_STORECON (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := do
   sail_assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:68.28-68.29"
@@ -18818,7 +18819,7 @@ def execute_SSPOPCHK (rs1 : regidx) : SailM ExecutionResult := do
                   (pure RETIRE_SUCCESS)))
           | .Err e => (pure e)))
 
-/-- Type quantifiers: width : Nat, k_ex1173400_ : Bool, k_ex1173399_ : Bool, List.elem width
+/-- Type quantifiers: width : Nat, k_ex1174109_ : Bool, k_ex1174108_ : Bool, List.elem width
   [1, 2, 4, 8] -/
 def execute_SSAMOSWAP (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := SailME.run do
   match (← readReg cur_privilege) with
@@ -19153,7 +19154,7 @@ def execute_REV8 (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
   (wX_bits rd (rev8 (← (rX_bits rs1))))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex1173402_ : Bool -/
+/-- Type quantifiers: k_ex1174111_ : Bool -/
 def execute_REMW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
@@ -19172,7 +19173,7 @@ def execute_REMW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool
   (wX_bits rd (sign_extend (m := 64) (to_bits_truncate (l := 32) remainder)))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex1173403_ : Bool -/
+/-- Type quantifiers: k_ex1174112_ : Bool -/
 def execute_REM (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
@@ -19300,7 +19301,7 @@ def execute_LPAD (lpl : (BitVec 20)) : SailM ExecutionResult := do
           (pure RETIRE_SUCCESS)))
   else (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: width : Nat, k_ex1173405_ : Bool, k_ex1173404_ : Bool, List.elem width
+/-- Type quantifiers: width : Nat, k_ex1174114_ : Bool, k_ex1174113_ : Bool, List.elem width
   [1, 2, 4, 8] -/
 def execute_LOADRES (aq : Bool) (rl : Bool) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := do
   sail_assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:43.28-43.29"
@@ -19311,7 +19312,7 @@ def execute_LOADRES (aq : Bool) (rl : Bool) (rs1 : regidx) (width : Nat) (rd : r
       (pure RETIRE_SUCCESS))
   | .Err e => (pure e)
 
-/-- Type quantifiers: width : Nat, k_ex1173407_ : Bool, List.elem width [1, 2, 4, 8] -/
+/-- Type quantifiers: width : Nat, k_ex1174116_ : Bool, List.elem width [1, 2, 4, 8] -/
 def execute_LOAD (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) (width : Nat) : SailM ExecutionResult := do
   let offset : xlenbits := (sign_extend (m := 64) imm)
   sail_assert (width ≤b xlen_bytes) "extensions/I/base_insts.sail:289.28-289.29"
@@ -19391,7 +19392,7 @@ def execute_HSV (width : Nat) (rs1 : regidx) (rs2 : regidx) : SailM ExecutionRes
               "HSV got false from vmem_write_explicit")
           | .Err e => (pure e)))
 
-/-- Type quantifiers: k_ex1173411_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
+/-- Type quantifiers: k_ex1174120_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
 def execute_HLVTYPE (width : Nat) (op : hlvop) (is_unsigned : Bool) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do
   if ((← (inVirtualPrivilege ())) : Bool)
   then (pure (Virtual_Instruction ()))
@@ -19534,7 +19535,7 @@ def execute_ECALL (_ : Unit) : SailM ExecutionResult := do
 def execute_EBREAK (_ : Unit) : SailM ExecutionResult := do
   (trap (← (exception_context (E_Breakpoint Brk_Software) (← readReg PC))))
 
-/-- Type quantifiers: k_ex1173412_ : Bool -/
+/-- Type quantifiers: k_ex1174121_ : Bool -/
 def execute_DIVW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs1)) 31 0))
   let rs2_bits ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) 31 0))
@@ -19557,7 +19558,7 @@ def execute_DIVW (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool
   (wX_bits rd (sign_extend (m := 64) (to_bits_truncate (l := 32) quotient)))
   (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: k_ex1173413_ : Bool -/
+/-- Type quantifiers: k_ex1174122_ : Bool -/
 def execute_DIV (rs2 : regidx) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) : SailM ExecutionResult := do
   let rs1_bits ← do (rX_bits rs1)
   let rs2_bits ← do (rX_bits rs2)
@@ -19858,7 +19859,7 @@ def execute_BTYPE (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) (op : bop) :
   then (jump_to ((← readReg PC) + (sign_extend (m := 64) imm)))
   else (pure RETIRE_SUCCESS)
 
-/-- Type quantifiers: width : Nat, k_ex1173415_ : Bool, k_ex1173414_ : Bool, List.elem width
+/-- Type quantifiers: width : Nat, k_ex1174124_ : Bool, k_ex1174123_ : Bool, List.elem width
   [1, 2, 4, 8, 16] -/
 def execute_AMO (op : amoop) (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := SailME.run do
   let width := width

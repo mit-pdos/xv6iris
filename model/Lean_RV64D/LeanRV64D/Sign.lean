@@ -190,6 +190,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -221,11 +222,11 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex1170333_ : Nat, List.elem k_ex1170333_ [16, 32, 64, 128] -/
-def float_is_positive (op : (BitVec k_ex1170333_)) : Bool :=
+/-- Type quantifiers: k_ex1171019_ : Nat, List.elem k_ex1171019_ [16, 32, 64, 128] -/
+def float_is_positive (op : (BitVec k_ex1171019_)) : Bool :=
   (is_highest_zero op)
 
-/-- Type quantifiers: k_ex1170335_ : Nat, List.elem k_ex1170335_ [16, 32, 64, 128] -/
-def float_is_negative (op : (BitVec k_ex1170335_)) : Bool :=
+/-- Type quantifiers: k_ex1171021_ : Nat, List.elem k_ex1171021_ [16, 32, 64, 128] -/
+def float_is_negative (op : (BitVec k_ex1171021_)) : Bool :=
   (is_highest_one op)
 

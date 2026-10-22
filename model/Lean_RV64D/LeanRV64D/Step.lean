@@ -220,6 +220,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -251,7 +252,7 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex1173420_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
+/-- Type quantifiers: k_ex1174129_ : Bool, _step_no : Nat, 0 ≤ _step_no -/
 def run_hart_waiting (_step_no : Nat) (wr : WaitReason) (instr_info : instr_info) (exit_wait : Bool) : SailM Step := do
   if ((← (shouldWakeForInterrupt ())) : Bool)
   then
@@ -519,7 +520,7 @@ def wait_is_nop (wr : WaitReason) : Bool :=
   | .WAIT_WRS_STO => false
   | .WAIT_WRS_NTO => false
 
-/-- Type quantifiers: k_ex1173423_ : Bool, step_no : Nat, 0 ≤ step_no -/
+/-- Type quantifiers: k_ex1174132_ : Bool, step_no : Nat, 0 ≤ step_no -/
 def try_step (step_no : Nat) (exit_wait : Bool) : SailM Bool := do
   let _ : Unit := (ext_pre_step_hook ())
   (update_mip ())

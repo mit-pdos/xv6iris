@@ -200,6 +200,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -1610,7 +1611,7 @@ def _set_Satp64_Mode (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 4)) : Sail
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Satp64_Mode r v)
 
-/-- Type quantifiers: vectored_alignment_exp : Nat, k_ex1172885_ : Bool, direct_alignment_exp : Nat, k_ex1172883_
+/-- Type quantifiers: vectored_alignment_exp : Nat, k_ex1173571_ : Bool, direct_alignment_exp : Nat, k_ex1173569_
   : Bool, 2 ≤ direct_alignment_exp ∧ direct_alignment_exp ≤ 24, 2 ≤ vectored_alignment_exp
   ∧ vectored_alignment_exp ≤ 24 -/
 def legalize_tvec (o : (BitVec 64)) (v : (BitVec 64)) (direct_supported : Bool) (direct_alignment_exp : Nat) (vectored_supported : Bool) (vectored_alignment_exp : Nat) : SailM (BitVec 64) := do
@@ -1673,7 +1674,7 @@ def _set_Mcause_IsInterrupt (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec (64
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Mcause_IsInterrupt r v)
 
-/-- Type quantifiers: k_ex1172887_ : Bool -/
+/-- Type quantifiers: k_ex1173573_ : Bool -/
 def legalize_cause (o : (BitVec 64)) (v : (BitVec 64)) (is_scause : Bool) : SailM (BitVec 64) := SailME.run do
   let v := (Mk_Mcause v)
   let code := (_get_Mcause_Cause v)
@@ -1863,7 +1864,7 @@ def undefined_Sstatus (_ : Unit) : SailM (BitVec 64) := do
 def Mk_Sstatus (v : (BitVec 64)) : (BitVec 64) :=
   v
 
-/-- Type quantifiers: k_ex1172913_ : Bool -/
+/-- Type quantifiers: k_ex1173599_ : Bool -/
 def lower_mstatus (m : (BitVec 64)) (virt : Bool) : SailM (BitVec 64) := do
   let s := (Mk_Sstatus (zeros (n := 64)))
   (pure (_update_Sstatus_SIE
@@ -1912,7 +1913,7 @@ def lift_sstatus (m : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64) :=
             (_get_Sstatus_FS s)) (_get_Sstatus_VS s)) (_get_Sstatus_SPP s)) (_get_Sstatus_SPIE s))
     (_get_Sstatus_SIE s))
 
-/-- Type quantifiers: k_ex1172914_ : Bool -/
+/-- Type quantifiers: k_ex1173600_ : Bool -/
 def legalize_sstatus (m : (BitVec 64)) (v : (BitVec 64)) (virt : Bool) : SailM (BitVec 64) := do
   let s := (Mk_Sstatus (zero_extend (m := 64) v))
   let s ← do
@@ -2073,7 +2074,7 @@ def get_vmid (stage : TranslationStage) : SailM (BitVec 14) := do
   then (pure (zeros (n := 14)))
   else (pure (_get_Hgatp64_VMID (Mk_Hgatp64 (← readReg hgatp))))
 
-/-- Type quantifiers: k_ex1172915_ : Bool -/
+/-- Type quantifiers: k_ex1173601_ : Bool -/
 def legalize_satp (arch : Architecture) (is_vsatp : Bool) (prev_value : (BitVec 64)) (written_value : (BitVec 64)) : SailM (BitVec 64) := do
   let s := (Mk_Satp64 written_value)
   let s :=

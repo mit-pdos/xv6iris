@@ -202,6 +202,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -301,7 +302,7 @@ def textra_match (t : TExtra) (priv : Privilege) : SailM Bool := do
   then (sselect_match t priv)
   else (pure false)
 
-/-- Type quantifiers: k_ex1173082_ : Bool -/
+/-- Type quantifiers: k_ex1173768_ : Bool -/
 def icount_match (t : ICount) (priv : Privilege) (reentrance : Bool) : SailM Bool := do
   if ((not ((t.action == TA_Breakpoint) && reentrance)) : Bool)
   then
@@ -313,7 +314,7 @@ def icount_match (t : ICount) (priv : Privilege) (reentrance : Bool) : SailM Boo
         | .VirtualUser => t.vu : Bool)))
   else (pure false)
 
-/-- Type quantifiers: k_ex1173083_ : Bool -/
+/-- Type quantifiers: k_ex1173769_ : Bool -/
 def match_icount_triggers (priv : Privilege) (reentrance : Bool) : SailM Unit := do
   if ((not (← (currentlyEnabled Ext_Sdtrig))) : Bool)
   then (pure ())

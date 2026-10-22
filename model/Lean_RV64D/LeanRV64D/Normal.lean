@@ -190,6 +190,7 @@ open PointerMaskingMode
 open PmpWriteOnlyReservedBehavior
 open PmpAddrMatchType
 open PTW_Error
+open PTE_Update_Result
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
@@ -221,13 +222,13 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex1170339_ : Nat, List.elem k_ex1170339_ [16, 32, 64, 128] -/
-def float_is_normal (op : (BitVec k_ex1170339_)) : Bool :=
+/-- Type quantifiers: k_ex1171025_ : Nat, List.elem k_ex1171025_ [16, 32, 64, 128] -/
+def float_is_normal (op : (BitVec k_ex1171025_)) : Bool :=
   let { exp := exp, sign := _, mantissa := _ } := (float_decompose op)
   ((! (is_all_ones exp)) && (! (is_all_zeros exp)))
 
-/-- Type quantifiers: k_ex1170341_ : Nat, List.elem k_ex1170341_ [16, 32, 64, 128] -/
-def float_is_subnormal (op : (BitVec k_ex1170341_)) : Bool :=
+/-- Type quantifiers: k_ex1171027_ : Nat, List.elem k_ex1171027_ [16, 32, 64, 128] -/
+def float_is_subnormal (op : (BitVec k_ex1171027_)) : Bool :=
   let { exp := exp, mantissa := mantissa, sign := _ } := (float_decompose op)
   ((is_all_zeros exp) && (! (is_all_zeros mantissa)))
 
