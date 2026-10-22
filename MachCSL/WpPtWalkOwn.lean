@@ -60,7 +60,7 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
     iintro Hb
     icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
     icases ctxBytes_hist ξ pa dq bs n $$ Hb1 with ⟨%Hs1, H1, %h1, W1⟩
-    icases ctxByte_cases ξ _ _ _ $$ Hb2 with ⟨%e, %H, Hpt, %he, #Hkey⟩
+    icases ctxByte_cases_np ξ _ _ _ $$ Hb2 with ⟨%hnp, %e, %H, Hpt, %he, #Hkey⟩
     have hmem : ∀ {k x : Nat}, (List.range n)[k]? = some x → x ≠ n := by
       intro k x hk hx
       have := List.mem_of_getElem? hk
@@ -93,7 +93,7 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
       · iapply W1 $$ Hh1
       · try simp only [List.length_range]
         rw [← he]
-        iapply ctxByte_intro ξ _ dq e H $$ [Hh2]
+        iapply ctxByte_intro ξ _ dq e H hnp $$ [Hh2]
         iframe Hh2 Hkey
 
 /-- A history's head stamp (0 for an empty history). -/
@@ -123,7 +123,7 @@ theorem ctxBytes_histK (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitV
     iintro Hb
     icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
     icases ctxBytes_histK ξ pa dq bs n $$ Hb1 with ⟨%Hs1, H1, %h1, Hk1, W1⟩
-    icases ctxByte_cases ξ _ _ _ $$ Hb2 with ⟨%e, %H, Hpt, %he, #Hkey⟩
+    icases ctxByte_cases_np ξ _ _ _ $$ Hb2 with ⟨%hnp, %e, %H, Hpt, %he, #Hkey⟩
     have hmem : ∀ {k x : Nat}, (List.range n)[k]? = some x → x ≠ n := by
       intro k x hk hx
       have := List.mem_of_getElem? hk
@@ -169,7 +169,7 @@ theorem ctxBytes_histK (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitV
       · iapply W1 $$ Hh1
       · try simp only [List.length_range]
         rw [← he]
-        iapply ctxByte_intro ξ _ dq e H $$ [Hh2]
+        iapply ctxByte_intro ξ _ dq e H hnp $$ [Hh2]
         iframe Hh2 Hkey
 
 /-- **The read half of an exclusive pair, from ownership** (route P, D7): owned bytes give the
@@ -347,7 +347,7 @@ theorem ctxBytes_heads_vis (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (
     icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
     ihave %H1 := ctxBytes_heads_vis σ cpu ξ pa dq bs n $$ [Hmm Hctx Hmem Hb1]
     · iframe
-    icases ctxByte_cases ξ _ dq (bs n) $$ Hb2 with ⟨%e, %H, Hpt, %_, #Hkey⟩
+    icases ctxByte_cases_np ξ _ dq (bs n) $$ Hb2 with ⟨%hnp, %e, %H, Hpt, %_, #Hkey⟩
     ihave %hvis := ctxByte_vis σ cpu ξ _ dq e H $$ [Hmm Hctx Hmem Hpt]
     · iframe Hmm Hctx Hmem Hpt; iexact Hkey
     ipureintro

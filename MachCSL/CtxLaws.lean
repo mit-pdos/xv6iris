@@ -245,13 +245,13 @@ instance instCtxMorphByte (a : PAddr) (dq : DFrac) (v : BitVec 8) :
     CtxMorph (GF := GF) (fun ξ => ctxByte ξ a dq v) where
   morph ξ ξ' := by
     iintro ⟨Hdom, Hb⟩
-    icases ctxByte_cases ξ a dq v $$ Hb with ⟨%e, %H, Hpt, %hev, Hkey⟩
+    icases ctxByte_cases_np ξ a dq v $$ Hb with ⟨%hnp, %e, %H, Hpt, %hev, Hkey⟩
     icases ctx_dom_key ξ ξ' _ e.t $$ [Hdom Hkey] with ⟨Hdom, Hkey⟩
     · iframe
     imodintro
     iframe Hdom
     subst hev
-    iapply ctxByte_intro ξ' a dq e H
+    iapply ctxByte_intro ξ' a dq e H hnp
     iframe Hpt Hkey
 
 instance instCtxMorphConst (P : IProp GF) : CtxMorph (GF := GF) (fun _ => P) where

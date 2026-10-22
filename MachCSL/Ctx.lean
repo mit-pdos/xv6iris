@@ -1236,9 +1236,13 @@ theorem ctxTok_introB (cpu : CPU) (ξ : CtxId) (r : Option Resv) (b : Bool) :
 /-! ## Memory points-to -/
 
 /-- The byte at `a` holds `v`, justified at context ξ: its latest write is at
-a timestamp ξ can see (the prototype's `ctx_phys_pointsto`). -/
+a timestamp ξ can see (the prototype's `ctx_phys_pointsto`); and (Q4 [OWN.154] (L1)) `a` is no
+publication word's base byte (`MachCSL.notPubBase`: paid where context bytes are made, so a generic
+load of context bytes owes the publication reads' provenance nothing). -/
 def ctxByte (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) : IProp GF := iprop%
-  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t
+  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗
+    ⌜e.v = v ∧ notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a⌝ ∗
+    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t
 
 /-- The byte at `a` is the boot image's `v`, never written (persistent;
 readable by every agent at every view; the prototype's `pristine_elem`). -/
@@ -1257,9 +1261,35 @@ theorem ctxByte_cases (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
     ctxByte ξ a dq v ⊢@{IProp GF}
       ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗
         keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t := by
-  unfold ctxByte; iintro H; iexact H
+  unfold ctxByte
+  iintro ⟨%e, %H, Hpt, %⟨hv, -⟩, Hk⟩
+  iexists e, H
+  iframe Hpt Hk
+  ipureintro; exact hv
 
-theorem ctxByte_intro (ξ : CtxId) (a : PAddr) (dq : DFrac) (e : HEnt) (H : Hist) :
+/-- **A context byte is no publication base** (Q4 [OWN.154] (L1)). -/
+theorem ctxByte_np (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
+    ctxByte ξ a dq v ⊢@{IProp GF} ⌜notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a⌝ := by
+  unfold ctxByte
+  iintro ⟨%e, %H, -, %⟨-, hnp⟩, -⟩
+  ipureintro; exact hnp
+
+/-- `ctxByte_cases` with the publication-base fact kept. -/
+theorem ctxByte_cases_np (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
+    ctxByte ξ a dq v ⊢@{IProp GF}
+      ⌜notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a⌝ ∗
+      ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗
+        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t := by
+  unfold ctxByte
+  iintro ⟨%e, %H, Hpt, %⟨hv, hnp⟩, Hk⟩
+  isplit
+  · ipureintro; exact hnp
+  iexists e, H
+  iframe Hpt Hk
+  ipureintro; exact hv
+
+theorem ctxByte_intro (ξ : CtxId) (a : PAddr) (dq : DFrac) (e : HEnt) (H : Hist)
+    (hnp : notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a) :
     a ↦ₕ{dq} (e :: H) ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t ⊢@{IProp GF}
       ctxByte ξ a dq e.v := by
   unfold ctxByte
@@ -1267,24 +1297,26 @@ theorem ctxByte_intro (ξ : CtxId) (a : PAddr) (dq : DFrac) (e : HEnt) (H : Hist
   iexists e, H
   iframe Hpt Hkey
   ipureintro
-  rfl
+  exact ⟨rfl, hnp⟩
 
-/-- A never-written byte is justified at every context. -/
-theorem histByte_img_ctx (ξ : CtxId) (a : PAddr) (dq : DFrac) (tid : Agent) (v : BitVec 8) :
+/-- A never-written byte, off the publication bases, is justified at every context. -/
+theorem histByte_img_ctx (ξ : CtxId) (a : PAddr) (dq : DFrac) (tid : Agent) (v : BitVec 8)
+    (hnp : notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a) :
     a ↦ₕ{dq} [⟨0, tid, v⟩] ⊢@{IProp GF} ctxByte ξ a dq v := by
   unfold ctxByte
   iintro H
   iexists ⟨0, tid, v⟩, []
   iframe H
   isplit
-  · ipureintro; rfl
+  · ipureintro; exact ⟨rfl, hnp⟩
   · iapply keyAt_0
 
-theorem imgByte_ctx (ξ : CtxId) (a : PAddr) (v : BitVec 8) :
+theorem imgByte_ctx (ξ : CtxId) (a : PAddr) (v : BitVec 8)
+    (hnp : notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a) :
     imgByte a v ⊢@{IProp GF} ctxByte ξ a DFrac.discard v := by
   unfold imgByte
   iintro ⟨%tid, H⟩
-  iapply histByte_img_ctx ξ a _ tid v $$ H
+  iapply histByte_img_ctx ξ a _ tid v hnp $$ H
 
 /-- The context-indexed points-to at the ambient context: `a ↦ₘ{dq} v`. -/
 notation:50 a:50 " ↦ₘ{" dq "} " v:50 => ctxByte curCtx a dq v
@@ -1313,13 +1345,56 @@ instance (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     Timeless (PROP := IProp GF) (imgBytes pa n w) := by
   unfold imgBytes; infer_instance
 
-theorem imgBytes_ctx (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+theorem imgBytes_ctx (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hnp : ∀ j, j < n → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)) :
     imgBytes pa n w ⊢@{IProp GF} ctxBytes ξ pa n DFrac.discard w := by
   unfold imgBytes ctxBytes
   iintro H
   iapply BigSepL.bigSepL_mono _ $$ H
   iintro %k %j %hk Hj
-  iapply imgByte_ctx ξ _ _ $$ Hj
+  have hj : j < n := List.mem_range.1 (List.mem_of_getElem? hk)
+  iapply imgByte_ctx ξ _ _ (hnp j hj) $$ Hj
+
+/-- Context bytes over a list of indices are no publication bases (kept). -/
+theorem ctxByteL_np (ξ : CtxId) (dq : DFrac) (f : Nat → PAddr) (g : Nat → BitVec 8) :
+    ∀ L : List Nat, ([∗list] j ∈ L, ctxByte ξ (f j) dq (g j)) ⊢@{IProp GF}
+      ([∗list] j ∈ L, ctxByte ξ (f j) dq (g j)) ∗
+        ⌜∀ j ∈ L, notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (f j)⌝
+  | [] => by
+    iintro H
+    iframe H
+    ipureintro
+    intro j hj; cases hj
+  | j :: L => by
+    iintro H
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hj, HL⟩
+    icases ctxByteL_np ξ dq f g L $$ HL with ⟨HL, %hL⟩
+    unfold ctxByte
+    icases Hj with ⟨%e, %H, Hpt, %⟨hv, hnp⟩, Hk⟩
+    isplitl [Hpt Hk HL]
+    · iapply BigSepL.bigSepL_cons.2
+      iframe HL
+      iexists e, H
+      iframe Hpt Hk
+      ipureintro; exact ⟨hv, hnp⟩
+    · ipureintro
+      intro k hk
+      rcases List.mem_cons.1 hk with rfl | hk
+      · exact hnp
+      · exact hL k hk
+
+/-- **The bytes of a context are no publication bases** (Q4 [OWN.154] (L1); kept). -/
+theorem ctxBytes_np (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    ctxBytes ξ pa n dq w ⊢@{IProp GF}
+      ctxBytes ξ pa n dq w ∗
+        ⌜∀ j, j < n → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)⌝ := by
+  unfold ctxBytes
+  iintro H
+  icases ctxByteL_np ξ dq (fun j => pa + BitVec.ofNat 64 j) (nthByte w) (List.range n) $$ H with ⟨H, %h⟩
+  iframe H
+  ipureintro
+  intro j hj
+  exact h j (List.mem_range.2 hj)
 
 end ambient
 

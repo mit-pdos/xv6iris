@@ -224,7 +224,7 @@ def iputLkRetOut (cpu : CPU) (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (inum : Bi
     ∃ (Hs : Nat → Hist) (t : Nat),
       histBytes (iRef (ientry kk)) 4 (fun _ => DFrac.own 1)
         (pushed (n := 4) Hs t (hartAgent cpu) (0#32 : BitVec 32)) ∗
-      authoredBy t (hartAgent cpu) ∗ itopLb t)
+      authoredBy t (hartAgent cpu) ∗ itopLb t ∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (iRef (ientry kk)) 4⌝)
 
 /-- THE RETIRE STORE's ACCESSOR (Rocq 3518--3594): the frozen last-close
 mover opens the table and the region, the rows' histories go out to the
@@ -251,14 +251,15 @@ theorem iput_lk_retire_au (cpu : CPU) (Mt : RegMapF (Qp × PosNat)) (kk : Nat) (
   iexists Hs
   iframe Hb
   inext
-  iintro %t Hb #Hau #Ht
+  iintro %t %hnp Hb #Hau #Ht
   imod Hmask
   imod Hcl $$ %(iprop(∃ (Hs : Nat → Hist) (t : Nat),
       histBytes (iRef (ientry kk)) 4 (fun _ => DFrac.own 1)
         (pushed (n := 4) Hs t (hartAgent cpu) (0#32 : BitVec 32)) ∗
-      authoredBy t (hartAgent cpu) ∗ itopLb t)) [Hb] with ⟨Hhalf, Hisl, Hpost, Hcnt, Hmir, Hst, HP⟩
+      authoredBy t (hartAgent cpu) ∗ itopLb t ∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (iRef (ientry kk)) 4⌝)) [Hb] with ⟨Hhalf, Hisl, Hpost, Hcnt, Hmir, Hst, HP⟩
   · iexists Hs, t
     iframe Hb Hau Ht
+    ipureintro; exact hnp
   imodintro
   unfold iputLkRetOut
   iframe Hhalf Hisl Hpost Hcnt Hmir Hst HP
@@ -286,11 +287,11 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
   obtain ⟨hram, hal⟩ := iRef_ram_aligned kk hkk
   iintro ⟨#Hesc, #Hclaim, Hrun, Hout, #Hllbk, Hmid⟩
   unfold iputLkRetOut iputLkMid
-  icases Hout with ⟨Hhalf, Hisl, Hpost, Hcnt0, Hmir, Hst, ⟨%Hs, %t, Hb, #Hau, #Ht⟩⟩
+  icases Hout with ⟨Hhalf, Hisl, Hpost, Hcnt0, Hmir, Hst, ⟨%Hs, %t, Hb, #Hau, #Ht, %hnp⟩⟩
   icases Hmid with ⟨Hstampsback, Hback, Hislback, Hiauth, Hpool, Hrd, #Hvd, Hc, Hvld, Hid, Hnlk, HgidD,
     HgidT, Hgidf, Hfree, Hiu, Hhpn⟩
   -- the retired word, a plain cell again
-  imod ctxBytes_of_pushed c curCtx (iRef (ientry kk)) 4 (DFrac.own 1) t Hs (0#32 : BitVec 32)
+  imod ctxBytes_of_pushed c curCtx (iRef (ientry kk)) 4 (DFrac.own 1) t Hs (0#32 : BitVec 32) hnp
     $$ [Hrun Hb] with ⟨Hrun, Hcell⟩
   · iframe Hrun Hau Ht Hb
   ihave Hcell := wordPointsTo_intro_id (iRef (ientry kk)) 4 (DFrac.own 1) (0#32 : BitVec 32)

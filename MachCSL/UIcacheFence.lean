@@ -89,7 +89,7 @@ theorem uic_ctxByte_stamp (σ : MState) (cpu : CPU) (ξ : CtxId) (K : Nat) (a : 
     memModel σ ∗ ownCtx cpu ξ ∗ ctxByte ξ a dq v ⊢@{IProp GF}
       memModel σ ∗ ownCtx cpu ξ ∗ ctxByteX ξ K a dq v := by
   iintro ⟨Hmm, Hctx, Hb⟩
-  icases ctxByte_cases ξ a dq v $$ Hb with ⟨%e, %H, Hpt, %hev, #Hkey⟩
+  icases ctxByte_cases_np ξ a dq v $$ Hb with ⟨%hnp, %e, %H, Hpt, %hev, #Hkey⟩
   icases ownCtx_key_land cpu ξ e.t $$ [Hctx Hkey] with ⟨Hctx, %K', #HK', Hvis⟩
   · iframe Hctx Hkey
   ihave %hK' : ⌜K' ≤ σ.tv cpu⌝ $$ [Hmm HK']
@@ -104,7 +104,7 @@ theorem uic_ctxByte_stamp (σ : MState) (cpu : CPU) (ξ : CtxId) (K : Nat) (a : 
     iexists e, H
     iframe Hpt Hkey
     isplit
-    · ipureintro; exact hev
+    · ipureintro; exact ⟨hev, hnp⟩
     · ileft; ipureintro; exact h0
   · ihave %ha := memModel_authored _ σ e.t (hartAgent cpu) $$ [Hmm Hau]
     · iframe Hmm
@@ -117,7 +117,7 @@ theorem uic_ctxByte_stamp (σ : MState) (cpu : CPU) (ξ : CtxId) (K : Nat) (a : 
     iexists e, H
     iframe Hpt Hkey
     isplit
-    · ipureintro; exact hev
+    · ipureintro; exact ⟨hev, hnp⟩
     · iright
       iexists p
       iframe Hp
@@ -127,7 +127,7 @@ theorem uic_ctxByte_stamp (σ : MState) (cpu : CPU) (ξ : CtxId) (K : Nat) (a : 
     iexists e, H
     iframe Hpt Hkey
     isplit
-    · ipureintro; exact hev
+    · ipureintro; exact ⟨hev, hnp⟩
     · iright
       iexists p
       iframe Hp

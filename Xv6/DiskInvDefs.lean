@@ -542,8 +542,8 @@ theorem ctxBytes_split_keysB (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
     iintro H
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     icases ctxBytes_split_keysB ξ pa bs n $$ H1 with ⟨%Hs, Hb, %hh, #Hk, Hc⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) (DFrac.own 1) (bs n) $$ H2
-      with ⟨%e, %He, Hpt, %hev, #Hkey⟩
+    icases ctxByte_cases_np ξ (pa + BitVec.ofNat 64 n) (DFrac.own 1) (bs n) $$ H2
+      with ⟨%hnp, %e, %He, Hpt, %hev, #Hkey⟩
     icases histByte_split_half (pa + BitVec.ofNat 64 n) (e :: He) $$ Hpt with ⟨Hpt1, Hpt2⟩
     iexists (fun j => if j = n then e :: He else Hs j)
     isplitl [Hb Hpt1]
@@ -587,7 +587,7 @@ theorem ctxBytes_split_keysB (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
         iexists e, He
         iframe Hpt2
         isplit
-        · ipureintro; exact hev
+        · ipureintro; exact ⟨hev, hnp⟩
         · iexact Hkey
 
 /-- A window before the drain: its raw half, its heads each the boot image's, LANDED, or in `ts`
@@ -741,7 +741,7 @@ theorem ctxByte_join_half (ξ : CtxId) (a : PAddr) (H : Hist) (b : BitVec 8) :
     iprop((a ↦ₕ{DFrac.own (1 : Qp).half} H) ∗ ctxByte (GF := GF) ξ a (DFrac.own (1 : Qp).half) b)
       ⊢ ctxByte ξ a (DFrac.own 1) b := by
   iintro ⟨Hpt, Hc⟩
-  icases ctxByte_cases ξ a (DFrac.own (1 : Qp).half) b $$ Hc with ⟨%e, %He, Hpt2, %hev, #Hkey⟩
+  icases ctxByte_cases_np ξ a (DFrac.own (1 : Qp).half) b $$ Hc with ⟨%hnp, %e, %He, Hpt2, %hev, #Hkey⟩
   icases histByte_join_half a H (e :: He) $$ [Hpt Hpt2] with ⟨Hpt, %heq⟩
   · iframe Hpt Hpt2
   rw [heq]
@@ -749,7 +749,7 @@ theorem ctxByte_join_half (ξ : CtxId) (a : PAddr) (H : Hist) (b : BitVec 8) :
   iexists e, He
   iframe Hpt
   isplit
-  · ipureintro; exact hev
+  · ipureintro; exact ⟨hev, hnp⟩
   · iexact Hkey
 
 /-- **The invariant's raw half and the driver's context half, rejoined.** -/
@@ -5094,6 +5094,18 @@ map takes it to itself read-write.  All three queue pages come from
 live. -/
 def pageRw (p : PAddr) : Prop :=
   inRam p 4096 ∧ p.toNat % 4096 = 0 ∧ kmapClass (vpnOf p).toNat = some .rw
+
+/-- A byte in the first 1024 bytes of a `pageRw` page is no publication base (`started`'s base sits
+at page offset `0x400`; Q4 [OWN.154] (L1)). -/
+theorem xv6NotPubBase_page {p : PAddr} (hp : pageRw p) {off j : Nat} (ho : off + j < 1024) :
+    notPubBase xv6RsvStatic (p + BitVec.ofNat 64 off + BitVec.ofNat 64 j) := by
+  refine xv6NotPubBase (fun e => ?_)
+  have ht := congrArg BitVec.toNat e
+  obtain ⟨⟨_, hr⟩, ha, _⟩ := hp
+  have hs : KA.«started».toNat = 0x8000a400 := rfl
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat, hs] at ht
+  unfold ramEnd at hr
+  omega
 
 /-- **The geometry**, persistent: the three page pointers of `struct disk`
 (read-only after `virtio_disk_init`), the frozen configuration they were

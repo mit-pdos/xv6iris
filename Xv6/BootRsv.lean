@@ -168,7 +168,7 @@ theorem bootRan_rsvErase_off (m : MemF Hist) (lo hi : Nat) (h : rsvOff KernelRsv
 /-- **A reserved `.bss` word's half, at its image history, is the half word
 at zero** (any context). -/
 theorem bootRsv_wordHalf [CurCtx] (va : PAddr) (n A : Nat) (hva : va.toNat = A) (hn : 0 < n)
-    (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end») (hal : A % n = 0) :
+    (hlo : MachCSL.KernelSyms.«_bss» + 4 ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end») (hal : A % n = 0) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       ([∗list] j ∈ List.range n, pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem)
         (va + BitVec.ofNat 64 j) (DFrac.own (1 : Qp).half)
@@ -193,7 +193,13 @@ theorem bootRsv_wordHalf [CurCtx] (va : PAddr) (n A : Nat) (hva : va.toNat = A) 
   have hg : get? (M := MemF) (imgFlat bootImage) (va + BitVec.ofNat 64 j) = some [⟨0, 0, 0#8⟩] :=
     bc_imgFlat_get bootImage _ _ hr1 hz
   rw [hg, Option.getD_some, show nthByte (0#(8 * n)) j = 0#8 by simp [nthByte]]
-  exact histByte_img_ctx curCtx _ _ 0 _
+  refine histByte_img_ctx curCtx _ _ 0 _ ?_
+  rw [hrsv]
+  refine xv6NotPubBase (fun e => ?_)
+  have h1 := congrArg BitVec.toNat e
+  rw [ht] at h1
+  have hs : KA.«started».toNat = 0x8000a400 := rfl
+  omega
 
 /-- A window of the erased map holding no reserved byte is the full map's. -/
 theorem bootRan_rsvErase_le (m : MemF Hist) (lo hi : Nat)
@@ -212,7 +218,7 @@ theorem xv6CpuRsvIn (h : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelR
 
 /-- **`bootCarve_image` over the erased map** (W8-β′): the read-only window
 holds no reserved byte, so it is the full image's. -/
-theorem bootCarve_imageR :
+theorem bootCarve_imageR (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ bootRaw (rsvErase KernelRsv.static (imgFlat bootImage)) ⊢@{IProp GF}
       |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗
         bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) bcRoHi ramEnd) := by
@@ -230,7 +236,7 @@ theorem bootCarve_imageR :
   imod Hro with #Hro
   ihave Ht := kernelText_intro (GF := GF) $$ [Hk Hro]
   · iframe Hk Hro
-  ihave Hd := kernelData_intro (GF := GF) $$ Hro
+  ihave Hd := kernelData_intro (GF := GF) hrsv $$ Hro
   imodintro
   iframe Ht Hd Hk Hown
 
@@ -276,7 +282,7 @@ theorem bootRsv_wordCellH0 (pa : PAddr) (n : Nat)
 /-- **A reserved `.bss` word's half, at its image history, is the word's
 half CELL over the image tail** (no entry yet; the lock layer's form). -/
 theorem bootRsv_wordCellH (pa : PAddr) (n A : Nat) (hva : pa.toNat = A)
-    (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end») :
+    (hlo : MachCSL.KernelSyms.«_bss» + 4 ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end») :
     ([∗list] j ∈ List.range n, pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem)
         (pa + BitVec.ofNat 64 j) (DFrac.own (1 : Qp).half)
         ((get? (M := MemF) (imgFlat bootImage) (pa + BitVec.ofNat 64 j)).getD [])) ⊢
@@ -309,7 +315,7 @@ theorem bootRsv_lockHalves0 (lk : PAddr)
 
 /-- **A static lock's halves, at the image, are its two half cells** (W8-β′). -/
 theorem bootRsv_lockHalves (lk : PAddr) (L : Nat) (hlk : lk.toNat = L)
-    (hlo : MachCSL.KernelSyms.«_bss» ≤ L) (hend : L + 24 ≤ MachCSL.KernelSyms.«end») :
+    (hlo : MachCSL.KernelSyms.«_bss» + 4 ≤ L) (hend : L + 24 ≤ MachCSL.KernelSyms.«end») :
     rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR lk) (imgFlat bootImage) ⊢
       wordCellH (GF := GF) lk 4 [] ∗ wordCellH (lk + 16#64) 8 [] := by
   have he : MachCSL.KernelSyms.«end» = 0x80023b10 := rfl

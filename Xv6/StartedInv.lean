@@ -497,11 +497,12 @@ flag (at its half, W8 (f2-ctx)), and the load's continuation learns
 `startedSeen` -- the set value with the reader's boot gate and (route P) its landing cover at
 its read view, past the record's stamp. -/
 theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)]
-    (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (K : Nat) :
-    startedInv (GF := GF) γ ξd P ⊢
-      readAUr cpu startedAddr 4 K [] (fun w => startedSeen γ ξd P cpu w) := by
+    (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (K : Nat) (pc : BitVec 64)
+    (hpc : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) :
+    startedInv (GF := GF) γ ξd P ⊢ LeanRV64D.Register.PC ↦ᵣ[cpu] pc -∗
+      readAUr cpu startedAddr 4 K [] (fun w => iprop(LeanRV64D.Register.PC ↦ᵣ[cpu] pc ∗ startedSeen γ ξd P cpu w)) := by
   unfold startedInv
-  iintro ⟨%hrsv, #Hinv⟩
+  iintro ⟨%hrsv, #Hinv⟩ HPC
   unfold readAUr
   isplitl []
   · simp only [Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
@@ -511,13 +512,17 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
   icases Hbody with (⟨>Hw, >Hrest⟩ | ⟨%t, %T, %K0, %a, >Hw, >Hidx, >%⟨ht0, hTK0⟩, >Hst, HP, >#HC, >#Hcov⟩)
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none, [], []
+    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none, [], [], some pc
     unfold startedWin
     iframe Hw
     isplitl []
     · iapply BigSepL.bigSepL_nil.2; itrivial
     isplit
     · ipureintro; exact started_readable (hartAgent cpu) K []
+    isplitl [HPC]
+    · unfold rsvPcCell; iexact HPC
+    isplitl []
+    · ipureintro; exact hpc
     isplitl []
     · simp only [rdIn]; iempintro
     isplitl []
@@ -525,14 +530,17 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
     isplitl []
     · iapply started_certs cpu K [] _ hrsv
     inext
-    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _ HPC
     imod Hmask
     imod Hclose $$ [Hb Hrest]
     · inext
       ileft
       iframe Hb Hrest
     imodintro
-    dsimp only; unfold startedSeen
+    isplitl [HPC]
+    · iapply (show rsvPcCell (GF := GF) cpu (some pc) ⊢ LeanRV64D.Register.PC ↦ᵣ[cpu] pc from .rfl) $$ HPC
+    try dsimp only
+    unfold startedSeen
     ileft
     ipureintro
     exact started_read_unarmed startedImg lp (hartAgent cpu) tvn w startedImg_tail hla.1 hrd
@@ -541,13 +549,18 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
     iintro Hmask
     iexists (fun _ => DFrac.own (1 : Qp).half),
       WordHist.hist ([⟨t, hartAgent startedPrimary, startedSet⟩] : WordHist 4) startedImg,
-      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0), a.1, K0), [], []
+      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0), a.1, K0), [], [],
+      some pc
     unfold startedWin
     iframe Hw
     isplitl []
     · iapply BigSepL.bigSepL_nil.2; itrivial
     isplit
     · ipureintro; exact started_readable (hartAgent cpu) K _
+    isplitl [HPC]
+    · unfold rsvPcCell; iexact HPC
+    isplitl []
+    · ipureintro; exact hpc
     isplitl []
     · iapply started_rdIn cpu hcpu _ a t K0 hrsv
         (fun e he => by simp at he; subst he; exact ⟨rfl, rfl, ht0⟩)
@@ -558,7 +571,7 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
     · iapply started_certs cpu K [] _ hrsv
     inext
     icases HP with #HP
-    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv Hout Hb _
+    iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv Hout Hb _ HPC
     imod Hmask
     imod Hclose $$ [Hb Hst]
     · inext
@@ -567,7 +580,10 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
       iframe Hb Hidx Hst HP HC Hcov
       ipureintro; exact ⟨ht0, hTK0⟩
     imodintro
-    dsimp only; unfold startedSeen
+    isplitl [HPC]
+    · iapply (show rsvPcCell (GF := GF) cpu (some pc) ⊢ LeanRV64D.Register.PC ↦ᵣ[cpu] pc from .rfl) $$ HPC
+    try dsimp only
+    unfold startedSeen
     rcases started_read_armed startedImg lp (hartAgent cpu) t tvn w startedImg_tail hla.1 hrd with hw | hw
     · ileft; ipureintro; exact hw
     · iright

@@ -270,10 +270,11 @@ theorem RvwmoXv6Adequacy.syncPathFirst {σ : MState} {A : CPU} {t : Nat} {B : CP
       rw [← e]; exact hf
     rcases harm with ⟨rfl, ht⟩ | ⟨a, -, hc⟩
     · exact ⟨r, f, H, v, ht, hf', he, .inr ⟨f, A, v, H, hp, hf', he⟩⟩
-    · -- `hopChain X.lm X.isLk` is `hopChain σ.mem (hopByteAt σ)` under eager landing
+    · -- `hopChain X.lm X.isLk` is a `hopChain σ.mem (hopByteAt σ)` under eager landing (the
+      -- registry's hops are certified hop bytes, Q2 [OWN.153] (D4))
       have e : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
       rw [e] at hc
-      exact hop hc
+      exact hop (hopChain_mono (memExt_refl _) (fun _ _ h => h.1) hc)
 
 /-! # 4. The refutation at a realized read, through `R` -/
 

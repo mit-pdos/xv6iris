@@ -182,9 +182,10 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   icases ms_kctx_ownCtx cpu k $$ Hk with ⟨Hown, Hk⟩
   icases ms_ownCtx_viewLb cpu curCtx $$ Hown with ⟨Hown, %K, #HK⟩
   ihave Hk := Hk $$ Hown
-  ihave HAU := started_readAUr γi ξd P cpu hcpu K $$ Hinv
+  icases kctx_pubLdPcsEq cpu k $$ Hk with ⟨%hpl, Hk⟩
+  ihave HAU := started_readAUr γi ξd P cpu hcpu K (KA.«main» + 22#64) (xv6PubLdPc_main hpl) $$ Hinv
   -- +0x16  lw a5,0(a4)
-  k_step (wp_s_lw_aur cpu _ ?hs (KA.«main» + 22#64) true 0#12 15#5 14#5 (by decide)
+  k_step (wp_s_lw_aur_pc cpu _ ?hs (KA.«main» + 22#64) true 0#12 15#5 14#5 (by decide)
       startedAddr ?ha (by decide) (by decide) K [] _)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hid $HK $HAU]
   iintro %w Hk Hpc Hseen

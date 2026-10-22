@@ -299,7 +299,7 @@ theorem idup_store_au [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (M : RegMapF (Qp × Po
   isplitl []
   · iapply topLbAt_0
   inext
-  iintro %t %htt Hb #Hau #Ht _
+  iintro %t %htt %_ Hb #Hau #Ht _
   imod Hmask
   ihave Hrows := Hpush $$ %t %(hartAgent cpu) %htt Hb
   imod Hcl $$ [Hrows] with Hout

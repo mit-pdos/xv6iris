@@ -3,8 +3,8 @@
 [R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]; W8 (f3-utext) [OWN.89]): W8's
 export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt
-∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp ∧ relProvAt ∧ dynLockWinZAt ∧ ksFrameAt` --
-ELEVEN conjuncts:
+∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp ∧ relProvAt ∧ dynLockWinZAt ∧ ksFrameAt ∧
+chainOkCertAtP ∧ startedFloorPcAt` -- THIRTEEN conjuncts:
 THREE of the skeleton's six (W8 (f2-ctx)), the ruled `holding()` clause
 `lkCpuReadAt` (W8 (f3-hold)), the KERNEL half of the skeleton's A/D
 write-back clause `pteDiscAt` (W8 (f3-ptek)), the user code clause
@@ -16,10 +16,16 @@ provenance `relProvAt` (mcslrec (2) [OWN.82] (a1)), the TENTH `dynLockWinZAt` (r
 a pipe lock's word is 0 at its window's opening -- option (c): the zero is part of the exemption's
 dynamic arm `MachCSL.dynLkDiscAt`, so the exemption NARROWED and `chainOkAt` got STRONGER; the
 dynamic arms of `lockWordDiscAt`/`lkCpuReadAt` got a narrower premise but are definitional
-consequences of it -- not strictly append-only), and the ELEVENTH `ksFrameAt` (mcslrec (3) X1
+consequences of it -- not strictly append-only), the ELEVENTH `ksFrameAt` (mcslrec (3) X1
 [OWN.90] [OWN.104] (b): a kernel-stack byte is, from then on, in no exempt class and written by
 harts only -- the X1 carve also narrowed `custAt`'s dynamic and user-table arms by `¬ ksByteAt`,
-STRONGER); `chainOkAt` carries the
+STRONGER), the TWELFTH `chainOkCertAtP` (Q2 [OWN.153] (D4), the certified-hop form:
+`chainOkAt` whose sync paths' hops are CERTIFIED -- each acquire an issued position whose pc record
+is `-1`, an exclusive write's; the first conjunct follows from it, `chainOkAtP_of_cert`; the
+certificate environment's hop registry `MachCSL.chainEnvAt` carries the same pc clause, so the
+boot hop's `pubCover` arm of `syncPath` got STRONGER), and the THIRTEENTH `startedFloorPcAt` (Q4
+[OWN.154] (L1): a hart's positive floor at `started` was raised by the boot spin's load at `main+0x16`,
+the ghost load-pc record); `chainOkAt` carries the
 ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)); `lockWordDiscAt` and
 `lkCpuReadAt` cover EVERY lock -- the static spinlocks and the live pipe
 locks (W8 (f3-pipelk)).
@@ -1315,6 +1321,56 @@ def chainOkAtP (σ : MState) : Prop :=
     syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1) ∨
       (custAtP σ a ((σ.hr j).coh a) = .racy ∧ racyValOkP σ a ((σ.hr j).coh a))
 
+/-- **A CERTIFIED hop byte** for an acquire at `a` (Q2 [OWN.153] (D4)): a hop byte (`hopByteAt`)
+whose acquire is an issued position stamped exclusive (`σ.pcAt a = -1`: `MState.storeL`, an AMO's
+write half) -- the certificate environment's hop registry (`(xv6Env σ).isLk`, definitionally). -/
+def certHopAt (σ : MState) (b : PAddr) (a : Nat) : Prop := hopByteAt σ b a ∧ a ≤ σ.top ∧ σ.pcAt a = -1
+
+/-- A certified hop byte is a hop byte. -/
+theorem hopByteAt_of_cert {σ : MState} {b : PAddr} {a : Nat} (h : certHopAt σ b a) : hopByteAt σ b a := h.1
+
+/-- **A CERTIFIED sync path** (Q2 [OWN.153] (D4)): `syncPath` whose hops are certified. -/
+def syncPathC (σ : MState) (A : CPU) (t : Nat) (B : CPU) (τ : Nat) : Prop :=
+  (∃ a, a < τ ∧ hopChain (σ.mem.landedOnly σ.lp) (certHopAt σ) A t B a) ∨ pubCover (xv6Env σ) A t B
+
+/-- A certified sync path is a sync path. -/
+theorem syncPath_of_cert {σ : MState} {A : CPU} {t : Nat} {B : CPU} {τ : Nat} (h : syncPathC σ A t B τ) :
+    syncPath σ A t B τ := by
+  rcases h with ⟨a, ha, hc⟩ | hp
+  · exact .inl ⟨a, ha, hopChain_mono (memExt_refl _) (fun _ _ h => hopByteAt_of_cert h) hc⟩
+  · exact .inr hp
+
+/-- **(iii+), route P, CERTIFIED** (Q2 [OWN.153] (D4), the export's TWELFTH conjunct): `chainOkAtP`
+whose sync paths' hops are certified -- every acquire on the path was an exclusive write. -/
+def chainOkCertAtP (σ : MState) : Prop :=
+  ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 →
+    σ.lp e.t = some ((σ.hr j).coh a) → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j →
+    (∀ b, custAtP σ a ((σ.hr j).coh a) ≠ .lockw b) → (∀ w, custAtP σ a ((σ.hr j).coh a) ≠ .pub w) →
+    custAtP σ a ((σ.hr j).coh a) ≠ .pte →
+    syncPathC σ ⟨e.tid, hA⟩ e.t j (σ.top + 1) ∨
+      (custAtP σ a ((σ.hr j).coh a) = .racy ∧ racyValOkP σ a ((σ.hr j).coh a))
+
+/-- The first conjunct follows from the twelfth. -/
+theorem chainOkAtP_of_cert {σ : MState} (h : chainOkCertAtP σ) : chainOkAtP σ := by
+  intro j a H e hH he het hc hA hne h1 h2 h3
+  rcases h j a H e hH he het hc hA hne h1 h2 h3 with hs | hr
+  · exact .inl (syncPath_of_cert hs)
+  · exact .inr hr
+
+/-- **The publication reads' provenance** (Q4 [OWN.154] (L1), the export's THIRTEENTH conjunct; the
+body of Weak's `CapSync.startedFloorPcP σ σ.ldPcAt`): a hart's POSITIVE coherence floor at the base
+byte of another hart's publication word (`started`) was last raised by a plain load issued at the
+boot spin's `main+0x16` (`MState.ldPcAt`, the ghost load-pc record [OWN.119]). -/
+def startedFloorPcAt (σ : MState) : Prop :=
+  ∀ (f : PAddr) (w j : CPU), pubByteIn xv6Rsv f w → j ≠ w → 0 < (σ.hr j).coh f →
+    σ.ldPcAt j f = (KernelSyms.«main» : Int) + 0x16
+
+/-- The thirteenth conjunct from the machine's record (`MachCSL.ldPcOk` at xv6's read sites). -/
+theorem startedFloorPcAt_of {σ : MState} (h : ldPcOk xv6Rsv KernelRsv.pubLdPcs σ) : startedFloorPcAt σ := by
+  intro f w j hf hj hpos
+  have := h f w j hf hj hpos
+  simpa [KernelRsv.pubLdPcs, xv6PubLdPcs] using this
+
 /-- The lock words as of landing position `t` (route P). -/
 def xv6LockWordP (σ : MState) (b : PAddr) (t : Nat) : Prop := b ∈ xv6StaticLocks ∨ xv6DynLockP σ b t
 
@@ -1426,23 +1482,38 @@ def ksFrameAtP (σ : MState) : Prop :=
     (∀ (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.landedLe σ.lp s = false → e.tid < NCPU)
 
 /-- **THE EXPORT, route P** (DUAL; the SAME eleven conjuncts in the same order, each its twin;
-`cpuStaticAt` and `relProvAt` verbatim). -/
+`cpuStaticAt` and `relProvAt` verbatim; Q2 [OWN.153] (D4) appends the twelfth, `chainOkCertAtP`, and Q4
+[OWN.154] (L1) the thirteenth, `startedFloorPcAt`). -/
 def xv6AccessDiscP (σ : MState) : Prop :=
   chainOkAtP σ ∧ lockWordDiscAtP σ ∧ cpuStaticAt σ ∧ lkCpuReadAtP σ ∧ pteDiscAtP σ ∧ utextDiscAtP σ ∧
-    uptDiscAtP σ ∧ kptMapsExpP σ ∧ relProvAt σ ∧ dynLockWinZAtP σ ∧ ksFrameAtP σ
+    uptDiscAtP σ ∧ kptMapsExpP σ ∧ relProvAt σ ∧ dynLockWinZAtP σ ∧ ksFrameAtP σ ∧ chainOkCertAtP σ ∧
+    startedFloorPcAt σ
 
 /-! ## THE EXPORT (route P, the flip)
 
 The export `xv6AccessDisc` IS the route-P twins' conjunction: the same eleven conjuncts in the same
-order, each read over the landing positions (`cpuStaticAt` and `relProvAt` verbatim).  The
+order, each read over the landing positions (`cpuStaticAt` and `relProvAt` verbatim), then the
+appended conjuncts (12: `chainOkCertAtP`, Q2 [OWN.153] (D4); 13: `startedFloorPcAt`, Q4 [OWN.154] (L1)).  The
 pre-route-P stamp form is kept above as `xv6AccessDiscS` (documentation; no statement uses it). -/
 
-/-- **THE ACCESS DISCIPLINE** (route P): the eleven conjuncts, as their landing-position twins. -/
+/-- **THE ACCESS DISCIPLINE** (route P): the eleven conjuncts, as their landing-position twins, and
+(Q2 [OWN.153] (D4), APPEND-ONLY) the twelfth `chainOkCertAtP`: the first conjunct's sync paths
+with every hop CERTIFIED (each acquire an exclusive write, `pcAt = -1`); and (Q4 [OWN.154] (L1)) the
+thirteenth `startedFloorPcAt`: the load that raised a foreign floor at `started` was `main+0x16`'s. -/
 def xv6AccessDisc (σ : MState) : Prop :=
   chainOkAtP σ ∧ lockWordDiscAtP σ ∧ cpuStaticAt σ ∧ lkCpuReadAtP σ ∧ pteDiscAtP σ ∧ utextDiscAtP σ ∧
-    uptDiscAtP σ ∧ kptMapsExpP σ ∧ relProvAt σ ∧ dynLockWinZAtP σ ∧ ksFrameAtP σ
+    uptDiscAtP σ ∧ kptMapsExpP σ ∧ relProvAt σ ∧ dynLockWinZAtP σ ∧ ksFrameAtP σ ∧ chainOkCertAtP σ ∧
+    startedFloorPcAt σ
 
 theorem xv6AccessDisc_eq_P (σ : MState) : xv6AccessDisc σ = xv6AccessDiscP σ := rfl
+
+/-- The export's TWELFTH conjunct (Q2 [OWN.153] (D4)). -/
+theorem chainOkCertAtP_ofExport {σ : MState} (h : xv6AccessDisc σ) : chainOkCertAtP σ :=
+  h.2.2.2.2.2.2.2.2.2.2.2.1
+
+/-- The export's THIRTEENTH conjunct (Q4 [OWN.154] (L1)). -/
+theorem startedFloorPcAt_ofExport {σ : MState} (h : xv6AccessDisc σ) : startedFloorPcAt σ :=
+  h.2.2.2.2.2.2.2.2.2.2.2.2
 
 /-! ## The extraction (route P) -/
 
@@ -1502,10 +1573,12 @@ theorem landedOnly_mem {σ : MState} {b : PAddr} {H' : Hist} {e : HEnt}
     obtain rfl := Option.some.inj hH
     exact ⟨H, rfl, (List.mem_filter.1 he).1⟩
 
-/-- **`chainOkAtP` from the load-side invariant** (and `mmOk`: every hop's last acquire is an
-entry at or below the issue top). -/
-theorem chainOkAtP_of (σ : MState) (hmm : mmOk σ)
-    (h : loadsChained (xv6Env σ) (chainExAtP xv6Rsv (slotWit xv6Rsv) σ.mem σ.lp σ.ltop)) : chainOkAtP σ := by
+/-- **`chainOkCertAtP` from the load-side invariant** (and `mmOk`: every hop's last acquire is an
+entry at or below the issue top): the certificates' chains run through the environment's hop
+registry, which IS `certHopAt` (Q2 [OWN.153] (D4)). -/
+theorem chainOkCertAtP_of (σ : MState) (hmm : mmOk σ)
+    (h : loadsChained (xv6Env σ) (chainExAtP xv6Rsv (slotWit xv6Rsv) σ.mem σ.lp σ.ltop)) :
+    chainOkCertAtP σ := by
   intro j a H e hH he het hc hA hne h1 h2 h3
   by_cases h4 : custAtP σ a ((σ.hr j).coh a) = .racy ∧ racyValOkP σ a ((σ.hr j).coh a)
   · exact .inr h4
@@ -1519,6 +1592,11 @@ theorem chainOkAtP_of (σ : MState) (hmm : mmOk σ)
     have hle := ((mmOk_hist hmm b H0 hH0).2 e' he0).1
     exact .inl ⟨b', by simp only [MState.top]; omega, hch⟩
   · exact .inr hp
+
+/-- **`chainOkAtP` from the load-side invariant** (through the certified form). -/
+theorem chainOkAtP_of (σ : MState) (hmm : mmOk σ)
+    (h : loadsChained (xv6Env σ) (chainExAtP xv6Rsv (slotWit xv6Rsv) σ.mem σ.lp σ.ltop)) : chainOkAtP σ :=
+  chainOkAtP_of_cert (chainOkCertAtP_of σ hmm h)
 
 /-- A live dynamic lock's windowed discipline over the landed view, at xv6's `cpus`. -/
 theorem dynLockWinAtP_of (σ : MState) (b : PAddr) (t : Nat) (h : xv6DynLockP σ b t) : dynLockWinAtP σ b t := by
@@ -1793,11 +1871,12 @@ derives them from the sealed table's record (`ptConjuncts_of`, DESIGN D17′, [O
 theorem accessDisc_of (σ : MState) (hmm : mmOk σ) (hr : rsvAllOk KernelRsv.static σ.mem)
     (h : loadsChained (xv6Env σ) (chainExAtP xv6Rsv (slotWit xv6Rsv) σ.mem σ.lp σ.ltop))
     (hpte : pteDiscAtP σ) (hu : uTextDiscAtP σ) (hp : uPtDiscAtP xv6Rsv σ) (hkm : kptMapsExpP σ)
-    (hrp : relPcOk xv6Rsv KernelRsv.relPcs σ) (hks : ksFrameAtP σ) : xv6AccessDisc σ :=
+    (hrp : relPcOk xv6Rsv KernelRsv.relPcs σ) (hks : ksFrameAtP σ)
+    (hld : ldPcOk xv6Rsv KernelRsv.pubLdPcs σ) : xv6AccessDisc σ :=
   have hl := lockCpuDiscP_of_rsvAllOk σ hr
   ⟨chainOkAtP_of σ hmm h, hl.1, hl.2, lkCpuReadAtP_of σ hl.1, hpte, hu, hp, hkm,
     relProvAt_of σ (fun a H e hH he => ((mmOk_hist hmm a H hH).2 e he).1) (mmOk_hist hmm) hrp,
-    dynLockWinZAtP_of σ, hks⟩
+    dynLockWinZAtP_of σ, hks, chainOkCertAtP_of σ hmm h, startedFloorPcAt_of hld⟩
 
 section power
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
@@ -1916,7 +1995,8 @@ interpretation gives `xv6AccessDisc` -- `mmOk`, the reserved regions' discipline
 conjunct's load-side invariant over landing positions, the user-epoch record's O1/T4 twins. -/
 theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
     (heqK : MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk)
-    (heqP : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs) (g : GState) :
+    (heqP : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)
+    (heqL : MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs) (g : GState) :
     powerInterp g ⊢@{IProp GF} ⌜g.pow = true → xv6AccessDisc g.m⌝ := by
   unfold powerInterp eraCur
   cases hpw : g.pow
@@ -1946,13 +2026,15 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m)
         (chainExAtP (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m.mem g.m.lp g.m.ltop) := hch
-    have hrp := hok.2
+    have hrp := hok.2.1
+    have hld := hok.2.2
+    rw [heq, heqL] at hld
     rw [heq, heqP] at hch'
     rw [heq] at hpt
     rw [heq, heqP] at hrp
     rw [heq, heqK] at hkr
     obtain ⟨hpte, hkm, hks⟩ := ptConjuncts_of g.m hmm hkr.1 hkr.2
-    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok.1) hch' hpte hu hpt hkm hrp hks
+    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok.1) hch' hpte hu hpt hkm hrp hks hld
 
 end power
 

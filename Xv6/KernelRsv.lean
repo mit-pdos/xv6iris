@@ -253,6 +253,23 @@ theorem xv6Pub_hart0 (f : PAddr) (w : CPU)
   have := List.all_eq_true.1 hall _ h
   simpa using this
 
+/-- `started` is the list's only publication base (Q4 [OWN.154] (L1)). -/
+theorem xv6Pub_started (f : PAddr) (w : CPU)
+    (h : (⟨f, .pub w⟩ : RsvRegion) ∈ xv6RsvStatic) : f = KA.«started» := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .pub _ => decide (R.base = KA.«started»)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
+/-- Every byte but `started`'s base is no publication base (Q4 [OWN.154] (L1)). -/
+theorem xv6NotPubBase {a : PAddr} (h : a ≠ KA.«started») : notPubBase xv6RsvStatic a :=
+  fun w hw => h (xv6Pub_started a w hw)
+
+/-- A byte above `started`'s base is no publication base. -/
+theorem xv6NotPubBase_gt {a : PAddr} (h : KA.«started».toNat < a.toNat) : notPubBase xv6RsvStatic a :=
+  xv6NotPubBase (fun e => by subst e; exact absurd h (Nat.lt_irrefl _))
+
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
 
 /-- `stack0` is the list's only static kernel stack (mcslrec (3) X1). -/

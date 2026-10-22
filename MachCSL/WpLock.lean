@@ -340,6 +340,8 @@ theorem wp_s_lw_lockword_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           show x ∈ W.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np4 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs4 cpu lk hm K ts [] _
@@ -450,6 +452,8 @@ theorem wp_s_lw_lockword_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbC]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -615,6 +619,8 @@ theorem wp_s_lw_lockword_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           show x ∈ W.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np4 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs4 cpu lk hm K ts [(B0, pB0)] _
@@ -756,6 +762,8 @@ theorem wp_s_lw_lockword_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbC]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -933,6 +941,8 @@ theorem wp_s_ld_lkcpu_notheld_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           show x ∈ W'.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np8 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs8 cpu lk hm K ts [] _
@@ -1063,6 +1073,8 @@ theorem wp_s_ld_lkcpu_notheld_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbL]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -1230,6 +1242,8 @@ theorem wp_s_ld_lkcpu_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           show x ∈ W'.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np8 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs8 cpu lk hm K ts [] _
@@ -1355,6 +1369,8 @@ theorem wp_s_ld_lkcpu_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbL]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -2358,7 +2374,7 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iexists W'.hist Hold, M, pB0
         iframe Hb HM HtB
         inext
-        iintro %t %hte Hb #Hau #Htop #Hla
+        iintro %t %hte %_ Hb #Hau #Htop #Hla
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc te (some (cpu, true)) W _ Ld t ((B0, t) :: O)
           (lkDynF_owner hf (by show M < t; omega) hst.1 hd.2.2 (cpuAddr cpu) (.inl rfl)
             (lockDiscWin_of (st := some (cpu, true)) ⟨hst.1, lkCpuAt_set hst.2 t⟩ (lockDynW_set hd t))) (lockDynW_set hd t) $$ [Hreg Htop HO HlB0 Hla]
@@ -2614,7 +2630,7 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         iexists W'.hist Hold, M, pB0
         iframe Hb HM HtB
         inext
-        iintro %t %hte Hb #Hau #Htop #Hla
+        iintro %t %hte %_ Hb #Hau #Htop #Hla
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc te (some (cpu, false)) W _ Ld t ((B0, t) :: O)
           (lkDynF_owner hf (by show M < t; omega) hst.1 hd.2.2 0#64 (.inr rfl)
             (lockDiscWin_of (st := some (cpu, false)) ⟨hst.1, lkCpuAt_clear hst.2 t⟩ (lockDynW_clear hd t))) (lockDynW_clear hd t) $$ [Hreg Htop HO HlB0 Hla]
@@ -2971,7 +2987,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         isplitl [HPC]
         · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb HPC #Hrc #Hau #Htop _ Hout
+        iintro %t %hte %_ Hb HPC #Hrc #Hau #Htop _ Hout
         have hteM : M < t := Nat.lt_of_le_of_lt (Nat.le_max_left M s0) hte
         have hte0 : s0 < t := Nat.lt_of_le_of_lt (Nat.le_max_right M s0) hte
         ihave #Hrr : relRcpt t $$ [Hrc]
@@ -3342,7 +3358,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         isplitl [HPC]
         · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb HPC #Hrc #Hau #Htop _ Hout
+        iintro %t %hte %_ Hb HPC #Hrc #Hau #Htop _ Hout
         have hteM : M < t := Nat.lt_of_le_of_lt (Nat.le_max_left M s0) hte
         have hte0 : s0 < t := Nat.lt_of_le_of_lt (Nat.le_max_right M s0) hte
         ihave #Hrr : relRcpt t $$ [Hrc]
@@ -3527,7 +3543,7 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iexists W.hist Hold
       iframe Hb
       inext
-      iintro %t Hb #Hau #Htop
+      iintro %t %hnp Hb #Hau #Htop
       imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
       imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
       imod Hlic $$ %B0 Hhalf0 HR with ⟨HD, HOut⟩
@@ -3673,6 +3689,8 @@ theorem wp_s_lw_lockword_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
           show x ∈ W.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np4 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs4 cpu lk hm K ts [(B0, pB0)] _
@@ -3817,6 +3835,8 @@ theorem wp_s_lw_lockword_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbC]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -3962,6 +3982,8 @@ theorem wp_s_ld_lkcpu_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           show x ∈ W'.map (WEnt.proj j) ++ Hold j
           rw [hH]; exact List.mem_append_right _ List.mem_cons_self
         isplitl []
+        · ipureintro; exact rdNpOk_of_np (Lock.rsv_np8 lk hm)
+        isplitl []
         · iapply rdCompBytes_nil
         isplitl []
         · iapply Lock.rsv_certs8 cpu lk hm K ts [] _
@@ -4090,6 +4112,8 @@ theorem wp_s_ld_lkcpu_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           · exact ⟨x, hxm, Or.inl (hxt.trans h)⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inr (by rw [hxt]; exact h)))⟩
           · exact ⟨x, hxm, Or.inr (Or.inr (Or.inl ⟨p, by rw [hxt]; exact hp, hpK⟩))⟩
+        isplitl []
+        · ipureintro; exact rdNpOk_own1
         isplitl [HbL]
         · unfold rdCompBytes
           iapply BigSepL.bigSepL_cons.2
@@ -4331,7 +4355,7 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
         iexists W'.hist Hold, M, pB0
         iframe Hb HM HtB
         inext
-        iintro %t %hte Hb #Hau #Htop #Hla
+        iintro %t %hte %_ Hb #Hau #Htop #Hla
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc te (some (cpu, false)) W _ Ld t ((B0, t) :: O)
           (lkDynF_owner hf (by show M < t; omega) hst.1 hd.2.2 0#64 (.inr rfl)
             (lockDiscWin_of (st := some (cpu, false)) ⟨hst.1, lkCpuAt_clear hst.2 t⟩ (lockDynW_clear hd t))) (lockDynW_clear hd t) $$ [Hreg Htop HO HlB0 Hla]
@@ -4674,7 +4698,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         isplitl [HPC]
         · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb HPC #Hrc #Hau #Htop _ Hout
+        iintro %t %hte %_ Hb HPC #Hrc #Hau #Htop _ Hout
         have hteM : M < t := Nat.lt_of_le_of_lt (Nat.le_max_left M s0) hte
         have hte0 : s0 < t := Nat.lt_of_le_of_lt (Nat.le_max_right M s0) hte
         ihave #Hrr : relRcpt t $$ [Hrc]

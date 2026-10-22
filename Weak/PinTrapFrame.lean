@@ -495,7 +495,7 @@ theorem framesOfKs (σ : MState) (hD : xv6AccessDisc σ) (heo : σ.mem.eagerOn �
   have hks' : ksByteAtP xv6Rsv σ.mem σ.lp s pa := by
     show ksByteAt xv6Rsv (σ.mem.lview σ.lp) s pa
     rw [FlatMem.lview_eagerOn σ.mem σ.lp heo]; exact hks
-  have h := hD.2.2.2.2.2.2.2.2.2.2 pa s hks'
+  have h := hD.2.2.2.2.2.2.2.2.2.2.1 pa s hks'
   refine ⟨h.1, fun H e hH he hse => h.2 H e hH he ?_⟩
   rw [HEnt.landedLe_eager _ _ e (heo pa H hH e he)]
   exact decide_eq_false (by omega)

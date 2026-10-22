@@ -223,7 +223,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 `file_node_raw_fentry`): the 40 `.bss` bytes of `ftable.file[k]` are
 `fentryRaw ξ k`, every field at the loader's zero. -/
 theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
-    (hk : k < NFILE) :
+    (hk : k < NFILE) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (fileB k) (fileB k + 40) -∗ fentryRaw ξ k := by
   have o : ∀ j, j < 40 → (fnode k + BitVec.ofNat 64 j).toNat = fileB k + j :=
     fun j hj => fileB_off k j hk hj
@@ -231,13 +231,13 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
     have := fnode_toNat k (Nat.le_of_lt hk); unfold aFtype; rw [this]; rfl
   have hB := fileB_val k
   have hkN : k < 100 := hk
-  have hlo : 0x8000a400 ≤ fileB k := by omega
+  have hlo : 0x8000a404 ≤ fileB k := by omega
   have hend : fileB k + 40 ≤ 0x80023b10 := by omega
   have hal : fileB k % 8 = 0 := by omega
   clear hB hkN
   generalize fileB k = B at *
   have cl : ∀ n A, B ≤ A → A + n ≤ B + 40 → A % n = 0 →
-      MachCSL.KernelSyms.«_bss» ≤ A ∧ A + n ≤ MachCSL.KernelSyms.«end» ∧ A % n = 0 := by
+      MachCSL.KernelSyms.«_bss» + 4 ≤ A ∧ A + n ≤ MachCSL.KernelSyms.«end» ∧ A % n = 0 := by
     intro n A h1 h2 h3
     refine ⟨?_, ?_, h3⟩
     · rw [bc_bss_val]; omega
@@ -291,7 +291,7 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
 /-- **The `NFILE` entries, carved** (Rocq `boot_file_entries`): the array
 `[ftable + 24, <disk>)`, one `fentryRaw` per slot, which is what
 `fileBoot_ftableRes` takes. -/
-theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
+theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (fileB 0) (fileB 0 + 40 * NFILE) -∗
       [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
   iintro #Hk H
@@ -308,7 +308,7 @@ theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
 row plus `boot_file_entries`, deviation 4): `[ftable + 24, ftable + 0xfb8)`
 (past the lock, a registered lock, W8-β′), which ends exactly at `<disk>`,
 is the `NFILE` raw entries. -/
-theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
+theorem bootCarve_ftable [CurCtx] (ξ : CtxId) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
       [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by

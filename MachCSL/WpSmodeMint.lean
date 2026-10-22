@@ -84,7 +84,7 @@ theorem wp_s_sd_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iexists Hs
       iframe Hb
       inext
-      iintro %t Hb #Hau #Htop
+      iintro %t %hnp Hb #Hau #Htop
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx
@@ -174,7 +174,7 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       isplitl []
       · iapply topLbAt_0
       inext
-      iintro %t %hTt Hb #Hau #Htop _
+      iintro %t %hTt %_ Hb #Hau #Htop _
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx

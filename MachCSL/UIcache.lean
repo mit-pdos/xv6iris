@@ -113,7 +113,7 @@ theorem uic_ctxByteX_read (σ : MState) (ξ : CtxId) (K : Nat) (a : PAddr) (dq :
   intro ag tvn htvn
   unfold FlatMem.readP
   rw [hget, Option.bind_some, Hist.readP_cons_visible _ _ _ _ _
-    (HEnt.visibleP_of_landed σ.lp ag tvn _ (p := p) hp (by omega)), hev]
+    (HEnt.visibleP_of_landed σ.lp ag tvn _ (p := p) hp (by omega)), hev.1]
 
 theorem uic_ctxBytesX_read' (σ : MState) (ξ : CtxId) (K : Nat) (pa : PAddr) (dq : DFrac)
     (bs : Nat → BitVec 8) : ∀ n : Nat,
@@ -223,6 +223,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
   iintro ⟨Hctx, Hb, HΦ⟩
+  icases ctxBytesX_np ξ K req.pa n dq w $$ Hb with ⟨Hb, %hnp⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
@@ -265,7 +266,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytesP_unique _ _ _ _ _ _ _ _ (hrd tvn htv) ((σ.readFwd_iff hP cpu tvn req.pa n w').1 hrd')
-    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) (ldPcObl_of_notPub hnp) $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]

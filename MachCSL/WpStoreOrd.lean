@@ -65,7 +65,7 @@ store hands the pipe lock it names (`wp_s_sd_ent`). -/
 def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=>
     ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ posLb T ∗
-      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           authoredBy t (hartAgent cpu) -∗ itopLb t -∗ entsAt pa n t (hartAgent cpu) w' ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (T Kl : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))) (po : Option (BitVec 64)),
       histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
@@ -86,8 +86,8 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
     iexists Hs, T
     iframe Hb HT
     inext
-    iintro %t %hT Hb Hau Htop Hent
-    imod Hcont $$ %t %hT Hb Hau Htop Hent with HΨ
+    iintro %t %hT %hnp Hb Hau Htop Hent
+    imod Hcont $$ %t %hT %hnp Hb Hau Htop Hent with HΨ
     imodintro
     iapply HW $$ HΨ
   · imodintro
@@ -223,7 +223,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     · iframe Hmem Hb
     imod memModel_entsIssue (σ.issue cpu req.pa n w') req.pa n Hs (σ.top + 1) (hartAgent cpu) w' hbs
       $$ Hmm with ⟨Hmm, #Hent⟩
-    imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' Hent with HΦ
+    imod Hcont $$ %(σ.top + 1) %(by omega) %(fun j hj => notPubBase_of_notRsv (hnr j hj)) Hb Hau Htop' Hent with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %(σ.issue cpu req.pa n w') %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
@@ -547,7 +547,7 @@ theorem wp_s_sd_ent [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
       iexists Hs, lo
       iframe Hcell Hpos
       inext
-      iintro %t %hlot Hb #Hau #Htop #Hent
+      iintro %t %hlot %hnp Hb #Hau #Htop #Hent
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx
@@ -560,15 +560,16 @@ theorem wp_s_sd_ent [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
       · iapply wordPointsTo_intro_id (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1)
           (k.rget cpu' rs2) hram hal $$ Hcl
         have hcb : ∀ (pa : PAddr) (v : BitVec 8) (H : Hist),
+            notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa →
             pa ↦ₕ{DFrac.own 1} (⟨t, hartAgent cpu', v⟩ :: H) ∗
               keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx t ⊢ ctxByte curCtx pa (DFrac.own 1) v :=
-          fun pa v H => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H
+          fun pa v H hp => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H hp
         unfold bytesPointsTo ctxBytes
         unfold histBytes
         iapply BigSepL.bigSepL_impl $$ Hb
         imodintro
         iintro %n %j %hj Hj
-        iapply hcb
+        iapply hcb _ _ _ (hnp j (List.mem_range.1 (List.mem_of_getElem? hj)))
         isplitl [Hj]
         · iexact Hj
         · iexact Hkey

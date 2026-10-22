@@ -208,7 +208,9 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     (hctx : c.ctx = curCtx) (hpay : c.pay = if c.dwr then dataDisk else dataBuf)
     (hram : ∀ j, j < BSIZE → inRam (aBufData (k.regs 10#5) + BitVec.ofNat 64 j) 1)
     (hkm : ∀ j, j < BSIZE →
-      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw) :
+      kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw)
+    (hbs : ∀ m, m < BSIZE →
+      KernelSyms.«stack0» + 0x8000 ≤ (aBufData (k.regs 10#5) + BitVec.ofNat 64 m).toNat) :
     vdrwP5Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by unfold virtioDiskRwSlots sleepSlots at hK; omega
   have hKf : freeDescSlots ≤ k.avail - 12 := by
@@ -274,7 +276,24 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     rw [hnr']; exact .rfl) $$ Hfl
   -- the collect
   iapply wpLoop_fupd
-  imod disk_collect γ pd pav pu c n T nr hcwf hnle hctx hramc hkmc
+  icases kctx_rsvEq _ _ $$ Hk with ⟨%heqR, Hk⟩
+  have hnpS : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) c.status 1 := fun j hj => by
+    rw [heqR]
+    refine xv6NotPubBase_gt ?_
+    have := (infoStatus_bounds c.hd hh j hj).1
+    have hs : KA.«started».toNat = 0x8000a400 := rfl
+    have h0 : KernelSyms.«stack0» = 0x8000a420 := rfl
+    rw [show c.status = aInfoStatus c.hd from rfl]
+    omega
+  have hnpD : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) c.data BSIZE := fun j hj => by
+    rw [heqR]
+    refine xv6NotPubBase_gt ?_
+    have := hbs j hj
+    have hs : KA.«started».toNat = 0x8000a400 := rfl
+    have h0 : KernelSyms.«stack0» = 0x8000a420 := rfl
+    rw [hcd]
+    omega
+  imod disk_collect γ pd pav pu c n T nr hcwf hnle hctx hramc hkmc hnpS hnpD
     $$ [Hinv HS Hgeom Hth Htm Htt Hcl Hnr Hdone Hwmn Hfl]
     with ⟨Hth, Htm, Htt, Hnr, Hc0, Hc1, Hc2, Hch, Hib, Hdsk, Hst, Hbuf, Hblkd, Hdone⟩
   · iframe #

@@ -2309,7 +2309,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- One read-only byte: the boot image's, never written. -/
-def dataByte (p : Nat × Nat) : IProp GF := imgBytes (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)
+def dataByte (p : Nat × Nat) : IProp GF := iprop%
+  imgBytes (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2) ∗
+    ⌜notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (BitVec.ofNat 64 p.1)⌝
 
 /-- The whole read-only data, persistent. -/
 def kernelData : IProp GF := iprop% [∗list] p ∈ Kernel.rodata, dataByte p
@@ -2352,8 +2354,11 @@ theorem kernelData_byte [CurCtx] (i a b : Nat) (h : Kernel.rodata[i]? = some (a,
   unfold kernelData
   icases BigSepL.bigSepL_lookup h $$ H with H
   unfold dataByte
+  icases H with ⟨H, %hnp⟩
   ihave #Hcl := kmapStatic_rw (BitVec.ofNat 64 a) hcl $$ HS
-  ihave Hb := imgBytes_ctx curCtx (BitVec.ofNat 64 a) 1 (BitVec.ofNat 8 b) $$ H
+  ihave Hb := imgBytes_ctx curCtx (BitVec.ofNat 64 a) 1 (BitVec.ofNat 8 b)
+    (fun j hj => by obtain rfl : j = 0 := by omega
+                    simpa using hnp) $$ H
   ihave Hw := wordPointsTo_intro_id (BitVec.ofNat 64 a) 1 DFrac.discard (BitVec.ofNat 8 b) hram (Nat.mod_one _) $$ Hcl Hb
   iexact Hw
 

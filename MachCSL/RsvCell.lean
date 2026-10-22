@@ -72,27 +72,28 @@ theorem cpuWords_mem [KernelGeom] (cpu : CPU) :
 below the S-mode rules). -/
 theorem RsvCell.ctxBytesOfKeyed (ξ : CtxId) (pa : PAddr) (dq : DFrac) (t : Nat) (ag : Agent)
     (Hs : Nat → Hist) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗
+    ∀ n : Nat, (∀ j, j < n → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)) →
+      keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗
         ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} (⟨t, ag, bs j⟩ :: Hs j))
       ⊢@{IProp GF} [∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)
-  | 0 => by
+  | 0, _ => by
     iintro ⟨_, _⟩
     simp only [List.range_zero]
     exact BigSepL.bigSepL_nil_intro
-  | n + 1 => by
+  | n + 1, hnp => by
     rw [List.range_succ]
     iintro ⟨#Hkey, H⟩
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     iapply BigSepL.bigSepL_snoc.2
     isplitl [H1]
-    · iapply RsvCell.ctxBytesOfKeyed ξ pa dq t ag Hs bs n
+    · iapply RsvCell.ctxBytesOfKeyed ξ pa dq t ag Hs bs n (fun j hj => hnp j (by omega))
       iframe H1
       iexact Hkey
     · unfold ctxByte
       iexists ⟨t, ag, bs n⟩, (Hs n)
       iframe H2
       isplit
-      · ipureintro; rfl
+      · ipureintro; exact ⟨rfl, hnp n (by omega)⟩
       · iexact Hkey
 
 /-- **The reserved-mode accessor of a half context window**: the store of `w`
@@ -103,6 +104,7 @@ theorem ctxBytes_writeAURsv [CurCtx] (cpu : CPU) (pa : PAddr) (n : Nat) (w0 w : 
       ownCtx cpu curCtx -∗
         writeAU cpu pa n w iprop(ownCtx cpu curCtx ∗ ctxBytes curCtx pa n (DFrac.own (1 : Qp).half) w) := by
   iintro Hb Hctx
+  icases ctxBytes_np curCtx pa n _ w0 $$ Hb with ⟨Hb, %hnp⟩
   iapply writeAU_of_rsv
   unfold writeAURsv
   icases histBytes_of_wordBytes curCtx pa n (DFrac.own (1 : Qp).half) w0 $$ Hb with ⟨%Hs, Hb⟩
@@ -129,7 +131,7 @@ theorem ctxBytes_writeAURsv [CurCtx] (cpu : CPU) (pa : PAddr) (n : Nat) (w0 w : 
   imodintro
   iframe Hctx
   unfold ctxBytes histBytes
-  iapply RsvCell.ctxBytesOfKeyed curCtx pa _ t (hartAgent cpu) Hs (nthByte w) n
+  iapply RsvCell.ctxBytesOfKeyed curCtx pa _ t (hartAgent cpu) Hs (nthByte w) n hnp
   iframe Hb
   iexact Hkey
 

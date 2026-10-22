@@ -651,6 +651,11 @@ theorem ldPcObl_of_pc {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu :
     (h : ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int) ∈ ps) : ldPcObl rs ps σ cpu pa n :=
   fun _ _ _ _ _ => h
 
+/-- A load whose footprint holds no publication base byte owes nothing. -/
+theorem ldPcObl_of_notPub {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    (h : ∀ j, j < n → notPubBase rs (pa + BitVec.ofNat 64 j)) : ldPcObl rs ps σ cpu pa n :=
+  fun j hj w hw _ => absurd hw (h j hj w)
+
 /-- The record reads only the floors and the load-pc record. -/
 theorem ldPcOk_congr {rs : List RsvRegion} {ps : List Int} {σ σ' : MState} (hl : σ'.ldPcAt = σ.ldPcAt)
     (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) : ldPcOk rs ps σ' = ldPcOk rs ps σ := by
@@ -688,6 +693,13 @@ theorem LoadSrcs.stamp_off (srcs : LoadSrcs) (me : Agent) (pa : PAddr) (n : Nat)
   obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hx
   rw [if_neg (h j (List.mem_range.1 hj))]
   exact Nat.le_refl _
+
+/-- At power-on (every coherence floor 0) the publication reads' provenance holds. -/
+theorem ldPcOk_boot {rs : List RsvRegion} {ps : List Int} (σ : MState) (h : ∀ c, σ.hr c = HRead.zero) :
+    ldPcOk rs ps σ := by
+  intro f w j _ _ hpos
+  rw [h j] at hpos
+  simp [HRead.zero] at hpos
 
 /-- A plain store's issue keeps the publication reads' provenance (its footprint's floors reset). -/
 theorem ldPcOk_issue {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)

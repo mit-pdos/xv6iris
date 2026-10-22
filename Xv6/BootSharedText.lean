@@ -100,7 +100,7 @@ theorem memCellsOut_ran (m : MemF Hist) :
 /-- **`bootCarve_image`, the window already persisted**: the persisted
 window with the static claims is the kernel's read-only image, and the cells
 outside the window hold the owned half `[_data, PHYSTOP)`. -/
-theorem bootCarve_imageT :
+theorem bootCarve_imageT (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ (winRoAt (MachGS.era (hlc := hlc) (GF := GF)).mem (imgFlat bootImage) bcRoLo bcRoHi ∗
       memCellsOut (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static (imgFlat bootImage)) bcRoLo bcRoHi) ⊢@{IProp GF}
       |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗
@@ -109,13 +109,13 @@ theorem bootCarve_imageT :
   ihave #Hro := winRoAt_bootRo (hlc := hlc) (GF := GF) (imgFlat bootImage) $$ Hw
   ihave Ht := kernelText_intro (GF := GF) $$ [Hk Hro]
   · iframe Hk Hro
-  ihave Hd := kernelData_intro (GF := GF) $$ Hro
+  ihave Hd := kernelData_intro (GF := GF) hrsv $$ Hro
   ihave Hown := memCellsOut_ran (hlc := hlc) (GF := GF) _ $$ Hout
   imodintro
   iframe Ht Hd Hk Hown
 
 /-- `bootShared_image`, the window already persisted (`bootCarve_imageT`). -/
-theorem bootShared_imageT (σ : MState) (hbf : bootFacts σ) :
+theorem bootShared_imageT (σ : MState) (hbf : bootFacts σ) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ (winRoAt (MachGS.era (hlc := hlc) (GF := GF)).mem σ.mem bcRoLo bcRoHi ∗
       memCellsOut (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) bcRoLo bcRoHi) ⊢
       |==> (kernelText ∗ kernelData ∗ bootGotRo ∗
@@ -126,7 +126,7 @@ theorem bootShared_imageT (σ : MState) (hbf : bootFacts σ) :
         bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ∗
         bootRan (imgFlat bootImage) 0x80024000 ramEnd) := by
   rw [hbf.1]
-  refine (bootCarve_imageT (GF := GF)).trans ?_
+  refine (bootCarve_imageT (GF := GF) hrsv).trans ?_
   iintro H
   imod H with ⟨⟨#Ht, #Hd, -⟩, Hown⟩
   icases bootCarve_owned (GF := GF) _ $$ Hown with ⟨Hdata, Hbss, Hfree⟩
@@ -167,7 +167,7 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
       ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ⊢
       |==> ∃ ξ0 : CtxId, bsCarveOut σ ξ0 := by
   iintro ⟨#Hk, ⟨Hmem, Hhalf, %⟨hrsv, hkptEq⟩⟩, Ht, Hr, Hl⟩
-  imod bootShared_imageT σ hbf $$ [Hmem] with
+  imod bootShared_imageT σ hbf hrsv $$ [Hmem] with
     ⟨#Htx, #Hd, #Hg, Hw1, Hw2, Hu0, Hu1, Hbss, Hfree⟩
   · iframe Hk Hmem
   icases bcpBssWindowsR (GF := GF) $$ Hbss with
@@ -283,6 +283,7 @@ theorem bootSharedAllocT (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (h
   unfold bsCarveOut bsKptWin
   icases Hc with ⟨#Htx, #Hd, Ht0, Hb0, Hrest, HL, HG, HU0, HU1, HP, ⟨W1, W2, W3, W4, W5, W6, W7, W8,
     W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21⟩, Hsc⟩
+  icases startedCell_rsvEq $$ Hsc with ⟨Hsc, %hrsv⟩
   -- the devices
   imod bootSharedDev_devs (hlc := hlc) (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩

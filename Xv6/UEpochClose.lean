@@ -130,7 +130,7 @@ abbrev qCell (a : PAddr) : IProp GF := iprop(∃ H : Hist, a ↦ₕ{DFrac.own Qp
 theorem ctxByte_joinQ (ξ : CtxId) (a : PAddr) (b : BitVec 8) :
     ctxByte (GF := GF) ξ a uCustQ b ∗ qCell a ⊢ ctxByte ξ a (DFrac.own 1) b := by
   iintro ⟨H1, %H, H2⟩
-  icases ctxByte_cases ξ a uCustQ b $$ H1 with ⟨%e, %He, Hpt1, %hev, #Hkey⟩
+  icases ctxByte_cases_np ξ a uCustQ b $$ H1 with ⟨%hnp, %e, %He, Hpt1, %hev, #Hkey⟩
   ihave %hag := pointsTo_agree $$ [Hpt1 H2]
   · iframe Hpt1 H2
   rw [← hag]
@@ -143,7 +143,7 @@ theorem ctxByte_joinQ (ξ : CtxId) (a : PAddr) (b : BitVec 8) :
   unfold ctxByte
   iexists e, He
   iframe Hpt Hkey
-  ipureintro; exact hev
+  ipureintro; exact ⟨hev, hnp⟩
 
 /-- **The join of a labelled list**: every byte at the read-only label meets
 a quarter of the cells `T`, the rest are whole already. -/

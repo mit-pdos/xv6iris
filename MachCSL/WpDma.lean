@@ -71,6 +71,7 @@ theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF))
         (σ.storeDma pa n w))
     (hpcs : ∀ t, t ≤ σ.top → (σ.storeDma pa n w).pcAt t = σ.pcAt t)
+    (hld : ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ → ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) (σ.storeDma pa n w))
     (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem →
       (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) (σ.storeDma pa n w)))
     (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem →
@@ -81,7 +82,7 @@ theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       genHeapInterp (G := E.mem) σ.mem ∗ rsvModelAt E (σ.storeDma pa n w) := by
   have hg := kptGrow_dma σ pa n w
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨Hm, ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩,
+  iintro ⟨Hm, ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp, hlp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩,
     Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩, #Hc⟩
   ihave Hsnap := kptSnapAt_mono E hg.1 (fun hne => by
     rcases hseal with h0 | h0
@@ -148,7 +149,7 @@ theorem rsvModel_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
     iframe Hreg
     isplit
     · ipureintro
-      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
+      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp, hld hlp⟩
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc Hsnap
     ipureintro
@@ -191,7 +192,7 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
       rwa [MState.storeDma_log_of_ne σ pa n w hn, MState.storeDma_llog_of_ne σ pa n w hn] at this) (by simp only [List.length_append, List.length_singleton]; omega)
     $$ Hlp with ⟨Hlp, #Hland⟩
   ihave Hx := rsvModel_dma E σ pa n w hn hmm hpub hrsv
-    (relPcOk_storeDma σ pa n w (ramBytes_le hram) (mmOk_le_top hmm) hnr) (relPc_dmaOld σ pa n w)
+    (relPcOk_storeDma σ pa n w (ramBytes_le hram) (mmOk_le_top hmm) hnr) (relPc_dmaOld σ pa n w) id
     (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (mmOk_okP hmm)) (fun _ h => chainLoads_dma σ pa n w hmm h)
     $$ [Hm Hrsv Hc]
   · iframe Hm Hrsv Hc

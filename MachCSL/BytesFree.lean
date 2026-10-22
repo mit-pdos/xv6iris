@@ -37,7 +37,7 @@ theorem histBytes_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → 
     iintro H
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     icases histBytes_of_bytes ξ pa dq bs n $$ H1 with ⟨%Hs, Hb⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2 with ⟨%e, %He, Hpt, %_, _⟩
+    icases ctxByte_cases_np ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2 with ⟨%hnp, %e, %He, Hpt, %_, _⟩
     iexists (fun j => if j = n then e :: He else Hs j)
     unfold histBytes
     rw [List.range_succ]

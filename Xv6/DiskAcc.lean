@@ -892,7 +892,7 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
   iexists Hs
   iframe Hraw
   inext
-  iintro %t Hraw #Hau #Ht
+  iintro %t %_ Hraw #Hau #Ht
   icases rawHalf_split (availRingAt pav (np0 % NUM)) 2 t (hartAgent cpu) Hs h $$ Hraw
     with ⟨Hcell, Hdrv⟩
   imod Hmask
@@ -996,7 +996,7 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
   isplitl []
   · iapply topLbAt_0
   inext
-  iintro %t %ht0 Hraw #Hau #Ht _
+  iintro %t %ht0 %_ Hraw #Hau #Ht _
   icases idxPend_split (availIdxAt pav) np0 t (hartAgent cpu) Hs (by omega) hhs $$ [Hraw]
     with ⟨Hcell, Hdrv⟩
   · iframe Hhs Hraw
@@ -1177,7 +1177,7 @@ of `MachCSL.keyAt` does the rest.  This is how the status byte comes back
 at the collect, and how the data buffer will once the invariant records
 its bytes. -/
 theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts T : Nat)
-    (hle : ts ≤ T) :
+    (hle : ts ≤ T) (hnp' : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n) :
     iprop(ctxFloor (GF := GF) ξ T ∗ dmaOwnT pa n w ts) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
   unfold dmaOwnT histBytes
   iintro ⟨#Hfl, ⟨%Hs, %s, Hraw, _, #Hls, %hp, #Hau, _⟩⟩
@@ -1208,7 +1208,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
   iexists e, He
   iframe Hb
   isplit
-  · ipureintro; exact hev
+  · ipureintro; exact ⟨hev, hnp' j hj⟩
   · unfold keyAt
     ileft
     rw [het]
@@ -1676,8 +1676,8 @@ theorem ctxBytesL_usedIdxKey (ξ : CtxId) (pa : PAddr) :
     · ipureintro
       refine ⟨⟨e0.t, e1.t, rfl, fun j hj => ?_⟩, rfl, by simp⟩
       rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
-      · exact ⟨e0, T0, by simp, by rw [hv0], rfl⟩
-      · exact ⟨e1, T1, by simp, by rw [hv1], rfl⟩
+      · exact ⟨e0, T0, by simp, by rw [hv0.1], rfl⟩
+      · exact ⟨e1, T1, by simp, by rw [hv1.1], rfl⟩
     isplitl []
     · unfold landedAll; simp only [usedLands, List.map_nil, List.zip_nil_left]
       iapply BigSepL.bigSepL_nil.2; iempintro
@@ -2843,7 +2843,7 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   have hls0 : ∀ q ∈ ls0, q ∈ usedLands dl sts ++ ls0 := fun q hq => List.mem_append_right _ hq
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), ((usedWS dl sts).hist Hold), none, [], (usedLands dl sts ++ ls0)
+  iexists (fun _ => DFrac.own 1), ((usedWS dl sts).hist Hold), none, [], (usedLands dl sts ++ ls0), none
   iframe Hb
   isplitl []
   · unfold landedAll
@@ -2876,6 +2876,10 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
           (List.mem_map.2 ⟨_, hzm, rfl⟩), rfl⟩)
       · exact Or.inr (Or.inr (Or.inl ⟨t, hls _ (DiskAcc.mem_usedLands dl sts _ hzm), htK⟩))
   isplitl []
+  · unfold rsvPcCell; iempintro
+  isplitl []
+  · ipureintro; exact rdNpOk_own1
+  isplitl []
   · simp only [rdIn]; iempintro
   isplitl []
   · unfold rdCompBytes
@@ -2884,7 +2888,7 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   · iapply DiskAcc.usedIdx_certs γ cpu c0.used K nr b dl sts Hold ts ls0 _ htail hlen h0s hls hls0 hmem
     iframe Hbs Hhc
   inext
-  iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _
+  iintro %w %tvn %lp %es %ps %hKt %⟨hla, hrd, _⟩ _ %hauth #Hrv _ Hb _ _
   imod Hmask
   have hl : ∀ q ∈ dl.zip sts, lp q.2 = some q.1.2.1 := by
     intro q hq
@@ -3626,7 +3630,9 @@ handler read to the status write of this one. -/
 theorem disk_collect [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (n T nr : Nat)
     (hwf : c.wf) (hnr : n ≤ nr) (hctx : c.ctx = curCtx)
     (hram : ∀ j, j < BSIZE → inRam (c.data + BitVec.ofNat 64 j) 1)
-    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw) :
+    (hkm : ∀ j, j < BSIZE → kmapClass (vpnOf (c.data + BitVec.ofNat 64 j)).toNat = some .rw)
+    (hnpS : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) c.status 1)
+    (hnpD : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) c.data BSIZE) :
     diskInv (GF := GF) γ ∗ kmapStatic ∗ diskGeom γ pd pav pu ∗
       headTok γ c.hd (.active c) ∗ headTok γ c.md (.member c.hd) ∗
       headTok γ c.tl (.member c.hd) ∗ claimResD γ curCtx pd c 0#32 ∗ diskReadAt γ nr ∗
@@ -3667,7 +3673,7 @@ theorem disk_collect [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
   iframe Hthd Htmd Httl Hnr Hd0 Hd1 Hd2 Hhdr Hib Hdsk Hblk Hdone
   -- the status byte, back at the payload's context
   isplitl [Hstat]
-  · ihave Hsc := dmaOwnT_ctxBytes curCtx c.status 1 0#8 ts T hts $$ [Hfl Hstat]
+  · ihave Hsc := dmaOwnT_ctxBytes curCtx c.status 1 0#8 ts T hts hnpS $$ [Hfl Hstat]
     · iframe Hfl Hstat
     iapply ctxBytes_wordPointsTo c.status 1 (DFrac.own 1) 0#8
       (by rw [show c.status = aInfoStatus c.hd from rfl]; exact info_status_ram c.hd hwf.1)
@@ -3684,7 +3690,7 @@ theorem disk_collect [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (c : Chain) (
       iexact Hbw
     · isimp only [bufDone_read c ts hdw] at Hbuf
       icases Hbuf with ⟨%t', %hle, Hb⟩
-      iapply dmaOwnT_ctxBytes curCtx c.data BSIZE c.payw t' T (by omega)
+      iapply dmaOwnT_ctxBytes curCtx c.data BSIZE c.payw t' T (by omega) hnpD
       iframe Hfl Hb
   iapply (show iprop(byteBuf (GF := GF) c.data (DFrac.own 1) (bytesOf c.payw)) ⊢
     byteBuf c.data (DFrac.own 1) c.pay from .rfl)
@@ -3747,6 +3753,8 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     have : j = 0 := by omega
     rw [this, heq]
     exact ⟨e, List.mem_cons_self, Or.inr (Or.inr (Or.inl ⟨ts, by rw [het]; simp, by omega⟩))⟩
+  isplitl []
+  · ipureintro; exact rdNpOk_own1
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []
@@ -3982,6 +3990,8 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
       rw [hx] at h0
       simp only [List.head?_cons, Option.map_some, Option.some.injEq] at h0
       exact ⟨e, List.mem_cons_self, Or.inr (Or.inr (Or.inl ⟨ts, by rw [h0]; simp, by omega⟩))⟩
+  isplitl []
+  · ipureintro; exact rdNpOk_own1
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []

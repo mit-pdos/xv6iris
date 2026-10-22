@@ -65,7 +65,7 @@ theorem fp_ctxByte_join (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8)
   · iframe
   have hev : e1 = e2 := (List.cons.injEq _ _ _ _ ▸ heq).1
   isplitl []
-  · ipureintro; rw [← hv1, ← hv2, hev]
+  · ipureintro; rw [← hv1.1, ← hv2.1, hev]
   · iexists e1, H1
     iframe Hp
     isplit

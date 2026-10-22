@@ -50,8 +50,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- A `.bss` cell at a named address `va` whose value is `A`. -/
 theorem bootBss_cellAt [CurCtx] (ξ : CtxId)
     (va : PAddr) (n A hi : Nat) (hva : va.toNat = A) (hhi : hi = A + n)
-    (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end»)
-    (hal : A % n = 0) (hn : 0 < n := by decide) :
+    (hlo : MachCSL.KernelSyms.«_bss» + 4 ≤ A) (hend : A + n ≤ MachCSL.KernelSyms.«end»)
+    (hal : A % n = 0) (hn : 0 < n := by decide) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A hi -∗ wordAtN ξ va n (DFrac.own 1) 0#(8 * n) := by
   subst hhi
   have hA : A < 2 ^ 64 := by simp only [MachCSL.KernelSyms.«end»] at hend; omega
@@ -73,7 +73,7 @@ theorem bc_buf_off (i o : Nat) (hi : i < NBUF) (ho : o < 1112) :
     (bnode i + BitVec.ofNat 64 o).toNat = bcBuf i + o := bnode_off_toNat i o hi ho
 
 theorem bc_buf_bounds (i : Nat) (hi : i < NBUF) :
-    MachCSL.KernelSyms.«_bss» ≤ bcBuf i ∧ bcBuf i + 1112 ≤ MachCSL.KernelSyms.«end» ∧ bcBuf i % 8 = 0 := by
+    MachCSL.KernelSyms.«_bss» + 4 ≤ bcBuf i ∧ bcBuf i + 1112 ≤ MachCSL.KernelSyms.«end» ∧ bcBuf i % 8 = 0 := by
   unfold bcBuf NBUF at *
   simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end», MachCSL.KernelSyms.«bcache»]
   omega
@@ -84,9 +84,9 @@ theorem bc_end_val : MachCSL.KernelSyms.«end» = 0x80023b10 := rfl
 /-- A `.bss` cell at a named address, as the ambient `wordPointsTo`. -/
 theorem bootBss_wordAt [CurCtx]
     (va : PAddr) (n A hi : Nat) (hva : va.toNat = A) (hhi : hi = A + n)
-    (hlo : 0x8000a400 ≤ A) (hend : A + n ≤ 0x80023b10) (hal : A % n = 0) (hn : 0 < n := by decide) :
+    (hlo : 0x8000a404 ≤ A) (hend : A + n ≤ 0x80023b10) (hal : A % n = 0) (hn : 0 < n := by decide) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A hi -∗ wordPointsTo va n (DFrac.own 1) 0#(8 * n) :=
-  bootBss_cellAt curCtx va n A hi hva hhi (by rw [bc_bss_val]; exact hlo)
+  bootBss_cellAt curCtx va n A hi hva hhi (by rw [bc_bss_val]; omega)
     (by rw [bc_end_val]; exact hend) hal hn
 
 /-- Buffer `i`'s 1112-byte window holds no registered byte but its sleeplock's
@@ -111,7 +111,7 @@ theorem bc_rsvBufLk_toNat (i : Nat) (hi : i < NBUF) : (rsvBufLk i).toNat = bcBuf
 (`bootRan_lockHole`) is `bufIn`'s and `bdBss`'s cells at the loader's zero;
 the inner lock's words are the client's half cells (a registered lock). -/
 theorem bootCarve_buf [CurCtx] (ξ : CtxId) (i : Nat) (hi : i < NBUF)
-    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bcBuf i) (bcBuf i + 1112) -∗
       rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (rsvBufLk i)) (imgFlat bootImage) -∗
       bufIn i ∗ bdBss ξ i := by
@@ -207,7 +207,7 @@ theorem bootCarve_buf [CurCtx] (ξ : CtxId) (i : Nat) (hi : i < NBUF)
 /-- A static lock's three words at zero, with its two identity claims (the
 input shape `initlock`'s callers pass as `lockWords`). -/
 theorem bootCarve_lockWords [CurCtx] (lk : PAddr) (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a404 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) L (L + 24) -∗ lockWords lk 0#32 0#64 0#64 := by
   have h8 : (lk + 8#64).toNat = L + 8 := bc_toNat_add _ 8 _ hlk (by omega)
   have h16 : (lk + 16#64).toNat = L + 16 := bc_toNat_add _ 16 _ hlk (by omega)
@@ -229,8 +229,8 @@ theorem bootCarve_lockWords [CurCtx] (lk : PAddr) (L : Nat)
 `.bss` window, the two raw words as the client's half cells (`lkRaw`'s
 reserved branch), the identity claims. -/
 theorem bootCarve_lockWordsR [CurCtx] (lk : PAddr) (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
-    (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a404 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
+    (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (L + 8) (L + 16) -∗
       rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR lk) (imgFlat bootImage) -∗
       lockWordsR lk 0#32 0#64 0#64 := by
@@ -258,8 +258,8 @@ theorem bootCarve_lockWordsR [CurCtx] (lk : PAddr) (L : Nat)
 less the hole (`bootRan_lockHole`, the only region in the window being the
 lock's own) is the name word; with the halves, `lockWordsR`. -/
 theorem bootLockWin_lockWordsR [CurCtx] (lk : PAddr) (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
-    (hon : rsvOnly KernelRsv.static (xv6LockR lk) L (L + 24) = true) (hin : xv6LockR lk ∈ xv6RsvStatic) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a404 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
+    (hon : rsvOnly KernelRsv.static (xv6LockR lk) L (L + 24) = true) (hin : xv6LockR lk ∈ xv6RsvStatic) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootLockWin lk L -∗ lockWordsR lk 0#32 0#64 0#64 := by
   have hh := bootRan_lockHole (GF := GF) (imgFlat bootImage) lk KernelGeom.cpusBase L (L + 24)
     (by omega) (by omega) (by omega) hon
@@ -277,7 +277,7 @@ lock and head rows of `main_globals_raw`): the `.bss` bytes of `bcache` past
 its lock (a registered lock, W8-β′: `bootCarveFs_mainLocksRaw`) are
 `binit`'s precondition cells (the head's links, every buffer's `bufIn`) and
 bioInitAt's `bdBss` rows, everything at its `.bss` zero. -/
-theorem bootCarve_bcache [CurCtx] (ξ : CtxId) :
+theorem bootCarve_bcache [CurCtx] (ξ : CtxId) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootBufsWin -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30)
@@ -332,7 +332,7 @@ theorem bc_kinit_span : 0x80024000 + 4096 * kinitPages = ramEnd := by decide
 /-- **kinit's page run** (Rocq `boot_kinit_run` / `boot_pg_run_own`): the
 RAM from `PGROUNDUP(end)` to `PHYSTOP` is `freerange`'s `pageRange`, each
 page owned at the image's contents. -/
-theorem bootCarve_kinitRun [CurCtx] :
+theorem bootCarve_kinitRun [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) 0x80024000 ramEnd -∗ pageRange kinitBase kinitPages := by
   have hspan := bc_kinit_span
   generalize kinitPages = P at *

@@ -1704,7 +1704,15 @@ theorem memModel_relPcOk (σ : MState) :
   unfold memModelAt rsvModelAt
   iintro ⟨_, _, _, _, _, ⟨%reg, _, %⟨_, _, _, hrp⟩, _⟩, _⟩
   ipureintro
-  exact hrp
+  exact hrp.1
+
+/-- The publication reads' provenance at the machine (Q4 [OWN.154] (L1)). -/
+theorem memModel_ldPcOk (σ : MState) :
+    memModelAt E σ ⊢@{IProp GF} ⌜ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ⌝ := by
+  unfold memModelAt rsvModelAt
+  iintro ⟨_, _, _, _, _, ⟨%reg, _, %⟨_, _, _, hrp⟩, _⟩, _⟩
+  ipureintro
+  exact hrp.2
 
 /-- An issued certificate is valid of the machine. -/
 theorem memModel_chainCert (σ : MState) (c : ChainCert) :
@@ -1827,6 +1835,7 @@ theorem rsvModel_mono (σ σ' : MState)
     (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
       relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ')
     (hpcs : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t)
+    (hld : ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ → ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ')
     (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
       (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ'))
     (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
@@ -1834,7 +1843,7 @@ theorem rsvModel_mono (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp, hlp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
   have hnew := h (all_of_reservedOk hin hok)
   ihave Hsnap := kptSnapAt_mono E hg.1 (fun hne => by
     rcases hseal with h0 | h0
@@ -1846,7 +1855,7 @@ theorem rsvModel_mono (σ σ' : MState)
     iframe Hreg
     isplit
     · ipureintro
-      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
+      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp, hld hlp⟩
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc Hsnap
     ipureintro
@@ -1874,6 +1883,7 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
     (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
       relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ')
     (hpcs : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t)
+    (hld : ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ → ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ')
     (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
       (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ'))
     (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
@@ -1885,7 +1895,7 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
     rsvModelAt E σ ∗ (∃ (k s S0 L0 : Nat), kptSealedAt E S0 L0 ∗ epochAtE E c k s ∗ ⌜S0 ≤ s ∧ s < t ∧ L0 ≤ L⌝) ∗
       landsAboveAtE E t L ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
+  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp, hlp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hdma, hseal⟩, Hcells, Hcarve, #Hrc, Hsnap⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
     ⟨%k, %s, %S0, %L0, #Hsl, #Hep, %hsl⟩, #Hla⟩
   unfold kptSealedAt
   ihave %hget := ghost_map_lookup $$ Hreg Hsl
@@ -1904,7 +1914,7 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
     iframe Hreg
     isplit
     · ipureintro
-      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
+      exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp, hld hlp⟩
     iexists S, dyn, stk
     iframe Hcells Hcarve Hrc Hsnap
     ipureintro
@@ -2089,12 +2099,14 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
 /-- A plain load moves only the read side of its hart. -/
 theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
     (hsrc : loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)
-      σ.mem cpu pa n tvn) :
+      σ.mem cpu pa n tvn)
+    (hob : ldPcObl (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF))
+      σ cpu pa n) :
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) (kptGrow_load σ cpu pa n tvn) (pubSame_refl _ _) id id
-    (fun _ _ => rfl)
+    (fun _ _ => rfl) (ldPcOk_afterLoad σ cpu pa n tvn hob)
     (fun _ => chainEnvAt_ext_load _ _ _ σ cpu pa n tvn)
     (fun _ h => chainLoads_load σ cpu pa n tvn hmm hsrc h) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
@@ -2333,7 +2345,7 @@ theorem memModel_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : Bit
       iintro ⟨H, _⟩
       iapply rsvModel_mono E σ (σ.issue cpu pa n w) (kptGrow_issue σ cpu pa n w) hpub hrsv
         (relPcOk_issue σ cpu pa n w (ramBytes_le hram) (mmOk_le_top hmm) hst)
-        (relPc_issueOld σ cpu pa n w)
+        (relPc_issueOld σ cpu pa n w) (ldPcOk_issue σ cpu pa n w)
         (chainEnvAt_ext_issue _ _ _ σ cpu pa n w (mmOk_okP hmm))
         (fun hnew h => chainLoads_issue σ cpu pa n w hmm hnew h) $$ H)
   isplitl [Hmm]
@@ -2365,7 +2377,7 @@ theorem memModel_issueLA (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : B
       iintro ⟨H, _, _⟩
       iapply rsvModel_mono E σ (σ.issue cpu pa n w) (kptGrow_issue σ cpu pa n w) hpub hrsv
         (relPcOk_issue σ cpu pa n w (ramBytes_le hram) (mmOk_le_top hmm) hst)
-        (relPc_issueOld σ cpu pa n w)
+        (relPc_issueOld σ cpu pa n w) (ldPcOk_issue σ cpu pa n w)
         (chainEnvAt_ext_issue _ _ _ σ cpu pa n w (mmOk_okP hmm))
         (fun hnew h => chainLoads_issue σ cpu pa n w hmm hnew h) $$ H)
   iframe Hmm Hfrag HK
@@ -2392,7 +2404,7 @@ theorem memModel_issue_sealedLA (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
       iintro ⟨H, HQ, #Hla⟩
       iapply rsvModel_mono_sealed E σ (σ.issue cpu pa n w) (kptGrow_issue σ cpu pa n w) hrsv
         (relPcOk_issue σ cpu pa n w (ramBytes_le hram) (mmOk_le_top hmm) hst)
-        (relPc_issueOld σ cpu pa n w)
+        (relPc_issueOld σ cpu pa n w) (ldPcOk_issue σ cpu pa n w)
         (chainEnvAt_ext_issue _ _ _ σ cpu pa n w (mmOk_okP hmm))
         (fun hnew h => chainLoads_issue σ cpu pa n w hmm hnew h) cpu (σ.top + 1) K
         (fun a H' e hH' he => by
@@ -2464,7 +2476,7 @@ theorem ctxByte_readable (σ : MState) (cpu : CPU) (ξ : CtxId) (a : PAddr) (dq 
     memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗ ctxByte ξ a dq v ⊢@{IProp GF}
       ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readP σ.lp (hartAgent cpu) tvn a = some v⌝ := by
   iintro ⟨Hmm, Hctx, Hmem, Hb⟩
-  icases ctxByte_cases ξ a dq v $$ Hb with ⟨%e, %H, Hpt, %hev, #Hkey⟩
+  icases ctxByte_cases_np ξ a dq v $$ Hb with ⟨%hnp, %e, %H, Hpt, %hev, #Hkey⟩
   ihave %hvis := ctxByte_vis σ cpu ξ a dq e H $$ [Hmm Hctx Hmem Hpt]
   · iframe Hmm Hctx Hmem Hpt; iexact Hkey
   ipureintro
@@ -2523,7 +2535,7 @@ theorem ctxByte_srcOk (σ : MState) (cpu : CPU) (ξ : CtxId) (a : PAddr) (dq : D
     memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗ ctxByte ξ a dq v ⊢@{IProp GF}
       ⌜∀ tvn, σ.tv cpu ≤ tvn → byteSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu tvn a⌝ := by
   iintro ⟨Hmm, Hctx, Hmem, Hb⟩
-  icases ctxByte_cases ξ a dq v $$ Hb with ⟨%e, %H, Hpt, %hev, #Hkey⟩
+  icases ctxByte_cases_np ξ a dq v $$ Hb with ⟨%hnp, %e, %H, Hpt, %hev, #Hkey⟩
   ihave %hvis := ctxByte_vis σ cpu ξ a dq e H $$ [Hmm Hctx Hmem Hpt]
   · iframe Hmm Hctx Hmem Hpt; iexact Hkey
   obtain ⟨hget, hvis⟩ := hvis
@@ -2708,7 +2720,7 @@ theorem ctxBytes_update' (ξ : CtxId) (m : FlatMem) (pa : PAddr) (bs bs' : Nat �
     iintro ⟨#Hkey, Hm, Hb⟩
     icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
     imod ctxBytes_update' ξ m pa bs bs' t h n $$ [$Hkey $Hm $Hb1] with ⟨Hm, Hb1⟩
-    icases ctxByte_cases ξ _ _ _ $$ Hb2 with ⟨%e, %H, Hpt, %_, _⟩
+    icases ctxByte_cases_np ξ _ _ _ $$ Hb2 with ⟨%hnp, %e, %H, Hpt, %_, _⟩
     ihave %hget : ⌜((List.range n).foldl (fun (m : FlatMem) j => FlatMem.push m (pa + BitVec.ofNat 64 j) ⟨t, h, bs' j⟩) m)[pa + BitVec.ofNat 64 n]? = some (e :: H)⌝ $$ [Hm Hpt]
     · icases genHeap_valid $$ [$Hm $Hpt] with >%_
       itrivial
@@ -2726,7 +2738,7 @@ theorem ctxBytes_update' (ξ : CtxId) (m : FlatMem) (pa : PAddr) (bs bs' : Nat �
     iframe Hm
     iapply BigSepL.bigSepL_snoc.2
     iframe Hb1
-    iapply ctxByte_intro ξ _ _ ⟨t, h, bs' n⟩ (e :: H)
+    iapply ctxByte_intro ξ _ _ ⟨t, h, bs' n⟩ (e :: H) hnp
     iframe Hpt
     iexact Hkey
 
@@ -3013,6 +3025,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
   iintro ⟨Hctx, Hb, HΦ⟩
+  icases ctxBytes_np ξ req.pa n dq w $$ Hb with ⟨Hb, %hnp⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
@@ -3053,7 +3066,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytesP_unique _ _ _ _ _ _ _ _ (hrd tvn htv) ((σ.readFwd_iff hP cpu tvn req.pa n w').1 hrd')
-    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) (ldPcObl_of_notPub hnp) $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]

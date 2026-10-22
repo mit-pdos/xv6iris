@@ -588,7 +588,7 @@ theorem ctxByte_byteMapped4 (ξ : CtxId) (a : BitVec 64) (ppn : BitVec 44) (b : 
   isplit
   · ipureintro; exact hfacts
   rw [hpa]
-  icases ctxByte_cases ξ _ _ b $$ Hb with ⟨%e, %H, Hpt, -, -⟩
+  icases ctxByte_cases_np ξ _ _ b $$ Hb with ⟨%hnp, %e, %H, Hpt, -, -⟩
   iexists e :: H
   iexact Hpt
 

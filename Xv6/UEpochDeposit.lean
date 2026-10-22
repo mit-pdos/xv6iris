@@ -223,7 +223,7 @@ theorem ctxByteX_custody (ξ : CtxId) (K : Nat) (a : PAddr) (v : BitVec 8) :
   icases h.1 $$ Hpt with ⟨H1, H2⟩
   isplitl [H1]
   · iexists e, He; iframe H1 Hkey HK; ipureintro; exact hev
-  · iexists e, He; iframe H2 HK; ipureintro; exact hev
+  · iexists e, He; iframe H2 HK; ipureintro; exact hev.1
 
 /-- **Gathering the heads' certificates into one list** (route P): what a slot's deposit cell
 (`MachCSL.uslotPreCell`) carries. -/

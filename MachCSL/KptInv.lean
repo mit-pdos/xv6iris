@@ -390,6 +390,11 @@ table's pages are off the client's static stacks (`RsvKind.stack`; xv6:
 def kptStackOff (t : PTree) : Prop :=
   ∀ e ∈ t.entries 2, ∀ j, j < 8 → ¬ stackByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (e.1 + BitVec.ofNat 64 j)
 
+/-- **No entry byte of `t` is a publication base** (Q4 [OWN.154] (L1): what a walk's read of an
+entry owes; established at the seal, where no entry byte is a reserved byte). -/
+def kptPubOff (t : PTree) : Prop :=
+  ∀ e ∈ t.entries 2, ∀ j, j < 8 → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (e.1 + BitVec.ofNat 64 j)
+
 /-- **The kernel page table is installed** (persistent): the table `t` is
 well-formed with distinct pages and entries in RAM, the mapping `M` is
 published (its auth discarded, so no element ever changes), the leaves sit
@@ -401,7 +406,7 @@ entry's POSITION in `t.entries 2`, not by its address: the seal chooses one
 function for the whole list by induction on it, which needs no argument
 that the addresses are distinct. -/
 def kptOn [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) : IProp GF := iprop%
-  ⌜kptFacts t M ∧ kptStackOff (hlc := hlc) (GF := GF) t⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
+  ⌜kptFacts t M ∧ kptStackOff (hlc := hlc) (GF := GF) t ∧ kptPubOff (hlc := hlc) (GF := GF) t⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
   (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗
   ∃ (fl : Nat → Nat → Nat) (fr : Nat → Nat), kptCore t fl fr ∗ kptKeys t fl fr
 
@@ -666,7 +671,7 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
       ownCtx cpu curCtx ∗ ∃ (K : Nat) (tsl : List (Nat × Agent)), viewLb cpu K ∗
         readAU cpu addr 8 K tsl (fun w => iprop(⌜pteVariant c w⌝)) := by
   unfold kptOn kptCore
-  iintro ⟨⟨%⟨hf, hso⟩, _, _, %fl, %fr, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _, _, #HrootF⟩, #Hkeys⟩, Hctx⟩
+  iintro ⟨⟨%⟨hf, hso, hpo⟩, _, _, %fl, %fr, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _, _, #HrootF⟩, #Hkeys⟩, Hctx⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
   ihave #Hk8 := kptKeys_acc t fl fr i (addr, c) hi $$ Hkeys
   icases srcCertAt_of_keys cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, #Hkc⟩
@@ -711,6 +716,8 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
       have := hreadable Hs c [] [] htail j hj
       rw [hHs] at this
       exact this
+    isplitl []
+    · ipureintro; exact rdNpOk_of_np (fun j hj => hpo (addr, c) hmem j hj)
     isplitl []
     · iapply rdCompBytes_nil
     isplitl []
@@ -770,6 +777,8 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
     iframe Hb
     isplit
     · ipureintro; exact hreadable Hold v0 W lsW htail
+    isplitl []
+    · ipureintro; exact rdNpOk_of_np (fun j hj => hpo (addr, c) hmem j hj)
     isplitl []
     · unfold rdCompBytes
       iapply BigSepL.bigSepL_cons.2
@@ -1125,7 +1134,7 @@ theorem histBytes_keys_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat
     iintro H
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     icases histBytes_keys_of_bytes ξ pa dq bs n $$ H1 with ⟨%Hs, %f, Hb, %hvals, #Hkeys⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2 with ⟨%e, %He, Hpt, %hev, #Hkey⟩
+    icases ctxByte_cases_np ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2 with ⟨%hnp, %e, %He, Hpt, %hev, #Hkey⟩
     iexists (fun j => if j = n then e :: He else Hs j), (fun j => if j = n then e.t else f j)
     isplitl [Hb Hpt]
     · unfold histBytes
@@ -2022,7 +2031,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
   isplitr
   · unfold kptOn
     isplit
-    · ipureintro; exact ⟨hf, hso⟩
+    · ipureintro; exact ⟨hf, hso, fun e he j hj => notPubBase_of_notRsv (hnrE e he j hj)⟩
     isplit
     · iexact Hauth
     isplit

@@ -189,7 +189,7 @@ steps: `boot_bytes_split`, `boot_text_persist`, `kernel_text_intro`,
 `boot_data_ran`, the GOT persist): the era's memory cells become the
 kernel's read-only image, the GOT row every hart reads, `.data`'s four
 windows, `.bss` whole and the free RAM run. -/
-theorem bootShared_image (σ : MState) (hbf : bootFacts σ) :
+theorem bootShared_image (σ : MState) (hbf : bootFacts σ) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) ⊢
       |==> (kernelText ∗ kernelData ∗ bootGotRo ∗
         bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
@@ -199,7 +199,7 @@ theorem bootShared_image (σ : MState) (hbf : bootFacts σ) :
         bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ∗
         bootRan (imgFlat bootImage) 0x80024000 ramEnd) := by
   rw [hbf.1]
-  refine (bootCarve_imageR (GF := GF)).trans ?_
+  refine (bootCarve_imageR (GF := GF) hrsv).trans ?_
   iintro H
   imod H with ⟨⟨#Ht, #Hd, -⟩, Hown⟩
   icases bootCarve_owned (GF := GF) _ $$ Hown with ⟨Hdata, Hbss, Hfree⟩
@@ -366,7 +366,7 @@ set_option maxRecDepth 100000 in
 /-- **The rows spent before the tier switch** (at the entry context,
 SpecMain deviation 5): the pre-switch locks and globals, both ports'
 `uarts[i]` cells, and kinit's page run. -/
-theorem bootShared_bareRows [CurCtx] :
+theorem bootShared_bareRows [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootLockWin KA.«cons» MachCSL.KernelSyms.«cons» -∗
       bootLockWin KA.«pr» MachCSL.KernelSyms.«pr» -∗
@@ -397,7 +397,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 rows, `main_globals_raw`, `main_sb_raw`, `main_log_raw`, `main_data_raw`'s
 `first`/`nextpid`, `boot_disk_slots`), out of their `.bss`/`.data`
 windows, the ring's boot ghosts and the slot supplies' proc-layer shares. -/
-theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
+theorem bootShared_kptRows [CurCtx] (cn : ConsNames) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootProcWin -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
@@ -506,7 +506,7 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
   unfold bootMemRes
   rw [hbf.1]
   iintro ⟨#Hk, ⟨Hmem, Hhalf, %⟨hrsv, hkptEq⟩⟩, Ht, Hr, Hl⟩
-  imod bootShared_image σ hbf $$ [Hmem] with
+  imod bootShared_image σ hbf hrsv $$ [Hmem] with
     ⟨#Htx, #Hd, #Hg, Hw1, Hw2, Hu0, Hu1, Hbss, Hfree⟩
   · rw [hbf.1]; iframe Hk Hmem
   icases bcpBssWindowsR (GF := GF) $$ Hbss with
@@ -694,6 +694,16 @@ def bootSharedOut [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fs
   diskInv γd ∗ crashInv (hlc := hlc) (GF := GF) ∗ diskCrashCaps (hlc := hlc) γd ∗ diskRoot γd
 
 set_option maxHeartbeats 400000 in
+/-- The `started` cell carries the registry equation (Q4 [OWN.154] (L1): what the kernel-tier
+rows' context bytes need). -/
+theorem startedCell_rsvEq :
+    startedCell (hlc := hlc) (GF := GF) ⊢
+      startedCell (hlc := hlc) (GF := GF) ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ := by
+  unfold startedCell
+  iintro ⟨H, %h⟩
+  iframe H
+  isplit <;> ipureintro <;> exact h
+
 /-- **Rocq `boot_shared_alloc`**: THE SHARED BOOT ALLOCATION.  Out of the
 power thread's rows (unpacked, `powerBootRes_unpack`, less the lend), the
 reset device state, and the three fs inputs the era's
@@ -737,6 +747,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   unfold bsCarveOut bsKptWin
   icases Hc with ⟨#Htx, #Hd, Ht0, Hb0, Hrest, HL, HG, HU0, HU1, HP, ⟨W1, W2, W3, W4, W5, W6, W7, W8,
     W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21⟩, Hsc⟩
+  icases startedCell_rsvEq $$ Hsc with ⟨Hsc, %hrsv⟩
   -- the devices
   imod bootSharedDev_devs (hlc := hlc) (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩

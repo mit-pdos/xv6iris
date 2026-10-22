@@ -30,9 +30,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- **Rocq `ctx_phys_xpointsto`**: the byte at `a` holds `v`, justified at
 context ξ, and its latest write is the boot image's or LANDED at or below the
 instruction-view position `K` (route P: the fetch agent reads landed entries only;
-a position, design D9). -/
+a position, design D9); as a context byte (Q4 [OWN.154] (L1)), `a` is no publication base. -/
 def ctxByteX (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : BitVec 8) : IProp GF := iprop%
-  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗
+  ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗
+    ⌜e.v = v ∧ notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a⌝ ∗
     keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t ∗
     (⌜e.t = 0⌝ ∨ ∃ p : Nat, landedAt e.t p ∗ ⌜p ≤ K⌝)
 
@@ -57,5 +58,45 @@ theorem ctxByteX_forget (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : Bit
   iexists e, H
   iframe Hpt Hk
   ipureintro; exact hv
+
+/-- Stamped bytes over a list of indices are no publication bases (kept; Q4 [OWN.154] (L1)). -/
+theorem ctxByteXL_np (ξ : CtxId) (K : Nat) (dq : DFrac) (f : Nat → PAddr) (g : Nat → BitVec 8) :
+    ∀ L : List Nat, ([∗list] j ∈ L, ctxByteX ξ K (f j) dq (g j)) ⊢@{IProp GF}
+      ([∗list] j ∈ L, ctxByteX ξ K (f j) dq (g j)) ∗
+        ⌜∀ j ∈ L, notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (f j)⌝
+  | [] => by
+    iintro H
+    iframe H
+    ipureintro
+    intro j hj; cases hj
+  | j :: L => by
+    iintro H
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hj, HL⟩
+    icases ctxByteXL_np ξ K dq f g L $$ HL with ⟨HL, %hL⟩
+    unfold ctxByteX
+    icases Hj with ⟨%e, %H, Hpt, %⟨hv, hnp⟩, Hk, Hc⟩
+    isplitl [Hpt Hk Hc HL]
+    · iapply BigSepL.bigSepL_cons.2
+      iframe HL
+      iexists e, H
+      iframe Hpt Hk Hc
+      ipureintro; exact ⟨hv, hnp⟩
+    · ipureintro
+      intro k hk
+      rcases List.mem_cons.1 hk with rfl | hk
+      · exact hnp
+      · exact hL k hk
+
+/-- **Stamped bytes are no publication bases** (kept). -/
+theorem ctxBytesX_np (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
+    ctxBytesX ξ K pa n dq w ⊢@{IProp GF}
+      ctxBytesX ξ K pa n dq w ∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ := by
+  unfold ctxBytesX
+  iintro H
+  icases ctxByteXL_np ξ K dq (fun j => pa + BitVec.ofNat 64 j) (nthByte w) (List.range n) $$ H with ⟨H, %h⟩
+  iframe H
+  ipureintro
+  intro j hj
+  exact h j (List.mem_range.2 hj)
 
 end MachCSL

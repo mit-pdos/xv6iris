@@ -228,7 +228,7 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iexists Hs
       iframe Hcell
       inext
-      iintro %t Hb #Hau #Htop
+      iintro %t %hnp Hb #Hau #Htop
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx
@@ -240,9 +240,10 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iapply wordPointsTo_intro (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own 1)
         (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) ppn ⟨hpin, hlt, hram, hal⟩ $$ Hcl
       have hcb : ∀ (pa : PAddr) (v : BitVec 8) (H : Hist),
+          notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa →
           pa ↦ₕ{DFrac.own 1} (⟨t, hartAgent cpu', v⟩ :: H) ∗
             keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx t ⊢ ctxByte curCtx pa (DFrac.own 1) v :=
-        fun pa v H => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H
+        fun pa v H hp => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H hp
       ihave Hb := (show histBytes (GF := GF) (paOf ppn (k.rget cpu rs1 + BitVec.signExtend 64 imm)) 4
           (fun _ => DFrac.own 1)
           (pushed (n := 4) Hs t (hartAgent cpu') (BitVec.extractLsb' 0 32 ((tpPin cpu' k.regs).get rs2))) ⊢
@@ -253,7 +254,7 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iapply BigSepL.bigSepL_impl $$ Hb
       imodintro
       iintro %n %j %hj Hj
-      iapply hcb
+      iapply hcb _ _ _ (hnp j (List.mem_range.1 (List.mem_of_getElem? hj)))
       isplitl [Hj]
       · iexact Hj
       · iexact Hkey

@@ -89,8 +89,8 @@ theorem ctxBytes_split_bytes (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
     iintro H
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     icases ctxBytes_split_bytes ξ pa bs n $$ H1 with ⟨%Hs, Hb, %hh, Hc⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) (DFrac.own 1) (bs n) $$ H2
-      with ⟨%e, %He, Hpt, %hev, #Hkey⟩
+    icases ctxByte_cases_np ξ (pa + BitVec.ofNat 64 n) (DFrac.own 1) (bs n) $$ H2
+      with ⟨%hnp, %e, %He, Hpt, %hev, #Hkey⟩
     icases histByte_split_half (pa + BitVec.ofNat 64 n) (e :: He) $$ Hpt with ⟨Hpt1, Hpt2⟩
     iexists (fun j => if j = n then e :: He else Hs j)
     isplitl [Hb Hpt1]
@@ -120,7 +120,7 @@ theorem ctxBytes_split_bytes (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
         iexists e, He
         iframe Hpt2
         isplit
-        · ipureintro; exact hev
+        · ipureintro; exact ⟨hev, hnp⟩
         · iexact Hkey
 
 /-- The word form of `ctxBytes_split_bytes`. -/

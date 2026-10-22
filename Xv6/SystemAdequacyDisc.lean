@@ -51,7 +51,7 @@ theorem xv6DiscAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
         (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
         (appTrivTk c) (appTrivHk c)
       iintro ⟨H, -⟩
-      ihave %h := AccessDiscipline.powerInterp_accessDisc (hlc := hlc) (GF := GF) rfl rfl rfl g' $$ H
+      ihave %h := AccessDiscipline.powerInterp_accessDisc (hlc := hlc) (GF := GF) rfl rfl rfl rfl g' $$ H
       imodintro
       ipureintro
       exact h)

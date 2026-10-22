@@ -354,18 +354,18 @@ theorem histBytes_split (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
 
 /-- A pushed window, at the new store's key, is the writer's bytes. -/
 theorem uepCtxBytes_of_pushed (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (Hs : Nat → Hist) (t : Nat)
-    (g : Agent) (w : BitVec (8 * n)) :
+    (g : Agent) (w : BitVec (8 * n)) (hnp : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n) :
     keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗ histBytes pa n (fun _ => dq) (pushed Hs t g w) ⊢@{IProp GF}
       ctxBytes ξ pa n dq w := by
   unfold histBytes ctxBytes
   iintro ⟨#Hk, H⟩
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
-  iintro %k %j %_ Hj
+  iintro %k %j %hj Hj
   unfold ctxByte
   iexists ⟨t, g, nthByte w j⟩, Hs j
   iframe Hj Hk
-  ipureintro; rfl
+  ipureintro; exact ⟨rfl, hnp j (List.mem_range.1 (List.mem_of_getElem? hj))⟩
 
 /-- The record's stamp is at or below the hart's instruction view. -/
 theorem memModel_iviewLbE (σ : MState) (cpu : CPU) (K : Nat) :
@@ -600,7 +600,8 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
       (lpOf_snoc_self σ.llog (σ.top + 1) (by omega) hnotin) (by omega) $$ Hmm with ⟨Hmm, #Hland⟩
     have hk0' : uslotHistOkL e.K d0 (pushed (n := 8) Hs0 (σ.top + 1) (hartAgent cpu) w') ((σ.top + 1, σ.ltop + 1) :: L0) :=
       uslotHistOkL_push hk0 hd0f (σ.top + 1) (σ.ltop + 1) (by omega) (hartAgent cpu) cpu.isLt w' hvar'
-    ihave Hb := uepCtxBytes_of_pushed ξ req.pa 8 _ Hs0 (σ.top + 1) (hartAgent cpu) w' $$ [HhC]
+    ihave Hb := uepCtxBytes_of_pushed ξ req.pa 8 _ Hs0 (σ.top + 1) (hartAgent cpu) w'
+      (fun j hj => notPubBase_of_notRsv (hnr j hj)) $$ [HhC]
     · iframe Hkey HhC
     ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ _ hk0' $$ [HhR]
     · iframe HhR

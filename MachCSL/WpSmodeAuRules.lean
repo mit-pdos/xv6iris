@@ -424,7 +424,7 @@ theorem wp_s_sw_au_inv_sanity [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     iexists Hs
     iframe Hb
     inext
-    iintro %t Hb Hau Htop
+    iintro %t %_ Hb Hau Htop
     imod Hmask
     ihave Hcl2 := Hclose $$ [Hb]
     case' _ =>

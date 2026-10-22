@@ -247,7 +247,9 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
   iapply wpLoop_bupd
   imod ctxBytes_of_pushed cpu curCtx (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half)
-    tt Hs (BitVec.ofNat 16 c.hd) $$ [Hctx Hau Ht Hraw] with ⟨Hctx, Hring⟩
+    tt Hs (BitVec.ofNat 16 c.hd) (fun j hj => by
+      rw [heqR]; have h1 := mod_NUM_lt np; have hN : NUM = 8 := rfl
+      exact xv6NotPubBase_page (off := 4 + 2 * (np % NUM)) hpav (by omega)) $$ [Hctx Hau Ht Hraw] with ⟨Hctx, Hring⟩
   · iframe Hctx Hau Ht Hraw
   imodintro
   ihave Hk := Hkback $$ Hctx
@@ -265,7 +267,8 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · iframe #; iframe
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hctx, Hkback⟩
   imod ctxBytes_of_pushed cpu curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half)
-    t2 Hs2 (wrap16 (np + 1)) $$ [Hctx Hau2 Ht2 Hraw2] with ⟨Hctx, Hidx⟩
+    t2 Hs2 (wrap16 (np + 1)) (fun j hj => by
+      rw [heqR]; exact xv6NotPubBase_page (off := 2) hpav (by omega)) $$ [Hctx Hau2 Ht2 Hraw2] with ⟨Hctx, Hidx⟩
   · iframe Hctx Hau2 Ht2 Hraw2
   imodintro
   ihave Hk := Hkback $$ Hctx

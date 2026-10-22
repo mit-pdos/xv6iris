@@ -139,7 +139,7 @@ theorem virtio_disk_rw_proof
           simp
         · rw [vdrwPayw_read _ dataBuf dataDisk hdd, bytesOf_bvOfBytes BSIZE dataDisk hdata]
           simp)
-      hbram hkm)
+      hbram hkm (fun m hm => (hbs m hm).1))
     iexact HP5⟩
 
 /-- The proved `virtio_disk_rw` interface. -/

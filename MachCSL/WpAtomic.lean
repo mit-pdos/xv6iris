@@ -129,7 +129,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     $$ Hlp with ⟨Hlp, #Hland⟩
   ihave Hrsv := rsvModel_mono E σ (σ.storeL cpu pa n w) (kptGrow_storeL σ cpu pa n w) hpub hrsv
     (relPcOk_storeL σ cpu pa n w (ramBytes_le hram) (mmOk_le_top hmm) hst)
-    (relPc_storeLOld σ cpu pa n w)
+    (relPc_storeLOld σ cpu pa n w) (ldPcOk_storeL σ cpu pa n w)
     (chainEnvAt_ext_storeL _ _ _ σ cpu pa n w (mmOk_okP hmm))
     (fun hnew h => chainLoads_storeL σ cpu pa n w hmm hnew h) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.ltop) (.ofNat (σ.ltop + 1))
@@ -1830,6 +1830,21 @@ theorem memModel_readCerts (σ : MState) (cpu : CPU) (pa : PAddr) (n K : Nat) (t
       · exact absurd (het.trans hv) ht0
       · exact ⟨τ, hv⟩
 
+/-- **What a plain read owes the publication reads' provenance** (Q4 [OWN.154] (L1)): every byte of
+the window is held whole (`own 1` -- then no reserved byte: the interpretation keeps half of each) or
+is no publication base. -/
+def rdNpOk (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) : Prop :=
+  ∀ j, j < n → dqs j = DFrac.own 1 ∨ notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)
+
+/-- Context-made bytes owe nothing. -/
+theorem rdNpOk_of_np {pa : PAddr} {n : Nat} {dqs : Nat → DFrac}
+    (h : notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n) : rdNpOk (hlc := hlc) (GF := GF) pa n dqs :=
+  fun j hj => .inr (h j hj)
+
+/-- Whole bytes owe nothing. -/
+theorem rdNpOk_own1 {pa : PAddr} {n : Nat} : rdNpOk (hlc := hlc) (GF := GF) pa n (fun _ => DFrac.own 1) :=
+  fun _ _ => .inl rfl
+
 /-- The accessor of a plain load by `cpu`, whose view is at least `K`: the
 client also offers authorship fragments `ts` (persistent), and the
 continuation learns that the entries of the histories at their timestamps
@@ -1845,7 +1860,7 @@ def readAU (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
   ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
   (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (cs : RdComps) (ls : List (Nat × Nat)),
     landedAll ls ∗ histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → readableAt (hartAgent cpu) K ls ts (Hs j)⌝ ∗
-    rdCompBytes cs ∗ readCertsAt cpu pa n K ts ls Hs cs ∗
+    ⌜rdNpOk (hlc := hlc) (GF := GF) pa n dqs⌝ ∗ rdCompBytes cs ∗ readCertsAt cpu pa n K ts ls Hs cs ∗
     ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat) (lp : LandPos) (es : Nat → HEnt) (ps : Nat → Nat), ⌜K ≤ tvn⌝ -∗
         ⌜lpAgree ls lp ∧ readsAreP lp (hartAgent cpu) tvn Hs n w ∧
           ∀ j, j < n → Hist.readEntP lp (hartAgent cpu) tvn (Hs j) = some (es j)⌝ -∗
@@ -1857,7 +1872,7 @@ pre-W8-β′ `writeAU`): the continuation gets the histories grown by the hart's
 entries at the next position `t`. -/
 def writeAUOwn (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=> ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗
-    ▷ (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+    ▷ (∀ t : Nat, ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ itopLb t ={∅,⊤}=∗ Ψ)
 
 /-- A reserved-mode store's COMPANIONS: other words (address, width,
@@ -2033,7 +2048,7 @@ def rtOut (cpu : CPU) (t : Nat) : Option (List (CPU × Nat)) → IProp GF
 def writeAUOwnRt (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (o : Option (List (CPU × Nat)))
     (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=> ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ rtIn cpu o ∗
-    ▷ (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+    ▷ (∀ t : Nat, ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ itopLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)
 
 /-- A plain store into a RESERVED word, with a retime request. -/
@@ -2057,7 +2072,7 @@ def writeAU (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp
     ((∃ (Hs : Nat → Hist) (o : Option (List (CPU × Nat))) (T : Nat) (po : Option (BitVec 64)) (Kl : Nat),
       histBytes pa n (fun _ => DFrac.own 1) Hs ∗
       itopLb T ∗ topLb Kl ∗ rtIn cpu o ∗ rsvPcCell cpu po ∗
-      ▷ (∀ t : Nat, ⌜T < t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+      ▷ (∀ t : Nat, ⌜T < t⌝ -∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           rsvPcCell cpu po -∗ pcRcptO t po -∗
           authoredBy t (hartAgent cpu) -∗ itopLb t -∗ landsAboveAt t Kl -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (cs : RsvComps) (o : Option (List (CPU × Nat))) (po : Option (BitVec 64)) (T : Nat),
@@ -2086,8 +2101,8 @@ theorem writeAU_of_ownRt (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)
   isplitr
   · unfold rsvPcCell; iempintro
   inext
-  iintro %t _ Hb _ _ Hau Htop _ Hout
-  iapply Hcont $$ %t Hb Hau Htop Hout
+  iintro %t _ %hnp Hb _ _ Hau Htop _ Hout
+  iapply Hcont $$ %t %hnp Hb Hau Htop Hout
 
 theorem writeAU_of_rsvRt (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n))
     (o : Option (List (CPU × Nat))) (Ψ : IProp GF) :
@@ -2127,8 +2142,8 @@ theorem writeAU_of_own (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) 
   isplitr
   · unfold rsvPcCell; iempintro
   inext
-  iintro %t _ Hb _ _ Hau Htop _ _
-  iapply Hcont $$ %t Hb Hau Htop
+  iintro %t _ %hnp Hb _ _ Hau Htop _ _
+  iapply Hcont $$ %t %hnp Hb Hau Htop
 
 /-- A plain store into OWNED bytes past a position `T` of the store order the
 client names once the histories are in hand (W8 (f2-ctx) S3: a dynamic lock's
@@ -2136,7 +2151,7 @@ words, past its registration). -/
 def writeAUOwnT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
     IProp GF := iprop%
   |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T Kl : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ itopLb T ∗ topLb Kl ∗
-    ▷ (∀ t : Nat, ⌜T < t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+    ▷ (∀ t : Nat, ⌜T < t⌝ -∗ ⌜notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ itopLb t -∗ landsAboveAt t Kl ={∅,⊤}=∗ Ψ)
 
 theorem writeAU_of_ownT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
@@ -2153,8 +2168,8 @@ theorem writeAU_of_ownT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n))
   isplitr
   · unfold rsvPcCell; iempintro
   inext
-  iintro %t %hT Hb _ _ Hau Htop HLA _
-  iapply Hcont $$ %t %hT Hb Hau Htop HLA
+  iintro %t %hT %hnp Hb _ _ Hau Htop HLA _
+  iapply Hcont $$ %t %hT %hnp Hb Hau Htop HLA
 
 theorem writeAU_of_rsv (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
     writeAURsv cpu pa n w' Ψ ⊢ writeAU cpu pa n w' Ψ := by
@@ -2714,6 +2729,50 @@ theorem memModel_readEntCerts {n : Nat} (σ : MState) (cpu : CPU) (tvn : Nat) (e
 
 /-! ## The leaves -/
 
+/-- The whole bytes of a window hold no reserved byte. -/
+theorem memModel_notRsv_histD (σ : MState) (pa : PAddr) (dqs : Nat → DFrac) (Hs : Nat → Hist) :
+    ∀ n : Nat, memModel σ ∗ histBytes pa n dqs Hs
+      ⊢@{IProp GF} ⌜∀ j, j < n → dqs j = DFrac.own 1 → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))⌝
+  | 0 => by
+    iintro _
+    ipureintro
+    intro j hj; omega
+  | n + 1 => by
+    unfold histBytes
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %h1 := memModel_notRsv_histD σ pa dqs Hs n $$ [Hmm Hb1]
+    · unfold histBytes; iframe
+    by_cases hd : dqs n = DFrac.own 1
+    · rw [hd]
+      ihave %h2 := memModel_notRsv σ _ _ $$ [Hmm Hb2]
+      · iframe
+      ipureintro
+      intro j hj hdj
+      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+      · exact h1 j h hdj
+      · exact h2
+    · ipureintro
+      intro j hj hdj
+      rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+      · exact h1 j h hdj
+      · exact absurd hdj hd
+
+/-- **A plain read's obligation to the publication reads' provenance, paid** (Q4 [OWN.154] (L1)):
+off the publication bases or whole. -/
+theorem memModel_ldPcObl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) (Hs : Nat → Hist)
+    (h : rdNpOk (hlc := hlc) (GF := GF) pa n dqs) :
+    memModel σ ∗ histBytes pa n dqs Hs ⊢@{IProp GF}
+      ⌜ldPcObl (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ cpu pa n⌝ := by
+  iintro H
+  ihave %hd := memModel_notRsv_histD σ pa dqs Hs n $$ H
+  ipureintro
+  refine ldPcObl_of_notPub (fun j hj => ?_)
+  rcases h j hj with h1 | h1
+  · exact notPubBase_of_notRsv (hd j hj h1)
+  · exact h1
+
 /-- A plain load of bytes inside an accessor (the racy read): the value is
 each byte's history read at one view (at least `K`) by this hart. -/
 theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
@@ -2735,7 +2794,9 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  imod H with ⟨%dqs, %Hs, %cs, %ls, #Hls, Hb, %hrd0, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %cs, %ls, #Hls, Hb, %hrd0, %hnp, Hcs, #Hcert, Hcont⟩
+  ihave %hob := memModel_ldPcObl σ cpu req.pa n dqs Hs hnp $$ [Hmm Hb]
+  · iframe
   ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
   · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
     iframe
@@ -2795,7 +2856,7 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
       exact this
     obtain ⟨es, ps, hes, hcert⟩ := readEnt_facts σ cpu tvn n Hs w' hreads
     icases memModel_readEntCerts σ cpu tvn es ps hcert n (Nat.le_refl _) $$ Hmm with ⟨Hmm, #Hrc⟩
-    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) hob $$ Hmm with Hmm
     imod Hcont $$ %w' %tvn %σ.lp %es %ps %(by omega) %⟨hla, hreads, hes⟩ Hrc %hauthors Hb Hcs with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
@@ -3026,7 +3087,8 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
         (pcIssueO_store σ cpu req.pa n w' po hpcv) $$ Hmm with ⟨Hmm, Hrc⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
-      imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hp Hrc Hau Htop' HLA Hout with HΦ
+      imod Hcont $$ %(σ.top + 1) %(by omega) %(fun j hj => notPubBase_of_notRsv (hnr j hj)) Hb Hp Hrc Hau Htop' HLA Hout
+        with HΦ
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %(σ.issue cpu req.pa n w') %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
@@ -3329,6 +3391,7 @@ and the byte is a hop byte at `t` -- a static spinlock's, or a live dynamic one'
 (its name word, headed by a registered name, is untouched by the store). -/
 theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' w0 : BitVec (8 * n))
     (Hs Hs' : Nat → Hist) (t p : Nat) (htop : σ'.top = t) (htp : σ'.lp t = some p) (hpl : σ'.ltop = p)
+    (hpcT : σ'.pcAt t = -1)
     (hbs : histsAt σ'.mem pa n Hs') (hins : insAboveRead σ'.lp Hs Hs' n t (hartAgent cpu) w' w0)
     (hold : ∀ i, i < n → ∀ e ∈ Hs i, e.t < t) (o : Option HopData) :
     genHeapInterp σ'.mem ∗ memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ' ∗ hopIn cpu pa n Hs w0 w' o ⊢@{IProp GF}
@@ -3432,7 +3495,7 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
         unfold hopRegAt
         icases Hreg with %hr
         ipureintro
-        exact Or.inl hr
+        exact ⟨Or.inl hr, by omega, hpcT⟩
       | some q =>
         obtain ⟨Ld, te⟩ := q
         unfold hopRegAt
@@ -3448,7 +3511,8 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
         simp only [hopRegWord] at hrw
         have hwaM : wordEntAt σ'.mem pa t (hartAgent cpu) := fun i hi =>
           ⟨_, _, hbs i (by omega), hnewIn i (by omega), rfl, rfl⟩
-        refine Or.inr ⟨⟨by omega, Ld, te, hwit, hLd, by omega, fun i hi => ⟨_, hbs i (by omega), ?_⟩⟩, hrel⟩
+        refine ⟨Or.inr ⟨⟨by omega, Ld, te, hwit, hLd, by omega, fun i hi => ⟨_, hbs i (by omega), ?_⟩⟩, hrel⟩,
+          by omega, hpcT⟩
         intro x hx _
         obtain ⟨P, e', Q, h1, h2, -⟩ := hins i (by omega)
         obtain ⟨P', Q', hPQ, hP', hQ'⟩ := hrw i hi
@@ -3734,7 +3798,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         ihave %hget' := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
         · iframe Hmem Hb
         imod memModel_hopIssue (σ.storeL cpu req.pa n w') cpu req.pa n w' w0 Hs _ (σ.top + 1) (σ.ltop + 1)
-          (by simp [MState.top]) htp (by simp [MState.ltop]) hget' hins hold o
+          (by simp [MState.top]) htp (by simp [MState.ltop]) (by simp [MState.storeL]) hget' hins hold o
           $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
         · iframe Hmem Hmm Ho
         ihave %hla : ⌜lpAgree ls (σ.storeL cpu req.pa n w').lp⌝ $$ [Hmm Hls]
@@ -3819,7 +3883,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         ihave %hget' := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
         · iframe Hmem Hb
         imod memModel_hopIssue (σ.storeL cpu req.pa n w') cpu req.pa n w' w0 Hs _ (σ.top + 1) (σ.ltop + 1)
-          (by simp [MState.top]) htp (by simp [MState.ltop]) hget' hins hold o
+          (by simp [MState.top]) htp (by simp [MState.ltop]) (by simp [MState.storeL]) hget' hins hold o
           $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
         · iframe Hmem Hmm Ho
         ihave %hla : ⌜lpAgree ls (σ.storeL cpu req.pa n w').lp⌝ $$ [Hmm Hls]
@@ -3850,12 +3914,14 @@ theorem readAU_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agen
   unfold readAU
   iintro ⟨#Hts, H⟩ HW
   iframe Hts
-  imod H with ⟨%dqs, %Hs, %cs, %ls, #Hls, Hb, %hne, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %cs, %ls, #Hls, Hb, %hne, %hnp, Hcs, #Hcert, Hcont⟩
   imodintro
   iexists dqs, Hs, cs, ls
   iframe Hls Hb Hcs Hcert
   isplit
   · ipureintro; exact hne
+  isplit
+  · ipureintro; exact hnp
   inext
   iintro %w %tvn %lp %es %ps %h1 %h2 Hrc %h3 Hb Hcs
   imod Hcont $$ %w %tvn %lp %es %ps %h1 %h2 Hrc %h3 Hb Hcs with HΨ
@@ -3872,8 +3938,8 @@ theorem writeAU_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (�
     iexists Hs, o, T, po, Kl
     iframe Hb Ho HT HKl Hp
     inext
-    iintro %t %hT Hb Hp Hrc Hau Htop HLA Hout
-    imod Hcont $$ %t %hT Hb Hp Hrc Hau Htop HLA Hout with HΨ
+    iintro %t %hT %hnp Hb Hp Hrc Hau Htop HLA Hout
+    imod Hcont $$ %t %hT %hnp Hb Hp Hrc Hau Htop HLA Hout with HΨ
     imodintro
     iapply HW $$ HΨ
   · imodintro

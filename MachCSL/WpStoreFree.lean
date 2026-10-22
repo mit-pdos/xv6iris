@@ -201,7 +201,7 @@ theorem wp_s_sb_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       isplitl [Hcell]
       · iapply histBytes_one_r (paOf ppn (k.rget cpu rs1 + BitVec.signExtend 64 imm)) (DFrac.own 1) H $$ Hcell
       inext
-      iintro %t Hb #Hau #Htop
+      iintro %t %hnp Hb #Hau #Htop
       imod Hmask
       imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
       · iframe Hctx
@@ -216,7 +216,8 @@ theorem wp_s_sb_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
         (pushed (n := 1) (fun _ => H) t (hartAgent cpu') (BitVec.extractLsb' 0 8 ((tpPin cpu' k.regs).get rs2)) 0)
         (⟨t, hartAgent cpu', nthByte (n := 1) (BitVec.extractLsb' 0 8 ((tpPin cpu' k.regs).get rs2)) 0⟩ :: H) rfl $$ Hb
       ihave Hbyte := ctxByte_intro curCtx (paOf ppn (k.rget cpu rs1 + BitVec.signExtend 64 imm)) (DFrac.own 1)
-        ⟨t, hartAgent cpu', nthByte (n := 1) (BitVec.extractLsb' 0 8 ((tpPin cpu' k.regs).get rs2)) 0⟩ H $$ [Hb Hkey]
+        ⟨t, hartAgent cpu', nthByte (n := 1) (BitVec.extractLsb' 0 8 ((tpPin cpu' k.regs).get rs2)) 0⟩ H
+        (by simpa using hnp 0 (by omega)) $$ [Hb Hkey]
       · iframe Hb; iexact Hkey
       iapply wordPointsTo_intro (k.rget cpu rs1 + BitVec.signExtend 64 imm) 1 (DFrac.own 1)
         (BitVec.extractLsb' 0 8 (k.rget cpu' rs2)) ppn ⟨hpin, hlt, hram, Nat.mod_one _⟩ $$ Hcl

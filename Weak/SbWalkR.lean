@@ -151,6 +151,69 @@ theorem memberOfCatR (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop)
   subst hc
   exact ⟨c, rfl, hv, hdr, memberOfRunR SbPol.epoch N _ X _ c hv hW.cat.wf hW.imgEq hW.len hP hfin hdr⟩
 
+/-! # 4. The S-R member's labels against GF's -/
+
+/-- **THE S-R MEMBER'S LABELS ARE GF's, UP TO THE FORWARDED BYTES' TIMESTAMPS** (off the exempt read): at a
+finished S-R walk, the member's label at a non-exempt event is GF's label VERBATIM (`PInvR.vb`) put through the
+member's fix-up `SbAgree.fixLbl`, which only re-names, at a byte the hart FORWARDED from an own pending store, the
+timestamp to that store's member write index.  (Finding F-MEM-1: exact equality is NOT a theorem — a byte may be
+forwarded from an own pending store whose value merely COINCIDES with GF's source, a foreign write co-after it; the
+S-R gate admits it, `srGate`'s first disjunct, and the member then reads the own store.) -/
+theorem memberLblR (N : Nat) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (c : CandW)
+    (hP : PInvR N c.img G X dev (cur c)) (hN : G.gxProg.length = N)
+    (hfin : ∀ x, x < N → ((cur c).rows x).length = (G.gxProg.getD x []).length)
+    (e : Geid) (l : Lbl) (hX : ¬ X e) (hl : gxLbl G e = some l) :
+    gxLbl (memberP N c) e =
+      some (fixLbl (rawG N c.img (cur c)) e.1 l (((cur c).fw e.1).getD e.2 [])) := by
+  have hl0 := hl
+  unfold gxLbl at hl0
+  cases hrow : G.gxProg[e.1]? with
+  | none => rw [hrow] at hl0; cases hl0
+  | some row =>
+    rw [hrow] at hl0
+    simp only [Option.bind_some] at hl0
+    have hx : e.1 < N := by rw [← hN]; exact lookup_lt_Some hrow
+    have hk : e.2 < ((cur c).rows e.1).length := by
+      rw [hfin e.1 hx, List.getD_eq_getElem?_getD, hrow]
+      exact lookup_lt_Some hl0
+    obtain ⟨l', hl'⟩ : ∃ l', ((cur c).rows e.1)[e.2]? = some l' := ⟨_, List.getElem?_eq_getElem hk⟩
+    have hv := hP.vb e.1 e.2 l' hl' hX
+    rw [show gxLbl G (e.1, e.2) = gxLbl G e from rfl, hl, Option.some.injEq] at hv
+    subst hv
+    unfold memberP
+    rw [memLbl, if_pos hx, hl']
+    rfl
+
+/-- **… EXACT for every event that is not a plain load** (stores, fences, AMOs, I/O). -/
+theorem memberLblEqR (N : Nat) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (c : CandW)
+    (hP : PInvR N c.img G X dev (cur c)) (hN : G.gxProg.length = N)
+    (hfin : ∀ x, x < N → ((cur c).rows x).length = (G.gxProg.getD x []).length)
+    (e : Geid) (l : Lbl) (hX : ¬ X e) (hl : gxLbl G e = some l)
+    (hnl : ∀ aq base ts vs, l ≠ LLoad aq base ts vs) :
+    gxLbl (memberP N c) e = some l := by
+  rw [memberLblR N G X dev c hP hN hfin e l hX hl]
+  rcases fixLblCases (rawG N c.img (cur c)) e.1 l (((cur c).fw e.1).getD e.2 []) with h | ⟨aq, base, ts, vs, he, -⟩
+  · rw [h]
+  · exact absurd he (hnl aq base ts vs)
+
+/-- **… and for a plain load, every byte not forwarded at its step keeps GF's timestamp** (aq, footprint and
+values always GF's). -/
+theorem memberLdR (N : Nat) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (c : CandW)
+    (hP : PInvR N c.img G X dev (cur c)) (hN : G.gxProg.length = N)
+    (hfin : ∀ x, x < N → ((cur c).rows x).length = (G.gxProg.getD x []).length)
+    (e : Geid) (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) (hX : ¬ X e)
+    (hl : gxLbl G e = some (LLoad aq base ts vs)) :
+    ∃ ts', gxLbl (memberP N c) e = some (LLoad aq base ts' vs) ∧ ts'.length = ts.length ∧
+      ∀ j, (((cur c).fw e.1).getD e.2 []).getD j none = none → ts'[j]? = ts[j]? := by
+  rw [memberLblR N G X dev c hP hN hfin e _ hX hl]
+  refine ⟨_, rfl, fixTsLen _ _ _ _, fun j hj => ?_⟩
+  simp only [fixTs, List.getElem?_mapIdx]
+  cases h : ts[j]? with
+  | none => rfl
+  | some t =>
+    simp only [Option.map_some]
+    rw [hj]
+
 end SbOrdR
 
 end Weak

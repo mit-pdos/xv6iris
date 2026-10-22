@@ -285,17 +285,29 @@ theorem bootImg_run (image : Mem) (A n : Nat) (vals : Nat → BitVec 8) (hA : bc
 def bootImgHas (image : Mem) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
   ∀ j, j < n → image[pa + BitVec.ofNat 64 j]? = some (nthByte w j)
 
+/-- **A boot byte off `started`'s word is no publication base** (Q4 [OWN.154] (L1)). -/
+theorem bcNotPub (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) {A n j : Nat}
+    (hA : bcInRam A n) (hj : j < n) (hns : MachCSL.KernelSyms.«started» + 4 ≤ A ∨ A + n ≤ MachCSL.KernelSyms.«started») :
+    notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (BitVec.ofNat 64 A + BitVec.ofNat 64 j) := by
+  rw [hrsv]
+  refine xv6NotPubBase (fun e => ?_)
+  have ht := congrArg BitVec.toNat e
+  rw [bc_addr_toNat A j (by obtain ⟨_, h⟩ := hA; unfold ramEnd at h; omega)] at ht
+  have hs : KA.«started».toNat = MachCSL.KernelSyms.«started» := rfl
+  omega
+
 /-- **Owned bytes at any context** (Rocq `boot_byte_data_run`): a run of
 never-written image bytes is `ctxBytes` at every context (timestamp 0 is
 under every bound). -/
 theorem bootImg_ctxBytes (ξ : CtxId) (image : Mem) (A n : Nat) (w : BitVec (8 * n))
-    (hA : bcInRam A n) (himg : bootImgHas image (BitVec.ofNat 64 A) n w) :
+    (hA : bcInRam A n) (himg : bootImgHas image (BitVec.ofNat 64 A) n w)
+    (hns : MachCSL.KernelSyms.«started» + 4 ≤ A ∨ A + n ≤ MachCSL.KernelSyms.«started») (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootRan (GF := GF) (imgFlat image) A (A + n) ⊢ ctxBytes ξ (BitVec.ofNat 64 A) n (DFrac.own 1) w := by
   refine (bootImg_run image A n (nthByte w) hA himg).trans ?_
   unfold ctxBytes
   apply BigSepL.bigSepL_mono
-  intro _ j _
-  exact histByte_img_ctx ξ _ _ 0 _
+  intro _ j hj
+  exact histByte_img_ctx ξ _ _ 0 _ (bcNotPub hrsv hA (List.mem_range.1 (List.mem_of_getElem? hj)) hns)
 
 /-! ## The read-only half: persisted -/
 
@@ -591,16 +603,28 @@ theorem kernelText_intro :
   imodintro
   iexact Ho
 
+/-- A byte of the read-only window is no publication base (Q4 [OWN.154] (L1): `started` is in `.bss`). -/
+theorem bcRo_notPub (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) {a : PAddr}
+    (h : a.toNat < bcRoHi) : notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) a := by
+  rw [hrsv]
+  refine xv6NotPubBase (fun e => ?_)
+  subst e
+  exact absurd h (by decide)
+
 /-- **The rodata** out of the persisted window (Rocq `kernel_data_intro`). -/
-theorem kernelData_intro :
+theorem kernelData_intro (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     bootRo (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi ⊢ kernelData := by
   unfold kernelData dataByte
   iintro #Ho
   iapply (BigSepL.bigSepL_intro (P := iprop(□ bootRo (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi))
     (fun _ p hp => by
       have hp' := List.mem_of_getElem? hp
-      exact intuitionistically_elim.trans (bootRo_imgBytes bootImage _ _ _ _ _
-        (bc_ro_bytes p hp') (bootImage_wf.rodata p hp'))))
+      have hb := bc_ro_bytes p hp' 0 (by omega)
+      iintro #H
+      isplitl []
+      · iapply (bootRo_imgBytes bootImage _ _ _ _ _ (bc_ro_bytes p hp') (bootImage_wf.rodata p hp')) $$ H
+      · ipureintro
+        exact bcRo_notPub hrsv (by simpa using hb.2.1)))
   imodintro
   iexact Ho
 
@@ -630,7 +654,7 @@ width-generic): the image word `w` at `[A, A + n)` above `etext`, as the
 kernel's `n`-byte cell at context `ξ`. -/
 theorem bootImg_wordAtN [CurCtx] (ξ : CtxId) (image : Mem) (A n : Nat) (w : BitVec (8 * n))
     (hn : 0 < n) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A) (hal : A % n = 0)
-    (himg : bootImgHas image (BitVec.ofNat 64 A) n w) :
+    (himg : bootImgHas image (BitVec.ofNat 64 A) n w) (hns : MachCSL.KernelSyms.«started» + 4 ≤ A ∨ A + n ≤ MachCSL.KernelSyms.«started») (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) A (A + n) -∗
       wordAtN ξ (BitVec.ofNat 64 A) n (DFrac.own 1) w := by
   have ht := bc_ofNat_toNat hA
@@ -639,19 +663,20 @@ theorem bootImg_wordAtN [CurCtx] (ξ : CtxId) (image : Mem) (A n : Nat) (w : Bit
     exact bc_kmapClass_rw _ (by rw [ht]; omega) (by rw [ht]; unfold ramEnd at h; omega)
   iintro #Hk Hr
   ihave Hid := kmapStatic_rw _ hrw $$ Hk
-  ihave Hb := bootImg_ctxBytes ξ image A n w hA himg $$ Hr
+  ihave Hb := bootImg_ctxBytes ξ image A n w hA himg hns $$ Hr
   iapply bc_wordAtN_intro ξ _ n _ w (bcInRam_inRam hA) (by rw [ht]; exact hal) $$ Hid Hb
 
 /-- ...and at ZERO inside `.bss` (Rocq `boot_ran_cell*_bss`). -/
 theorem bootImg_wordAtN_bss [CurCtx] (ξ : CtxId)
-    (A n : Nat) (hn : 0 < n) (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hhi : A + n ≤ MachCSL.KernelSyms.«end»)
-    (hal : A % n = 0) :
+    (A n : Nat) (hn : 0 < n) (hlo : MachCSL.KernelSyms.«_bss» + 4 ≤ A) (hhi : A + n ≤ MachCSL.KernelSyms.«end»)
+    (hal : A % n = 0) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
       wordAtN ξ (BitVec.ofNat 64 A) n (DFrac.own 1) 0#(8 * n) := by
   have hA : bcInRam A n := by
     unfold bcInRam ramBase ramEnd; simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end»] at *
     omega
   refine bootImg_wordAtN ξ bootImage A n _ hn hA (by simp only [MachCSL.KernelSyms.«_bss»] at hlo; omega) hal ?_
+    (.inl (by simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«started»] at *; omega))
   intro j hj
   rw [show nthByte (0#(8 * n)) j = 0#8 by simp [nthByte]]
   have := bc_addr_toNat A j (by simp only [MachCSL.KernelSyms.«end»] at hhi; omega)
@@ -669,7 +694,9 @@ theorem bc_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
 `boot_ran_bytes_list`): the `n` bytes of `[A, A + n)` above `etext`, one
 kernel byte cell each, at context `ξ`. -/
 theorem bootImg_bytes_ex [CurCtx] (ξ : CtxId)
-    (A n : Nat) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A) :
+    (A n : Nat) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A)
+    (hns : MachCSL.KernelSyms.«started» + 4 ≤ A := by simp only [MachCSL.KernelSyms.«started»] at *; omega)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
       ∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗
         [∗list] j ↦ b ∈ bs, wordAtN ξ (BitVec.ofNat 64 A + BitVec.ofNat 64 j) 1 (DFrac.own 1) b := by
@@ -696,7 +723,7 @@ theorem bootImg_bytes_ex [CurCtx] (ξ : CtxId)
   have hrw : kmapClass (vpnOf (BitVec.ofNat 64 A + BitVec.ofNat 64 i)).toNat = some .rw :=
     bc_kmapClass_rw _ (by omega) (by obtain ⟨_, h⟩ := hA; unfold ramEnd at h; omega)
   ihave Hid := kmapStatic_rw _ hrw $$ Hk
-  ihave Hb := histByte_img_ctx ξ _ (DFrac.own 1) 0 (vals i) $$ Hj
+  ihave Hb := histByte_img_ctx ξ _ (DFrac.own 1) 0 (vals i) (bcNotPub hrsv hA hj (.inl hns)) $$ Hj
   ihave Hb := bc_ctxBytes_one ξ _ _ _ $$ Hb
   iapply bc_wordAtN_intro ξ _ 1 _ _ (bcInRam_byte hA hj) (Nat.mod_one _) $$ Hid Hb
 
@@ -729,7 +756,7 @@ theorem bootRan_stride (m : MemF Hist) (base stride : Nat) :
 byte histories of a fresh era, with the static claims, persist the
 read-only window into the kernel's read-only image (`KernelImage.ro`, the
 copy `kctx` owns) and hand back the owned half `[_data, PHYSTOP)`. -/
-theorem bootCarve_image :
+theorem bootCarve_image (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ bootRaw (imgFlat bootImage) ⊢@{IProp GF}
       |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat bootImage) bcRoHi ramEnd) := by
   have h1 : bcRoLo ≤ bcRoHi := by decide
@@ -745,7 +772,7 @@ theorem bootCarve_image :
   imod Hro with #Hro
   ihave Ht := kernelText_intro (GF := GF) $$ [Hk Hro]
   · iframe Hk Hro
-  ihave Hd := kernelData_intro (GF := GF) $$ Hro
+  ihave Hd := kernelData_intro (GF := GF) hrsv $$ Hro
   imodintro
   iframe Ht Hd Hk Hown
 

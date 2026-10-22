@@ -98,8 +98,8 @@ theorem bootCarveFs_lkRaw [CurCtx] (lk : BitVec 64) (vl : BitVec 32) (vn vc : Bi
 /-- A registered static lock's 24-byte window is its `mainLkRawR` row
 (W8-β′). -/
 theorem bootCarveFs_lkRawR [CurCtx] (lk lk' : PAddr) (he : lk = lk') (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a400 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
-    (hon : rsvOnly KernelRsv.static (xv6LockR lk) L (L + 24) = true) (hin : xv6LockR lk ∈ xv6RsvStatic) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a404 ≤ L) (hend : L + 24 ≤ 0x80023b10) (hal : L % 8 = 0)
+    (hon : rsvOnly KernelRsv.static (xv6LockR lk) L (L + 24) = true) (hin : xv6LockR lk ∈ xv6RsvStatic) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ bootLockWin lk L -∗ mainLkRawR lk' := by
   subst he
   iintro #Hk H
@@ -112,7 +112,7 @@ theorem bootCarveFs_lkRawR [CurCtx] (lk lk' : PAddr) (he : lk = lk') (L : Nat)
 / `wait_lock` / `tickslock` / `bcache` / `itable` / `ftable` rows;
 deviation 1): every one a registered lock (W8-β′), out of its own 24-byte
 `.bss` window. -/
-theorem bootCarveFs_mainLocksRaw [CurCtx] :
+theorem bootCarveFs_mainLocksRaw [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootLockWin KA.«pid_lock» MachCSL.KernelSyms.«pid_lock» -∗
       bootLockWin KA.«wait_lock» MachCSL.KernelSyms.«wait_lock» -∗
@@ -146,7 +146,7 @@ theorem bootCarveFs_mainLocksRaw [CurCtx] :
 /-! ## The static superblock -/
 
 /-- **`&sb`'s 32 bytes** (Rocq `main_sb_raw`'s producer). -/
-theorem bootCarveFs_sb [CurCtx] :
+theorem bootCarveFs_sb [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) -∗ mainSbRaw := by
   have hA : bcInRam 0x80020e08 32 := by unfold bcInRam ramBase ramEnd; omega
@@ -168,7 +168,7 @@ theorem bootCarveFs_sb [CurCtx] :
 (a registered lock, W8-β′) and `[log + 24, log + 168)` are `mainLogRaw` --
 the spinlock, the six scalar fields and the thirty header words, all at the
 loader's zero. -/
-theorem bootCarveFs_log [CurCtx] :
+theorem bootCarveFs_log [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootLockWin KA.«log» MachCSL.KernelSyms.«log» -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«log» + 24) (MachCSL.KernelSyms.«log» + 168) -∗
@@ -239,7 +239,7 @@ inner lock is a registered lock, its two words the client's half cells,
 and the rest of the entry (`ientryRaw`, the icache boot's), every field at
 the loader's zero (deviation 3). -/
 theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE)
-    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bootCarveFs_ient k) (bootCarveFs_ient k + 136) -∗
       rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (rsvInodeLk k)) (imgFlat bootImage) -∗
@@ -247,12 +247,12 @@ theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE)
   have hB := bootCarveFs_ient_val k
   have hkN : k < 50 := hk
   -- the numeric side conditions FIRST: `omega` is slow once the address facts are in scope
-  have lo : ∀ o, 0x8000a400 ≤ bootCarveFs_ient k + o := fun o => by omega
+  have lo : ∀ o, 0x8000a404 ≤ bootCarveFs_ient k + o := fun o => by omega
   have hi : ∀ o n, o + n ≤ 136 → bootCarveFs_ient k + o + n ≤ 0x80023b10 := fun o n h => by omega
   have al2 : ∀ o, o % 2 = 0 → (bootCarveFs_ient k + o) % 2 = 0 := fun o h => by omega
   have al4 : ∀ o, o % 4 = 0 → (bootCarveFs_ient k + o) % 4 = 0 := fun o h => by omega
   have al8 : ∀ o, o % 8 = 0 → (bootCarveFs_ient k + o) % 8 = 0 := fun o h => by omega
-  have loA : ∀ j, 0x8000a400 ≤ bootCarveFs_ient k + 80 + 4 * j := fun j => by omega
+  have loA : ∀ j, 0x8000a404 ≤ bootCarveFs_ient k + 80 + 4 * j := fun j => by omega
   have hiA : ∀ j, j < 13 → bootCarveFs_ient k + 80 + 4 * j + 4 ≤ 0x80023b10 := fun j h => by omega
   have alA : ∀ j, (bootCarveFs_ient k + 80 + 4 * j) % 4 = 0 := fun j => by omega
   have hbo : bootCarveFs_ient k + 16 + 120 < 2 ^ 64 := by omega
@@ -404,7 +404,7 @@ theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE)
 plus `boot_inode_entries`): `[itable + 24, itable + 0x1aa8)` (past the lock,
 a registered lock, W8-β′) is `mainGlobalsRaw`'s two inode rows -- the fifty sleeplocks `iinit`
 initialises and the fifty entries' other cells. -/
-theorem bootCarveFs_itable [CurCtx] :
+theorem bootCarveFs_itable [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootInodesWin -∗
       ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
@@ -437,7 +437,7 @@ theorem bootCarveFs_itable [CurCtx] :
 /-- **The whole `bcache` symbol, in `mainGlobalsRaw`'s rows** (over
 `BootCarveMain.bootCarve_bcache`, past the lock): the head's link row,
 and the two per-buffer rows split. -/
-theorem bootCarveFs_bcache [CurCtx] (ξ : CtxId) :
+theorem bootCarveFs_bcache [CurCtx] (ξ : CtxId) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootBufsWin -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30)
@@ -465,17 +465,17 @@ theorem bootCarveFs_diskAddr (o : Nat) (ho : o < 0x140) : (diskAddr o).toNat = 0
   exact bc_toNat_add _ o _ rfl (by omega)
 
 /-- One `info[i]` pair, out of its 16-byte slot: `b` and `status`, zero. -/
-theorem bootCarveFs_diskInfo [CurCtx] (i : Nat) (hi : i < NUM) :
+theorem bootCarveFs_diskInfo [CurCtx] (i : Nat) (hi : i < NUM) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) (0x800239d0 + 40 + 16 * i) (0x800239d0 + 40 + 16 * i + 16) -∗
       wordPointsTo (aInfoB i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
       wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) (0 : BitVec (8 * 1)) := by
   have hi8 : i < 8 := hi
-  have hlo : 0x8000a400 ≤ 0x800239d0 + 40 + 16 * i := by omega
+  have hlo : 0x8000a404 ≤ 0x800239d0 + 40 + 16 * i := by omega
   have hhi1 : 0x800239d0 + 40 + 16 * i + 8 ≤ 0x80023b10 := by omega
   have hhi2 : 0x800239d0 + 40 + 16 * i + 8 + 1 ≤ 0x80023b10 := by omega
   have hal : (0x800239d0 + 40 + 16 * i) % 8 = 0 := by omega
-  have hlo2 : 0x8000a400 ≤ 0x800239d0 + 40 + 16 * i + 8 := by omega
+  have hlo2 : 0x8000a404 ≤ 0x800239d0 + 40 + 16 * i + 8 := by omega
   have ab : (aInfoB i).toNat = 0x800239d0 + 40 + 16 * i := by
     unfold aInfoB dOffInfo infoSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
   have asec : (aInfoStatus i).toNat = 0x800239d0 + 40 + 16 * i + 8 := by
@@ -491,18 +491,18 @@ theorem bootCarveFs_diskInfo [CurCtx] (i : Nat) (hi : i < NUM) :
 
 /-- One `ops[i]` request header, out of its 16-byte slot: the type/reserved
 doubleword and the sector, zero. -/
-theorem bootCarveFs_diskOps [CurCtx] (i : Nat) (hi : i < NUM) :
+theorem bootCarveFs_diskOps [CurCtx] (i : Nat) (hi : i < NUM) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) (0x800239d0 + 168 + 16 * i) (0x800239d0 + 168 + 16 * i + 16) -∗
       wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
       wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) := by
   have hi8 : i < 8 := hi
-  have hlo : 0x8000a400 ≤ 0x800239d0 + 168 + 16 * i := by omega
+  have hlo : 0x8000a404 ≤ 0x800239d0 + 168 + 16 * i := by omega
   have hhi1 : 0x800239d0 + 168 + 16 * i + 8 ≤ 0x80023b10 := by omega
   have hhi2 : 0x800239d0 + 168 + 16 * i + 8 + 8 ≤ 0x80023b10 := by omega
   have hal1 : (0x800239d0 + 168 + 16 * i) % 8 = 0 := by omega
   have hal2 : (0x800239d0 + 168 + 16 * i + 8) % 8 = 0 := by omega
-  have hlo2 : 0x8000a400 ≤ 0x800239d0 + 168 + 16 * i + 8 := by omega
+  have hlo2 : 0x8000a404 ≤ 0x800239d0 + 168 + 16 * i + 8 := by omega
   have ao : (aOps i).toNat = 0x800239d0 + 168 + 16 * i := by
     unfold aOps dOffOps opsSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
   have asec : (aOpsSector i).toNat = 0x800239d0 + 168 + 16 * i + 8 := by
@@ -518,7 +518,7 @@ theorem bootCarveFs_diskOps [CurCtx] (i : Nat) (hi : i < NUM) :
 disk rows of `main_locks_raw` / `main_globals_raw`; deviation 2):
 `[disk, disk + 0x140)`, which ends exactly at `end`, is
 `virtio_disk_init`'s `diskInitCells` at the loader's zeros. -/
-theorem bootCarveFs_disk [CurCtx] :
+theorem bootCarveFs_disk [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) -∗
       bootLockWin rsvDiskLk (MachCSL.KernelSyms.«disk» + 296) -∗
@@ -592,7 +592,7 @@ theorem bootCarveFs_disk [CurCtx] :
   iapply bootBss_wordAt (GF := GF) _ 1 _ _ (aF j hj8) rfl (by omega) (by omega) (Nat.mod_one _) $$ Hk Hj
 
 /-- ...in SpecMain's `∃`-form (the row `MAIN` takes). -/
-theorem bootCarveFs_diskEx [CurCtx] :
+theorem bootCarveFs_diskEx [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) -∗
       bootLockWin rsvDiskLk (MachCSL.KernelSyms.«disk» + 296) -∗

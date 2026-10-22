@@ -495,7 +495,7 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
             isplit
             · ipureintro
               refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_,
-                relPcOk_img g₂.m bootImage hmem0⟩
+                relPcOk_img g₂.m bootImage hmem0, ldPcOk_boot g₂.m (fun c => (hhart0 c).2.2.1)⟩
               rw [hmem0]
               exact rsvAllOk_boot hrwf
             · unfold kptModelAt

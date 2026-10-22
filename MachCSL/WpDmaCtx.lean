@@ -44,31 +44,33 @@ reach its own buffered store -- but it IS a key of its running context
 (`MachCSL.ctx_key_mint`), which is all `ctxByte` asks for. -/
 theorem ctxBytes_of_keyed (ξ : CtxId) (pa : PAddr) (dq : DFrac) (t : Nat) (ag : Agent)
     (Hs : Nat → Hist) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗
+    ∀ n : Nat, (∀ j, j < n → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)) →
+      keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗
         ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} (⟨t, ag, bs j⟩ :: Hs j))
       ⊢@{IProp GF} [∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)
-  | 0 => by
+  | 0, _ => by
     iintro ⟨_, _⟩
     simp only [List.range_zero]
     exact BigSepL.bigSepL_nil_intro
-  | n + 1 => by
+  | n + 1, hnp => by
     rw [List.range_succ]
     iintro ⟨#Hkey, H⟩
     icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
     iapply BigSepL.bigSepL_snoc.2
     isplitl [H1]
-    · iapply ctxBytes_of_keyed ξ pa dq t ag Hs bs n
+    · iapply ctxBytes_of_keyed ξ pa dq t ag Hs bs n (fun j hj => hnp j (by omega))
       iframe H1
       iexact Hkey
     · unfold ctxByte
       iexists ⟨t, ag, bs n⟩, (Hs n)
       iframe H2
       isplit
-      · ipureintro; rfl
+      · ipureintro; exact ⟨rfl, hnp n (by omega)⟩
       · iexact Hkey
 
 theorem ctxBytes_of_pushed (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
-    (t : Nat) (Hs : Nat → Hist) (w : BitVec (8 * n)) :
+    (t : Nat) (Hs : Nat → Hist) (w : BitVec (8 * n))
+    (hnp : ∀ j, j < n → notPubBase (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (pa + BitVec.ofNat 64 j)) :
     ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ itopLb t ∗
       histBytes pa n (fun _ => dq) (pushed Hs t (hartAgent cpu) w) ⊢
       |==> (ownCtx cpu ξ ∗ ctxBytes ξ pa n dq w) := by
@@ -78,7 +80,7 @@ theorem ctxBytes_of_pushed (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq :
   imodintro
   iframe Hctx
   unfold ctxBytes histBytes
-  iapply ctxBytes_of_keyed ξ pa dq t (hartAgent cpu) Hs (nthByte w) n
+  iapply ctxBytes_of_keyed ξ pa dq t (hartAgent cpu) Hs (nthByte w) n hnp
   iframe Hb
   iexact Hkey
 

@@ -114,6 +114,80 @@ macro "load_file_S_au_proof" lem:ident hrd:term:max va:term:max n:num spl:term:m
     iexists w
     iframe))
 
+set_option hygiene false in
+/-- `load_file_S_au_proof` lending the hart's `PC` cell to the accessor (Q4 [OWN.154] (L1): a
+publication read shows its issuing pc to the provenance record). -/
+macro "load_file_S_au_pc_proof" lem:ident hrd:term:max va:term:max n:num spl:term:max : tactic =>
+  `(tactic| (
+    intro Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, #Hcl, HF, #HK, HAUw⟩, HΦ⟩
+    have hva := is_aligned_vaddr_of $va $n hal
+    have hsplit := $spl
+    have hlt := inRam_lt38 _ _ hram
+    have hlt' := inRam_lt _ _ hram
+    have hpin := tierPin_id curTier $va hlt'
+    have hok' : SConfPhys (GF := GF) c sie := hok.phys
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok'
+    obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+    have hok' : SConfPhys (GF := GF) c sie := hok.phys
+    conf_cases HmConf
+    unfold execute
+    swp_run 60
+    iapply swp_bind
+    iapply swp_rX_file
+    iframe
+    iintro HF
+    swp_run 150
+    iapply swp_bind
+    conf_intro HmConf
+    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inl rfl)))
+    iframe HmConf
+    inext
+    iintro HmConf
+    conf_cases HmConf
+    swp_run 100
+    iapply swp_bind
+    conf_intro HmConf
+    iapply (swp_translationMode_tier cpu dq c sie curTier root hok)
+    iframe HmConf
+    inext
+    iintro HmConf
+    conf_cases HmConf
+    swp_run 100
+    iapply swp_bind
+    conf_intro HmConf
+    unfold transTok
+    icases HT with ⟨Htrans, Htok⟩
+    iapply (swp_translateAddr_tier cpu dq c sie curTier root hok _ hlt _ (Or.inr (Or.inl rfl)) (idPpn (vpnOf $va)) .rw rfl hpin)
+    iframe HmConf Hcl Htrans Htok
+    iintro HmConf Htrans Htok
+    rw [paOf_id $va hlt']
+    conf_cases HmConf
+    swp_run 40
+    conf_intro HmConf
+    iapply swp_bind
+    ispecialize HAUw $$ Htok HPC
+    iapply ($lem:ident (hok := hok') (hram := hram) (hal := hal) (K := K) (ts := ts)
+      (Ψ := fun w => iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ w)))
+    iframe HmConf HAUw
+    isplit
+    · iexact HK
+    inext
+    iintro HmConf %w ⟨HPC, HΨ⟩
+    conf_cases HmConf
+    swp_run 60
+    iapply swp_bind
+    iapply swp_wX_file (hrd := $hrd)
+    iframe
+    inext
+    iintro HF
+    swp_run 10
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC [Htrans HF HΨ]
+    iframe Htrans
+    iexists w
+    iframe))
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- `lw rd, imm(rs1)`, racy, from a 4-aligned RAM address inside an

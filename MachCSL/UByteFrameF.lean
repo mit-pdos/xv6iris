@@ -33,17 +33,17 @@ theorem ctxByte_halve (ξ : CtxId) (a : PAddr) (b : BitVec 8) :
     ctxByte (GF := GF) ξ a (DFrac.own 1) b ⊣⊢ ctxByte ξ a dqRO b ∗ ctxByte ξ a dqRest b := by
   constructor
   · iintro H
-    icases ctxByte_cases ξ a (DFrac.own 1) b $$ H with ⟨%e, %He, Hpt, %hev, #Hkey⟩
+    icases ctxByte_cases_np ξ a (DFrac.own 1) b $$ H with ⟨%hnp, %e, %He, Hpt, %hev, #Hkey⟩
     have h := (Fractional.fractional (Φ := fun q => iprop(a ↦ₕ{DFrac.own q} (e :: He)))
       Qp.threeQuarters Qp.quarter)
     rw [qp_tq_add_q] at h
     icases h.1 $$ Hpt with ⟨H1, H2⟩
     isplitl [H1]
-    · unfold ctxByte; iexists e, He; iframe H1 Hkey; ipureintro; exact hev
-    · unfold ctxByte; iexists e, He; iframe H2 Hkey; ipureintro; exact hev
+    · unfold ctxByte; iexists e, He; iframe H1 Hkey; ipureintro; exact ⟨hev, hnp⟩
+    · unfold ctxByte; iexists e, He; iframe H2 Hkey; ipureintro; exact ⟨hev, hnp⟩
   · iintro ⟨H1, H2⟩
-    icases ctxByte_cases ξ a dqRO b $$ H1 with ⟨%e, %He, Hpt1, %hev, #Hkey⟩
-    icases ctxByte_cases ξ a dqRest b $$ H2 with ⟨%e', %He', Hpt2, %_, _⟩
+    icases ctxByte_cases_np ξ a dqRO b $$ H1 with ⟨%hnp, %e, %He, Hpt1, %hev, #Hkey⟩
+    icases ctxByte_cases_np ξ a dqRest b $$ H2 with ⟨%hnp, %e', %He', Hpt2, %_, _⟩
     ihave %hag := pointsTo_agree $$ [Hpt1 Hpt2]
     · iframe Hpt1 Hpt2
     rw [← hag]
@@ -56,7 +56,7 @@ theorem ctxByte_halve (ξ : CtxId) (a : PAddr) (b : BitVec 8) :
     unfold ctxByte
     iexists e, He
     iframe Hpt Hkey
-    ipureintro; exact hev
+    ipureintro; exact ⟨hev, hnp⟩
 
 /-- The fraction a half-label gives. -/
 def ubFr (hf : PAddr → Bool) (a : PAddr) : DFrac := if hf a then dqRO else DFrac.own 1
@@ -317,8 +317,8 @@ theorem ubOwnAF_nodup' (ξ : CtxId) (hf : PAddr → Bool) : ∀ A : List (PAddr 
       · obtain ⟨q, hq, hqe⟩ := List.mem_map.1 ha
         icases BigSepL.bigSepL_mem_acc (Φ := fun q : PAddr × BitVec 8 => ctxByte ξ q.1 (ubFr hf q.1) q.2) hq
           $$ H with ⟨Hq, -⟩
-        icases ctxByte_cases ξ _ _ _ $$ Hp with ⟨%e, %He, Hpt, -, -⟩
-        icases ctxByte_cases ξ _ _ _ $$ Hq with ⟨%e', %He', Hpt', -, -⟩
+        icases ctxByte_cases_np ξ _ _ _ $$ Hp with ⟨%hnp, %e, %He, Hpt, -, -⟩
+        icases ctxByte_cases_np ξ _ _ _ $$ Hq with ⟨%hnp, %e', %He', Hpt', -, -⟩
         ihave %hne := pointsTo_frac_ne (ubFr_op_invalid hf p.1 q.1) $$ Hpt Hpt'
         exact (hne hqe.symm).elim
       · ipureintro; exact ha
@@ -364,8 +364,8 @@ theorem ubOwnAF_disj (ξ : CtxId) (hf hf' : PAddr → Bool) (A B : List (PAddr �
         $$ HA with ⟨Hp, -⟩
       icases BigSepL.bigSepL_mem_acc (Φ := fun q : PAddr × BitVec 8 => ctxByte ξ q.1 (ubFr hf' q.1) q.2) hq
         $$ HB with ⟨Hq, -⟩
-      icases ctxByte_cases ξ _ _ _ $$ Hp with ⟨%e, %He, Hpt, -, -⟩
-      icases ctxByte_cases ξ _ _ _ $$ Hq with ⟨%e', %He', Hpt', -, -⟩
+      icases ctxByte_cases_np ξ _ _ _ $$ Hp with ⟨%hnp, %e, %He, Hpt, -, -⟩
+      icases ctxByte_cases_np ξ _ _ _ $$ Hq with ⟨%hnp, %e', %He', Hpt', -, -⟩
       ihave %hne := pointsTo_frac_ne (ubFr_op_invalid2 hf hf' p.1 q.1) $$ Hpt Hpt'
       exact (hne hqe.symm).elim
     · ipureintro

@@ -66,6 +66,13 @@ def rdOut (cpu : CPU) {n : Nat} (tvn : Nat) (w : BitVec (8 * n)) : Option RdIssu
         ⌜K0 < tvn⌝)
     else iprop(emp)
 
+/-- **What a racy read owes the publication reads' provenance** (Q4 [OWN.154] (L1)): no pc -- the
+window is whole or off the publication bases (`MachCSL.rdNpOk`); or the read lends the hart's `PC` cell
+at a publication-read pc (xv6: `main+0x16`, the boot spin's load of `started`). -/
+def rdPcOk (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) : Option (BitVec 64) → Prop
+  | none => rdNpOk (hlc := hlc) (GF := GF) pa n dqs
+  | some v => ((v.toNat : Nat) : Int) ∈ MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)
+
 /-- The accessor of a plain load by `cpu` whose view is at least `K`, WITH
 the read watermark's receipt: the continuation also gets
 `MachCSL.rviewLb cpu tvn` for the very view `tvn` its answer was read
@@ -76,15 +83,16 @@ def readAUr (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
     (Ψ : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
   ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
   (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (o : Option RdIssue) (cs : RdComps)
-      (ls : List (Nat × Nat)),
+      (ls : List (Nat × Nat)) (po : Option (BitVec 64)),
     landedAll ls ∗ histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → readableAt (hartAgent cpu) K ls ts (Hs j)⌝ ∗
+    rsvPcCell cpu po ∗ ⌜rdPcOk (hlc := hlc) (GF := GF) pa n dqs po⌝ ∗
     rdIn cpu pa n Hs o ∗ rdCompBytes cs ∗ readCertsAt cpu pa n K ts ls Hs cs ∗
     ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat) (lp : LandPos) (es : Nat → HEnt) (ps : Nat → Nat), ⌜K ≤ tvn⌝ -∗
         ⌜lpAgree ls lp ∧ readsAreP lp (hartAgent cpu) tvn Hs n w ∧
           ∀ j, j < n → Hist.readEntP lp (hartAgent cpu) tvn (Hs j) = some (es j)⌝ -∗
         ([∗list] j ∈ List.range n, readEntCert cpu tvn (es j) (ps j)) -∗
         ⌜authorsAre ts n Hs⌝ -∗ rviewLb cpu tvn -∗ rdOut cpu tvn w o -∗ histBytes pa n dqs Hs -∗
-        rdCompBytes cs ={∅,⊤}=∗ Ψ w))
+        rdCompBytes cs -∗ rsvPcCell cpu po ={∅,⊤}=∗ Ψ w))
 
 /-- The postcondition may be weakened, as for `MachCSL.readAU`. -/
 theorem readAUr_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
@@ -93,15 +101,17 @@ theorem readAUr_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Age
   unfold readAUr
   iintro ⟨#Hts, H⟩ Hw
   iframe Hts
-  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, #Hls, Hb, %hne, Ho, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, %po, #Hls, Hb, %hne, Hp, %hpo, Ho, Hcs, #Hcert, Hcont⟩
   imodintro
-  iexists dqs, Hs, o, cs, ls
-  iframe Hls Hb Ho Hcs Hcert
+  iexists dqs, Hs, o, cs, ls, po
+  iframe Hls Hb Hp Ho Hcs Hcert
   isplitl []
   · ipureintro; exact hne
+  isplitl []
+  · ipureintro; exact hpo
   inext
-  iintro %w %tvn %lp %es %ps %hK %hrd Hrc %hau #Hrv Hout Hb Hcs
-  imod Hcont $$ %w %tvn %lp %es %ps %hK %hrd Hrc %hau Hrv Hout Hb Hcs with HΨ
+  iintro %w %tvn %lp %es %ps %hK %hrd Hrc %hau #Hrv Hout Hb Hcs Hp
+  imod Hcont $$ %w %tvn %lp %es %ps %hK %hrd Hrc %hau Hrv Hout Hb Hcs Hp with HΨ
   imodintro
   iapply Hw $$ %w HΨ
 

@@ -227,7 +227,7 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   isplitl []
   · iapply topLbAt_0
   inext
-  iintro %t %htt Hb #Hau #Ht _
+  iintro %t %htt %_ Hb #Hau #Ht _
   imod Hmask
   ihave Hpin := Hpush $$ %t %(hartAgent c) %htt Hb
   imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Hicnt, ⟨%tstn, Hstn, #Hllbn, #Hautn⟩⟩
@@ -435,7 +435,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   iexists Hs
   iframe Hb
   inext
-  iintro %t Hb #Hau #Ht
+  iintro %t %hnp Hb #Hau #Ht
   imod Hmask
   imod Hcl $$ %(iprop(emp)) [] with ⟨Hhalf, Hisl, Hoff, Hcnt0, -, Hstf, -⟩
   · iempintro
@@ -444,7 +444,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   imodintro
   iintro Hctx
   -- the retired cell: a free slot's plain ctx cell at 0
-  imod ctxBytes_of_pushed c curCtx (iRef (ientry kk)) 4 (DFrac.own 1) t Hs (0#32 : BitVec 32)
+  imod ctxBytes_of_pushed c curCtx (iRef (ientry kk)) 4 (DFrac.own 1) t Hs (0#32 : BitVec 32) hnp
     $$ [Hctx Hau Ht Hb] with ⟨Hctx, Hcell⟩
   · iframe Hctx Hb Hau Ht
   ihave Hcell := wordPointsTo_intro_id (iRef (ientry kk)) 4 (DFrac.own 1) (0#32 : BitVec 32)

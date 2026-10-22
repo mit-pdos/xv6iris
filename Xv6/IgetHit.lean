@@ -155,7 +155,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   isplitl []
   · iapply topLbAt_0
   inext
-  iintro %t %htt Hb #Hau #Ht _
+  iintro %t %htt %_ Hb #Hau #Ht _
   imod Hmask
   ihave Hpin := Hpush $$ %t %(hartAgent c) %htt Hb
   imod Hcl $$ [Hpin] with ⟨Hhalf, Hisl, Htok, Hsel, Hlic, Hicnt, Hru, ⟨%tstn, Hstn, #Hllbn, #Hautn⟩⟩

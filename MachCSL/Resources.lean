@@ -1154,11 +1154,16 @@ def pubByteIn (rs : List RsvRegion) (f : PAddr) (w : CPU) : Prop :=
 registry is the static lock bytes, or (time-indexed [R35.1]; [OWN.49] (a′-r))
 a live dynamic lock whose witness `wit` the state's memory holds
 (`dynLkAt`) and whose release under the acquire was issued at a pc of `ps`
-(`relBelowOk`, mcslrec (2) [OWN.82] (a1)). -/
+(`relBelowOk`, mcslrec (2) [OWN.82] (a1)); and (Q2 [OWN.153] (D4), the CERTIFIED-HOP form)
+the acquire at `a` is an issued position whose pc record is `-1` -- an exclusive write's
+(`MState.storeL`): a certified hop is minted only at a winning AMO's hop request
+(`MachCSL.memModel_hopIssue`, the one producer of the registry), where its acquire entry IS the
+AMO's.  A position's pc never changes once issued, so the registry still only grows. -/
 def chainEnvAt (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     (σ : MState) : ChainEnv :=
   ⟨σ.mem, fun j => (σ.hr j).coh,
-    fun b a => lockByteIn rs b ∨ (dynLkAt wit σ.mem σ.top b a ∧ relBelowOk ps σ b a), pubByteIn rs, σ.lp⟩
+    fun b a => (lockByteIn rs b ∨ (dynLkAt wit σ.mem σ.top b a ∧ relBelowOk ps σ b a)) ∧
+      a ≤ σ.top ∧ σ.pcAt a = -1, pubByteIn rs, σ.lp⟩
 
 /-- **The certificate map's invariant**: every certificate key names a valid
 certificate, every gate key a hart past the gate, every entry key (W8
@@ -1249,7 +1254,7 @@ theorem chainEnvAt_congr (rs : List RsvRegion) (ps : List Int) (wit : List (PAdd
     intro b a; unfold relBelowOk; rw [h, hp, hlp]
   unfold chainEnvAt
   rw [h, ht, hlp]
-  simp only [hb]
+  simp only [hb, hp]
   congr 1
   funext j a
   exact hc j a
@@ -1279,6 +1284,8 @@ theorem chainEnvAt_ext_of (rs : List RsvRegion) (ps : List Int) (wit : List (PAd
     (hcoh : ∀ (j : CPU) (f : PAddr) (w : CPU), pubByteIn rs f w → j ≠ w → (σ.hr j).coh f ≤ (σ'.hr j).coh f) :
     (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit σ') := by
   refine ⟨memExt_of_memExtP hlm, fun b r h => ?_, fun _ _ => Iff.rfl, hcoh, memIncl_of_memIns hins, hlp⟩
+  obtain ⟨h, hat, hpa⟩ := h
+  refine ⟨?_, Nat.le_trans hat htop, by rw [hpc r hat]; exact hpa⟩
   rcases h with h | ⟨h, hr⟩
   · exact Or.inl h
   · refine Or.inr ⟨dynLkAt_monoI hins htop h, relBelowOk_grow (fun H hH => hlm b H hH) (fun H e hH he => ?_) hr⟩
@@ -1573,10 +1580,12 @@ abbrev chainEx [MachFixedGS hlc GF] (σ : MState) : PAddr → Nat → Prop :=
   chainExAtP (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
     σ.mem σ.lp σ.ltop
 
-/-- A static lock byte is a hop byte at every position. -/
+/-- A static lock byte is a hop byte at every issued position stamped exclusive (Q2 [OWN.153]
+(D4): the certified-hop form). -/
 theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Nat)
-    (h : rsvLockByte (hlc := hlc) (GF := GF) b) : (chainEnv (hlc := hlc) (GF := GF) σ).isLk b r :=
-  Or.inl h
+    (h : rsvLockByte (hlc := hlc) (GF := GF) b) (hr : r ≤ σ.top) (hpc : σ.pcAt r = -1) :
+    (chainEnv (hlc := hlc) (GF := GF) σ).isLk b r :=
+  ⟨Or.inl h, hr, hpc⟩
 
 /-! ### The load-side invariant at the ambient record, step by step (W8
 (f2-ctx) S3-c1: what `chainModelAt`'s first conjunct needs of each machine
@@ -2261,7 +2270,8 @@ def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
     ⌜staticIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       rsvExact (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg ∧
-      relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ⌝ ∗
+      relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ ∧
+      ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ⌝ ∗
       kptModelAt E σ reg) ∗
   rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) ∗
   chainModelAt E σ
@@ -2833,14 +2843,15 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 store pcs. -/
 theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
     (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a)
-    (hp : σ'.pcAt = σ.pcAt := by rfl) (hll : σ'.llog = σ.llog := by rfl) :
+    (hp : σ'.pcAt = σ.pcAt := by rfl) (hll : σ'.llog = σ.llog := by rfl)
+    (hld : σ'.ldPcAt = σ.ldPcAt := by rfl) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
   have ht : σ'.top = σ.top := by simp only [MState.top, hl]
   have hlp : σ'.lp = σ.lp := by simp only [MState.lp, hll]
   have hlt : σ'.ltop = σ.ltop := by simp only [MState.ltop, hll]
   unfold rsvModelAt reservedOk kptModelAt kptSnapAt chainModelAt chainEnv chainEx relPcOk
   have hpk : pcKeysOk σ' = pcKeysOk σ := by funext Z; unfold pcKeysOk; rw [ht, hp]
-  rw [chainEnvAt_congr _ _ _ h hl hc hp hll, h, ht, hp, hpk, hlp, hlt]
+  rw [chainEnvAt_congr _ _ _ h hl hc hp hll, h, ht, hp, hpk, hlp, hlt, ldPcOk_congr hld hc]
 
 /-- **A landing keeps the reserved conjunct** (route P): the reserved regions, the release
 sites, the sealed table read the merged memory and the issue top, which a landing does not move;
@@ -2854,8 +2865,10 @@ theorem rsvModelAt_land [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CP
       (σ.land cpu t) = relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
         (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ := rfl
   have h3 : ∀ reg, kptModelAt (GF := GF) E (σ.land cpu t) reg = kptModelAt E σ reg := fun _ => rfl
+  have h4 : ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) (σ.land cpu t) =
+      ldPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF)) σ := rfl
   unfold rsvModelAt chainModelAt
-  simp only [h1, h2, h3]
+  simp only [h1, h2, h3, h4]
   iintro ⟨Hreg, Hhalf, %hlc, %Z, HZ, %⟨hcert, hpk⟩, Hel⟩
   isplitl [Hreg]
   · iexact Hreg

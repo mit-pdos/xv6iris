@@ -39,7 +39,7 @@ theorem ctxByte_merge (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8) :
   have he : e = e' := (List.cons.injEq _ _ _ _ ▸ heq).1
   isplitl [Hp]
   · iexists e, H; iframe Hp Hk; ipureintro; exact he1
-  · ipureintro; rw [← he1, ← he2, he]
+  · ipureintro; rw [← he1.1, ← he2.1, he]
 
 /-! ## `n` bytes -/
 

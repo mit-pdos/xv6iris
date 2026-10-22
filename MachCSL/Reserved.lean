@@ -433,6 +433,21 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
   have := mem_regionBytes hw hn
   simpa using this
 
+/-- **`a` is no publication word's base byte** (Q4 [OWN.154] (L1)): what a context byte carries (a
+context byte is never a publication base, so a generic load of context bytes owes the publication
+reads' provenance nothing, `ldPcObl_of_notPub`). -/
+def notPubBase (rs : List RsvRegion) (a : PAddr) : Prop := ∀ w : CPU, (⟨a, .pub w⟩ : RsvRegion) ∉ rs
+
+/-- The `n` bytes at `pa` are no publication bases. -/
+def notPubBytes (rs : List RsvRegion) (pa : PAddr) (n : Nat) : Prop :=
+  ∀ j, j < n → notPubBase rs (pa + BitVec.ofNat 64 j)
+
+/-- A byte of no reserved region is no publication base. -/
+theorem notPubBase_of_notRsv {rs : List RsvRegion} {a : PAddr} (h : a ∉ rsvBytes rs) : notPubBase rs a := by
+  intro w hw
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hw
+  exact h (mem_rsvBytes hi (RsvRegion.base_mem _ rfl))
+
 /-- Two regions at different indices of a byte-distinct list share no byte. -/
 theorem rsvBytes_disjoint {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) :
     ∀ {i i' : Nat} {R R' : RsvRegion}, rs[i]? = some R → rs[i']? = some R' → i ≠ i' →

@@ -3148,6 +3148,33 @@ theorem Lock.rsv_certs4 (cpu : CPU) (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) 
   exact h
 
 
+/-- **A static lock's words are no publication bases** (Q4 [OWN.154] (L1)): they are bytes of the lock
+region, and the static list's regions have distinct bytes. -/
+theorem Lock.rsv_np (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk)
+    (off n : Nat) (hw : (off = 0 ∧ n = 4) ∨ (off = 16 ∧ n = 8)) :
+    notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (lk + BitVec.ofNat 64 off) n := by
+  intro j hj w hw'
+  have hnd := (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+  have hb : (lk + BitVec.ofNat 64 off) + BitVec.ofNat 64 j ∈ (⟨lk, .lock KernelGeom.cpusBase⟩ : RsvRegion).bytes := by
+    simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
+      List.append_nil, List.mem_append, List.mem_map, List.mem_range]
+    rcases hw with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+    · exact Or.inl ⟨j, hj, by simp⟩
+    · exact Or.inr ⟨j, hj, by simp⟩
+  have := congrArg RsvRegion.kind (rsvByte_region hnd hi hw' hb (RsvRegion.base_mem _ rfl))
+  simp at this
+
+theorem Lock.rsv_np4 (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) lk 4 := by
+  have h := Lock.rsv_np (hlc := hlc) (GF := GF) lk hm 0 4 (Or.inl ⟨rfl, rfl⟩)
+  simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h
+  exact h
+
+theorem Lock.rsv_np8 (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    notPubBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (lk + 16#64) 8 :=
+  Lock.rsv_np (hlc := hlc) (GF := GF) lk hm 16 8 (Or.inr ⟨rfl, rfl⟩)
+
 theorem Lock.rsv_certs8 (cpu : CPU) (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (K : Nat)
     (ts : List (Nat × Agent)) (ls : List (Nat × Nat)) (Hs : Nat → Hist) : ⊢@{IProp GF} readCertsAt cpu (lk + 16#64) 8 K ts ls Hs [] :=
   Lock.rsv_certs (hlc := hlc) (GF := GF) cpu lk hm 16 8 (Or.inr ⟨rfl, rfl⟩) K ts ls Hs

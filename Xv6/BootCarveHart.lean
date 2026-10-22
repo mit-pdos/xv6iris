@@ -110,9 +110,15 @@ theorem bootRo_ctxBytes (ξ : CtxId) (image : Mem) (lo hi : Nat) (pa : PAddr) (n
     (w : BitVec (8 * n))
     (hin : ∀ j, j < n → lo ≤ (pa + BitVec.ofNat 64 j).toNat ∧ (pa + BitVec.ofNat 64 j).toNat < hi ∧
       inRam (pa + BitVec.ofNat 64 j) 1)
-    (himg : bootImgHas image pa n w) :
+    (himg : bootImgHas image pa n w) (hhi : hi ≤ MachCSL.KernelSyms.«started») (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootRo (GF := GF) (imgFlat image) lo hi ⊢ ctxBytes ξ pa n DFrac.discard w :=
-  (bootRo_imgBytes image lo hi pa n w hin himg).trans (imgBytes_ctx ξ pa n w)
+  (bootRo_imgBytes image lo hi pa n w hin himg).trans (imgBytes_ctx ξ pa n w (fun j hj => by
+    rw [hrsv]
+    refine xv6NotPubBase (fun e => ?_)
+    have h1 := (hin j hj).2.1
+    rw [e] at h1
+    have hs : KA.«started».toNat = MachCSL.KernelSyms.«started» := rfl
+    omega))
 
 /-- **Persist the GOT word** out of `.data` (Rocq `boot_shared_alloc`'s GOT
 persist), handing back the two sides of `.data`. -/
@@ -131,13 +137,14 @@ theorem bootCarve_gotRo :
 /-- **The GOT word at the hart's own context, discarded** (Rocq
 `mb_ld_ea ↦ₚ₈□ v_stack0`): what `Xv6.wp_boot_body` (at `dqg = DFrac.discard`)
 takes. -/
-theorem bootGot_word [CurCtx] :
+theorem bootGot_word [CurCtx] (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootGotRo (GF := GF) ⊢ pwordPointsTo stack0Slot 8 DFrac.discard KA.«stack0» := by
   have hA : bcInRam bhGot 8 := by unfold bcInRam bhGot ramBase ramEnd; omega
   rw [bh_stack0Slot]
   unfold bootGotRo
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by decide))
   refine bootRo_ctxBytes curCtx bootImage _ _ _ 8 _ (fun j hj => ?_) (bh_stack0Slot ▸ bootImage_wf.got)
+    (by unfold bhGot; simp only [MachCSL.KernelSyms.«started»]; omega)
   have := bc_addr_toNat bhGot j (by unfold bhGot; omega)
   rw [this]
   refine ⟨by omega, by omega, ?_⟩
@@ -181,11 +188,12 @@ theorem bhRan_down (m : MemF Hist) :
 /-- **A `.bss` physical word at its zero** (Rocq `boot_cran_cell8_bss` at
 the M-mode tier). -/
 theorem bh_pword0 [CurCtx] (A : Nat)
-    (hlo : 0x8000a400 ≤ A) (hhi : A + 8 ≤ 0x80023b10) (hal : A % 8 = 0) :
+    (hlo : 0x8000a404 ≤ A) (hhi : A + 8 ≤ 0x80023b10) (hal : A % 8 = 0) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootRan (GF := GF) (imgFlat bootImage) A (A + 8) ⊢ pwordPointsTo (BitVec.ofNat 64 A) 8 (DFrac.own 1) 0#64 := by
   have hA : bcInRam A 8 := by unfold bcInRam ramBase ramEnd; omega
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by rw [bc_ofNat_toNat hA]; exact hal))
   refine bootImg_ctxBytes curCtx bootImage A 8 0#64 hA (fun j hj => ?_)
+    (.inl (by simp only [MachCSL.KernelSyms.«started»]; omega))
   rw [show nthByte (0#(8 * 8)) j = 0#8 by simp [nthByte]]
   have := bc_addr_toNat A j (by omega)
   exact bootImage_wf.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
@@ -216,7 +224,7 @@ theorem bh_slot_addr (c : CPU) (i : Nat) (hi : i < 508) :
 
 /-- The words below a `.bss` top `T`, at the hart's context, top-down. -/
 theorem bh_stack_rest [CurCtx] (n T : Nat)
-    (hlo : 0x8000a400 + 8 * n ≤ T) (hhi : T ≤ 0x80023b10) (hal : T % 8 = 0) :
+    (hlo : 0x8000a404 + 8 * n ≤ T) (hhi : T ≤ 0x80023b10) (hal : T % 8 = 0) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootRan (GF := GF) (imgFlat bootImage) (T - 8 * n) T ⊢
       [∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (BitVec.ofNat 64 (T - 8 * (i + 1))) 8 (DFrac.own 1) w := by
@@ -233,7 +241,7 @@ set_option maxRecDepth 20000 in
 `boot_cran_stack_own_phys`, at the hart's own context): `wp_boot_body`'s four
 frame words at their `.bss` zeros (`start`'s at `sp₀ - 16`/`sp₀ - 8`,
 `timerinit`'s at `sp₀ - 32`/`sp₀ - 24`) and the other 508 words below. -/
-theorem bootStack_carve [CurCtx] (c : CPU) :
+theorem bootStack_carve [CurCtx] (c : CPU) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     bootRan (GF := GF) (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) ⊢
       pwordPointsTo (spOf c - 16#64) 8 (DFrac.own 1) 0#64 ∗
       pwordPointsTo (spOf c - 8#64) 8 (DFrac.own 1) 0#64 ∗
@@ -310,7 +318,7 @@ theorem bootStack_rejoin [CurCtx] (sp a b : BitVec 64) :
 `boot_hart_pre`'s `cpu_ctx_free`): the 14 `.bss` words of `cpus[c].context`
 in a FRESH stamped context (`MachCSL.ctxStamped_boot`) at stamp 0, with the
 hart's `viewLb c 0` receipt. -/
-theorem bootCpuCtxFree (c : CPU) :
+theorem bootCpuCtxFree (c : CPU) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
       bootRan (imgFlat bootImage) (bhCpuLo c + 8) (bhCpuLo c + 120) -∗ |==> cpuCtxFree c := by
   have hc := c.isLt
@@ -354,7 +362,7 @@ theorem bootCpuCtxFree (c : CPU) :
 `boot_cpu_slot_raw`'s `proc`/`noff`/`intena` rows, `boot_hart_pre`'s
 `cur_proc`): what `Xv6.bootBridge` takes, at their `.bss` zeros -- RESERVED
 cells (W8-β′), out of the client's halves of the region. -/
-theorem bootCpuCells [CurCtx] (c : CPU) (hin : cpuRsvIn (hlc := hlc) (GF := GF) c) :
+theorem bootCpuCells [CurCtx] (c : CPU) (hin : cpuRsvIn (hlc := hlc) (GF := GF) c) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static := by assumption) :
     kmapStatic (GF := GF) ⊢
       rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) -∗
       cpuCell c (aCpuProc c) 8 0#64 ∗
@@ -417,6 +425,7 @@ theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (G
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bhCpuLo c) (bhCpuLo c + 128) -∗
       rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) -∗
       |==> bootHartBss c := by
+  have hrsv := hin.1
   iintro #Hk #Hv Hs Hc Hh
   icases (bootRan_split (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) _ (bhCpuLo c + 8) _
     (by omega) (by omega)).1 $$ Hc with ⟨-, Hc⟩
@@ -498,6 +507,7 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
         MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF) = KernelRsv.pubLdPcs)⌝ := by
   unfold bootHartBss
   iintro ⟨#Hk, #Hg, Hs, Hh, %hin, Hf⟩
+  have hrsv := hin.1
   ihave Hw := bootGot_word $$ Hg
   icases bootStack_carve c $$ Hs with ⟨H16, H8, H32, H24, Hr⟩
   icases bootCpuCells c (xv6CpuRsvIn hin.1 c) $$ Hk Hh with ⟨Hp, Hn, Hi⟩

@@ -89,13 +89,15 @@ theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :
 receipt. -/
 theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
     (hsrc : loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)
-      σ.mem cpu pa n tvn) :
+      σ.mem cpu pa n tvn)
+    (hob : ldPcObl (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF))
+      σ cpu pa n) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗ rviewLbAt E cpu tvn) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) (kptGrow_load σ cpu pa n tvn) (pubSame_refl _ _) id id
-    (fun _ _ => rfl)
+    (fun _ _ => rfl) (ldPcOk_afterLoad σ cpu pa n tvn hob)
     (fun _ => chainEnvAt_ext_load _ _ _ σ cpu pa n tvn)
     (fun _ h => chainLoads_load σ cpu pa n tvn hmm hsrc h) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
@@ -219,7 +221,17 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, #Hls, Hb, %hrd0, Ho, Hcs, #Hcert, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, %cs, %ls, %po, #Hls, Hb, %hrd0, Hp, %hpo, Ho, Hcs, #Hcert, Hcont⟩
+  ihave %hpcv := rsvPcCell_valid cpu (σ.regs cpu) po $$ [Hregs Hp]
+  · iframe
+  ihave %hob : ⌜ldPcObl (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.pubLdPcs (hlc := hlc) (GF := GF))
+      σ cpu req.pa n⌝ $$ [Hmm Hb]
+  · cases po with
+    | none => iapply memModel_ldPcObl σ cpu req.pa n dqs Hs hpo $$ [Hmm Hb]; iframe
+    | some v =>
+      ipureintro
+      refine ldPcObl_of_pc ?_
+      rw [hpcv v rfl]; exact hpo
   ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
   · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
     iframe
@@ -279,10 +291,10 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       exact this
     obtain ⟨es, ps, hes, hcert⟩ := readEnt_facts σ cpu tvn n Hs w' hreads
     icases memModel_readEntCerts σ cpu tvn es ps hcert n (Nat.le_refl _) $$ Hmm with ⟨Hmm, #Hrc⟩
-    imod memModel_load_rv _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) $$ Hmm with ⟨Hmm, #Hrv⟩
+    imod memModel_load_rv _ σ cpu req.pa n tvn htop (hsrc tvn (by omega)) hob $$ Hmm with ⟨Hmm, #Hrv⟩
     imod memModel_rdIssue σ cpu req.pa n tvn Hs w' hget hreads o $$ [Hmm Ho] with ⟨Hmm, Hout⟩
     · iframe Hmm Ho
-    imod Hcont $$ %w' %tvn %σ.lp %es %ps %(by omega) %⟨hla, hreads, hes⟩ Hrc %hauthors Hrv Hout Hb Hcs with HΦ
+    imod Hcont $$ %w' %tvn %σ.lp %es %ps %(by omega) %⟨hla, hreads, hes⟩ Hrc %hauthors Hrv Hout Hb Hcs Hp with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
@@ -519,6 +531,26 @@ theorem execSpecF_lw_aur [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
         ∃ w : BitVec (8 * 4), gprFile cpu (RegMap.set R rd (BitVec.signExtend 64 w)) ∗ Ψ w) := by
   load_file_S_au_proof swp_checked_mem_read_load4_S_aur hrd (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- `execSpecF_lw_aur` lending the hart's `PC` cell to the accessor (Q4 [OWN.154] (L1)). -/
+theorem execSpecF_lw_aur_pc [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
+    (root : BitVec 44) (hok : SConfAt (GF := GF) curTier c root sie)
+    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap)
+    (K : Nat) (ts : List (Nat × Agent)) (Ψ : BitVec (8 * 4) → IProp GF)
+    (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4)
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
+    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) pc npc₀ npc₀
+      iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1 + BitVec.signExtend 64 imm) ∗
+        gprFile cpu R ∗ viewLb cpu K ∗
+        (ctxTok cpu curCtx -∗ Register.PC ↦ᵣ[cpu] pc -∗
+          readAUr cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 K ts
+            (fun w => iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ w))))
+      iprop(transSlotAt cpu curTier root ∗
+        ∃ w : BitVec (8 * 4), gprFile cpu (RegMap.set R rd (BitVec.signExtend 64 w)) ∗ Ψ w) := by
+  load_file_S_au_pc_proof swp_checked_mem_read_load4_S_aur hrd (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
+
 /-- **`lw rd, imm(rs1)`, racy, inside a `readAUr`** (the width-4 twin of
 `wp_s_lhu_aur`): the accessor's continuation names the value read
 AND the read watermark it was read at. -/
@@ -567,6 +599,81 @@ theorem wp_s_lw_aur [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
       inext
       iintro %w HΨ
       iframe Htok HΨ
+    · inext
+      iintro HmConf HPC HnextPC ⟨Htrans, %w, HF, Htok, HΨ⟩
+      ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
+      case' _ => iframe
+      iapply HΦ $$ HmConf HPC HnextPC
+      iframe HT Hlocks
+      iexists w
+      rw [htp w]
+      iframe
+  iapply (wpLoop_k_lock cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
+    (fun w : BitVec (8 * 4) => k.regs.set rd (BitVec.signExtend 64 w))
+    (fun _ => RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) (fun _ => k.locks) (fun _ => hwf) _ (fun w => Ψ w) hexec)
+  iframe HI Hk Hpc HAU
+  isplitl []
+  · isplit
+    · iexact Hcl
+    · iexact HK
+  inext
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HW %w Hk Hpc HΨ
+  simp only [ek]
+  iapply HW $$ %w Hk Hpc HΨ
+
+/-- **`wp_s_lw_aur` lending the hart's `PC` cell to the accessor** (Q4 [OWN.154] (L1): the boot spin's
+load of `started` shows its pc).  Otherwise as **`lw rd, imm(rs1)`, racy, inside a `readAUr`** (the width-4 twin of
+`wp_s_lhu_aur`): the accessor's continuation names the value read
+AND the read watermark it was read at. -/
+theorem wp_s_lw_aur_pc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (hsie : k.sie = false)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rdOk rd)
+    (va : BitVec 64) (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = va)
+    (hram : inRam va 4) (hal : va.toNat % 4 = 0)
+    (K : Nat) (ts : List (Nat × Agent)) (Ψ : BitVec (8 * 4) → IProp GF) :
+    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗ viewLb cpu K ∗
+    (Register.PC ↦ᵣ[cpu] pc -∗ readAUr cpu va 4 K ts (fun w => iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ w))) ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(∀ w : BitVec (8 * 4), kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
+          pcIs cpu' (pc + instrLen is_rvc) -∗ Ψ w -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨HI, Hk, Hpc, #Hcl, #HK, HAU, HΦ⟩
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have htp := fun w : BitVec (8 * 4) => tpPin_set cpu k.regs rd (BitVec.signExtend 64 w) hrd.2.2
+  have ek : ∀ w : BitVec (8 * 4), (k.withRegs (k.regs.set rd (BitVec.signExtend 64 w))).withLocks k.locks =
+      k.setReg rd (BitVec.signExtend 64 w) := fun _ => rfl
+  have haddr' : RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm = va := by
+    simpa only [KCtx.rget] using haddr
+  have hram' : inRam (RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm) 4 := by
+    rw [haddr']; exact hram
+  have hal' : (RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0 := by
+    rw [haddr']; exact hal
+  have hexec : ∀ c : MConf, SConfAt (GF := GF) curTier c k.root false → c.menvcfg = menvcfgS →
+      execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
+        (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) pc (pc + instrLen is_rvc)
+        (pc + instrLen is_rvc)
+        iprop(transTok cpu curTier k.root ∗ gprFile cpu (tpPin cpu k.regs) ∗ lockSet cpu k.locks ∗
+          (kmapId va ∗ viewLb cpu K ∗
+            (Register.PC ↦ᵣ[cpu] pc -∗ readAUr cpu va 4 K ts (fun w => iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ w)))))
+        iprop(transTok cpu curTier k.root ∗
+          ∃ w : BitVec (8 * 4), gprFile cpu (tpPin cpu (k.regs.set rd (BitVec.signExtend 64 w))) ∗
+            lockSet cpu k.locks ∗ Ψ w) := by
+    intro c hok' _ Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hcl, #HK, HAU⟩, HΦ⟩
+    have e := execSpecF_lw_aur_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc)
+      imm rd rs1 hrd.1 (tpPin cpu k.regs) K ts (fun w => iprop(ctxTok cpu curCtx ∗ Ψ w)) hram' hal'
+    rw [haddr'] at e
+    iapply (e Φ)
+    iframe HmConf HPC HnextPC HT HF Hcl HK
+    isplitl [HAU]
+    · iintro Htok HPC
+      ispecialize HAU $$ HPC
+      iapply readAUr_wand cpu va 4 K ts _ $$ HAU
+      inext
+      iintro %w ⟨HPC, HΨ⟩
+      iframe Htok HΨ HPC
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, %w, HF, Htok, HΨ⟩
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]

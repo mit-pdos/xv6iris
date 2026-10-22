@@ -363,6 +363,8 @@ theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Na
     · exact Or.inr (Or.inr (Or.inr h))
     · exact Or.inr (Or.inr (Or.inl h))
   isplitl []
+  · ipureintro; exact rdNpOk_own1
+  isplitl []
   · iapply rdCompBytes_nil
   isplitl []
   · iapply iref_certs cpu k hk hrsv K ts ls W Hold lo v0 htail h0 hW hd lo (Or.inr rfl) hlic
@@ -455,6 +457,8 @@ theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [
         hlicE (x.proj j) hxt⟩
     · obtain ⟨e0, H0, hH, _, ht0⟩ := htail j hj
       exact ⟨e0, by unfold WordHist.hist; rw [hH]; simp, hlicE e0 (by rw [ht0, hlo])⟩
+  isplitl []
+  · ipureintro; exact rdNpOk_own1
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []

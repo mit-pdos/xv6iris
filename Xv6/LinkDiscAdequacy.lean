@@ -9,7 +9,10 @@ files import Proof files).
 Whenever the power is on, the machine's memory obeys W8's export
 `AccessDiscipline.xv6AccessDisc` = `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt
 ∧ lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp ∧ relProvAt ∧
-dynLockWinZAt ∧ ksFrameAt` (eleven conjuncts; mcslrec (3) X1 [OWN.90] [OWN.104] (b): `ksFrameAt`;
+dynLockWinZAt ∧ ksFrameAt ∧ chainOkCertAtP ∧ startedFloorPcAt` (thirteen conjuncts; Q2 [OWN.153] (D4):
+`chainOkCertAtP`, the first conjunct's sync paths with every hop certified -- each acquire an exclusive
+write, `pcAt = -1`; Q4 [OWN.154] (L1): `startedFloorPcAt`, a foreign floor at `started` raised at `main+0x16`;
+mcslrec (3) X1 [OWN.90] [OWN.104] (b): `ksFrameAt`;
 row 5′ E4 (c) [OWN.107]: `dynLockWinZAt`; mcslrec (2) [OWN.82] (a1): `relProvAt`; mcslrec (1)
 [OWN.99]; W8 (f3-utext) O1 + T4 [OWN.89]; W8 (f2-ctx): three of §C W8's six conjuncts; W8
 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]): every foreign hart entry a hart's coherence

@@ -25,6 +25,10 @@ publication store at `r` gives a read `Y`, gmo-after a write at or after `r`, fe
       `CapSync.syncRealizedOf` — `CapSync.syncRealizedP` (= `syncRealized` with `0 < r` in (b),
       finding F-6a-6) at the member, from §1–§4 and the interfaces;
       `CapSync.chainHypsOfSyncPathP` — W11-D's derivation consumes the corrected interface.
+  §6  **Q2 [OWN.153] (D4) — THE GLUE OVER CERTIFIED HOPS**: the export's twelfth conjunct
+      `chainOkCertAtP` (sync paths whose hops are certified, `pcAt = -1` on each acquire) retires
+      the interim premise `lockNzExclP` for 6a: `CapSync.lockNzExclC` (PROVED), `syncRealizedC`,
+      `CapSync.syncRealizedOfC` (no `lockNzExclP`), `CapSync.chainHypsOfSyncPathC`.
 
 Findings (PROGRESS Task F): F-6a-4 `pcAt = -1` also stamps the walker's A/D write-back (an
 `LExStore`), so `exclHopReal` keeps "no walker write-back on a hop acquire"; F-6a-5 (b) needs the
@@ -514,6 +518,190 @@ theorem CapSync.chainHypsOfSyncPathP (GD : Gdexec) (log : List Wmsg) (c : Wpcfg 
   have h3 : Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
   rw [← hcoh] at h1 h2 h3
   rcases hD.1 j pa _ ⟨p + 1, i, v⟩ hH he (by simp) (by rw [hm pa _ hH _ he, hcoh]) hiN hij h1 h2 h3
+    with hs | hrc
+  · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v', H', hne, hpub, hf, hew, hrle, harm⟩
+    · rw [hlo] at hc
+      obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, b, C, r, hbl, hsh⟩ :=
+        RvwmoXv6Adequacy.hopChainSpan hr hc
+      simp only at ht1
+      obtain ⟨Hb, va, hHb, hmemA⟩ := RvwmoXv6Adequacy.syncHopAcq hsh
+      obtain ⟨W, hW, hix, hW1, -⟩ :=
+        RvwmoXv6Adequacy.entGraph hR hpre hwf hlog hHb hmemA (by simp only; omega)
+      simp only at hix hW1
+      obtain ⟨hWR, hWaq, hWe⟩ := hre.1 W b C r hW hW1 (by rw [hix]; omega)
+        (by rw [hix]; exact hbl) (by rw [hix]; exact hsh)
+      refine ⟨W, W, hpw, hW, by rw [hix, hpix]; omega, .inl rfl, .inl ⟨hWR, hWaq, ?_⟩⟩
+      rcases CatLin.CatReroute.poOrEq GD.gdG _ _ _ hWe hrun with heq | hpo
+      · exact .inl heq
+      · exact .inr ⟨hpo, hmx⟩
+    · have hlt : p + 1 < r := by
+        rcases harm with ⟨-, h⟩ | ⟨a, ha, hc⟩
+        · exact h
+        · rw [hlo'] at hc
+          obtain ⟨⟨_, _, _, _, _, _, ht1, h1a⟩, -⟩ :=
+            RvwmoXv6Adequacy.hopChainSpan (m := σ.mem) hr hc
+          simp only at ht1
+          omega
+      have hf' : σ.mem[f]? = some H' := by rw [← hlo']; exact hf
+      have hrle' : r ≤ (σ.hr j).coh f := by
+        obtain ⟨q, hq, hle⟩ := hrle
+        have hlr : σ.lp r = some r := hm f H' hf' _ hew
+        have hlr' : (Xv6.AccessDiscipline.xv6Env σ).lp r = some r := hlr
+        rw [hlr'] at hq
+        cases hq
+        exact hle
+      obtain ⟨W, Y, hW, hrW, hWY, hfc⟩ := hre.2 f w r v' H' hne hpub hf' hew (by omega) hrle'
+      exact ⟨W, Y, hpw, hW, by rw [hpix]; omega, hWY, .inr hfc⟩
+  · rw [hcoh] at hrc
+    exact absurd (.inr (.inr (.inr hrc))) hnb
+
+/-! # 6. Q2 [OWN.153] (D4): THE GLUE OVER CERTIFIED HOPS (interim premise (a-1) retired)
+
+The export's TWELFTH conjunct `Xv6.AccessDiscipline.chainOkCertAtP` gives `chainOkAtP`'s sync paths
+with every hop CERTIFIED (`certHopAt`: a hop byte whose acquire is an issued position stamped
+`pcAt = -1`, minted only at a winning AMO's hop request).  W11-D's derivation consumes only the
+path's hops, so 6a's glue is restated over them: `lockNzExclP` becomes the definitional
+`CapSync.lockNzExclC` (no premise), (a) of `syncRealizedP` is asked of certified hops only
+(`CapSync.syncRealizedC`), and the derivation reads conjunct 12 (`CapSync.chainHypsOfSyncPathC`).
+Spec: the pc record is a proof-only ghost of the machine; FAITHFUL. -/
+
+/-- **(a-1), the certified-hop form — PROVED** (no premise): a certified hop's acquire entry was an
+exclusive write. -/
+theorem CapSync.lockNzExclC (σ : MState) (b : PAddr) (A B : CPU) (r a : Nat) :
+    Xv6.AccessDiscipline.certHopAt σ b a → syncHop σ.mem b A r B a → σ.pcAt a = -1 :=
+  fun h _ => h.2.2
+
+/-- **`syncRealizedP` over CERTIFIED hops**: (a) asks only of hop acquires that are certified; (b)
+verbatim. -/
+def CapSync.syncRealizedC (GD : Gdexec) (σ : MState) (j : CPU) (s : Seg) : Prop :=
+  (∀ (W : Geid) (b : PAddr) (C : CPU) (r : Nat), W ∈ gwrites GD.gdG → W.1 = hartAgent j →
+      gwix GD.gdG W ≤ σ.top → Xv6.AccessDiscipline.certHopAt σ b (gwix GD.gdG W) →
+      syncHop σ.mem b C r j (gwix GD.gdG W) →
+      glblIs GD.gdG W lbIsR ∧ glblIs GD.gdG W lbAq ∧
+        (W = s.sgEntry ∨ WeakRvwmoGraph.gpo GD.gdG W s.sgEntry)) ∧
+  (∀ (f : PAddr) (w : CPU) (r : Nat) (v : BitVec 8) (H : Hist), j ≠ w →
+      (Xv6.AccessDiscipline.xv6Env σ).isPub f w → σ.mem[f]? = some H →
+      (⟨r, hartAgent w, v⟩ : HEnt) ∈ H → 0 < r → r ≤ (σ.hr j).coh f →
+      ∃ (W Y : Geid), W ∈ gwrites GD.gdG ∧ r ≤ gwix GD.gdG W ∧ (W = Y ∨ gmoLt GD.gdG W Y) ∧
+        gfenceCovers GD.gdG Y s.sgExit)
+
+/-- The corrected interface gives the certified one. -/
+theorem CapSync.syncRealizedCOfP (GD : Gdexec) (σ : MState) (j : CPU) (s : Seg) :
+    CapSync.syncRealizedP GD σ j s → CapSync.syncRealizedC GD σ j s :=
+  fun h => ⟨fun W b C r hW hW1 htop hhb hsh => h.1 W b C r hW hW1 htop hhb.1 hsh, h.2⟩
+
+/-- **THE GLUE OVER CERTIFIED HOPS — A1 at the `SbCand` member**: `CapSync.syncRealizedOf` with
+the interim premise `lockNzExclP` gone (a certified hop carries its `pcAt = -1`,
+`CapSync.lockNzExclC`). -/
+theorem CapSync.syncRealizedOfC (pol : SbPol) (N : Nat) (c : SbWalk.CandW) (GD : Gdexec)
+    (hG : GD.gdG = SbAgree.memberP N c) (hv : SbWalk.validW pol c)
+    (σ : MState) (j : CPU) (s : Seg) (lr : CPU → PAddr → Int) (ipc : Geid → Int)
+    (hAq : CapSync.amoAqAt GD.gdG) (hP : CapSync.startedFloorPcP σ lr)
+    (hRA : CapSync.exclHopReal GD σ) (hRB : CapSync.realBefore GD σ s.sgEntry)
+    (hRF : CapSync.floorReadReal GD σ lr ipc j s) (hR2 : CapSync.spinFenceNext GD ipc)
+    (hj : s.sgEntry.1 = j.val) (hEnt : glblIs GD.gdG s.sgEntry lbIsR)
+    (hrun : s.sgEntry = s.sgExit ∨ WeakRvwmoGraph.gpo GD.gdG s.sgEntry s.sgExit)
+    (hexR : glblIs GD.gdG s.sgExit lbIsR ∨ glblIs GD.gdG s.sgExit lbIsW) :
+    CapSync.syncRealizedC GD σ j s := by
+  refine ⟨fun W b C r hW hW1 htop hhb hsh => ?_, fun f w r v H hne hpub hf he hr0 hrle => ?_⟩
+  · -- (a): the certified hop's acquire is an exclusive write, hence an AMO, hence `.aq`
+    have hpc := CapSync.lockNzExclC σ b C j r _ hhb hsh
+    obtain ⟨aq, rl, base, ts, rvs, wvs, kc, hlb⟩ := hRA W b C j r hW hW1 hhb.1 hsh hpc
+    have haq := hAq W aq rl base ts rvs wvs kc hlb
+    subst haq
+    refine ⟨⟨_, hlb, rfl⟩, ⟨_, hlb, rfl⟩, ?_⟩
+    rcases hRB W hW htop with h | h
+    · exact .inl h
+    · right
+      obtain ⟨le, hle, hler⟩ := hEnt
+      have hge : SbWalk.gmoEv le = true := by
+        cases le <;> simp_all [lbIsR, SbWalk.gmoEv, SbWalk.isSt, lbIsMem]
+      have hrow : W.1 = s.sgEntry.1 := by rw [hW1, hj]; rfl
+      rw [hG] at h hlb hle
+      have hlt := CapSync.memberPoOfGmo pol N c hv W s.sgEntry _ le h hrow hlb rfl hle hge
+      refine ⟨hrow, hlt, ?_, ?_⟩
+      · rw [hG, hlb]; rfl
+      · rw [hG, hle]; rfl
+  · -- (b): the floor's read is the boot spin's load, followed by `fence r,rw`
+    obtain ⟨W, Y, hW, hrW, hWY, hY1, hYR, hipc, hYe⟩ := hRF f w r v H hne hpub hf he hr0 hrle
+    have hlr := hP f w j hpub hne (by omega)
+    have hfn := hR2 Y (by rw [hipc, hlr]) hYR
+    obtain ⟨hpr, hsr, hsw⟩ := CapSync.spinFenceBits
+    refine ⟨W, Y, hW, hrW, hWY, wFencePr (kw CapSync.spinFencePc), wFencePw (kw CapSync.spinFencePc),
+      wFenceSr (kw CapSync.spinFencePc), wFenceSw (kw CapSync.spinFencePc), ?_, .inl ⟨hYR, hpr⟩, ?_⟩
+    · obtain ⟨hYe1, hYe2, -, -⟩ := hYe
+      have hx : s.sgEntry.1 = s.sgExit.1 ∧ s.sgEntry.2 ≤ s.sgExit.2 := by
+        rcases hrun with h | ⟨h1, h2, -⟩
+        · rw [h]; exact ⟨rfl, Nat.le_refl _⟩
+        · exact ⟨h1, Nat.le_of_lt h2⟩
+      have hne' : Y.2 + 1 ≠ s.sgExit.2 := by
+        intro heq
+        have hl : gxLbl GD.gdG s.sgExit = some CapSync.spinFenceLbl := by
+          have : s.sgExit = (Y.1, Y.2 + 1) := by
+            rw [heq, hYe1, hx.1]
+          rw [this]; exact hfn
+        rcases hexR with ⟨l, hl', hb⟩ | ⟨l, hl', hb⟩
+        · rw [hl, Option.some.injEq] at hl'; subst hl'; simp [CapSync.spinFenceLbl, lbIsR] at hb
+        · rw [hl, Option.some.injEq] at hl'; subst hl'; simp [CapSync.spinFenceLbl, lbIsW] at hb
+      refine ⟨hYe1.trans hx.1, by omega, Y.2 + 1, by omega, by omega, ?_⟩
+      exact hfn
+    · rcases hexR with h | h
+      · exact .inl ⟨h, hsr⟩
+      · exact .inr ⟨h, hsw⟩
+
+/-- **(b-1) DISCHARGED by the export** (Q4 [OWN.154] (L1), the export's thirteenth conjunct): the
+interim premise `startedFloorPcP` at the machine's ghost load-pc record. -/
+theorem CapSync.startedFloorPcP_ofExport (σ : MState) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ) :
+    CapSync.startedFloorPcP σ σ.ldPcAt :=
+  fun f w j hp hj hpos => Xv6.AccessDiscipline.startedFloorPcAt_ofExport hD f w j hp hj hpos
+
+/-- **THE GLUE FROM THE EXPORT** (Q2 [OWN.153] (D4) + Q4 [OWN.154] (L1)): `CapSync.syncRealizedOfC` with
+BOTH interim premises gone -- the certified hops carry `pcAt = -1`, and the floor's load pc is the
+export's (`lr := σ.ldPcAt`). -/
+theorem CapSync.syncRealizedOfX (pol : SbPol) (N : Nat) (c : SbWalk.CandW) (GD : Gdexec)
+    (hG : GD.gdG = SbAgree.memberP N c) (hv : SbWalk.validW pol c)
+    (σ : MState) (j : CPU) (s : Seg) (ipc : Geid → Int) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ)
+    (hAq : CapSync.amoAqAt GD.gdG)
+    (hRA : CapSync.exclHopReal GD σ) (hRB : CapSync.realBefore GD σ s.sgEntry)
+    (hRF : CapSync.floorReadReal GD σ σ.ldPcAt ipc j s) (hR2 : CapSync.spinFenceNext GD ipc)
+    (hj : s.sgEntry.1 = j.val) (hEnt : glblIs GD.gdG s.sgEntry lbIsR)
+    (hrun : s.sgEntry = s.sgExit ∨ WeakRvwmoGraph.gpo GD.gdG s.sgEntry s.sgExit)
+    (hexR : glblIs GD.gdG s.sgExit lbIsR ∨ glblIs GD.gdG s.sgExit lbIsW) :
+    CapSync.syncRealizedC GD σ j s :=
+  CapSync.syncRealizedOfC pol N c GD hG hv σ j s σ.ldPcAt ipc hAq (CapSync.startedFloorPcP_ofExport σ hD)
+    hRA hRB hRF hR2 hj hEnt hrun hexR
+
+/-- **W11-D's derivation at the CERTIFIED interface** (Q2 [OWN.153] (D4); `chainHypsOfSyncPathP`
+verbatim but for the export's TWELFTH conjunct `chainOkCertAtP` in place of the first, and
+`syncRealizedC`: the path's hops are certified, so (a) is asked only of certified hops). -/
+theorem CapSync.chainHypsOfSyncPathC (GD : Gdexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab)
+    (st : List (Nat × Wlabel)) (σ : MState) (j : CPU) (pa : PAddr) (p : Nat) (m : Wmsg)
+    (i : Nat) (prev : Geid) (s : Seg)
+    (hrd : readAt log c st σ j pa p m) (hi : m.wmTid = some i) (hiN : i < NCPU)
+    (hij : i ≠ hartAgent j) (hnb : ¬ benignAt σ pa (p + 1))
+    (hwf : gwf GD.gdG) (hlog : logOf GD.gdG log) (hprev : gwriteAt GD.gdG (p + 1) = some prev)
+    (hrun : s.sgEntry = s.sgExit ∨ WeakRvwmoGraph.gpo GD.gdG s.sgEntry s.sgExit)
+    (hmx : gmem GD.gdG s.sgExit) (hre : CapSync.syncRealizedC GD σ j s) :
+    chainHyps GD prev s := by
+  obtain ⟨hR, hD, -, hpre, hp, hv, hram, hcoh, heg⟩ := hrd
+  have hm := PfStepTsoMem.memEager c st σ hR heg
+  have hlo := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp hm
+  have hlo' : (Xv6.AccessDiscipline.xv6Env σ).lm = σ.mem := hlo
+  have hr := hR.2.2.1
+  obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hv
+  obtain ⟨hpw, hpix⟩ := gwriteAtInv GD.gdG (p + 1) prev hwf.1 hprev
+  have hH := hr.1 pa hram
+  have he : (⟨p + 1, i, v⟩ : HEnt) ∈ TsoOfPf.histOf c.pcImg c.pcLog (paZ pa) := by
+    have := RvwmoXv6Adequacy.histOfMem c.pcImg c.pcLog (paZ pa) p m v hp hv
+    rwa [hi] at this
+  have h1 : ∀ b, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .lockw b :=
+    fun b hb' => hnb (.inl ⟨b, hb'⟩)
+  have h2 : ∀ w, Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pub w :=
+    fun w hw => hnb (.inr (.inl ⟨w, hw⟩))
+  have h3 : Xv6.AccessDiscipline.custAtP σ pa (p + 1) ≠ .pte := fun h => hnb (.inr (.inr (.inl h)))
+  rw [← hcoh] at h1 h2 h3
+  rcases Xv6.AccessDiscipline.chainOkCertAtP_ofExport hD j pa _ ⟨p + 1, i, v⟩ hH he (by simp)
+    (by rw [hm pa _ hH _ he, hcoh]) hiN hij h1 h2 h3
     with hs | hrc
   · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v', H', hne, hpub, hf, hew, hrle, harm⟩
     · rw [hlo] at hc
