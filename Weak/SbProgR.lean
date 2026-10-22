@@ -493,6 +493,28 @@ theorem blkLoadR (hP : PInvR N img G X dev w) (hc : CatH G) (hN : G.gxProg.lengt
       obtain ⟨hv, heq⟩ := tgtPendR hP x k p hk
       exact ⟨_, hv, by rw [heq]; exact Nat.lt_trans hgp hlt.2.2⟩
 
+/-- **THE BLOCKED I/O HEAD** ([OWN.152]; `SbOrd.blkIo` over `PInvR`; edge the trusted (R1)). -/
+theorem blkIoR (hP : PInvR N img G X dev w) (hc : CatH G)
+    (hr1 : ∀ s m, WeakRvwmoGraph.gpo G s m → gmem G s → gisIo G s = false → gisIo G m = true →
+      gmoLt G s m)
+    (x : Nat) (kd : IoKind) (base : Int) (vs : List (BitVec 8))
+    (hl : gxLbl G (hd w x) = some (LIo kd base vs)) (hne : w.σ.sb x ≠ []) :
+    ∃ B, validT N G w B ∧ muR G dev w B < gpos G (hd w x) := by
+  obtain ⟨p0, ps, hps⟩ : ∃ p0 ps, w.pend x = p0 :: ps := by
+    rw [hP.inv.sb x] at hne
+    cases h : w.pend x with
+    | nil => rw [h] at hne; exact absurd rfl hne
+    | cons p0 ps => exact ⟨p0, ps, rfl⟩
+  have hp0 : (w.pend x)[0]? = some p0 := by rw [hps]; rfl
+  have hp0m : p0 ∈ w.pend x := List.mem_of_getElem? hp0
+  obtain ⟨rl, base0, vs0, kc, hl0, -, -⟩ := pendLblR hP x p0 hp0m
+  have hs0r := pendRealizedR hP x p0 hp0m
+  unfold realized at hs0r
+  have hpo : WeakRvwmoGraph.gpo G (x, p0.1) (hd w x) := SBAcq.gpoOf G _ _ _ _ hl0 hl rfl hs0r
+  have hlt := hr1 _ _ hpo ⟨_, hl0, rfl⟩ (by unfold gisIo; rw [hl0]; rfl) (by unfold gisIo; rw [hl]; rfl)
+  obtain ⟨hv, heq⟩ := tgtPendR hP x 0 p0 hp0
+  exact ⟨_, hv, by rw [heq]; exact hlt.2.2⟩
+
 /-- **EVERY BLOCKED S-R HEAD WAITS FOR A GENUINE ITEM OF STRICTLY SMALLER MEASURE** — rows H1 (`aqOrd`),
 H2 (`blkFenceR`), H4 (`ioOrd`, `stOrd`) PROVED, row H3′ the named `HeadOrdW`, `.aq` plain loads excluded by
 the census `NoAqLd`. -/
@@ -505,9 +527,9 @@ theorem blkHeadR (hP : PInvR N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (h
     (hr2'' : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisR G m = true → gmoLt G s m)
     (hr3a : ∀ s m, gisIo G s = true → gisIo G m = true → WeakRvwmoGraph.gpo G s m → gmoLt G s m)
     (hr3 : ∀ d e, gmem G d → gmem G e → before dev d e → gmoLt G d e)
-    (hR : HeadOrdW G X dev w) (hDS : DevStOrd G dev)
+    (hR : HeadOrdW G X dev w) (hDS : DevStOrd G dev) (hDF : DevStFab G dev)
     (hHart : ∀ e, e ∈ dev → e.1 < NCPU → gisIo G e = true) (x : Nat)
-    (hv : validT N G w (.hd x)) (hb : ¬ enbR SbPol.epoch G X dev w (.hd x)) :
+    (hv : validT N G w (.hd x)) (hq : SbOrd.devQuiet w) (hb : ¬ enbR SbPol.epoch G X dev w (.hd x)) :
     ∃ B, validT N G w B ∧ muR G dev w B < muR G dev w (.hd x) := by
   obtain ⟨l, hl⟩ := lblOfValid x hv.2
   have hbound : ∀ n, lbIsMem l = true →
@@ -518,7 +540,7 @@ theorem blkHeadR (hP : PInvR N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (h
       ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOnR G dev m → gmoLt G (hd w x) m :=
     fun H m h1 h2 h3 _ => H m h1 h2 h3
   by_cases hf : fabOk dev w (hd w x)
-  · have hnl : ¬ enbLR G X w (hd w x) l := fun h => hb ⟨l, hl, hf, h⟩
+  · have hnl : ¬ enbLR G X w (hd w x) l := fun h => hb ⟨hq, l, hl, hf, h⟩
     cases l with
     | LLoad aq base ts vs =>
       cases aq with
@@ -529,9 +551,20 @@ theorem blkHeadR (hP : PInvR N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (h
         obtain ⟨B, hB, hlt⟩ := blkLoadR hP hc hN x base ts vs hl hns
         exact ⟨B, hB, hbound _ rfl (hR x base ts vs hl hX hns) hlt⟩
     | LStore rl base vs kc =>
-      exfalso
-      have := hI.noRl _ _ hl
-      exact hnl (fun h => by simp [lbRl] at this; rw [this] at h; cases h)
+      -- [OWN.151]: a device store issues only as GF's next write (it lands at once)
+      have hrl : rl = false := by have := hI.noRl _ _ hl; simpa [lbRl] using this
+      have hno : ¬ (NCPU ≤ x → wrW w ++ [hd w x] <+: gwrites G) :=
+        fun h => hnl ⟨(fun h' => by rw [hrl] at h'; cases h'), h⟩
+      have hx : NCPU ≤ x := Classical.byContradiction (fun h => hno (fun h' => absurd h' h))
+      have hno' : ¬ (wrW w ++ [hd w x] <+: gwrites G) := fun h => hno (fun _ => h)
+      have hem : hd w x ∈ G.gxGmo := lblGmo _ _ _ hc.wf hl rfl
+      have hs : hd w x ∈ gwrites G := (gwritesElemOf _ _).2 ⟨hem, by unfold gisW; rw [hl]; rfl⟩
+      have hsW : hd w x ∉ wrW w := by
+        intro h
+        obtain ⟨l', hl', -⟩ := hP.inv.gmoMem _ (List.mem_filter.1 h).1
+        unfold hd at hl'; simp at hl'
+      obtain ⟨B, hB, hlt⟩ := nextTgtR hP hc hN _ hs hsW hno'
+      exact ⟨B, hB, hbound _ rfl (hall (stOrd hc hDS hHart x rl base vs kc hl (hDF _ rl base vs kc hx hl))) hlt⟩
     | LFence pr pw sr sw =>
       have hdr : SbCand.drains pw sr = true :=
         Classical.byContradiction (fun h => hnl (fun h' => absurd h' h))
@@ -542,7 +575,10 @@ theorem blkHeadR (hP : PInvR N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (h
       have haq := hI.amoAq _ aq rl base ts rvs wvs kc hl
       subst haq
       exact ⟨B, hB, hbound _ rfl (hall (aqOrd hc x _ hl rfl)) hlt⟩
-    | LIo kd base vs => exact absurd trivial hnl
+    | LIo kd base vs =>
+      -- [OWN.152]: an I/O head waits for its row's oldest pending store ((R1))
+      obtain ⟨B, hB, hlt⟩ := blkIoR hP hc hr1 x kd base vs hl hnl
+      exact ⟨B, hB, hbound _ rfl (hall (ioOrd hc hr2 hr2'' hr3a x kd base vs hl)) hlt⟩
   · obtain ⟨B, hB, hlt⟩ := blkFabR hc hN hwio hr3 x hf
     have hin : hd w x ∈ dev := by
       unfold fabOk at hf
@@ -591,12 +627,21 @@ theorem noStuckR (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (w : 
     (hc : CatH GF.gfGd.gdG) (hio : ioResidueGmo GF) (hwio : gfDevWIo GF) (hI : ImgFacts GF.gfGd.gdG)
     (hNA : NoAqLd GF.gfGd.gdG)
     (hN : GF.gfGd.gdG.gxProg.length = N) (hP : PInvR N img GF.gfGd.gdG X GF.gfDev w)
-    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev)
+    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev) (hDF : DevStFab GF.gfGd.gdG GF.gfDev)
     (hHart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true)
     (hR : HeadOrdW GF.gfGd.gdG X GF.gfDev w) :
     ((∃ x, x < N ∧ (w.rows x).length < (GF.gfGd.gdG.gxProg.getD x []).length) ∨ (∃ i, w.pend i ≠ [])) →
     ∃ T, validT N GF.gfGd.gdG w T ∧ enbR SbPol.epoch GF.gfGd.gdG X GF.gfDev w T := by
   intro hne
+  by_cases hnq : ¬ SbOrd.devQuiet w
+  · -- [OWN.151]: a pending device store — its landing is the enabled item (the device unit)
+    obtain ⟨i, hi, hpi⟩ : ∃ i, NCPU ≤ i ∧ w.pend i ≠ [] := by
+      refine Classical.byContradiction (fun hn => hnq (fun i hi => ?_))
+      exact Classical.byContradiction (fun h => hn ⟨i, hi, h⟩)
+    obtain ⟨-, hlg, -⟩ := hP.du i hi hpi
+    obtain ⟨p, hp, -⟩ := id hlg
+    exact ⟨.ld i 0, ⟨pendAgR hP i p (List.mem_of_getElem? hp), p, hp⟩, .inr hi, hlg⟩
+  have hq : SbOrd.devQuiet w := Classical.byContradiction hnq
   obtain ⟨A0, hA0⟩ := validOfNonFinalR hP hne
   have hwio' : ∀ d, d ∈ GF.gfDev → gmem GF.gfGd.gdG d :=
     fun d hd => WeakRvwmoLin2.wioGmem _ d (hwio d hd)
@@ -619,11 +664,11 @@ theorem noStuckR (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (w : 
     (muR GF.gfGd.gdG GF.gfDev w) (fun A hv hb => ?_) A0 hA0
   cases A with
   | hd x =>
-    obtain ⟨B, hB, hlt⟩ := blkHeadR hP hc hI hNA hN hwio' hwio hr1 hr2 hr2'' hr3a hr3 hR hDS hHart x hv hb
+    obtain ⟨B, hB, hlt⟩ := blkHeadR hP hc hI hNA hN hwio' hwio hr1 hr2 hr2'' hr3a hr3 hR hDS hDF hHart x hv hq hb
     exact ⟨B, hB, .inr hlt⟩
   | ld i k =>
     obtain ⟨-, p, hp⟩ := hv
-    obtain ⟨B, hB, hlt⟩ := blkLandR hP hc hN i k p hp hb
+    obtain ⟨B, hB, hlt⟩ := blkLandR hP hc hN i k p hp (fun h => hb ⟨.inl hq, h⟩)
     exact ⟨B, hB, .inr (by rw [muRLd i k p hp]; exact hlt)⟩
 
 end SbOrdR

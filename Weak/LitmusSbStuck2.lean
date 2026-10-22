@@ -77,7 +77,7 @@ theorem SbStuck.l7HeadOrdFalse (pol : SbPol) (rdG : RdG)
     ¬ SbStuck.HeadOrdAll pol SbStuck.l7.gdG (fun _ => False) rdG [] (init AxLitmus.imgw) := by
   intro h
   have hb : ¬ enb pol SbStuck.l7.gdG (fun _ => False) rdG [] (init AxLitmus.imgw) (.hd 1) := by
-    rintro ⟨l, hl, -, hen⟩
+    rintro ⟨-, l, hl, -, hen⟩
     have hl' : gxLbl SbStuck.l7.gdG (1, 0) = some l := hl
     rw [SbStuck.l7Lbl, Option.some.injEq] at hl'
     subst hl'
@@ -110,7 +110,8 @@ theorem SbStuck.l7SrcBlk : ¬ srcGate SbStuck.l7.gdG (init AxLitmus.imgw) 1 0 [1
 /-- `r1` is waited on by nothing at the initial state (no pending entry; the only AMO head writes `lk`,
 not `lk->cpu`). -/
 theorem SbStuck.l7R1Idle : ¬ waitedOn SbStuck.l7.gdG [] (init AxLitmus.imgw) (1, 1) := by
-  rintro (h | h | ⟨a, t, v, hr, -, ⟨i, p, hp, -⟩ | ⟨x, aq, rl, base, ts, rvs, wvs, kc, hl, hw⟩⟩)
+  rintro (h | h | ⟨a, t, v, hr, -, ⟨i, p, hp, -⟩ | ⟨x, aq, rl, base, ts, rvs, wvs, kc, hl, hw⟩ |
+    ⟨x, rl, base, vs, kc, hx, hl, -⟩⟩)
   · simp at h
   · exact absurd h (by decide)
   · simp [init] at hp
@@ -131,6 +132,14 @@ theorem SbStuck.l7R1Idle : ¬ waitedOn SbStuck.l7.gdG [] (init AxLitmus.imgw) (1
     rcases x with _ | _ | x
     · exact absurd hw (by decide +kernel)
     · simp [gxLbl, SbStuck.l7, AxLitmus.mkgd, SbStuck.l7Prog] at hl
+    · simp [gxLbl, SbStuck.l7, AxLitmus.mkgd, SbStuck.l7Prog] at hl
+  · -- a device-row store head: `l7` has no device row
+    have hx' : hd (init AxLitmus.imgw) x = (x, 0) := rfl
+    rw [hx'] at hl
+    have h8 : NCPU = 8 := rfl
+    rcases x with _ | _ | x
+    · omega
+    · omega
     · simp [gxLbl, SbStuck.l7, AxLitmus.mkgd, SbStuck.l7Prog] at hl
 
 /-- **THE RESTRICTED INTERFACE HOLDS THERE**: the only gated read head with a later event is `r0`, and

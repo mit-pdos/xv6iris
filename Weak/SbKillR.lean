@@ -82,7 +82,7 @@ theorem SbKillR.certSupplyOfWalkR (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat 
     (hW : SbKillR.walkHypCZR boot d0 fab im Xof) (hS : SbKillR.stateIfcCZR boot d0 fab im Xof) :
     SbKill.certSupplyP boot d0 fab im Xof := by
   intro GF ad him hc hconf hres
-  obtain ⟨hI, hDS, hex, hdef⟩ :=
+  obtain ⟨hI, hDS, hDF, hex, hdef⟩ :=
     SbDevSt.walkHypAt boot d0 fab im Xof hdb hwio hdf hW.1 GF ad him hc hconf hres
   have hWH : WalkHyp GF GF.gfGd.gdG.gxProg.length im (Xof GF) :=
     { cat := ⟨hc.1, hc.2.1, hc.2.2.1, hc.2.2.2.1⟩
@@ -90,6 +90,7 @@ theorem SbKillR.certSupplyOfWalkR (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat 
       wio := hwio GF ad him hc hconf
       imgF := hI
       devSt := hDS
+      devFab := hDF
       hart := LockFacts3.hartDevIo boot d0 fab GF hconf hbt
       len := rfl
       imgEq := him

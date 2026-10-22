@@ -431,7 +431,7 @@ section Inv
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
 /-- The member label of a realized event, related to GF's. -/
-theorem SbBlocked.memLbl (hP : PInv N img G X dev w) (e : Geid) (l : Lbl) (hr : realized w e)
+theorem SbBlocked.memLblB (hP : PInvB N img G X dev w) (e : Geid) (l : Lbl) (hr : realized w e)
     (hl : gxLbl G e = some l) : ∃ l', (w.rows e.1)[e.2]? = some l' ∧ lblRelX (X e) l l' := by
   obtain ⟨l', hl'⟩ : ∃ l', (w.rows e.1)[e.2]? = some l' := ⟨_, List.getElem?_eq_getElem hr⟩
   obtain ⟨l0, hl0, hrel⟩ := hP.pf.1 e.1 e.2 l' hl'
@@ -439,30 +439,47 @@ theorem SbBlocked.memLbl (hP : PInv N img G X dev w) (e : Geid) (l : Lbl) (hr : 
   subst h0
   exact ⟨l', hl', hrel⟩
 
+theorem SbBlocked.memLbl (hP : PInv N img G X dev w) (e : Geid) (l : Lbl) (hr : realized w e)
+    (hl : gxLbl G e = some l) : ∃ l', (w.rows e.1)[e.2]? = some l' ∧ lblRelX (X e) l l' :=
+  SbBlocked.memLblB hP.toB e l hr hl
+
 /-- A realized GF fence's member label is the same fence. -/
-theorem SbBlocked.memFence (hP : PInv N img G X dev w) (e : Geid) (pr pw sr sw : Bool)
+theorem SbBlocked.memFenceB (hP : PInvB N img G X dev w) (e : Geid) (pr pw sr sw : Bool)
     (hr : realized w e) (hl : gxLbl G e = some (LFence pr pw sr sw)) :
     (w.rows e.1)[e.2]? = some (LFence pr pw sr sw) := by
-  obtain ⟨l', hl', hrel⟩ := SbBlocked.memLbl hP e _ hr hl
+  obtain ⟨l', hl', hrel⟩ := SbBlocked.memLblB hP e _ hr hl
   rw [hl', SbBlocked.relXFenceL _ _ _ _ _ l' hrel]
 
-theorem SbBlocked.landedOfGmo (hP : PInv N img G X dev w) (s : Geid) (hs : s ∈ w.gmo) :
+theorem SbBlocked.memFence (hP : PInv N img G X dev w) (e : Geid) (pr pw sr sw : Bool)
+    (hr : realized w e) (hl : gxLbl G e = some (LFence pr pw sr sw)) :
+    (w.rows e.1)[e.2]? = some (LFence pr pw sr sw) :=
+  SbBlocked.memFenceB hP.toB e pr pw sr sw hr hl
+
+theorem SbBlocked.landedOfGmoB (hP : PInvB N img G X dev w) (s : Geid) (hs : s ∈ w.gmo) :
     SbBlocked.Landed w s := by
   obtain ⟨l, hl, -⟩ := hP.inv.gmoMem s hs
   refine ⟨lookup_lt_Some hl, fun p hp hp1 => ?_⟩
   apply hP.inv.pendGmo s.1 p hp
   rw [hp1]; exact hs
 
+theorem SbBlocked.landedOfGmo (hP : PInv N img G X dev w) (s : Geid) (hs : s ∈ w.gmo) :
+    SbBlocked.Landed w s :=
+  SbBlocked.landedOfGmoB hP.toB s hs
+
 /-- A landed GF write of `a` is in the landed list of `a`. -/
-theorem SbBlocked.landedWr (hP : PInv N img G X dev w) (s : Geid) (a : Int) (hL : SbBlocked.Landed w s)
+theorem SbBlocked.landedWrB (hP : PInvB N img G X dev w) (s : Geid) (a : Int) (hL : SbBlocked.Landed w s)
     (hw : gwrB G a s = true) : s ∈ wrAtW w a := by
   refine Classical.byContradiction (fun hn => ?_)
-  rcases unlanded hP a s hw hn with hr | ⟨k, p, hk, hp1⟩
+  rcases unlandedB hP a s hw hn with hr | ⟨k, p, hk, hp1⟩
   · exact hr hL.1
   · exact hL.2 p (List.mem_of_getElem? hk) hp1
 
+theorem SbBlocked.landedWr (hP : PInv N img G X dev w) (s : Geid) (a : Int) (hL : SbBlocked.Landed w s)
+    (hw : gwrB G a s = true) : s ∈ wrAtW w a :=
+  SbBlocked.landedWrB hP.toB s a hL hw
+
 /-- A landed GF write is in the member's gmo. -/
-theorem SbBlocked.landedGmo (hP : PInv N img G X dev w) (s : Geid) (hL : SbBlocked.Landed w s)
+theorem SbBlocked.landedGmoB (hP : PInvB N img G X dev w) (s : Geid) (hL : SbBlocked.Landed w s)
     (hW : gisW G s = true) : s ∈ w.gmo := by
   obtain ⟨l, hl⟩ : ∃ l, gxLbl G s = some l := by
     unfold gisW at hW
@@ -470,7 +487,7 @@ theorem SbBlocked.landedGmo (hP : PInv N img G X dev w) (s : Geid) (hL : SbBlock
     | none => rw [h] at hW; cases hW
     | some l => exact ⟨l, rfl⟩
   have hWl : lbIsW l = true := by unfold gisW at hW; rw [hl] at hW; exact hW
-  obtain ⟨l', hl', hrel⟩ := SbBlocked.memLbl hP s l hL.1 hl
+  obtain ⟨l', hl', hrel⟩ := SbBlocked.memLblB hP s l hL.1 hl
   have hW' : lbIsW l' = true := by
     rcases relXW _ l l' hrel (.inl hWl) with rfl | ⟨_, _, _, _, _, _, _, _, -, rfl, -⟩
     · exact hWl
@@ -480,9 +497,13 @@ theorem SbBlocked.landedGmo (hP : PInv N img G X dev w) (s : Geid) (hL : SbBlock
   · obtain ⟨p, hp, hp1⟩ := List.mem_map.1 h
     exact absurd hp1 (hL.2 p hp)
 
+theorem SbBlocked.landedGmo (hP : PInv N img G X dev w) (s : Geid) (hL : SbBlocked.Landed w s)
+    (hW : gisW G s = true) : s ∈ w.gmo :=
+  SbBlocked.landedGmoB hP.toB s hL hW
+
 /-- **A REALIZED AMO'S BYTE SOURCE HAS LANDED** (atomicity: the source is gmo-before the AMO's own
 write of the byte, which landed at the AMO's step; the landed list is gmo-downward closed). -/
-theorem SbBlocked.amoSrcLanded (hP : PInv N img G X dev w) (hc : CatH G) (A s : Geid) (aq rl : Bool)
+theorem SbBlocked.amoSrcLandedB (hP : PInvB N img G X dev w) (hc : CatH G) (A s : Geid) (aq rl : Bool)
     (base : Int) (ts : List Nat) (rvs wvs : List (BitVec 8)) (kc : WmClass) (j t : Nat)
     (hl : gxLbl G A = some (LRmw aq rl base ts rvs wvs kc)) (hrA : realized w A)
     (htj : ts[j]? = some t) (hs : gwriteAt G t = some s) : SbBlocked.Landed w s := by
@@ -494,11 +515,11 @@ theorem SbBlocked.amoSrcLanded (hP : PInv N img G X dev w) (hc : CatH G) (A s : 
     ⟨_, base, ts, rvs, j, hl, rfl, htj, List.getElem?_eq_getElem _, rfl⟩
   have hAL : SbBlocked.Landed w A := by
     refine ⟨hrA, fun p hp hp1 => ?_⟩
-    obtain ⟨rl', base', vs', kc', hl', -, -⟩ := pendLbl hP A.1 p hp
+    obtain ⟨rl', base', vs', kc', hl', -, -⟩ := pendLblB hP A.1 p hp
     have h2 : gxLbl G (A.1, p.1) = gxLbl G A := by rw [hp1]
     rw [h2, hl] at hl'
     cases hl'
-  have hAW : A ∈ wrAtW w (accAddr base j) := SbBlocked.landedWr hP A _ hAL (gwrBOf G A _ _ hc.wf hwe).1
+  have hAW : A ∈ wrAtW w (accAddr base j) := SbBlocked.landedWrB hP A _ hAL (gwrBOf G A _ _ hc.wf hwe).1
   obtain ⟨hsrc, -⟩ := hc.lv A _ t _ hre
   cases t with
   | zero => simp [gwriteAt] at hs
@@ -513,42 +534,58 @@ theorem SbBlocked.amoSrcLanded (hP : PInv N img G X dev w) (hc : CatH G) (A s : 
     obtain ⟨hsb, hsm⟩ := gwrBOf G s _ _ hc.wf hsw
     have hsG : s ∈ wrAtG G (accAddr base j) := List.mem_filter.2 ⟨hsm, hsb⟩
     have hsW := landedDown G w _ s A (hP.pf.2 _) hc.wf.1 hAW hsG hlt
-    exact SbBlocked.landedOfGmo hP s (List.mem_filter.1 hsW).1
+    exact SbBlocked.landedOfGmoB hP s (List.mem_filter.1 hsW).1
+
+theorem SbBlocked.amoSrcLanded (hP : PInv N img G X dev w) (hc : CatH G) (A s : Geid) (aq rl : Bool)
+    (base : Int) (ts : List Nat) (rvs wvs : List (BitVec 8)) (kc : WmClass) (j t : Nat)
+    (hl : gxLbl G A = some (LRmw aq rl base ts rvs wvs kc)) (hrA : realized w A)
+    (htj : ts[j]? = some t) (hs : gwriteAt G t = some s) : SbBlocked.Landed w s :=
+  SbBlocked.amoSrcLandedB hP.toB hc A s aq rl base ts rvs wvs kc j t hl hrA htj hs
 
 /-- **THE RELEASE EPOCH** (rule 4 at the buffer, (EP)): a write po-before a `pw ∧ sw` fence po-before a
 LANDED write of its row has landed. -/
-theorem SbBlocked.epochLanded (hP : PInv N img G X dev w) (hE : SbBlocked.EpochOk w) (r s : Geid)
+theorem SbBlocked.epochLandedB (hP : PInvB N img G X dev w) (hE : SbBlocked.EpochOk w) (r s : Geid)
     (hL : SbBlocked.Landed w r) (hrW : gisW G r = true) (h1 : s.1 = r.1) (hf : fenceSw G s.1 s.2 r.2) :
     SbBlocked.Landed w s := by
   obtain ⟨kf, pr, sr, hk1, hk2, hkl⟩ := hf
-  have hrg := SbBlocked.landedGmo hP r hL hrW
+  have hrg := SbBlocked.landedGmoB hP r hL hrW
   obtain ⟨lr, hlr⟩ : ∃ l, gxLbl G r = some l := by
     unfold gisW at hrW
     cases h : gxLbl G r with
     | none => rw [h] at hrW; cases hrW
     | some l => exact ⟨l, rfl⟩
   have hWl : lbIsW lr = true := by unfold gisW at hrW; rw [hlr] at hrW; exact hrW
-  obtain ⟨lr', hlr', hrel⟩ := SbBlocked.memLbl hP r lr hL.1 hlr
+  obtain ⟨lr', hlr', hrel⟩ := SbBlocked.memLblB hP r lr hL.1 hlr
   have hW' : lbIsW lr' = true := by
     rcases relXW _ lr lr' hrel (.inl hWl) with rfl | ⟨_, _, _, _, _, _, _, _, -, rfl, -⟩
     · exact hWl
     · rfl
   have hrl : r.2 < (w.rows s.1).length := by rw [h1]; exact hL.1
   have hkr : realized w (s.1, kf) := by show kf < (w.rows s.1).length; omega
-  have hkm := SbBlocked.memFence hP (s.1, kf) pr true sr true hkr hkl
+  have hkm := SbBlocked.memFenceB hP (s.1, kf) pr true sr true hkr hkl
   refine ⟨by show s.2 < (w.rows s.1).length; omega, fun p hp hp1 => ?_⟩
   exact hE s.1 p r hp hrg h1.symm (by omega) ⟨lr', by rw [h1]; exact hlr', hW'⟩ kf _ (by omega) hk2
     hkm rfl
 
+theorem SbBlocked.epochLanded (hP : PInv N img G X dev w) (hE : SbBlocked.EpochOk w) (r s : Geid)
+    (hL : SbBlocked.Landed w r) (hrW : gisW G r = true) (h1 : s.1 = r.1) (hf : fenceSw G s.1 s.2 r.2) :
+    SbBlocked.Landed w s :=
+  SbBlocked.epochLandedB hP.toB hE r s hL hrW h1 hf
+
 /-- **THE DRAINING FENCE** ((DR), [R46.6]'s `drainLanded`): an event po-before a REALIZED draining
 fence (`pw ∧ sr`) of its row is not pending. -/
-theorem SbBlocked.drainLanded (hP : PInv N img G X dev w) (hD : SbBlocked.DrainOk w) (f s : Geid)
+theorem SbBlocked.drainLandedB (hP : PInvB N img G X dev w) (hD : SbBlocked.DrainOk w) (f s : Geid)
     (pr sw : Bool) (hrf : realized w f) (hfl : gxLbl G f = some (LFence pr true true sw))
     (h1 : s.1 = f.1) (h2 : s.2 < f.2) : SbBlocked.Landed w s := by
-  have hfm := SbBlocked.memFence hP f pr true true sw hrf hfl
+  have hfm := SbBlocked.memFenceB hP f pr true true sw hrf hfl
   have hfl' : f.2 < (w.rows s.1).length := by rw [h1]; exact hrf
   refine ⟨by show s.2 < (w.rows s.1).length; omega, fun p hp hp1 => ?_⟩
   exact hD s.1 p f.2 pr sw hp (by omega) (by rw [h1]; exact hfm)
+
+theorem SbBlocked.drainLanded (hP : PInv N img G X dev w) (hD : SbBlocked.DrainOk w) (f s : Geid)
+    (pr sw : Bool) (hrf : realized w f) (hfl : gxLbl G f = some (LFence pr true true sw))
+    (h1 : s.1 = f.1) (h2 : s.2 < f.2) : SbBlocked.Landed w s :=
+  SbBlocked.drainLandedB hP.toB hD f s pr sw hrf hfl h1 h2
 
 end Inv
 
@@ -578,7 +615,7 @@ section Inv2
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
 /-- **THE CHAIN IS SOUND** at a walk state with (EP) and (DR). -/
-theorem SbBlocked.hbSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
+theorem SbBlocked.hbSoundB (hP : PInvB N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
     (hD : SbBlocked.DrainOk w) (x : Nat) (b : Bool) (e : Geid) (hh : SbBlocked.Hb G dev (hd w x) b e) :
     (b = false → realized w e) ∧ (b = true → SbBlocked.Landed w e) := by
   induction hh with
@@ -595,11 +632,16 @@ theorem SbBlocked.hbSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBloc
   | lr e _ ih => exact ⟨fun _ => (ih.2 rfl).1, fun h => by cases h⟩
   | amo A s aq rl base ts rvs wvs kc j t _ hl htj hs ih =>
     exact ⟨(fun h => nomatch h), fun _ =>
-      SbBlocked.amoSrcLanded hP hc A s aq rl base ts rvs wvs kc j t hl (ih.1 rfl) htj hs⟩
+      SbBlocked.amoSrcLandedB hP hc A s aq rl base ts rvs wvs kc j t hl (ih.1 rfl) htj hs⟩
   | epoch r s _ hrW h1 hf ih =>
-    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.epochLanded hP hE r s (ih.2 rfl) hrW h1 hf⟩
+    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.epochLandedB hP hE r s (ih.2 rfl) hrW h1 hf⟩
   | drain f s pr sw _ hfl h1 h2 ih =>
-    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.drainLanded hP hD f s pr sw (ih.1 rfl) hfl h1 h2⟩
+    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.drainLandedB hP hD f s pr sw (ih.1 rfl) hfl h1 h2⟩
+
+theorem SbBlocked.hbSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
+    (hD : SbBlocked.DrainOk w) (x : Nat) (b : Bool) (e : Geid) (hh : SbBlocked.Hb G dev (hd w x) b e) :
+    (b = false → realized w e) ∧ (b = true → SbBlocked.Landed w e) :=
+  SbBlocked.hbSoundB hP.toB hc hE hD x b e hh
 
 /-! # 4. Own sources -/
 
@@ -654,14 +696,14 @@ theorem SbBlocked.fwdLast (a : Int) (A B : List SbEnt) (e : SbEnt) (he : (msgByt
 /-- **A PENDING OWN SOURCE IS FORWARDED WITH GF'S VALUE**: it is the youngest own pending entry at the
 byte (a younger one would be a po-later own write of the byte, gmo-after the source by rule 1 and
 visible to the read — contradicting the load value axiom's maximality). -/
-theorem SbBlocked.ownFwd (hP : PInv N img G X dev w) (hc : CatH G) (x : Nat) (aq : Bool) (base : Int)
+theorem SbBlocked.ownFwdB (hP : PInvB N img G X dev w) (hc : CatH G) (x : Nat) (aq : Bool) (base : Int)
     (ts : List Nat) (vs : List (BitVec 8)) (hl : gxLbl G (hd w x) = some (LLoad aq base ts vs))
     (a : Int) (t : Nat) (v : BitVec 8) (hrd : greadsByte G (hd w x) a t v) (s : Geid)
     (hs : gwriteAt G t = some s) (hsx : s.1 = x) (p : Nat × SbEnt) (hp : p ∈ w.pend x)
     (hp1 : p.1 = s.2) : SbCand.fwdByte (w.σ.sb x) a = some v := by
   obtain ⟨hpo, hsw⟩ := SbBlocked.ownPo hc (hd w x) aq base ts vs hl a t v hrd s hs hsx
   have hsxp : s = (x, p.1) := Prod.ext hsx hp1.symm
-  have hcov := pendCovers hP x p a v hp (by rw [← hsxp]; exact hsw)
+  have hcov := pendCoversB hP x p a v hp (by rw [← hsxp]; exact hsw)
   obtain ⟨A, B, hAB⟩ := List.append_of_mem hp
   have hpw := hP.ord x
   rw [hAB, List.map_append, List.map_cons, List.pairwise_append, List.pairwise_cons] at hpw
@@ -672,10 +714,10 @@ theorem SbBlocked.ownFwd (hP : PInv N img G X dev w) (hc : CatH G) (x : Nat) (aq
     | some u =>
       exfalso
       have hqB : q ∈ w.pend x := by rw [hAB]; simp [hq]
-      have hqw := pendWritesV hP x q a u hqB hm
+      have hqw := pendWritesVB hP x q a u hqB hm
       have hlt : p.1 < q.1 := hpw.2.1.1 q.1 (List.mem_map.2 ⟨q, hq, rfl⟩)
-      have hqr := pendRealized hP x q hqB
-      obtain ⟨rl', base', vs', kc', hlq, -, -⟩ := pendLbl hP x q hqB
+      have hqr := pendRealizedB hP x q hqB
+      obtain ⟨rl', base', vs', kc', hlq, -, -⟩ := pendLblB hP x q hqB
       obtain ⟨ls, -, -, -, hls, -⟩ := id hsw
       have hpo1 : WeakRvwmoGraph.gpo G s (x, q.1) :=
         SBAcq.gpoOf G s (x, q.1) ls _ hls hlq hsx (by rw [← hp1]; exact hlt)
@@ -694,9 +736,16 @@ theorem SbBlocked.ownFwd (hP : PInv N img G X dev w) (hc : CatH G) (x : Nat) (aq
       exact hB q hq)]
   obtain ⟨u, hu⟩ := Option.isSome_iff_exists.1 hcov
   rw [hu]
-  have := pendWritesV hP x p a u hp hu
+  have := pendWritesVB hP x p a u hp hu
   rw [← hsxp] at this
   rw [gwritesByteDet G s a u v this hsw]
+
+theorem SbBlocked.ownFwd (hP : PInv N img G X dev w) (hc : CatH G) (x : Nat) (aq : Bool) (base : Int)
+    (ts : List Nat) (vs : List (BitVec 8)) (hl : gxLbl G (hd w x) = some (LLoad aq base ts vs))
+    (a : Int) (t : Nat) (v : BitVec 8) (hrd : greadsByte G (hd w x) a t v) (s : Geid)
+    (hs : gwriteAt G t = some s) (hsx : s.1 = x) (p : Nat × SbEnt) (hp : p ∈ w.pend x)
+    (hp1 : p.1 = s.2) : SbCand.fwdByte (w.σ.sb x) a = some v :=
+  SbBlocked.ownFwdB hP.toB hc x aq base ts vs hl a t v hrd s hs hsx p hp hp1
 
 /-- Per byte: a LANDED GF source is not forwarded and is the member-latest (as `srcGateOfLanded`). -/
 theorem SbBlocked.byteOfLanded (hP : PInv N img G X dev w) (hc : CatH G) (x : Nat) (aq : Bool)

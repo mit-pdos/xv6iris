@@ -839,6 +839,12 @@ import Weak.SbProgR
 import Weak.SbWalkR
 import Weak.SbKillR
 import Weak.SbDomLit
+import Weak.SbHoldR
+import Weak.SbLockstepR
+import Weak.SbIssueCo
+import Weak.SbRealPDma
+import Weak.SbRealPHart
+import Weak.SbRealPEv
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2

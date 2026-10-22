@@ -50,21 +50,28 @@ def srGate (G : Gexec) (w : WS) (x : Nat) (aq : Bool) (base : Int) (ts : List Na
 def enbLR (G : Gexec) (X : Geid → Prop) (w : WS) (e : Geid) : Lbl → Prop
   | LLoad aq base ts vs =>
       X e ∨ (¬ X e ∧ (aq = true → SbCand.noRl (w.σ.sb e.1)) ∧ srGate G w e.1 aq base ts vs)
-  | LStore rl _ _ _ => rl = true → w.σ.sb e.1 = []
+  | LStore rl _ _ _ => (rl = true → w.σ.sb e.1 = []) ∧ (NCPU ≤ e.1 → wrW w ++ [e] <+: gwrites G)
   | LFence _ pw sr _ => SbCand.drains pw sr = true → w.σ.sb e.1 = []
   | LRmw aq rl base ts _ _ _ =>
       SbCand.amoOk (w.σ.sb e.1) base ts.length ∧ (rl = true → w.σ.sb e.1 = []) ∧
       (aq = true → SbCand.noRl (w.σ.sb e.1)) ∧ wrW w ++ [e] <+: gwrites G
-  | LIo .. => True
+  | LIo .. => w.σ.sb e.1 = []
 
 /-- **THE S-R LANDING GATE**: the policy, and the store is GF's NEXT write (S-P). -/
 def landR (pol : SbPol) (G : Gexec) (w : WS) (i k : Nat) : Prop :=
   ∃ p, (w.pend i)[k]? = some p ∧ pol.landOk (w.σ.sb i) k ∧ wrW w ++ [(i, p.1)] <+: gwrites G
 
-/-- **THE S-R GATE.** -/
+/-- **THE S-R GATE** (with `SbOrd.enb`'s [OWN.151] device unit: while a device store is pending only its
+landing goes, `SbOrd.devQuiet`). -/
 def enbR (pol : SbPol) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (w : WS) : Tgt → Prop
-  | .hd x => ∃ l, gxLbl G (hd w x) = some l ∧ fabOk dev w (hd w x) ∧ enbLR G X w (hd w x) l
-  | .ld i k => landR pol G w i k
+  | .hd x => SbOrd.devQuiet w ∧ ∃ l, gxLbl G (hd w x) = some l ∧ fabOk dev w (hd w x) ∧ enbLR G X w (hd w x) l
+  | .ld i k => (SbOrd.devQuiet w ∨ NCPU ≤ i) ∧ landR pol G w i k
+
+/-- **THE S-R DEVICE UNIT** ([OWN.151], `SbOrd.devUnit` with the S-R landing gate): a device row with a
+pending store holds exactly one, its landing is enabled, no other device row has one. -/
+def devUnitR (G : Gexec) (w : WS) : Prop :=
+  ∀ i, NCPU ≤ i → w.pend i ≠ [] →
+    (w.pend i).length = 1 ∧ landR SbPol.epoch G w i 0 ∧ ∀ j, NCPU ≤ j → j ≠ i → w.pend j = []
 
 /-! # 2. The walk-state invariant -/
 
@@ -85,6 +92,7 @@ structure PInvR (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : L
   spw : wrW w <+: gwrites G
   vb : ∀ (x n : Nat) (l' : Lbl), (w.rows x)[n]? = some l' → ¬ X (x, n) → gxLbl G (x, n) = some l'
   dom : ∀ x, DomInv G w x
+  du : devUnitR G w
 
 /-! # 3. S-P gives the per-byte co prefix -/
 
@@ -164,13 +172,13 @@ theorem pendRealizedR (hP : PInvR N img G X dev w) (i : Nat) (p : Nat × SbEnt) 
 
 /-- **AN ENABLED S-R LANDING KEEPS THE WALK INVARIANT.** -/
 theorem pinvLandR (hc : CatH G) (pol : SbPol) (hP : PInvR N img G X dev w) (i k : Nat)
-    (hg : landR pol G w i k) : PInvR N img G X dev (nextI w (.land i k)) := by
+    (hq : SbOrd.devQuiet w ∨ NCPU ≤ i) (hg : landR pol G w i k) : PInvR N img G X dev (nextI w (.land i k)) := by
   obtain ⟨p, hp, hok, hS⟩ := hg
   have hpm : p ∈ w.pend i := List.mem_of_getElem? hp
   obtain ⟨rl, base, vs, kc, hl, hrow, -⟩ := pendLblR hP i p hpm
   have hrows : (nextI w (.land i k)).rows = w.rows := by rw [landEq i k p hp]
   refine ⟨invLand img pol w i k hP.inv hok, ?_, exOkLand X w i k hP.ex, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    pfxWLand img G w i k p hP.inv hp hS, ?_, fun x => ?_⟩
+    pfxWLand img G w i k p hP.inv hp hS, ?_, fun x => ?_, ?_⟩
   · refine pfxLand img pol G X w i k hP.inv hP.pf hok (fun p' hp' b hb => ?_)
     rw [hp, Option.some.injEq] at hp'
     subst hp'
@@ -191,6 +199,32 @@ theorem pinvLandR (hc : CatH G) (pol : SbPol) (hP : PInvR N img G X dev w) (i k 
   · intro x n l' hl' hX; rw [hrows] at hl'; exact hP.vb x n l' hl' hX
   · exact domLand hc hP.inv hP.pf hP.spw i k p hp hS (fun h => by rw [hP.nrl i p hpm] at h; cases h)
       x (hP.dom x)
+  · -- the device unit: a device landing empties its row; a hart landing happens at a quiet state
+    intro j hj hne
+    exfalso
+    have hpe : ∀ j', (nextI w (.land i k)).pend j' = if j' = i then (w.pend i).eraseIdx k else w.pend j' := by
+      intro j'; rw [landEq i k p hp]; show upd w.pend i _ j' = _
+      by_cases h : j' = i
+      · subst h; rw [updEq, if_pos rfl]
+      · rw [updNe _ _ _ _ h, if_neg h]
+    rw [hpe j] at hne
+    rcases hq with hq | hq
+    · by_cases hji : j = i
+      · subst hji; rw [if_pos rfl, hq j hj] at hne; simp at hne
+      · rw [if_neg hji, hq j hj] at hne; exact hne rfl
+    · have hpi : w.pend i ≠ [] := fun h => by rw [h] at hp; simp at hp
+      obtain ⟨h1, -, h3⟩ := hP.du i hq hpi
+      by_cases hji : j = i
+      · subst hji
+        rw [if_pos rfl] at hne
+        have hk0 : k = 0 := by have := lookup_lt_Some hp; omega
+        subst hk0
+        obtain ⟨q, hq'⟩ : ∃ q, w.pend j = [q] := by
+          cases h : w.pend j with
+          | nil => rw [h] at h1; simp at h1
+          | cons q t => rw [h] at h1; simp at h1; subst h1; exact ⟨q, rfl⟩
+        rw [hq'] at hne; simp at hne
+      · rw [if_neg hji, h3 j hj hji] at hne; exact hne rfl
 
 /-- A gmo event that writes is an AMO. -/
 theorem gmoWRmw (l : Lbl) : (gmoEv l && lbIsW l) = true →
@@ -211,7 +245,8 @@ theorem pinvEvR (hc : CatH G) (hP : PInvR N img G X dev w) (x : Nat) (hx : x < N
     (hld : ∀ aq base ts vs ts' vs', l = LLoad aq base ts vs → lb' = LLoad aq base ts' vs' →
       SrBytes G w x aq base ts ts')
     (hnrl : ∀ rl base vs kc, lb' = LStore rl base vs kc → rl = false)
-    (hex : X (hd w x) → exValL x lb') :
+    (hex : X (hd w x) → exValL x lb') (hq : SbOrd.devQuiet w)
+    (hdev : ∀ rl base vs kc, lb' = LStore rl base vs kc → NCPU ≤ x → wrW w ++ [hd w x] <+: gwrites G) :
     PInvR N img G X dev (nextI w (.ev ⟨x, lb'⟩)) := by
   have htag : ∀ q, q ∈ w.pend x → q.1 < (w.rows x).length := fun q hq => pendRealizedR hP x q hq
   have hamoW : (gmoEv lb' && lbIsW lb') = true → lb' = l ∧ wrW w ++ [hd w x] <+: gwrites G := by
@@ -222,7 +257,7 @@ theorem pinvEvR (hc : CatH G) (hP : PInvR N img G X dev w) (x : Nat) (hx : x < N
     exact hamo aq rl base ts0 rvs wvs kc hl0
   refine ⟨invEv img w ⟨x, lb'⟩ hP.inv hst, pfxEv img G X w ⟨x, lb'⟩ l hP.inv hP.pf hl hrel ?_,
     exOkEv X w ⟨x, lb'⟩ hP.ex hex, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    pfxWEv img G w ⟨x, lb'⟩ hP.inv hP.spw (fun h => (hamoW h).2), ?_, fun y => ?_⟩
+    pfxWEv img G w ⟨x, lb'⟩ hP.inv hP.spw (fun h => (hamoW h).2), ?_, fun y => ?_, ?_⟩
   · -- the AMO's per-byte co prefix, from S-P
     intro hg b hb
     have hw : lbIsW lb' = true := wrsBOfWr lb' b hb
@@ -336,6 +371,30 @@ theorem pinvEvR (hc : CatH G) (hP : PInvR N img G X dev w) (x : Nat) (hx : x < N
     · exact hP.vb j n l' h hX
     · rw [hvb hX]; exact hl
   · exact domEv hc hP.inv hP.spw ⟨x, lb'⟩ l hl hrel hamo hld y (hP.dom y)
+  · -- the device unit: only a device store's issue makes a device row non-empty (from a quiet state)
+    intro j hj hne
+    rw [pendEvEq] at hne
+    have hothers : ∀ j', NCPU ≤ j' → j' ≠ x → (nextI w (.ev ⟨x, lb'⟩)).pend j' = [] := by
+      intro j' hj' hne'; rw [pendEvEq, if_neg hne']; exact hq j' hj'
+    by_cases hjx : j = x
+    · subst hjx
+      rw [if_pos rfl] at hne
+      rcases pendECases w j lb' with ⟨rl, base, vs, kc, hlb, hpe⟩ | ⟨pr, sr, -, hpe⟩ | hpe
+      · rw [hq j hj, List.nil_append] at hpe
+        have hpe' : (nextI w (.ev ⟨j, lb'⟩)).pend j = [((w.rows j).length, SbCand.issueEnt w.σ j rl base vs kc)] := by
+          rw [pendEvEq, if_pos rfl]; exact hpe
+        have hst' : SbCand.stepE w.σ j lb' (SbCand.nextE w.σ j lb') := hst
+        have hI' := invEv img w ⟨j, lb'⟩ hP.inv hst'
+        refine ⟨by rw [hpe']; rfl, ⟨((w.rows j).length, SbCand.issueEnt w.σ j rl base vs kc), by rw [hpe']; rfl, ?_, ?_⟩, hothers⟩
+        · rw [hI'.sb j, hpe']; exact SbPol.epoch.oldest _ []
+        · rw [wrWEv hP.inv ⟨j, lb'⟩]
+          subst hlb
+          simp only [gmoEv, isSt, Bool.not_true, Bool.and_false, Bool.false_and, Bool.false_eq_true,
+            if_false, List.append_nil]
+          exact hdev rl base vs kc rfl hj
+      · rw [hpe, hq j hj] at hne; exact absurd rfl hne
+      · rw [hpe, hq j hj] at hne; exact absurd rfl hne
+    · rw [if_neg hjx, hq j hj] at hne; exact absurd rfl hne
 
 /-- The empty walk. -/
 theorem pinvInitR (N : Nat) (img : Image) (G : Gexec) (hwf : gwf G) (X : Geid → Prop) (dev : List Geid) :
@@ -353,6 +412,7 @@ theorem pinvInitR (N : Nat) (img : Image) (G : Gexec) (hwf : gwf G) (X : Geid �
   spw := by simp [wrW, init]
   vb _ _ _ h := by simp [init] at h
   dom x := domInit G hwf img x
+  du _ _ h := absurd rfl h
 
 end Sound
 

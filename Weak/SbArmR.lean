@@ -313,7 +313,9 @@ theorem armHdR {c : CandW} (hv : validW SbPol.epoch c) (hP : PInvR N c.img G X d
       (∀ aq base ts vs ts' vs', l = LLoad aq base ts vs → lb' = LLoad aq base ts' vs' →
         SrBytes G (cur c) x aq base ts ts') ∧
       (∀ rl base vs kc, lb' = LStore rl base vs kc → rl = false) ∧
-      (X (hd (cur c) x) → exValL x lb') := by
+      (X (hd (cur c) x) → exValL x lb') ∧
+      (∀ rl base vs kc, lb' = LStore rl base vs kc → NCPU ≤ x →
+        wrW (cur c) ++ [hd (cur c) x] <+: gwrites G) := by
   have hnX : ∀ l0, gxLbl G (hd (cur c) x) = some l0 → (∀ base ts vs, l0 ≠ LLoad false base ts vs) →
       ¬ X (hd (cur c) x) := by
     intro l0 hl0 hn hx
@@ -332,7 +334,7 @@ theorem armHdR {c : CandW} (hv : validW SbPol.epoch c) (hP : PInvR N c.img G X d
       obtain ⟨-, -, -, hl1, hl2⟩ := hsub
       refine ⟨LLoad false base ts' vs', .inr ⟨hx, ⟨rfl, rfl, rfl, hl1, hl2⟩⟩, hst, fun h => absurd hx h,
         (fun _ _ _ _ _ _ _ h => by cases h), fun aq0 base0 ts0 vs0 ts1 vs1 h1 h2 => ?_,
-        (fun _ _ _ _ h => by cases h), fun _ => ⟨base, ts', vs', rfl, ?_⟩⟩
+        (fun _ _ _ _ h => by cases h), fun _ => ⟨base, ts', vs', rfl, ?_⟩, (fun _ _ _ _ h => by cases h)⟩
       · simp only [LLoad.injEq] at h1 h2
         obtain ⟨rfl, rfl, rfl, -⟩ := h1
         obtain ⟨-, -, rfl, -⟩ := h2
@@ -341,7 +343,7 @@ theorem armHdR {c : CandW} (hv : validW SbPol.epoch c) (hP : PInvR N c.img G X d
     · obtain ⟨hst, hsr⟩ := armLd hP hc himg x aq base ts vs hl hrl hg
       refine ⟨LLoad aq base ts vs, .inl ⟨hx, lblReidxRefl _⟩, hst, fun _ => rfl,
         (fun _ _ _ _ _ _ _ h => by cases h), fun aq0 base0 ts0 vs0 ts1 vs1 h1 h2 => ?_,
-        (fun _ _ _ _ h => by cases h), fun h => absurd h hx⟩
+        (fun _ _ _ _ h => by cases h), fun h => absurd h hx, (fun _ _ _ _ h => by cases h)⟩
       simp only [LLoad.injEq] at h1 h2
       obtain ⟨rfl, rfl, rfl, -⟩ := h1
       obtain ⟨-, -, rfl, -⟩ := h2
@@ -355,9 +357,9 @@ theorem armHdR {c : CandW} (hv : validW SbPol.epoch c) (hP : PInvR N c.img G X d
       | some row =>
         rw [hr] at hl; simp only [Option.bind_some] at hl
         exact hc.wf.2.2 _ row _ _ hr hl
-    refine ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .issue rl base vs kc hne he, fun _ => rfl,
+    refine ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .issue rl base vs kc hne he.1, fun _ => rfl,
       (fun _ _ _ _ _ _ _ h => by cases h), (fun _ _ _ _ _ _ h => by cases h), fun rl0 _ _ _ h => ?_,
-      fun h => absurd h hx⟩
+      fun h => absurd h hx, fun _ _ _ _ _ hxd => he.2 hxd⟩
     simp only [LStore.injEq] at h
     obtain ⟨rfl, -⟩ := h
     have := hI.noRl _ _ hl
@@ -366,18 +368,18 @@ theorem armHdR {c : CandW} (hv : validW SbPol.epoch c) (hP : PInvR N c.img G X d
     have hx := hnX _ hl (fun _ _ _ h => by cases h)
     exact ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .fence pr pw sr sw he, fun _ => rfl,
       (fun _ _ _ _ _ _ _ h => by cases h), (fun _ _ _ _ _ _ h => by cases h), (fun _ _ _ _ h => by cases h),
-      fun h => absurd h hx⟩
+      fun h => absurd h hx, (fun _ _ _ _ h => by cases h)⟩
   | LRmw aq rl base ts rvs wvs kc =>
     have hx := hnX _ hl (fun _ _ _ h => by cases h)
     obtain ⟨hok, hrl, haq, hS⟩ := he
     exact ⟨_, .inl ⟨hx, lblReidxRefl _⟩, armAmo hv hP hc himg x aq rl base ts rvs wvs kc hl hok hrl haq hS,
       fun _ => rfl, fun _ _ _ _ _ _ _ _ => ⟨rfl, hS⟩, (fun _ _ _ _ _ _ h => by cases h),
-      (fun _ _ _ _ h => by cases h), fun h => absurd h hx⟩
+      (fun _ _ _ _ h => by cases h), fun h => absurd h hx, (fun _ _ _ _ h => by cases h)⟩
   | LIo kd base vs =>
     have hx := hnX _ hl (fun _ _ _ h => by cases h)
     exact ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .io kd base vs, fun _ => rfl,
       (fun _ _ _ _ _ _ _ h => by cases h), (fun _ _ _ _ _ _ h => by cases h), (fun _ _ _ _ h => by cases h),
-      fun h => absurd h hx⟩
+      fun h => absurd h hx, (fun _ _ _ _ h => by cases h)⟩
 
 end Arms
 
@@ -395,8 +397,9 @@ theorem walkStepR (GF : Gfexec) (N : Nat) (X : Geid → Prop) (c : CandW)
   cases T with
   | ld i k =>
     obtain ⟨hi, -⟩ := hT
-    obtain ⟨p, hp, hok, -⟩ := id he
-    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLandR hW.cat _ hP i k he, ?_, rfl⟩
+    obtain ⟨hq, p, hp, hok, -⟩ := id he
+    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLandR hW.cat _ hP i k hq he.2, ?_,
+      rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ i N hi ?_ (fun y hy => ?_)
     · rw [landEq i k p hp]
@@ -409,11 +412,12 @@ theorem walkStepR (GF : Gfexec) (N : Nat) (X : Geid → Prop) (c : CandW)
       rw [updNe _ _ _ _ hy]
   | hd x =>
     obtain ⟨hx, hcnt⟩ := hT
-    obtain ⟨l, hl, hfab, hen⟩ := he
-    obtain ⟨lb', hrel, hst, hvb, hamo, hld, hnrl, hex⟩ := armHdR hv hP hW.cat hW.imgF hW.imgEq hW.ex
+    obtain ⟨hq, l, hl, hfab, hen⟩ := he
+    obtain ⟨lb', hrel, hst, hvb, hamo, hld, hnrl, hex, hdev⟩ := armHdR hv hP hW.cat hW.imgF hW.imgEq hW.ex
       hW.def' hEx x l hl hen
     refine ⟨.ev ⟨x, lb'⟩, validSnoc _ c _ hv hst, by
-      rw [curSnoc]; exact pinvEvR hW.cat hP x hx hcnt l lb' hl hrel hst hfab hvb hamo hld hnrl hex, ?_, rfl⟩
+      rw [curSnoc]; exact pinvEvR hW.cat hP x hx hcnt l lb' hl hrel hst hfab hvb hamo hld hnrl hex hq hdev,
+      ?_, rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ x N hx ?_ (fun y hy => ?_)
     · rw [rowsEvEq, if_pos rfl, pendEvEq, if_pos rfl, List.length_append, List.length_singleton]

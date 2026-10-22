@@ -81,14 +81,14 @@ def landGX (pol : SbPol) (G : Gexec) (w : WS) (i k : Nat) : Prop :=
 def enbX (pol : SbPol) (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (w : WS) :
     Tgt → Prop
   | .hd x => enb pol G X rdG dev w (.hd x) ∧ (amoHd G w x → wrW w ++ [hd w x] <+: gwrites G)
-  | .ld i k => landGX pol G w i k
+  | .ld i k => (SbOrd.devQuiet w ∨ NCPU ≤ i) ∧ landGX pol G w i k
 
 /-- **EVERY S-P ITEM IS A GATED ITEM** (so S-P walks are gated walks). -/
 theorem enbXSub (pol : SbPol) (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (w : WS)
     (T : Tgt) : enbX pol G X rdG dev w T → enb pol G X rdG dev w T := by
   cases T with
   | hd x => exact fun h => h.1
-  | ld i k => exact fun h => h.1
+  | ld i k => exact fun h => ⟨h.1, h.2.1⟩
 
 /-- A landed write in the old sense (some byte) is a landed write. -/
 theorem wrAtWrW (w : WS) (a : Int) (n : Geid) : n ∈ wrAtW w a → n ∈ wrW w := by
@@ -238,16 +238,18 @@ theorem logOfWrW (img : Image) (w : WS) : Inv img w →
 /-- **`noStuckPX` — PROGRESS UNDER THE S-P GATE**: `SbOrd.noStuckP`'s hypotheses (rows H1–H5, the named
 H3 `HeadOrdRd`, `DevStOrd`, the trusted residue) and the S-P prefix invariant give an ENABLED genuine
 S-P item at every non-final walk state.  No new named input: a blocked S-P landing or AMO head waits for
-the next unlanded GF write, which is strictly gmo-earlier. -/
+the next unlanded GF write, which is strictly gmo-earlier.  [OWN.151] integration (2026-10-22): stated at
+DEVICE-QUIET states (`hq`; the spike's S-P gate does not carry the device unit — the S-R walk
+`SbOrdR.noStuckR` does) and with `DevStFab` for `SbOrd.blkHead`. -/
 theorem noStuckPX (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG) (w : WS)
     (hc : CatH GF.gfGd.gdG) (hio : ioResidueGmo GF) (hwio : gfDevWIo GF) (hI : ImgFacts GF.gfGd.gdG)
     (hN : GF.gfGd.gdG.gxProg.length = N) (hP : PInv N img GF.gfGd.gdG X GF.gfDev w)
     (hmono : ∀ x aq base ts vs, gxLbl GF.gfGd.gdG (hd w x) = some (LLoad aq base ts vs) →
       srcGate GF.gfGd.gdG w x base ts vs → rdG w x base ts vs)
-    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev)
+    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev) (hDF : DevStFab GF.gfGd.gdG GF.gfDev)
     (hHart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true)
     (hR : HeadOrdRd GF.gfGd.gdG X rdG GF.gfDev w)
-    (hW : wrW w <+: gwrites GF.gfGd.gdG) :
+    (hW : wrW w <+: gwrites GF.gfGd.gdG) (hq : SbOrd.devQuiet w) :
     ((∃ x, x < N ∧ (w.rows x).length < (GF.gfGd.gdG.gxProg.getD x []).length) ∨ (∃ i, w.pend i ≠ [])) →
     ∃ T, validT N GF.gfGd.gdG w T ∧ enbX SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev w T := by
   intro hne
@@ -300,13 +302,13 @@ theorem noStuckPX (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG
       refine ⟨B, hB, .inr (headBound hc.wf x _ _ hl rfl
         (fun m h1 h2 h3 _ => aqOrd hc x _ hl rfl m h1 h2 h3) hlt)⟩
     · obtain ⟨B, hB, hlt⟩ := blkHead SbPol.epoch hP hc hI hN rdG hwio' hwio hr1 hr2 hr2'' hr3a hr3 hR
-        hDS hHart x (hmono x) hv he
+        hDS hDF hHart x (hmono x) hv hq he
       exact ⟨B, hB, .inr hlt⟩
   | ld i k =>
     obtain ⟨-, p, hp⟩ := hv
     by_cases hl : landG SbPol.epoch GF.gfGd.gdG w i k
     · have hno : ¬ (wrW w ++ [(i, p.1)] <+: gwrites GF.gfGd.gdG) :=
-        fun h => hb ⟨hl, p, hp, h⟩
+        fun h => hb ⟨.inl hq, hl, p, hp, h⟩
       have hpm := List.mem_of_getElem? hp
       obtain ⟨rl, base, vs, kc, hlb, -, -⟩ := pendLbl hP i p hpm
       have hs : (i, p.1) ∈ gwrites GF.gfGd.gdG :=

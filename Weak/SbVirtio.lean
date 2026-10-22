@@ -112,7 +112,7 @@ section Inv
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
 /-- **THE EXTENDED CHAIN IS SOUND** at a walk state with (EP), (DR) and `CtrLanded`. -/
-theorem SbVirtio.hvSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
+theorem SbVirtio.hvSoundB (hP : PInvB N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
     (hD : SbBlocked.DrainOk w) {Ctr : Geid → Prop} (hC : SbVirtio.CtrLanded G Ctr w) (x : Nat)
     (b : Bool) (e : Geid) (hh : SbVirtio.Hv G dev Ctr (hd w x) b e) :
     (b = false → realized w e) ∧ (b = true → SbBlocked.Landed w e) := by
@@ -130,23 +130,29 @@ theorem SbVirtio.hvSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBlock
   | lr e _ ih => exact ⟨fun _ => (ih.2 rfl).1, fun h => by cases h⟩
   | amo A s aq rl base ts rvs wvs kc j t _ hl htj hs ih =>
     exact ⟨(fun h => nomatch h), fun _ =>
-      SbBlocked.amoSrcLanded hP hc A s aq rl base ts rvs wvs kc j t hl (ih.1 rfl) htj hs⟩
+      SbBlocked.amoSrcLandedB hP hc A s aq rl base ts rvs wvs kc j t hl (ih.1 rfl) htj hs⟩
   | epoch r s _ hrW h1 hf ih =>
-    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.epochLanded hP hE r s (ih.2 rfl) hrW h1 hf⟩
+    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.epochLandedB hP hE r s (ih.2 rfl) hrW h1 hf⟩
   | drain f s pr sw _ hfl h1 h2 ih =>
-    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.drainLanded hP hD f s pr sw (ih.1 rfl) hfl h1 h2⟩
+    exact ⟨(fun h => nomatch h), fun _ => SbBlocked.drainLandedB hP hD f s pr sw (ih.1 rfl) hfl h1 h2⟩
   | co s s' a _ hb' hb hsm hlt ih =>
     refine ⟨(fun h => nomatch h), fun _ => ?_⟩
-    have hs'W : s' ∈ wrAtW w a := SbBlocked.landedWr hP s' a (ih.2 rfl) hb'
+    have hs'W : s' ∈ wrAtW w a := SbBlocked.landedWrB hP s' a (ih.2 rfl) hb'
     have hsW := landedDown G w a s s' (hP.pf.2 a) hc.wf.1 hs'W (List.mem_filter.2 ⟨hsm, hb⟩) hlt
-    exact SbBlocked.landedOfGmo hP s (List.mem_filter.1 hsW).1
+    exact SbBlocked.landedOfGmoB hP s (List.mem_filter.1 hsW).1
   | ctr r s a t v _ hCr hrd hs ih =>
     refine ⟨(fun h => nomatch h), fun _ => ?_⟩
     rcases hC r a t v hCr (ih.1 rfl) hrd with rfl | ⟨s0, hs0, hs0W⟩
     · simp [gwriteAt] at hs
     · rw [hs] at hs0
       cases hs0
-      exact SbBlocked.landedOfGmo hP s (List.mem_filter.1 hs0W).1
+      exact SbBlocked.landedOfGmoB hP s (List.mem_filter.1 hs0W).1
+
+theorem SbVirtio.hvSound (hP : PInv N img G X dev w) (hc : CatH G) (hE : SbBlocked.EpochOk w)
+    (hD : SbBlocked.DrainOk w) {Ctr : Geid → Prop} (hC : SbVirtio.CtrLanded G Ctr w) (x : Nat)
+    (b : Bool) (e : Geid) (hh : SbVirtio.Hv G dev Ctr (hd w x) b e) :
+    (b = false → realized w e) ∧ (b = true → SbBlocked.Landed w e) :=
+  SbVirtio.hvSoundB hP.toB hc hE hD hC x b e hh
 
 /-! # 2. Source classes and the gate -/
 

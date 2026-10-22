@@ -317,7 +317,7 @@ theorem evStep (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : 
     (hfr : fetchReady D (cur S.c) x) :
     ∃ pC' d', PrgInv d0 fab GF.gfDev N D TR (snocE S s pC' d') := by
   subst hs
-  obtain ⟨l, hl, hfo, -⟩ := id he
+  obtain ⟨-, l, hl, hfo, -⟩ := id he
   obtain ⟨pC, hpC, hrel⟩ := hI.rel s.esAg hx
   -- the member label, its relation, its exempt fact, its machine step
   have hrowsN : (cur (snocC S.c (.ev s))).rows s.esAg = (cur S.c).rows s.esAg ++ [s.esLb] := by
@@ -469,7 +469,7 @@ theorem walkRunProgP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (
     · exfalso
       have hSI := hS S.c hR.valid hR.gated hR.imgEq hR.pinv
       obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur S.c) hW.cat hW.io hW.wio hW.imgF hW.len hR.pinv
-        hSI.mono hW.devSt hW.hart hSI.head (nonFinal hR.pinv hfin)
+        hSI.mono hW.devSt hW.devFab hW.hart hSI.head (nonFinal hR.pinv hfin)
       have hW' : WalkHyp GF N S.c.img X := hR.imgEq ▸ hW
       have hP' : PInv N S.c.img GF.gfGd.gdG X GF.gfDev (cur S.c) := hR.imgEq ▸ hR.pinv
       obtain ⟨it, -, -, hlt, -⟩ := walkStepP GF N X rdG S.c hW' hR.valid hP' hSI T hT he
@@ -481,7 +481,7 @@ theorem walkRunProgP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (
     · exact ⟨S, hR, hI, hfin.1, hfin.2⟩
     · have hSI := hS S.c hR.valid hR.gated hR.imgEq hR.pinv
       obtain ⟨T0, hT0, he0⟩ := noStuckP GF N img X rdG (cur S.c) hW.cat hW.io hW.wio hW.imgF hW.len
-        hR.pinv hSI.mono hW.devSt hW.hart hSI.head (nonFinal hR.pinv hfin)
+        hR.pinv hSI.mono hW.devSt hW.devFab hW.hart hSI.head (nonFinal hR.pinv hfin)
       -- a non-fetch-blocked enabled target
       obtain ⟨T, hT, he, hfr⟩ : ∃ T, validT N GF.gfGd.gdG (cur S.c) T ∧
           enb SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev (cur S.c) T ∧

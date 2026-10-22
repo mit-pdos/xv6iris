@@ -477,6 +477,27 @@ theorem SbDevSt.devStOrd (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     · exact .inr (.inr (.inl ⟨hsm, hsio, hmr, hN⟩))
     · exact .inr (.inr (.inr (.inr (.inr ⟨hsm, hsio, hmr⟩))))
 
+/-- **`DevStFab` DISCHARGED** ([OWN.151]): on an xv6-shaped bundle (rows `≥ NCPU` boot as the idle
+disk), every device-row store is a fabric member — its block is a fabric contact (`rowTq`), and the
+emission's membership clause turns the contact into membership. -/
+theorem SbDevSt.devStFab (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
+    (hconf : GraphFabConf.gfexecConfZF boot d0 fab GF)
+    (hdb : ∀ i, NCPU ≤ i → boot i = .PDisk none) :
+    DevStFab GF.gfGd.gdG GF.gfDev := by
+  intro e rl base vs kc he hl
+  obtain ⟨row, hrow, hre⟩ := SbDevSt.lblOf _ e _ hl
+  obtain ⟨em, dvi, dvo, tq, hem, hiff, -, -, -⟩ := hconf.2.2.2 e.1 row hrow
+  have hem' : hemitf dvi dvo tq 0 wsInit row (.PDisk none) em.emItems em.emFin := by
+    have h : hemitf dvi dvo tq 0 wsInit row (boot e.1) em.emItems em.emFin := hem
+    rw [hdb e.1 he] at h
+    exact h
+  have htq : tq e.2 = true := by
+    have := SbDevSt.rowTq _ _ _ _ _ _ _ _ _ hem' trivial e.2 _ hre rfl
+    rw [Nat.zero_add] at this
+    exact this
+  have hlt : e.2 < row.length := (List.getElem?_eq_some_iff.1 hre).1
+  exact (hiff e.2 hlt).2 (.inr (.inr htq))
+
 /-- xv6's boot (`xboot`): every row `≥ NCPU` is the idle disk. -/
 theorem SbDevSt.xbootDisk (σ0 : WGState) : ∀ i, NCPU ≤ i → xboot σ0 i = .PDisk none := by
   intro i hi
@@ -519,13 +540,13 @@ theorem SbDevSt.walkHypAt (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab
     ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
       GF.gfGd.gdG.gxImg = im → CatLin.rvwmoCatAD GF.gfGd ad →
       GraphFabConf.gfexecConfZF boot d0 fab GF → ioResidueGmo GF →
-      ImgFacts GF.gfGd.gdG ∧ DevStOrd GF.gfGd.gdG GF.gfDev ∧
+      ImgFacts GF.gfGd.gdG ∧ DevStOrd GF.gfGd.gdG GF.gfDev ∧ DevStFab GF.gfGd.gdG GF.gfDev ∧
       (∀ e l, Xof GF e → gxLbl GF.gfGd.gdG e = some l → ∃ base ts vs, l = LLoad false base ts vs) ∧
       (∀ e a t v, greadsByte GF.gfGd.gdG e a t v → (im a).isSome) := by
   intro GF ad him hc hconf hres
   obtain ⟨hI, hex, hdef⟩ := hW GF ad him hc hconf
   exact ⟨hI, SbDevSt.devStOrd boot d0 fab GF hconf hdb hres (hwio GF ad him hc hconf)
-    (hdf GF ad him hc hconf), hex, hdef⟩
+    (hdf GF ad him hc hconf), SbDevSt.devStFab boot d0 fab GF hconf hdb, hex, hdef⟩
 
 /-- **THE SUPPLY FROM THE GATED WALK, `DevStOrd` discharged** (`SbKill.certSupplyOfWalkP` with
 `walkHypCZD` + the disk boot shape + `diskFabPoCZ`). -/
@@ -537,7 +558,7 @@ theorem SbDevSt.certSupplyOfWalkPD (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat
     (hW : SbDevSt.walkHypCZD boot d0 fab im Xof) (hS : SbKill.stateIfcCZ boot d0 fab im Xof) :
     SbKill.certSupplyP boot d0 fab im Xof := by
   intro GF ad him hc hconf hres
-  obtain ⟨hI, hDS, hex, hdef⟩ :=
+  obtain ⟨hI, hDS, hDF, hex, hdef⟩ :=
     SbDevSt.walkHypAt boot d0 fab im Xof hdb hwio hdf hW GF ad him hc hconf hres
   have hWH : WalkHyp GF GF.gfGd.gdG.gxProg.length im (Xof GF) :=
     { cat := ⟨hc.1, hc.2.1, hc.2.2.1, hc.2.2.2.1⟩
@@ -545,6 +566,7 @@ theorem SbDevSt.certSupplyOfWalkPD (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat
       wio := hwio GF ad him hc hconf
       imgF := hI
       devSt := hDS
+      devFab := hDF
       hart := LockFacts3.hartDevIo boot d0 fab GF hconf hbt
       len := rfl
       imgEq := him

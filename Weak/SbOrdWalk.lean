@@ -155,15 +155,48 @@ section Sound
 
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
+/-- **THE DEVICE UNIT ALONG A LANDING** ([OWN.151]): an enabled landing (no pending device store, or the
+device store's own landing) leaves every device buffer empty. -/
+theorem duLand (hP : PInv N img G X dev w) (i k : Nat) (p : Nat × SbEnt) (hp : (w.pend i)[k]? = some p)
+    (hq : devQuiet w ∨ NCPU ≤ i) : devUnit G (nextI w (.land i k)) := by
+  have hne : w.pend i ≠ [] := fun h => by rw [h] at hp; cases hp
+  have hall : ∀ j, NCPU ≤ j → (nextI w (.land i k)).pend j = [] := by
+    intro j hj
+    rw [landEq i k p hp]
+    show upd w.pend i ((w.pend i).eraseIdx k) j = []
+    by_cases hji : j = i
+    · subst hji
+      rw [updEq]
+      rcases hq with hq | _
+      · exact absurd (hq j hj) hne
+      · obtain ⟨h1, -, -⟩ := hP.du j hj hne
+        have hk : k < (w.pend j).length := lookup_lt_Some hp
+        have hk0 : k = 0 := by omega
+        subst hk0
+        cases h : w.pend j with
+        | nil => exact absurd h hne
+        | cons q qs =>
+          rw [h] at h1
+          simp only [List.length_cons] at h1
+          have : qs = [] := List.eq_nil_of_length_eq_zero (by omega)
+          subst this; rfl
+    · rw [updNe _ _ _ _ hji]
+      rcases hq with hq | hi
+      · exact hq j hj
+      · exact (hP.du i hi hne).2.2 j hj hji
+  intro j hj hne'
+  exact absurd (hall j hj) hne'
+
 /-- **AN ENABLED LANDING KEEPS THE WALK INVARIANT.** -/
-theorem pinvLand (pol : SbPol) (hP : PInv N img G X dev w) (i k : Nat) (hg : landG pol G w i k) :
+theorem pinvLand (pol : SbPol) (hP : PInv N img G X dev w) (i k : Nat) (hq : devQuiet w ∨ NCPU ≤ i)
+    (hg : landG pol G w i k) :
     PInv N img G X dev (nextI w (.land i k)) := by
   obtain ⟨p, hp, hok, hco⟩ := hg
   have hpm : p ∈ w.pend i := List.mem_of_getElem? hp
   obtain ⟨rl, base, vs, kc, hl, hrow, -⟩ := pendLbl hP i p hpm
   have hrows : (nextI w (.land i k)).rows = w.rows := by rw [landEq i k p hp]
   refine ⟨invLand img pol w i k hP.inv hok, ?_, exOkLand X w i k hP.ex, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-    ?_⟩
+    ?_, ?_⟩
   · refine pfxLand img pol G X w i k hP.inv hP.pf hok (fun p' hp' b hb => ?_)
     rw [hp, Option.some.injEq] at hp'
     subst hp'
@@ -194,6 +227,7 @@ theorem pinvLand (pol : SbPol) (hP : PInv N img G X dev w) (i k : Nat) (hg : lan
   · intro j q q' hq hq' hlt hfs
     exact hP.fs2 j q q' (pendLandMem i k p hp j q hq) (pendLandMem i k p hp j q' hq') hlt hfs
   · intro j q hq; exact hP.nrl j q (pendLandMem i k p hp j q hq)
+  · exact duLand hP i k p hp hq
 
 theorem pendECases (w : WS) (x : Nat) (lb : Lbl) :
     (∃ rl base vs k, lb = LStore rl base vs k ∧
@@ -222,6 +256,47 @@ theorem relXStore (x : Prop) (l : Lbl) (rl : Bool) (base : Int) (vs : List (BitV
 theorem fenceSwMono (G : Gexec) (i lo hi hi' : Nat) : fenceSw G i lo hi → hi ≤ hi' → fenceSw G i lo hi' := by
   rintro ⟨kf, pr, sr, h1, h2, h3⟩ hle; exact ⟨kf, pr, sr, h1, by omega, h3⟩
 
+/-- **THE DEVICE UNIT ALONG AN EVENT** ([OWN.151]): an enabled head event (no pending device store) of a
+device row's store leaves exactly that store pending, with its landing enabled (`devLandOk` read at the
+issue: the landed lists do not move, the realized set grows); every other event leaves every device
+buffer empty. -/
+theorem duEv (hP : PInv N img G X dev w) (x : Nat) (l lb' : Lbl) (hl : gxLbl G (hd w x) = some l)
+    (hrel : lblRelX (X (hd w x)) l lb') (hst : SbCand.stepE w.σ x lb' (SbCand.nextE w.σ x lb'))
+    (hq : devQuiet w) (hdl : ∀ rl base vs k, l = LStore rl base vs k → devLandOk G w (hd w x) l) :
+    devUnit G (nextI w (.ev ⟨x, lb'⟩)) := by
+  have hI' := invEv img w ⟨x, lb'⟩ hP.inv hst
+  have hother : ∀ j, NCPU ≤ j → j ≠ x → (nextI w (.ev ⟨x, lb'⟩)).pend j = [] := by
+    intro j hj hjx
+    rw [pendEvEq, if_neg hjx]; exact hq j hj
+  intro j hj hne
+  by_cases hjx : j ≠ x
+  · exact absurd (hother j hj hjx) hne
+  have hjx' : j = x := Classical.byContradiction hjx
+  subst hjx'
+  have hpx : (nextI w (.ev ⟨j, lb'⟩)).pend j = pendE w j lb' := by
+    rw [pendEvEq, if_pos rfl]
+  rcases pendECases w j lb' with ⟨rl, base, vs, k, hlb, hpe⟩ | ⟨pr, sr, -, hpe⟩ | hpe
+  · subst hlb
+    have hl' := relXStore _ l rl base vs k hrel
+    have hpj : (nextI w (.ev ⟨j, LStore rl base vs k⟩)).pend j =
+        [((w.rows j).length, SbCand.issueEnt w.σ j rl base vs k)] := by
+      rw [hpx, hpe, hq j hj]; rfl
+    refine ⟨by rw [hpj]; rfl, ⟨_, by rw [hpj]; rfl, ?_, fun a ha => ?_⟩, fun j' hj' hne' => hother j' hj' hne'⟩
+    · rw [hI'.sb j, hpj]; exact SbPol.epoch.oldest _ _
+    · have hwb : wrsB (LStore rl base vs k) a = true := by
+        unfold rwrB at ha
+        rw [rowsEvEq, if_pos rfl] at ha
+        simpa using ha
+      obtain ⟨hpre, hrd⟩ := hdl rl base vs k hl' hj a (by rw [hl']; exact hwb)
+      have hw' : wrAtW (nextI w (.ev ⟨j, LStore rl base vs k⟩)) a = wrAtW w a := by
+        rw [wrAtEv img w _ a hP.inv]
+        simp [gmoEv, isSt]
+      refine ⟨by rw [hw']; exact hpre, fun r t v hr hsl hner => ?_⟩
+      rw [srcLatestCongr G w _ a t hw'] at hsl
+      exact (realizedEv _ r).2 (.inl (hrd r t v hr hsl hner))
+  · rw [hpx, hpe, hq j hj] at hne; exact absurd rfl hne
+  · rw [hpx, hpe, hq j hj] at hne; exact absurd rfl hne
+
 /-- **AN ENABLED HEAD EVENT, WITH ITS ARM'S MEMBER LABEL, KEEPS THE WALK INVARIANT** — given the arm's
 facts: the label related to GF's, the `SbCand` step, the fabric turn, for an AMO the co-prefix and the
 readers condition at each written byte (the `wr` gate), for an exempt read an in-range word. -/
@@ -232,11 +307,12 @@ theorem pinvEv (hP : PInv N img G X dev w) (hI : ImgFacts G) (x : Nat) (hx : x <
     (hfab : fabOk dev w (hd w x))
     (hco : gmoEv lb' = true → ∀ b, wrsB lb' b = true → wrAtW w b ++ [hd w x] <+: wrAtG G b)
     (hdone : gmoEv lb' = true → ∀ b, wrsB lb' b = true → readersDone G w b (hd w x))
-    (hex : X (hd w x) → exValL x lb') :
+    (hex : X (hd w x) → exValL x lb') (hq : devQuiet w)
+    (hdl : ∀ rl base vs k, l = LStore rl base vs k → devLandOk G w (hd w x) l) :
     PInv N img G X dev (nextI w (.ev ⟨x, lb'⟩)) := by
   have htag : ∀ q, q ∈ w.pend x → q.1 < (w.rows x).length := fun q hq => pendRealized hP x q hq
   refine ⟨invEv img w ⟨x, lb'⟩ hP.inv hst, pfxEv img G X w ⟨x, lb'⟩ l hP.inv hP.pf hl hrel hco,
-    exOkEv X w ⟨x, lb'⟩ hP.ex hex, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    exOkEv X w ⟨x, lb'⟩ hP.ex hex, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, duEv hP x l lb' hl hrel hst hq hdl⟩
   · -- rows bounded
     intro j
     rw [rowsEvEq]
@@ -487,7 +563,7 @@ theorem armHd {N : Nat} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {rdG :
       | some row =>
         rw [hr] at hl; simp only [Option.bind_some] at hl
         exact hc.wf.2.2 _ row _ _ hr hl
-    exact ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .issue rl base vs kc hne he, fun h => by simp [gmoEv, isSt, lbIsMem, lbIsR, lbIsW] at h,
+    exact ⟨_, .inl ⟨hx, lblReidxRefl _⟩, .issue rl base vs kc hne he.1, fun h => by simp [gmoEv, isSt, lbIsMem, lbIsR, lbIsW] at h,
       fun h => by simp [gmoEv, isSt, lbIsMem, lbIsR, lbIsW] at h, fun h => absurd h hx⟩
   | LFence pr pw sr sw =>
     have hx := hnX _ hl (fun _ _ _ h => by cases h)
@@ -575,6 +651,7 @@ structure WalkHyp (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) : Pr
   wio : gfDevWIo GF
   imgF : ImgFacts GF.gfGd.gdG
   devSt : DevStOrd GF.gfGd.gdG GF.gfDev
+  devFab : DevStFab GF.gfGd.gdG GF.gfDev
   hart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true
   len : GF.gfGd.gdG.gxProg.length = N
   imgEq : GF.gfGd.gdG.gxImg = img
@@ -632,8 +709,8 @@ theorem walkStepP (GF : Gfexec) (N : Nat) (X : Geid → Prop) (rdG : RdG) (c : C
   cases T with
   | ld i k =>
     obtain ⟨hi, -⟩ := hT
-    obtain ⟨p, hp, hok, -⟩ := id he
-    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLand _ hP i k he, ?_, rfl⟩
+    obtain ⟨hq, p, hp, hok, -⟩ := id he
+    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLand _ hP i k he.1 he.2, ?_, rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ i N hi ?_ (fun y hy => ?_)
     · rw [landEq i k p hp]
@@ -646,11 +723,13 @@ theorem walkStepP (GF : Gfexec) (N : Nat) (X : Geid → Prop) (rdG : RdG) (c : C
       rw [updNe _ _ _ _ hy]
   | hd x =>
     obtain ⟨hx, hcnt⟩ := hT
-    obtain ⟨l, hl, hfab, hen⟩ := he
+    obtain ⟨hq, l, hl, hfab, hen⟩ := he
     obtain ⟨lb', hrel, hst, hco, hdone, hex⟩ := armHd hv hP hW.cat hW.imgEq hS.sound hW.ex hW.def'
       hS.iref x l hl hen
+    have hdl : ∀ rl base vs k, l = LStore rl base vs k → devLandOk GF.gfGd.gdG (cur c) (hd (cur c) x) l := by
+      intro rl base vs k hlk; subst hlk; exact hen.2
     refine ⟨.ev ⟨x, lb'⟩, validSnoc _ c _ hv hst, by
-      rw [curSnoc]; exact pinvEv hP hW.imgF x hx hcnt l lb' hl hrel hst hfab hco hdone hex, ?_, rfl⟩
+      rw [curSnoc]; exact pinvEv hP hW.imgF x hx hcnt l lb' hl hrel hst hfab hco hdone hex hq hdl, ?_, rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ x N hx ?_ (fun y hy => ?_)
     · rw [rowsEvEq, if_pos rfl, pendEvEq, if_pos rfl, List.length_append, List.length_singleton]
@@ -678,6 +757,7 @@ theorem pinvInit (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : 
   fs0 _ _ h := by simp [init] at h
   fs2 _ _ _ h := by simp [init] at h
   nrl _ _ h := by simp [init] at h
+  du _ _ h := absurd rfl h
 
 /-- **`walkRunP` — THE GATED WALK RUNS TO COMPLETION**: given the global hypotheses and, at every reachable
 GATED candidate (F-W2-V-1 (a): every item enabled at its state, `gatedW`), `noStuckP`'s per-state
@@ -706,7 +786,7 @@ theorem walkRunP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
     · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · exfalso
       obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hg hc hP).mono hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
+        (hS c hv hg hc hP).mono hW.devSt hW.devFab hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, -, -, hlt, -⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv hg rfl hP) T hT he
       omega
@@ -716,7 +796,7 @@ theorem walkRunP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
         drained (cur c)
     · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hg hc hP).mono hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
+        (hS c hv hg hc hP).mono hW.devSt hW.devFab hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, hv', hP', hlt, hit⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv hg rfl hP) T hT he
       exact ih (snocC c it) hv' (gatedSnoc _ X rdG _ c it hg (by rw [hit]; exact he)) rfl hP'

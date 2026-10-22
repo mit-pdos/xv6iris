@@ -14,8 +14,13 @@ buffer: `SbPol.epoch`)).  Lean-only, no Rocq twin.  A PRIMED TWIN: nothing regis
       gate `valGate` of finding F-P-W3-1); a store issues unless `.rl` with a nonempty buffer; a fence
       waits for the drain when `pw ∧ sr`; an AMO (`wr`) needs its byte sources member-latest, every GF
       reader of them realized (`readersDone`), `amoOk`, the `.rl`/`.aq` buffer conditions; an I/O event
-      always goes.  A landing (`landG`) needs `pol.landOk`, and at every byte it writes: landed list ++ it
-      a GF co prefix, every GF reader of the current member-latest realized.
+      waits for an empty own buffer ([OWN.152], F-CM-2: a hart's `DRIVER_OK` store finds its queue-page
+      stores landed — MachCSL's `drvOkGuard`; progress from the trusted (R1) + H4 `ioOrd`, `blkIo`); a
+      DEVICE row's store issues only when it can land at once (`devLandOk`, [OWN.151], F-CM-1 (b′)) and,
+      while it is pending, ONLY its landing is enabled (`devQuiet`; the issue and the landing are one
+      walk unit, `PInv.du`/`devUnit`; this subsumes [OWN.148]).  A landing (`landG`) needs `pol.landOk`,
+      and at every byte it writes: landed list ++ it a GF co prefix, every GF reader of the current
+      member-latest realized.
   §2  the walk-state invariant **`SbOrd.PInv`**: P-W2's bookkeeping `Inv`, prefix `pfx`, `exOk`, the
       rows bounded by GF's, the agent bound, and the four progress invariants — `rd` (an unrealized read
       whose GF source has landed reads the member-latest), `dvP` (realized fabric members are a prefix
@@ -84,17 +89,31 @@ def valGate (w : WS) (x : Nat) (base : Int) (_ts : List Nat) (vs : List (BitVec 
 /-- A read gate: a predicate on (state, agent, footprint, GF timestamps, GF values). -/
 abbrev RdG : Type := WS → Nat → Int → List Nat → List (BitVec 8) → Prop
 
-/-- **THE PER-LABEL GATE** of row `e.1`'s next event `e` with GF label `l`. -/
+/-- **THE DEVICE STORE'S LANDING CONDITION AT ITS ISSUE** ([OWN.151], F-CM-1 (b′)): a store of a DEVICE
+row (`NCPU ≤ e.1`) issues only when it can land at once — at every byte it writes, the landed list
+followed by it is a GF co prefix and every GF reader of the current member-latest is realized (the
+landing gate `landG`'s byte clause, read at the issue; the AMO's `wr` gate). -/
+def devLandOk (G : Gexec) (w : WS) (e : Geid) (l : Lbl) : Prop :=
+  NCPU ≤ e.1 → ∀ b, wrsB l b = true → wrAtW w b ++ [e] <+: wrAtG G b ∧ readersDone G w b e
+
+/-- **NO DEVICE STORE IS PENDING** ([OWN.151]): every device row's buffer is empty.  While a device
+store is pending (between its issue and its landing — one walk unit), only its landing is enabled. -/
+def devQuiet (w : WS) : Prop := ∀ i, NCPU ≤ i → w.pend i = []
+
+/-- **THE PER-LABEL GATE** of row `e.1`'s next event `e` with GF label `l`.  [OWN.151]: a DEVICE row's
+store issues only when it can land at once (`devLandOk`); [OWN.152] (F-CM-2): an I/O event waits until
+its row's pending stores have landed (an empty own buffer; progress from the trusted (R1) + H4
+`ioOrd`). -/
 def enbL (G : Gexec) (X : Geid → Prop) (rdG : RdG) (w : WS) (e : Geid) : Lbl → Prop
   | LLoad aq base ts vs => X e ∨ (¬ X e ∧ (aq = true → SbCand.noRl (w.σ.sb e.1)) ∧ rdG w e.1 base ts vs)
-  | LStore rl _ _ _ => rl = true → w.σ.sb e.1 = []
+  | LStore rl base vs kc => (rl = true → w.σ.sb e.1 = []) ∧ devLandOk G w e (LStore rl base vs kc)
   | LFence _ pw sr _ => SbCand.drains pw sr = true → w.σ.sb e.1 = []
   | LRmw aq rl base ts _ _ _ =>
       (∀ j t, ts[j]? = some t →
         srcLatest G w (accAddr base j) t ∧ readersDone G w (accAddr base j) e) ∧
       SbCand.amoOk (w.σ.sb e.1) base ts.length ∧ (rl = true → w.σ.sb e.1 = []) ∧
       (aq = true → SbCand.noRl (w.σ.sb e.1))
-  | LIo .. => True
+  | LIo .. => w.σ.sb e.1 = []
 
 /-- The gate's items: a row's next event, or a pending store. -/
 inductive Tgt where
@@ -110,8 +129,8 @@ def landG (pol : SbPol) (G : Gexec) (w : WS) (i k : Nat) : Prop :=
 /-- **THE GATE.** -/
 def enb (pol : SbPol) (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (w : WS) :
     Tgt → Prop
-  | .hd x => ∃ l, gxLbl G (hd w x) = some l ∧ fabOk dev w (hd w x) ∧ enbL G X rdG w (hd w x) l
-  | .ld i k => landG pol G w i k
+  | .hd x => devQuiet w ∧ ∃ l, gxLbl G (hd w x) = some l ∧ fabOk dev w (hd w x) ∧ enbL G X rdG w (hd w x) l
+  | .ld i k => (devQuiet w ∨ NCPU ≤ i) ∧ landG pol G w i k
 
 /-- A genuine item: a row (an agent below `N`) with GF events left, or an existing pending entry. -/
 def validT (N : Nat) (G : Gexec) (w : WS) : Tgt → Prop
@@ -128,6 +147,13 @@ def landedSrc (G : Gexec) (w : WS) (a : Int) (t : Nat) : Prop :=
 def fenceSw (G : Gexec) (i lo hi : Nat) : Prop :=
   ∃ kf pr sr, lo < kf ∧ kf < hi ∧ gxLbl G (i, kf) = some (LFence pr true sr true)
 
+/-- **THE DEVICE UNIT** ([OWN.151]): a device row with a pending store holds exactly ONE, its landing is
+enabled (`landG` under the epoch buffer), and no other device row has one — the store's issue and its
+landing are one walk unit (`enb` lets only that landing go meanwhile). -/
+def devUnit (G : Gexec) (w : WS) : Prop :=
+  ∀ i, NCPU ≤ i → w.pend i ≠ [] →
+    (w.pend i).length = 1 ∧ landG SbPol.epoch G w i 0 ∧ ∀ j, NCPU ≤ j → j ≠ i → w.pend j = []
+
 /-- **THE WALK-STATE INVARIANT** of route P's gated walk. -/
 structure PInv (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (w : WS) :
     Prop where
@@ -142,6 +168,28 @@ structure PInv (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : Li
   fs0 : ∀ i p, p ∈ w.pend i → p.2.fs ≠ 0 → fenceSw G i p.1 (w.rows i).length
   fs2 : ∀ i p p', p ∈ w.pend i → p' ∈ w.pend i → p'.1 < p.1 → p'.2.fs ≠ p.2.fs → fenceSw G i p'.1 p.1
   nrl : ∀ i p, p ∈ w.pend i → p.2.rl = false
+  du : devUnit G w
+
+/-- **THE BASE WALK-STATE INVARIANT** (the `PInv` split, [OWN.150] integration): `PInv`'s bookkeeping
+fields WITHOUT the top-read field `rd` and the device unit `du` — what both the top-read walk (`PInv`) and
+the S-R walk (`SbOrdR.PInvR`, whose reads are stale and whose device unit lands in GF's write order) keep.
+The lemmas that use only these fields are stated on it (`…B`); their `PInv` forms are wrappers. -/
+structure PInvB (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : List Geid) (w : WS) :
+    Prop where
+  inv : Inv img w
+  pf : pfx G X w
+  ex : exOk X w
+  len : ∀ x, (w.rows x).length ≤ (G.gxProg.getD x []).length
+  ag : agOk N w
+  dvP : ∀ d d', before dev d d' → realized w d' → realized w d
+  ord : ∀ i, ((w.pend i).map Prod.fst).Pairwise (· < ·)
+  fs0 : ∀ i p, p ∈ w.pend i → p.2.fs ≠ 0 → fenceSw G i p.1 (w.rows i).length
+  fs2 : ∀ i p p', p ∈ w.pend i → p' ∈ w.pend i → p'.1 < p.1 → p'.2.fs ≠ p.2.fs → fenceSw G i p'.1 p.1
+  nrl : ∀ i p, p ∈ w.pend i → p.2.rl = false
+
+theorem PInv.toB {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
+    (hP : PInv N img G X dev w) : PInvB N img G X dev w :=
+  ⟨hP.inv, hP.pf, hP.ex, hP.len, hP.ag, hP.dvP, hP.ord, hP.fs0, hP.fs2, hP.nrl⟩
 
 /-! # 3. The measure and the descent -/
 
@@ -163,8 +211,9 @@ theorem minPosGt (G : Gexec) (d n : Nat) : ∀ (l : List Geid), n < d → (∀ e
   | f :: l, hd, h => Nat.lt_min.2 ⟨h f (by simp), minPosGt G d n l hd (fun e he => h e (by simp [he]))⟩
 
 /-- **AN EVENT SOME ITEM CAN WAIT ON** (finding F-P-W3-3): a fabric member (Efab), a write (an unissued
-source, (E2)/(E2w)), or a GF reader of a byte's member-latest write where a PENDING entry or an AMO HEAD
-writes that byte ((E3)/(E3w)).  These are exactly the events the edges INTO a head pass through; an
+source, (E2)/(E2w)), or a GF reader of a byte's member-latest write where a PENDING entry, an AMO HEAD or
+([OWN.151]) a DEVICE-ROW STORE HEAD writes that byte ((E3)/(E3w)/(E3d): the device store issues only when
+it can land, `devLandOk`).  These are exactly the events the edges INTO a head pass through; an
 unrealized read nothing can wait on is left out of its head's measure (it may be gmo-before a blocked
 head — load–load reordering, `SbStuck.l7` — without closing any cycle). -/
 def waitedOn (G : Gexec) (dev : List Geid) (w : WS) (m : Geid) : Prop :=
@@ -172,6 +221,8 @@ def waitedOn (G : Gexec) (dev : List Geid) (w : WS) (m : Geid) : Prop :=
   ∃ a t v, greadsByte G m a t v ∧ srcLatest G w a t ∧
     ((∃ i p, p ∈ w.pend i ∧ gwrB G a (i, p.1) = true) ∨
      (∃ x aq rl base ts rvs wvs kc, gxLbl G (hd w x) = some (LRmw aq rl base ts rvs wvs kc) ∧
+       gwrB G a (hd w x) = true) ∨
+     (∃ x rl base vs kc, NCPU ≤ x ∧ gxLbl G (hd w x) = some (LStore rl base vs kc) ∧
        gwrB G a (hd w x) = true))
 
 open Classical in
@@ -261,6 +312,14 @@ write is a fabric-moving `DWriteDev` (`LockFacts3.diskFabPo`), the `DFence` sits
 NAMED here like `diskFabPo` (FAITHFUL to the device model, open: a pass over `pdiskProg`'s emission). -/
 def DevStOrd (G : Gexec) (dev : List Geid) : Prop :=
   ∀ f m, f ∈ dev → gisIo G f = false → NCPU ≤ f.1 → WeakRvwmoGraph.gpo G f m → gmem G m → gmoLt G f m
+
+/-- **EVERY DEVICE-ROW STORE IS A FABRIC MEMBER (NAMED, device model; [OWN.151])**: the virtio disk's RAM
+stores are its fabric-moving `DWriteDev` writes (`VirtioProg` node table: every `DWriteDev` store moves
+the fabric; membership by fabric contact [OWN.43]; the text `DevStOrd`'s docstring already reads off
+`LockFacts3.diskFabPo`).  FAITHFUL to the device model; open: a pass over `pdiskProg`'s emission (the
+store arm's `pdevEv`). -/
+def DevStFab (G : Gexec) (dev : List Geid) : Prop :=
+  ∀ e rl base vs kc, NCPU ≤ e.1 → gxLbl G e = some (LStore rl base vs kc) → e ∈ dev
 
 /-! # 5. Basic facts -/
 
@@ -378,7 +437,7 @@ section Inv
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
 /-- A pending entry's store: its member row label and GF's label are the same `LStore`. -/
-theorem pendLbl (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
+theorem pendLblB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
     ∃ rl base vs kc, gxLbl G (i, p.1) = some (LStore rl base vs kc) ∧
       (w.rows i)[p.1]? = some (LStore rl base vs kc) ∧ p.2.msg = ⟨base, vs, some i, kc⟩ := by
   intro hp
@@ -388,19 +447,31 @@ theorem pendLbl (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈
   · rw [← h] at hl; exact ⟨rl, base, vs, kc, hl, hrow, hmsg⟩
   · cases h
 
-theorem pendRealized (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
+theorem pendLbl (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
+    ∃ rl base vs kc, gxLbl G (i, p.1) = some (LStore rl base vs kc) ∧
+      (w.rows i)[p.1]? = some (LStore rl base vs kc) ∧ p.2.msg = ⟨base, vs, some i, kc⟩ :=
+  pendLblB hP.toB i p
+
+theorem pendRealizedB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
     realized w (i, p.1) := by
   intro hp
-  obtain ⟨_, _, _, _, _, hrow, _⟩ := pendLbl hP i p hp
+  obtain ⟨_, _, _, _, _, hrow, _⟩ := pendLblB hP i p hp
   exact lookup_lt_Some hrow
 
-theorem pendAg (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i → i < N := by
+theorem pendRealized (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i →
+    realized w (i, p.1) :=
+  pendRealizedB hP.toB i p
+
+theorem pendAgB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i → i < N := by
   intro hp
-  have := pendRealized hP i p hp
+  have := pendRealizedB hP i p hp
   exact hP.ag i (fun h => by unfold realized at this; rw [h] at this; simp at this)
 
+theorem pendAg (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) : p ∈ w.pend i → i < N :=
+  pendAgB hP.toB i p
+
 /-- A GF write of `a` that has not landed is unrealized or pending. -/
-theorem unlanded (hP : PInv N img G X dev w) (a : Int) (s : Geid) :
+theorem unlandedB (hP : PInvB N img G X dev w) (a : Int) (s : Geid) :
     gwrB G a s = true → s ∉ wrAtW w a →
     ¬ realized w s ∨ ∃ (k : Nat) (p : Nat × SbEnt), (w.pend s.1)[k]? = some p ∧ p.1 = s.2 := by
   intro hw hn
@@ -416,6 +487,11 @@ theorem unlanded (hP : PInv N img G X dev w) (a : Int) (s : Geid) :
       obtain ⟨k, hk⟩ := List.mem_iff_getElem?.1 hp
       exact ⟨k, p, hk, hp1⟩
   · exact .inl hr
+
+theorem unlanded (hP : PInv N img G X dev w) (a : Int) (s : Geid) :
+    gwrB G a s = true → s ∉ wrAtW w a →
+    ¬ realized w s ∨ ∃ (k : Nat) (p : Nat × SbEnt), (w.pend s.1)[k]? = some p ∧ p.1 = s.2 :=
+  unlandedB hP.toB a s
 
 /-- **AN UNREALIZED EVENT IS A TARGET**: its row's head is genuine and measures at most its position. -/
 theorem tgtEv (hwf : gwf G) (hN : G.gxProg.length = N) (m : Geid) :
@@ -573,13 +649,17 @@ section Blk
 variable {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}
 
 /-- A pending entry's store writes every byte its message covers (GF's label). -/
-theorem pendWrites (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) :
+theorem pendWritesB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) :
     p ∈ w.pend i → (msgByte p.2.msg a).isSome → ∃ u, gwritesByte G (i, p.1) a u := by
   intro hp hs
-  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLbl hP i p hp
+  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLblB hP i p hp
   rw [hm] at hs
   obtain ⟨j, hj, rfl⟩ := msgByteIndex base vs _ _ a hs
   exact ⟨vs[j], _, base, vs, j, hl, rfl, List.getElem?_eq_getElem hj, rfl⟩
+
+theorem pendWrites (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) :
+    p ∈ w.pend i → (msgByte p.2.msg a).isSome → ∃ u, gwritesByte G (i, p.1) a u :=
+  pendWritesB hP.toB i p a
 
 /-- **THE BLOCKED LANDING** (edges (E1) rule 1 / rule 4 under the epoch buffer, (E2) co ⊆ gmo, (E3) fr):
 it waits for a genuine item of strictly smaller measure — no census, no interface. -/
@@ -666,6 +746,77 @@ theorem blkLand (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length 
     obtain ⟨hv, heq⟩ := tgtPend hP i k' p' hp'
     exact ⟨_, hv, by rw [heq]; exact hlt.2.2⟩
 
+/-- **THE BLOCKED DEVICE STORE HEAD** ([OWN.151], edges (E2) co ⊆ gmo, (E3d) fr): a device-row store
+head whose landing condition fails at some byte (`devLandOk`) waits for a genuine item strictly
+gmo-before it — the next unlanded GF write of the byte, or an unrealized GF reader of its member-latest
+(waited-on through the device-store-head clause of `waitedOn`). -/
+theorem blkDevSt (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length = N) (x : Nat)
+    (rl : Bool) (base : Int) (vs : List (BitVec 8)) (kc : WmClass) (hx : NCPU ≤ x)
+    (hl : gxLbl G (hd w x) = some (LStore rl base vs kc)) (b : Int)
+    (hwb : wrsB (LStore rl base vs kc) b = true)
+    (hbad : ¬ (wrAtW w b ++ [hd w x] <+: wrAtG G b ∧ readersDone G w b (hd w x))) :
+    ∃ B, validT N G w B ∧ mu G dev w B < gpos G (hd w x) := by
+  have hgw : gwrB G b (hd w x) = true := by simp only [gwrB, hl]; exact hwb
+  obtain ⟨u, hwu⟩ := gwrBTo G _ b hgw
+  have hsm : hd w x ∈ G.gxGmo := lblGmo G _ _ hc.wf hl rfl
+  have hsG : hd w x ∈ wrAtG G b := List.mem_filter.2 ⟨hsm, hgw⟩
+  have hsW : hd w x ∉ wrAtW w b := by
+    intro h
+    obtain ⟨l', hl', -⟩ := hP.inv.gmoMem _ (List.mem_filter.1 h).1
+    have := lookup_lt_Some hl'
+    unfold hd at this; simp at this
+  by_cases hpre : wrAtW w b ++ [hd w x] <+: wrAtG G b
+  · -- (E3d): an unrealized GF reader of the current member-latest
+    have hrd : ¬ readersDone G w b (hd w x) := fun h => hbad ⟨hpre, h⟩
+    obtain ⟨r, t, v, hr, hsl, hne, hnr⟩ : ∃ r t v, greadsByte G r b t v ∧ srcLatest G w b t ∧
+        r ≠ hd w x ∧ ¬ realized w r := by
+      refine Classical.byContradiction (fun hn => hrd (fun r t v h1 h2 h3 => ?_))
+      exact Classical.byContradiction (fun h4 => hn ⟨r, t, v, h1, h2, h3, h4⟩)
+    have hlt : t < gwix G (hd w x) := by
+      rcases hsl with ⟨rfl, -⟩ | ⟨src, hs, hlast⟩
+      · exact gwixPos G _ (gwritesOf G _ b u hc.wf hwu)
+      · have hsrcW : src ∈ wrAtW w b := List.mem_of_getLast? hlast
+        obtain ⟨T, hT⟩ := hpre
+        have hsrcG : src ∈ wrAtG G b := by rw [← hT]; simp [hsrcW]
+        have hp1 : posOf (wrAtG G b) src < posOf (wrAtG G b) (hd w x) := by
+          rw [← hT, List.append_assoc, posOfApp _ _ src hsrcW, posOfAppNot _ _ _ hsW]
+          have := posOfLt _ src hsrcW
+          omega
+        have hg := (wrAtGLt G b src _ hc.wf.1 hsrcG hsG).1 hp1
+        obtain ⟨hsrcGW, hsrcIx⟩ := gwriteAtInv G t src hc.wf.1 hs
+        rw [← hsrcIx]
+        exact (gwixGposLt G src _ hc.wf.1 hsrcGW (gwritesOf G _ b u hc.wf hwu)).2 hg
+    have hrs := frLtW hc r (hd w x) b t v u hr hwu hlt hne
+    exact tgtE hc.wf hN r _ hrs.1 hnr
+      (.inr (.inr ⟨b, t, v, hr, hsl, .inr (.inr ⟨x, rl, base, vs, kc, hx, hl, hgw⟩)⟩)) hrs.2.2
+  · -- (E2): the next unlanded GF write of the byte
+    obtain ⟨n, hnG, hnW, hlt⟩ := nextUnlanded G w b _ (hP.pf.2 b) hc.wf.1 hsG hsW hpre
+    obtain ⟨hnm, hnb⟩ := List.mem_filter.1 hnG
+    exact tgtW hP hc.wf hN b n _ hnb hnm hnW hlt
+
+/-- **THE BLOCKED I/O HEAD** ([OWN.152], F-CM-2; edge the trusted (R1)): an I/O head with a pending own
+store waits for the OLDEST one, gmo-before the head. -/
+theorem blkIo (hP : PInv N img G X dev w) (hc : CatH G)
+    (hr1 : ∀ s m, WeakRvwmoGraph.gpo G s m → gmem G s → gisIo G s = false → gisIo G m = true →
+      gmoLt G s m)
+    (x : Nat) (kd : IoKind) (base : Int) (vs : List (BitVec 8))
+    (hl : gxLbl G (hd w x) = some (LIo kd base vs)) (hne : w.σ.sb x ≠ []) :
+    ∃ B, validT N G w B ∧ mu G dev w B < gpos G (hd w x) := by
+  obtain ⟨p0, ps, hps⟩ : ∃ p0 ps, w.pend x = p0 :: ps := by
+    rw [hP.inv.sb x] at hne
+    cases h : w.pend x with
+    | nil => rw [h] at hne; exact absurd rfl hne
+    | cons p0 ps => exact ⟨p0, ps, rfl⟩
+  have hp0 : (w.pend x)[0]? = some p0 := by rw [hps]; rfl
+  have hp0m : p0 ∈ w.pend x := List.mem_of_getElem? hp0
+  obtain ⟨rl, base0, vs0, kc, hl0, -, -⟩ := pendLbl hP x p0 hp0m
+  have hs0r := pendRealized hP x p0 hp0m
+  unfold realized at hs0r
+  have hpo : WeakRvwmoGraph.gpo G (x, p0.1) (hd w x) := SBAcq.gpoOf G _ _ _ _ hl0 hl rfl hs0r
+  have hlt := hr1 _ _ hpo ⟨_, hl0, rfl⟩ (by unfold gisIo; rw [hl0]; rfl) (by unfold gisIo; rw [hl]; rfl)
+  obtain ⟨hv, heq⟩ := tgtPend hP x 0 p0 hp0
+  exact ⟨_, hv, by rw [heq]; exact hlt.2.2⟩
+
 /-! ## 7.1 Forwarding: the youngest covering entry -/
 
 def fwdF (a : Int) (o : Option Nat) (p : Nat × SbEnt) : Option Nat :=
@@ -725,7 +876,7 @@ theorem fwdFoldMax (a : Int) : ∀ (ps : List (Nat × SbEnt)) (o : Option Nat) (
       · exact fwdFoldMax a ps o r hpw.2 h q hq hc
 
 /-- A covered byte IS forwarded. -/
-theorem fwdOfCover (hP : PInv N img G X dev w) (x : Nat) (q : Nat × SbEnt) (a : Int) :
+theorem fwdOfCoverB (hP : PInvB N img G X dev w) (x : Nat) (q : Nat × SbEnt) (a : Int) :
     q ∈ w.pend x → (msgByte q.2.msg a).isSome = true → SbCand.fwdByte (w.σ.sb x) a ≠ none := by
   intro hq hc
   rw [hP.inv.sb x]
@@ -735,26 +886,38 @@ theorem fwdOfCover (hP : PInv N img G X dev w) (x : Nat) (q : Nat × SbEnt) (a :
     rw [hc] at this; cases this
   · rw [h2]; intro h; rw [h] at h3; cases h3
 
+theorem fwdOfCover (hP : PInv N img G X dev w) (x : Nat) (q : Nat × SbEnt) (a : Int) :
+    q ∈ w.pend x → (msgByte q.2.msg a).isSome = true → SbCand.fwdByte (w.σ.sb x) a ≠ none :=
+  fwdOfCoverB hP.toB x q a
+
 /-- The pending entry's store writes exactly the bytes its message has, with their values. -/
-theorem pendWritesV (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
+theorem pendWritesVB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
     p ∈ w.pend i → msgByte p.2.msg a = some u → gwritesByte G (i, p.1) a u := by
   intro hp hs
-  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLbl hP i p hp
+  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLblB hP i p hp
   rw [hm] at hs
   obtain ⟨j, hj, rfl⟩ := msgByteIndex base vs _ _ _ (by rw [hs]; rfl)
   rw [msgByteVal] at hs
   exact ⟨_, base, vs, j, hl, rfl, hs, rfl⟩
 
-theorem pendCovers (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
+theorem pendWritesV (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
+    p ∈ w.pend i → msgByte p.2.msg a = some u → gwritesByte G (i, p.1) a u :=
+  pendWritesVB hP.toB i p a u
+
+theorem pendCoversB (hP : PInvB N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
     p ∈ w.pend i → gwritesByte G (i, p.1) a u → (msgByte p.2.msg a).isSome = true := by
   intro hp hw
-  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLbl hP i p hp
+  obtain ⟨rl, base, vs, kc, hl, -, hm⟩ := pendLblB hP i p hp
   obtain ⟨l, base', vs', j, hl', hwr, hv, ha⟩ := hw
   rw [hl, Option.some.injEq] at hl'
   subst hl'
   simp only [lbWr, Option.some.injEq, Prod.mk.injEq] at hwr
   obtain ⟨rfl, rfl⟩ := hwr
   rw [hm, ← ha, msgByteVal, hv]; rfl
+
+theorem pendCovers (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a : Int) (u : BitVec 8) :
+    p ∈ w.pend i → gwritesByte G (i, p.1) a u → (msgByte p.2.msg a).isSome = true :=
+  pendCoversB hP.toB i p a u
 
 /-! ## 7.2 The heads -/
 
@@ -918,8 +1081,8 @@ theorem blkAmo (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (hN :
       subst this
       have hrs := frLtW hc r (hd w x) _ t' v' _ hr (hwr j hjl) hlt hne
       have hwo : waitedOn G dev w r :=
-        .inr (.inr ⟨_, t', v', hr, hsl', .inr ⟨x, aq, rl, base, ts, rvs, wvs, kc, hl,
-          (gwrBOf G _ _ _ hc.wf (hwr j hjl)).1⟩⟩)
+        .inr (.inr ⟨_, t', v', hr, hsl', .inr (.inl ⟨x, aq, rl, base, ts, rvs, wvs, kc, hl,
+          (gwrBOf G _ _ _ hc.wf (hwr j hjl)).1⟩)⟩)
       exact tgtE hc.wf hN r _ hrs.1 hnrr hwo hrs.2.2
     · -- (E2w) / the source not yet issued: an unlanded source, gmo-before the AMO
       have hnl : ¬ landedSrc G w (accAddr base j) t :=
@@ -1107,11 +1270,11 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
     (hr2'' : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisR G m = true → gmoLt G s m)
     (hr3a : ∀ s m, gisIo G s = true → gisIo G m = true → WeakRvwmoGraph.gpo G s m → gmoLt G s m)
     (hr3 : ∀ d e, gmem G d → gmem G e → before dev d e → gmoLt G d e)
-    (hR : HeadOrdRd G X rdG dev w) (hDS : DevStOrd G dev)
+    (hR : HeadOrdRd G X rdG dev w) (hDS : DevStOrd G dev) (hDF : DevStFab G dev)
     (hHart : ∀ e, e ∈ dev → e.1 < NCPU → gisIo G e = true) (x : Nat)
     (hmono : ∀ aq base ts vs, gxLbl G (hd w x) = some (LLoad aq base ts vs) →
       srcGate G w x base ts vs → rdG w x base ts vs)
-    (hv : validT N G w (.hd x)) (hb : ¬ enb pol G X rdG dev w (.hd x)) :
+    (hv : validT N G w (.hd x)) (hq : devQuiet w) (hb : ¬ enb pol G X rdG dev w (.hd x)) :
     ∃ B, validT N G w B ∧ mu G dev w B < mu G dev w (.hd x) := by
   obtain ⟨l, hl⟩ := lblOfValid x hv.2
   have hbound : ∀ n, lbIsMem l = true →
@@ -1122,7 +1285,7 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
       ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOn G dev w m → gmoLt G (hd w x) m :=
     fun H m h1 h2 h3 _ => H m h1 h2 h3
   by_cases hf : fabOk dev w (hd w x)
-  · have hnl : ¬ enbL G X rdG w (hd w x) l := fun h => hb ⟨l, hl, hf, h⟩
+  · have hnl : ¬ enbL G X rdG w (hd w x) l := fun h => hb ⟨hq, l, hl, hf, h⟩
     cases l with
     | LLoad aq base ts vs =>
       have hns : ¬ srcGate G w x base ts vs := by
@@ -1140,9 +1303,17 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
         have hrd : ¬ rdG w x base ts vs := fun h => hnl (.inr ⟨hX, fun h' => absurd h' (by decide), h⟩)
         exact hR x base ts vs hl hX hrd
     | LStore rl base vs kc =>
-      exfalso
-      have := hI.noRl _ _ hl
-      exact hnl (fun h => by simp [lbRl] at this; rw [this] at h; cases h)
+      have hrl : rl = false := by have := hI.noRl _ _ hl; simpa [lbRl] using this
+      have hdl : ¬ devLandOk G w (hd w x) (LStore rl base vs kc) :=
+        fun h => hnl ⟨fun h' => (by rw [hrl] at h'; cases h'), h⟩
+      have hx : NCPU ≤ (hd w x).1 := Classical.byContradiction (fun h => hdl (fun h' => absurd h' h))
+      obtain ⟨b0, hwb, hbad⟩ : ∃ b0, wrsB (LStore rl base vs kc) b0 = true ∧
+          ¬ (wrAtW w b0 ++ [hd w x] <+: wrAtG G b0 ∧ readersDone G w b0 (hd w x)) := by
+        refine Classical.byContradiction (fun hn => hdl (fun _ b0 hb0 => ?_))
+        exact Classical.byContradiction (fun h => hn ⟨b0, hb0, h⟩)
+      obtain ⟨B, hB, hlt⟩ := blkDevSt hP hc hN x rl base vs kc hx hl b0 hwb hbad
+      exact ⟨B, hB, hbound _ rfl (hall (stOrd hc hDS hHart x rl base vs kc hl
+        (hDF _ rl base vs kc hx hl))) hlt⟩
     | LFence pr pw sr sw =>
       have hdr : SbCand.drains pw sr = true :=
         Classical.byContradiction (fun h => hnl (fun h' => absurd h' h))
@@ -1153,7 +1324,9 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
       have haq := hI.amoAq _ aq rl base ts rvs wvs kc hl
       subst haq
       exact ⟨B, hB, hbound _ rfl (hall (aqOrd hc x _ hl rfl)) hlt⟩
-    | LIo kd base vs => exact absurd trivial hnl
+    | LIo kd base vs =>
+      obtain ⟨B, hB, hlt⟩ := blkIo hP hc hr1 x kd base vs hl hnl
+      exact ⟨B, hB, hbound _ rfl (hall (ioOrd hc hr2 hr2'' hr3a x kd base vs hl)) hlt⟩
   · obtain ⟨B, hB, hlt⟩ := blkFab hc hN hwio hr3 x hf
     have hin : hd w x ∈ dev := by
       unfold fabOk at hf
@@ -1197,19 +1370,30 @@ cat-consistent `GF` satisfying the walk invariant, if any work is left, SOME GEN
 under the per-address + fence-epoch buffer [OWN.113], any read gate weaker than the design's source
 gate, the trusted residue ((R1), (R2), (R2″) [OWN.116], (R3)), `gfDevWIo`, the hart-row fabric fact
 (`LockFacts3.hartDevIo`'s conclusion), the image facts (rows H1/H2/H5), the device-row store order
-`DevStOrd` (row H4, NAMED device model) and the gated-read interface `HeadOrdRd` (row H3, NAMED,
-F-P-W3-3). -/
+`DevStOrd` (row H4, NAMED device model) and membership `DevStFab` ([OWN.151]; both discharged on xv6
+bundles, `SbDevSt.devStOrd`/`SbDevSt.devStFab`) and the gated-read interface `HeadOrdRd` (row H3,
+NAMED, F-P-W3-3).  [OWN.151]: a pending device store's landing is enabled (`PInv.du`); [OWN.152]: a
+blocked I/O head waits for its row's oldest pending store (`blkIo`, (R1)). -/
 theorem noStuckP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG) (w : WS)
     (hc : CatH GF.gfGd.gdG) (hio : ioResidueGmo GF) (hwio : gfDevWIo GF) (hI : ImgFacts GF.gfGd.gdG)
     (hN : GF.gfGd.gdG.gxProg.length = N) (hP : PInv N img GF.gfGd.gdG X GF.gfDev w)
     (hmono : ∀ x aq base ts vs, gxLbl GF.gfGd.gdG (hd w x) = some (LLoad aq base ts vs) →
       srcGate GF.gfGd.gdG w x base ts vs → rdG w x base ts vs)
-    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev)
+    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev) (hDF : DevStFab GF.gfGd.gdG GF.gfDev)
     (hHart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true)
     (hR : HeadOrdRd GF.gfGd.gdG X rdG GF.gfDev w) :
     ((∃ x, x < N ∧ (w.rows x).length < (GF.gfGd.gdG.gxProg.getD x []).length) ∨ (∃ i, w.pend i ≠ [])) →
     ∃ T, validT N GF.gfGd.gdG w T ∧ enb SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev w T := by
   intro hne
+  by_cases hnq : ¬ devQuiet w
+  · -- [OWN.151]: a pending device store — its landing is the enabled item (the device unit)
+    obtain ⟨i, hi, hpi⟩ : ∃ i, NCPU ≤ i ∧ w.pend i ≠ [] := by
+      refine Classical.byContradiction (fun hn => hnq (fun i hi => ?_))
+      exact Classical.byContradiction (fun h => hn ⟨i, hi, h⟩)
+    obtain ⟨-, hlg, -⟩ := hP.du i hi hpi
+    obtain ⟨p, hp, -⟩ := id hlg
+    exact ⟨.ld i 0, ⟨pendAg hP i p (List.mem_of_getElem? hp), p, hp⟩, .inr hi, hlg⟩
+  have hq : devQuiet w := Classical.byContradiction hnq
   obtain ⟨A0, hA0⟩ := validOfNonFinal hP hne
   have hwio' : ∀ d, d ∈ GF.gfDev → gmem GF.gfGd.gdG d :=
     fun d hd => WeakRvwmoLin2.wioGmem _ d (hwio d hd)
@@ -1233,11 +1417,11 @@ theorem noStuckP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
   cases A with
   | hd x =>
     obtain ⟨B, hB, hlt⟩ := blkHead SbPol.epoch hP hc hI hN rdG hwio' hwio hr1 hr2 hr2'' hr3a hr3 hR
-      hDS hHart x (hmono x) hv hb
+      hDS hDF hHart x (hmono x) hv hq hb
     exact ⟨B, hB, .inr hlt⟩
   | ld i k =>
     obtain ⟨-, p, hp⟩ := hv
-    obtain ⟨B, hB, hlt⟩ := blkLand hP hc hN i k p hp hb
+    obtain ⟨B, hB, hlt⟩ := blkLand hP hc hN i k p hp (fun h => hb ⟨.inl hq, h⟩)
     exact ⟨B, hB, .inr (by rw [muLd _ _ w i k p hp]; exact hlt)⟩
 
 /-- The VALUE gate is admissible (weaker than the source gate at every invariant state). -/

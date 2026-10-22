@@ -87,7 +87,7 @@ theorem walkRunR (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop)
     · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · exfalso
       obtain ⟨T, hT, he⟩ := noStuckR GF N img X (cur c) hW.cat hW.io hW.wio hW.imgF hNA hW.len hP
-        hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
+        hW.devSt hW.devFab hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, -, -, hlt, -⟩ := walkStepR GF N X c hW hv hP (hS c hv hg rfl hP).exv T hT he
       omega
@@ -97,7 +97,7 @@ theorem walkRunR (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop)
         drained (cur c)
     · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · obtain ⟨T, hT, he⟩ := noStuckR GF N img X (cur c) hW.cat hW.io hW.wio hW.imgF hNA hW.len hP
-        hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
+        hW.devSt hW.devFab hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, hv', hP', hlt, hit⟩ := walkStepR GF N X c hW hv hP (hS c hv hg rfl hP).exv T hT he
       exact ih (snocC c it) hv' (gatedSnocR _ X _ c it hg (by rw [hit]; exact he)) rfl hP'

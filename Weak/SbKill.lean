@@ -20,7 +20,7 @@ Lean-only, no Rocq twin.
       `SbKill.csHypsCertCP`, `SbKill.l2ClaimAtP`, `SbKill.rawChainChainP`.
   §4  **THE KILL CORE `SbKill.cycleKillCoreP` → `CatLin.cycleKillCZT`**: the cycle's segments, the
       gated walk's member (`SbOrd.memberOfCat` under the value gate), the chain, `cycleKillIOC`.  Its
-      named inputs: `SbKill.walkHypCZ` (image facts, device-row store order, the exempt reads),
+      named inputs: `SbKill.walkHypCZ` (image facts, device-row store order and membership [OWN.151], the exempt reads),
       `SbKill.stateIfcCZ` (`HeadOrdRd`, `ExValTop` at every reachable state), `SbKill.memberRunCZ`
       (`protRegZB`, `lockRealB`, `csIssue` at every finished member — the export / realization,
       P-W5/P-W6/6j), `SbKill.l2ClaimP` (the L2′ classification at every finished member, with
@@ -433,7 +433,7 @@ def SbKill.walkHypCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im
     (Xof : Gfexec → Geid → Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
     GF.gfGd.gdG.gxImg = im → CatLin.rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
-    ImgFacts GF.gfGd.gdG ∧ DevStOrd GF.gfGd.gdG GF.gfDev ∧
+    ImgFacts GF.gfGd.gdG ∧ DevStOrd GF.gfGd.gdG GF.gfDev ∧ DevStFab GF.gfGd.gdG GF.gfDev ∧
     (∀ e l, Xof GF e → gxLbl GF.gfGd.gdG e = some l → ∃ base ts vs, l = LLoad false base ts vs) ∧
     (∀ e a t v, greadsByte GF.gfGd.gdG e a t v → (im a).isSome)
 
@@ -473,13 +473,14 @@ theorem SbKill.certSupplyOfWalkP (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
     (hW : SbKill.walkHypCZ boot d0 fab im Xof) (hS : SbKill.stateIfcCZ boot d0 fab im Xof) :
     SbKill.certSupplyP boot d0 fab im Xof := by
   intro GF ad him hc hconf hres
-  obtain ⟨hI, hDS, hex, hdef⟩ := hW GF ad him hc hconf
+  obtain ⟨hI, hDS, hDF, hex, hdef⟩ := hW GF ad him hc hconf
   have hWH : WalkHyp GF GF.gfGd.gdG.gxProg.length im (Xof GF) :=
     { cat := ⟨hc.1, hc.2.1, hc.2.2.1, hc.2.2.2.1⟩
       io := hres
       wio := hwio GF ad him hc hconf
       imgF := hI
       devSt := hDS
+      devFab := hDF
       hart := LockFacts3.hartDevIo boot d0 fab GF hconf hbt
       len := rfl
       imgEq := him

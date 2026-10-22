@@ -353,10 +353,13 @@ theorem SbHeadHop2.valGateOfLanded (hP : PInv N img G X dev w) (hc : CatH G) (hi
   valGateMono hP hc.wf hc.lv himg x aq base ts vs hl
     (SbHeadHop2.srcGateOfLanded hP hc x aq base ts vs hl hland)
 
-/-- A QUIET byte for row `x`: no OTHER row's pending entry writes it and no AMO head writes it. -/
+/-- A QUIET byte for row `x`: no OTHER row's pending entry writes it, no AMO head writes it and
+([OWN.151], `SbOrd.waitedOn`'s device clause) no DEVICE-ROW STORE head writes it. -/
 def SbHeadHop2.ByteQuiet (G : Gexec) (w : WS) (x : Nat) (a : Int) : Prop :=
   (∀ i p, p ∈ w.pend i → gwrB G a (i, p.1) = true → i = x) ∧
   (∀ y aq rl base ts rvs wvs kc, gxLbl G (hd w y) = some (LRmw aq rl base ts rvs wvs kc) →
+    gwrB G a (hd w y) = false) ∧
+  (∀ y rl base vs kc, NCPU ≤ y → gxLbl G (hd w y) = some (LStore rl base vs kc) →
     gwrB G a (hd w y) = false)
 
 /-- **AN OWN PENDING ENTRY NEVER MAKES A READ WAITED-ON** (the Weak half of stack custody (ii) and
@@ -370,8 +373,9 @@ theorem SbHeadHop2.notWaitedOwn (hP : PInv N img G X dev w) (hc : CatH G) (m : G
   rintro (h | h | ⟨a, t, v, hrd, hsl, hwr⟩)
   · exact hdev h
   · rw [hw] at h; cases h
-  · obtain ⟨hfor, hamo⟩ := hq a t v hrd
-    rcases hwr with ⟨i, p, hp, hpw⟩ | ⟨y, aq, rl, base, ts, rvs, wvs, kc, hl, hpw⟩
+  · obtain ⟨hfor, hamo, hdevq⟩ := hq a t v hrd
+    rcases hwr with ⟨i, p, hp, hpw⟩ | ⟨y, aq, rl, base, ts, rvs, wvs, kc, hl, hpw⟩ |
+      ⟨y, rl, base, vs, kc, hy, hl, hpw⟩
     · have hi := hfor i p hp hpw
       subst hi
       obtain ⟨u, hsw⟩ := gwrBTo G _ a hpw
@@ -405,6 +409,8 @@ theorem SbHeadHop2.notWaitedOwn (hP : PInv N img G X dev w) (hc : CatH G) (m : G
           have hsGa : (m.1, p.1) ∈ wrAtG G a := List.mem_filter.2 ⟨hsm, hpw⟩
           exact hsNW (landedDown G w _ _ s (hP.pf.2 _) hc.wf.1 hsl' hsGa hgp)
     · rw [hamo y aq rl base ts rvs wvs kc hl] at hpw
+      cases hpw
+    · rw [hdevq y rl base vs kc hy hl] at hpw
       cases hpw
 
 /-- **(A2) FROM A QUIET WINDOW**: if every pure read of row `x` strictly between its head and the next
