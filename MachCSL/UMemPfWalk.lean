@@ -46,10 +46,10 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **No write-back for a prefetch** (U1-P1's `uwk_upd_none` at the prefetch's kind):
 nothing is read or written. -/
-theorem ume_upd_none_pf (D : UFoot) (orc : UOrc) (s : UWSt) (vpn : BitVec 27) (addr : BitVec 64)
-    (w : BitVec 64) (c : cbop_zicbop) (mxr sum : Bool) :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 (umoPf c) .User mxr sum .S_Stage ()) =
-      some (.Ok (none, ()), s, orc) := by
+theorem ume_upd_none_pf (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64)
+    (w : BitVec 64) (c : cbop_zicbop) :
+    runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w (umoPf c) .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done none, ()), s, orc) := by
   uwk_run -bv [ume_upd_pf]
 
 set_option maxHeartbeats 4000000 in
@@ -159,10 +159,11 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A prefetch's hit on a denying entry**: `PTW_No_Permission`, nothing
 moves. -/
-theorem ume_hit_denied_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
+theorem ume_hit_denied_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (root : BitVec 44)
+    (vpn : BitVec 27)
     (c : cbop_zicbop) (mxr sum : Bool) (ppn : BitVec 44) (w addr : BitVec 64) (hinv : uwkInv w = false)
     (hperm : uwkPermOk (umePfAcc c) mxr w = false) :
-    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User mxr sum (tlbHash vpn)
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn (umoPf c) .User mxr sum (tlbHash vpn)
       (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_run -bv [ume_check_perm_pf, uwkPerm, tlb_get_pte_tlbEntryOf]
@@ -171,16 +172,17 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A prefetch's hit on a granting entry**: the cached page; no write-back
 (a prefetch sets no bit), the TLB is not written. -/
-theorem ume_hit_keep_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
+theorem ume_hit_keep_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (root : BitVec 44)
+    (vpn : BitVec 27)
     (c : cbop_zicbop) (mxr sum : Bool) (ppn : BitVec 44) (w addr : BitVec 64) (hinv : uwkInv w = false)
     (hperm : uwkPermOk (umePfAcc c) mxr w = true) :
-    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User mxr sum (tlbHash vpn)
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn (umoPf c) .User mxr sum (tlbHash vpn)
       (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Ok (ppn, .PBMT_PMA, ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   have hpb := utlb_pbmt_of_valid w hinv
-  have hupd := ume_upd_none_pf D orc s vpn addr w c mxr sum
-  uwk_run -bv [ume_check_perm_pf, uwkPerm, tlb_get_pte_tlbEntryOf, tlb_get_level_tlbEntryOf,
-    pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf, hupd]
+  have hupd := ume_upd_none_pf D orc s addr w c
+  uwk_run -bv [ume_check_perm_pf, uwkPerm, tlb_get_pte_tlbEntryOf, pteAddr_tlbEntryOf,
+    tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf, hupd]
   all_goals try simp only [tlb_get_ppn_tlbEntryOf]
 
 end MachCSL

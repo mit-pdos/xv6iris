@@ -73,10 +73,11 @@ theorem utlb_pte_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 4
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A hit on a denying entry**: `PTW_No_Permission`, nothing moves. -/
-theorem utlb_hit_denied (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
+theorem utlb_hit_denied (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (root : BitVec 44)
+    (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = false) :
-    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn acc .User mxr sum (tlbHash vpn)
       (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf]
@@ -85,39 +86,60 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A hit on a granting entry, no write-back needed**: the cached page;
 the TLB is not written. -/
-theorem utlb_hit_keep (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
+theorem utlb_hit_keep (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPins D s.file) (root : BitVec 44)
+    (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = true)
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (none, ()), s', orc')) :
-    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+    (hupd : runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done none, ()), s', orc')) :
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn acc .User mxr sum (tlbHash vpn)
       (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Ok (ppn, .PBMT_PMA, ()), s', orc') := by
   have hrw := uwk_rw_of_valid w hinv
   have hpb := utlb_pbmt_of_valid w hinv
-  uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, tlb_get_level_tlbEntryOf,
-    pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
+  uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, pteAddr_tlbEntryOf,
+    tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
   simp only [tlb_get_ppn_tlbEntryOf]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A hit on a granting entry, with the write-back**: the cached page; the
-slot is refreshed with the entry now in memory. -/
+slot is refreshed with the cached word with its new bits (`p`, the word the
+write-back put in memory). -/
 theorem utlb_hit_refresh (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPins D s.file)
-    (hdr : D.Dr .tlb = true) (hdw : D.Dw .tlb = true) (tlb : Tlb) (ht : s'.file .tlb = tlb) (vpn : BitVec 27)
+    (hdr : D.Dr .tlb = true) (hdw : D.Dw .tlb = true) (tlb : Tlb) (ht : s'.file .tlb = tlb) (root : BitVec 44)
+    (vpn : BitVec 27)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool) (ppn : BitVec 44)
     (w addr p : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = true)
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (some p, ()), s', orc')) :
-    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc .User mxr sum (tlbHash vpn)
+    (hupd : runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done (some p), ()), s', orc')) :
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn acc .User mxr sum (tlbHash vpn)
       (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) =
       some (.Ok (ppn, .PBMT_PMA, ()),
         { s' with pin := s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn) (some (tlbEntryOf 0#16 vpn ppn p addr))) },
         orc') := by
   have hrw := uwk_rw_of_valid w hinv
   have hpb := utlb_pbmt_of_valid w hinv
-  uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, tlb_get_level_tlbEntryOf,
-    pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
+  uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, pteAddr_tlbEntryOf,
+    tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf]
   simp only [tlb_get_ppn_tlbEntryOf, BitVec.setWidth_eq, tlb_set_pte_tlbEntryOf]
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- **A hit on a granting entry whose cached copy is stale** (the write-back's
+compare finds a different entry in memory, VATP step 7): the hit falls back to
+the miss, a walk of the table from `root` at the state the failed compare left
+(`hm`, any outcome `r`). -/
+theorem utlb_hit_retry (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UwkPins D s.file) (root : BitVec 44)
+    (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
+    (ppn : BitVec 44) (w addr : BitVec 64) (hinv : uwkInv w = false) (hperm : uwkPermOk acc mxr w = true)
+    (hupd : runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Retry (), ()), s', orc'))
+    (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
+    (hm : runRW D orc' s' (translate_TLB_miss 39 0#16 0#14 root vpn acc .User mxr sum .S_Stage ()) = r) :
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn acc .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = r := by
+  have hrw := uwk_rw_of_valid w hinv
+  uwk_run -bv [uwk_check_perm, uwkPerm, tlb_get_pte_tlbEntryOf, pteAddr_tlbEntryOf, utlb_pte_tlbEntryOf]
 
 /-! ## §3 The miss (Rocq `exec_translate_TLB_miss_user`,
 `exec_translate_TLB_miss_user_walk_err`, `exec_add_to_TLB_user`) -/
@@ -142,8 +164,8 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
     (acc : MemoryAccessType mem_payload) (mxr sum : Bool) (w addr : BitVec 64) (po : Option (BitVec 64))
     (hwalk : runRW D orc s (pt_walk 39 vpn acc .User mxr sum root 2 false .S_Stage ()) =
       some (.Ok (uwkOut w addr false, ()), s, orc))
-    (hupd : runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (po, ()), s', orc')) :
+    (hupd : runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done po, ()), s', orc')) :
     runRW D orc s (translate_TLB_miss 39 0#16 0#14 root vpn acc .User mxr sum .S_Stage ()) =
       some (.Ok (ptePpn w, .PBMT_PMA, ()),
         UWSt.mk (s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn)
@@ -259,7 +281,7 @@ theorem utlb_translate_of_hit (D : UFoot) (orc : UOrc) (s : UWSt) (root : BitVec
     (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr sum : Bool) (i : Nat) (ent : TLB_Entry)
     (r : Option (Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) × UWSt × UOrc))
     (hl : runRW D orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (some (i, ent), s, orc))
-    (hh : runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn acc p mxr sum i ent .S_Stage ()) = r) :
+    (hh : runRW D orc s (translate_TLB_hit 39 0#16 0#14 root vpn acc p mxr sum i ent .S_Stage ()) = r) :
     runRW D orc s (translate 39 0#16 0#14 root vpn acc p mxr sum .S_Stage ()) = r := by
   rw [utr_translate_split, hl]; exact hh
 
