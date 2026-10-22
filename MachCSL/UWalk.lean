@@ -393,7 +393,7 @@ theorem uwk_mem_kid0 {mm : BMap} {t c1 c0 : PTree} (hm : uwkTreeMem mm t) (i2 i1
 /-- **The walk of an owned user-shaped table at User** (Rocq
 `CommonWalk.exec_pt_walk_user` with its fault twins): the result is the
 tree's walk, classified by `uwkWalkRes`; the state does not move (no walk
-node writes: the A/D write-back is `translate_TLB_miss`'s). -/
+node writes: the A/D write-back is `translate_TLB_miss_retry`'s). -/
 theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (t : PTree) (hwf : t.wfU 2)
     (hm : uwkTreeMem s.mm t) (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true)
     (mxr sum : Bool) (hN : ∀ addr w, t.walk 2 vpn = some (addr, w) → _get_PTE_Ext_N (uwkExt w) = 0#1) :
@@ -498,49 +498,42 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **No update needed** (the cached or walked word already has the bits the
 access sets): nothing is read or written. -/
-theorem uwk_upd_none (D : UFoot) (orc : UOrc) (s : UWSt) (vpn : BitVec 27) (addr : BitVec 64)
-    (w : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
+theorem uwk_upd_none (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64)
+    (w : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true)
     (hu : uwkUpd w acc = none) :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (none, ()), s, orc) := by
+    runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done none, ()), s, orc) := by
   uwk_run -bv [uwk_update_PTE_Bits]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-/-- **The hardware write-back** (Svadu, `menvcfg.ADUE = 1`): the entry `m`
-in memory is read under a reservation, re-checked (a valid granting leaf),
-and, when the access sets bits it lacks, written back conditionally; the
-reservation is spent.  The decision to update is taken on the word `w` the
-caller holds (the walk's, or the TLB's cached copy). -/
-theorem uwk_upd_write (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
-    (addr : BitVec 64) (hok : pteAddrOk addr) (w m m' x : BitVec 64) (hr : bmRead s.mm addr 8 = some m)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
-    (hu : uwkUpd w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
-    (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : uwkUpd m acc = some m') :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (some m', ()), { s with mm := bmWrite s.mm addr 8 m', rv := false }, orc) := by
-  have hrw := uwk_rw_of_valid m hinv
+/-- **The hardware write-back** (Svadu, `menvcfg.ADUE = 1`; VATP step 7): the
+entry in memory is read under a reservation and compared with the word `w` the
+caller holds (the walk's, or the TLB's cached copy); here it IS that word, so
+the word with the bits the access sets is written back conditionally and the
+reservation is spent. -/
+theorem uwk_upd_write (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
+    (addr : BitVec 64) (hok : pteAddrOk addr) (w x : BitVec 64) (hr : bmRead s.mm addr 8 = some w)
+    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hu : uwkUpd w acc = some x) :
+    runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Done (some x), ()), { s with mm := bmWrite s.mm addr 8 x, rv := false }, orc) := by
   have hown := bmOwned_of_read _ _ _ _ hr
   uwk_pins hp
-  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwk_write_pte_cond, uwkPerm,
-    uwk_update_PTE_Bits]
+  uwk_run -bv [uwk_read_pte_excl, uwk_write_pte_cond, uwk_update_PTE_Bits]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-/-- **The write-back finds the bits already set** (another hart's, or an
-earlier walk's): the entry is re-read under a reservation and not written;
-the reservation stays held. -/
-theorem uwk_upd_keep (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
+/-- **The write-back finds a different entry** (VATP step 7's failed compare:
+the caller's word `w` is stale, e.g. a TLB copy whose bits memory has since
+gained): the entry is re-read under a reservation and not written, the
+reservation stays held, and the caller is asked to walk again. -/
+theorem uwk_upd_retry (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
     (addr : BitVec 64) (hok : pteAddrOk addr) (w m x : BitVec 64) (hr : bmRead s.mm addr 8 = some m)
-    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
-    (hu : uwkUpd w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
-    (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : uwkUpd m acc = none) :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
-      some (.Ok (some m, ()), { s with rv := true }, orc) := by
-  have hrw := uwk_rw_of_valid m hinv
+    (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (hu : uwkUpd w acc = some x)
+    (hne : m ≠ w) :
+    runRW D orc s (update_and_write_pte 39 (.Physaddr addr) w acc .S_Stage ()) =
+      some (.Ok (.PTE_Update_Retry (), ()), { s with rv := true }, orc) := by
   uwk_pins hp
-  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwkPerm, uwk_update_PTE_Bits]
+  uwk_run -bv [uwk_read_pte_excl, uwk_update_PTE_Bits]
 
 end MachCSL
