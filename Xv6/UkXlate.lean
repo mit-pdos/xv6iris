@@ -51,6 +51,12 @@ theorem ukm_canon (va : BitVec 64) (h : va.toNat / 4096 < tfVpn.toNat) :
     rw [BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
     omega
 
+/-- An engine machine is one whatever the walker's reservation flag (`UkLand` reads only the
+file and the byte map): the state a failed step-7 compare leaves (`uwk_upd_retry`). -/
+theorem UkLand.withRv {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P T s) (b : Bool) :
+    UkLand C P T { s with rv := b } :=
+  ⟨hl.cfg, hl.priv, hl.ms, hl.act, hl.mem⟩
+
 theorem ukm_uwkU (w : BitVec 64) : uwkU w = pteBit w 4 := by
   simp only [uwkU, uwk_bit_to_bool, _get_PTE_Flags_U, Mk_PTE_Flags, Sail.BitVec.extractLsb, BitVec.extractLsb,
     pteBit]
@@ -145,7 +151,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
     cases hu : uwkUpd w acc with
     | none =>
       refine ⟨_, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
-        _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ hacc false sum hu), ?_⟩
+        _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s addr w _ hacc hu), ?_⟩
       refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hm ?_,
         fun x hx => uft_file_tlb _ _ _ _ _ x hx, rfl⟩
       rw [uft_file_tlb_same]
@@ -153,8 +159,7 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
     | some x =>
       have hadx : pteAD w x := pteAD_trans (pteAD_symm had') (ume_update_AD hpl hacc had' hu)
       have hokx := uftLeafOk_AD hok hadx
-      have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w w x x hmem.2 _ hacc false sum hu
-        hok.inv (uft_nonleaf hok) hok.n0 hperm' hu
+      have hupd := fun orc => uwk_upd_write ufFoot orc s hwk addr hmem.1 w x hmem.2 _ hacc hu
       obtain ⟨hm', hview⟩ := ukm_setLeaf hm vpn addr w x hw (uft_ne_zero hokx) (uft_ptRep_setLeaf hrep hw hadx hokx)
       refine ⟨_, fun orc => utlb_miss_ok ufFoot orc orc s _ hdr hdw _ rfl vpn t.base
         _ false sum w addr (some x) (hwalk' orc) (hupd orc), ?_⟩
@@ -171,7 +176,8 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
     (ent : TLB_Entry) (hslot : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
     (hmt : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
     ∃ s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_hit 39 0#16 0#14 vpn acc .User false sum (tlbHash vpn) ent .S_Stage ()) = some (ukmRes acc lw, s', orc)) ∧
+        (translate_TLB_hit 39 0#16 0#14 P.root vpn acc .User false sum (tlbHash vpn) ent .S_Stage ()) =
+          some (ukmRes acc lw, s', orc)) ∧
       UkmOut C P T s s' := by
   have hv := uptWf_leavesValid P hm.wf
   have hwk : UwkPins ufFoot s.file := (ukm_pins hl).wk
@@ -197,44 +203,38 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
     have hres : ukmRes acc lw = .Err (.PTW_No_Permission (), ()) := by
       simp only [ukmRes, hperm, Bool.false_eq_true, ite_false]
     rw [hres]
-    exact ⟨s, fun orc => utlb_hit_denied ufFoot orc s hwk vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
+    exact ⟨s, fun orc => utlb_hit_denied ufFoot orc s hwk _ vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
       (hpermEq.trans hperm), ukmOut_refl hl⟩
   | true =>
     have hres : ukmRes acc lw = .Ok (ptePpn w, .PBMT_PMA, ()) := by
       simp only [ukmRes, hperm, ite_true, hppn]
     rw [hres]
     have hperm' : uwkPermOk acc false w' = true := hpermEq.trans hperm
-    have hpermw : uwkPermOk acc false w = true := by
-      obtain ⟨a', d', e'⟩ := had
-      rw [e', utlb_permOk_setAD]; exact hperm
     cases hu : uwkUpd w' acc with
     | none =>
-      exact ⟨_, fun orc => utlb_hit_keep ufFoot orc orc s s hwk vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
-        hperm' (uwk_upd_none ufFoot orc s vpn addr w' _ hacc false sum hu), ukmOut_refl hl⟩
+      exact ⟨_, fun orc => utlb_hit_keep ufFoot orc orc s s hwk _ vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
+        hperm' (uwk_upd_none ufFoot orc s addr w' _ hacc hu), ukmOut_refl hl⟩
     | some x =>
-      cases hum : uwkUpd w acc with
-      | some m' =>
-        have hadm : pteAD w m' := pteAD_trans (pteAD_symm had) (ume_update_AD hpl hacc had hum)
-        have hokm := uftLeafOk_AD hok hadm
-        have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w' w m' x hmem.2 _ hacc false sum hu
-          hok.inv (uft_nonleaf hok) hok.n0 hpermw hum
+      by_cases hww : w' = w
+      · -- the cached copy is the leaf in memory: the write-back, the slot refreshed
+        subst w'
+        have hadx : pteAD w x := pteAD_trans (pteAD_symm had) (ume_update_AD hpl hacc had hu)
+        have hokx := uftLeafOk_AD hok hadx
+        have hupd := fun orc => uwk_upd_write ufFoot orc s hwk addr hmem.1 w x hmem.2 _ hacc hu
         obtain ⟨hm', hview⟩ :=
-          ukm_setLeaf hm vpn addr w m' hw (uft_ne_zero hokm) (uft_ptRep_setLeaf hrep hw hadm hokm)
-        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (ptePpn w) w'
-          addr m' hok'.inv hperm' (hupd orc), ?_⟩
+          ukm_setLeaf hm vpn addr w x hw (uft_ne_zero hokx) (uft_ptRep_setLeaf hrep hw hadx hokx)
+        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl _ vpn _ hacc false sum (ptePpn w) w
+          addr x hok'.inv hperm' (hupd orc), ?_⟩
         refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) _ hm' ?_,
           fun y hy => uft_file_tlb _ _ _ _ _ y hy, hview⟩
         rw [uft_file_tlb_same]
-        exact utlbOk_after t _ _ htlb vpn addr w m' hw hadm (uft_ne_zero hokm) (Or.inr rfl)
-      | none =>
-        have hupd := fun orc => uwk_upd_keep ufFoot orc s hwk vpn addr hmem.1 w' w x hmem.2 _ hacc false sum hu
-          hok.inv (uft_nonleaf hok) hok.n0 hpermw hum
-        refine ⟨_, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ hacc false sum (ptePpn w) w'
-          addr w hok'.inv hperm' (hupd orc), ?_⟩
-        refine ⟨ukm_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hm ?_,
-          fun y hy => uft_file_tlb _ _ _ _ _ y hy, rfl⟩
-        rw [uft_file_tlb_same]
-        exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)
+        exact utlbOk_after t _ _ htlb vpn addr w x hw hadx (uft_ne_zero hokx) (Or.inr rfl)
+      · -- the cached copy is stale: the compare fails and the hit walks the table
+        have hupd := fun orc => uwk_upd_retry ufFoot orc s hwk addr hmem.1 w' w x hmem.2 _ hacc hu (Ne.symm hww)
+        obtain ⟨s', hmiss, hout⟩ := ukm_miss { s with rv := true } (hl.withRv true) t hm htlb vpn lw hlw acc hacc hpl sum
+        rw [hres] at hmiss
+        exact ⟨s', fun orc => utlb_hit_retry ufFoot orc orc s _ hwk _ vpn _ hacc false sum (ptePpn w) w' addr
+          hok'.inv hperm' (hupd orc) _ (hmiss orc), hout⟩
 
 /-- **`translate` of a user access to a mapped page**, precise (the lookup,
 then the hit or the miss). -/
