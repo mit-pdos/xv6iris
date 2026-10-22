@@ -212,7 +212,13 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   the model under any invariant.  Ruling (19): the exclusive read stamps the floors (register
   section 5; the TSO header's own RVWMO rule for plain loads, applied to exclusive reads).  With it
   the re-walk reads the entry the hart still reserves, so at most two walks happen and the kernel
-  page-table invariant is unchanged.  Proof structure: the rules that step through the retry loop
+  page-table invariant is unchanged.  The independent audit of 2026-10-22 added two precisions, both
+  recorded in register section 5: for the walker's implicit reads the rule is a modelling assumption
+  narrower than the privileged spec's letter (translation caches may be incoherent until SFENCE.VMA),
+  with a liveness-only consequence; and the trusted-base check compares module/axiom/`opaque` sets,
+  so it passed although `TsoMem`/`Lang`'s content changed and the new `resvInv` entered the
+  open-interpretation statements through `memModelAt` -- a content pin for the trusted base is the
+  owner's call.  Proof structure: the rules that step through the retry loop
   live in `MachCSL.WpPtWalkKpt`; the owned-bytes leaves in `MachCSL.WpCtxBytes`; the TLB-hit rules
   take the miss as an obligation (the cached copy's A/D bits need not match memory's).
 

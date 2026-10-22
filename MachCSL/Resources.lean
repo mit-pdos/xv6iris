@@ -927,8 +927,12 @@ theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
 
 /-! ### The reservation invariant
 
-A pure fact the interpretation carries beside `mmOk` (and kept out of it:
-`mmOk` is part of the top-level statement, `Xv6.xv6TracePure`).  Two
+A pure fact the interpretation carries beside `mmOk`, and kept out of `mmOk`
+because `mmOk` is part of the closed top-level statements (through
+`Xv6.xv6TracePure`), which therefore do not mention it.  The statements that
+quantify over the interpretation itself (`memModelAt`: `riscvPowerAdequacy`,
+`xv6PowerAdequacy`, `xv6FsAdequacy_xv6GF`, `userProof`) do reach it, so for
+them it is part of the trusted base a reader must read.  Two
 clauses: the reservations of distinct harts share no byte, and a byte a
 hart reserves has its latest write under that hart's coherence floor.  The
 first is what an exclusive re-read of the bytes the hart reserves needs (no
