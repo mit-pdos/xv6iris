@@ -105,14 +105,14 @@ theorem swp_pmpCheck_ent0 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : N
 kernel accesses, whatever its other entries. -/
 theorem pmpPassesM_ent0 (cpu : CPU) (dq : DFrac) (c : MConf) (h0 : pmpEnt0Ok c.pmpcfg c.pmpaddr) :
     pmpPassesM (GF := GF) cpu dq c := by
-  intro addr width acc Φ hacc hram
+  intro addr width acc Φ hacc hram _
   exact swp_pmpCheck_ent0 cpu dq addr width acc Φ c.pmpcfg c.pmpaddr h0 hacc (pmpOk_of_inRam hram)
 
 /-- A configuration whose PMP entries are all off passes, whatever its
 address table (Rocq `wp_entry_boot`'s `pmp_all_off` premise). -/
 theorem pmpPassesM_allOff (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : pmpAllOff c.pmpcfg) :
     pmpPassesM (GF := GF) cpu dq c := by
-  intro addr width acc Φ _ _
+  intro addr width acc Φ _ _ _
   exact swp_pmpCheck_allOff cpu dq addr width acc Φ c.pmpcfg c.pmpaddr hcfg
 
 theorem MConf.ok_ent0 (c : MConf) (hm : c.mok) (h0 : pmpEnt0Ok c.pmpcfg c.pmpaddr) :

@@ -305,10 +305,21 @@ theorem is_shadow_stack_access_kernel (acc : MemoryAccessType mem_payload) (hacc
     is_shadow_stack_access acc = (Pure.pure false : SailM Bool) := by
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
 
-/-- The PMP check passes, in machine mode, for every kernel access inside RAM. -/
+/-- A non-empty access within one 8-byte granule: no 8-aligned PMP bound splits it
+(a partial match faults even in machine mode). -/
+def pmpSafe (addr : BitVec 64) (width : Nat) : Prop := 0 < width ∧ addr.toNat % 8 + width ≤ 8
+
+/-- Naturally aligned accesses of width 1, 2, 4 or 8 are `pmpSafe`. -/
+theorem pmpSafe_of_aligned {pa : BitVec 64} {n : Nat} (hal : pa.toNat % n = 0)
+    (hn : n = 1 ∨ n = 2 ∨ n = 4 ∨ n = 8) : pmpSafe pa n := by
+  unfold pmpSafe
+  rcases hn with rfl | rfl | rfl | rfl <;> omega
+
+/-- The PMP check passes, in machine mode, for every `pmpSafe` kernel access inside RAM. -/
 def pmpPassesM (cpu : CPU) (dq : DFrac) (c : MConf) : Prop :=
   ∀ (addr : BitVec 64) (width : Nat) (acc : MemoryAccessType mem_payload)
     (Φ : Option ExceptionType → IProp GF), kernelAccess acc → inRam addr width →
+    pmpSafe addr width →
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr -∗ Φ none)
     ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ
@@ -338,9 +349,9 @@ theorem MConf.ok_same {c c' : MConf} (h : MConf.ok (GF := GF) c) (hms : c'.mstat
   refine ⟨⟨?_, ?_⟩, ?_⟩
   · rw [hms]; exact h.1.1
   · rw [hms]; exact h.1.2
-  · intro cpu dq addr width acc Φ hacc hram
+  · intro cpu dq addr width acc Φ hacc hram hs
     rw [hcfg, haddr]
-    exact h.2 cpu dq addr width acc Φ hacc hram
+    exact h.2 cpu dq addr width acc Φ hacc hram hs
 
 /-! ### Decoding -/
 
