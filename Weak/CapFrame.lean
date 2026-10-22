@@ -28,6 +28,10 @@ po-between; (`ownIn`) an own write to `pa` after `s` is po-between.
       publication read is at `main+0x16`, so the decided site census `frameWindowsNoStarted` (no
       `started`-load site in any window) refutes `pubSeenAfter` without `FrameQuiet.noPub`'s
       address reading (the deviation in `PinTrapFrame`'s header).
+  §5  **row 6g residue — THE GLUE OVER CERTIFIED HOPS** `CapFrame.frameWinOfX` / `CapFrame.frameRfC`: the
+      frame fact read at the export's conjuncts 12 (`chainOkCertAtP`) and 13 (`startedFloorPcAt`), with
+      `FrameWinC` (`acqIn` at certified hops), `CapSync.lockNzExclC` and `startedFloorPcP_ofExport` —
+      no interim premise.
 
 Spec: riscv.cat rule 1 (`[M];po-loc;[W]`) is the per-address buffer's law; RVWMO's load-value axiom and
 gmo are the member's; the premises are xv6 run facts (FAITHFUL once discharged, WEAKER while named —
@@ -562,6 +566,287 @@ theorem frameWinOf (pol : SbPol) (N : Nat) (c : SbWalk.CandW) (GD : Gdexec)
     refine ⟨⟨_, hlb, rfl⟩, evAfter W _ hW1 hlb rfl (hafter W hW hsW), wBefore W _ hW hW1 hlb htop⟩
   · -- pubIn: the site-level arm
     obtain ⟨x, h1, h2, h3, -⟩ := pubInSite pol N c GD hG hv σ j pa w k lr ipc hP hRF rl sbase svs skc
+      hSp hSpW raq rbase rts rvs hRs hkSite h
+    exact ⟨x, h1, h2, h3⟩
+  · -- ownIn: an AMO arm as `acqIn`; a plain store to `pa` lands after an older own store to `pa`
+    obtain ⟨-, lw, hlw, hww⟩ := gwritesLbl _ _ hW
+    refine ⟨?_, wBefore W lw hW hW1 hlw htop⟩
+    rcases wLblCases lw hww with ⟨rl', b', vs', kc', rfl⟩ | gw
+    · rcases Nat.lt_trichotomy W.2 w with h | h | h
+      · exfalso
+        obtain ⟨u1, hu1⟩ := hby
+        obtain ⟨u2, hu2⟩ := hSpb
+        have hm := hSpm
+        rw [hG] at hm hlw hSp hu1 hu2
+        have := (memberStBefore pol N c hv W (hartAgent j, w) hm hW1 h _ _ _ _ _ _ _ _ hlw hSp _ u1 u2
+          hu1 hu2).2.2
+        have h' := hafter W hW hsW
+        rw [hG] at h'; omega
+      · exfalso
+        have : W = (hartAgent j, w) := by rw [← hW1, ← h]
+        rw [this] at hsW; omega
+      · exact h
+    · exact evAfter W lw hW1 hlw gw (hafter W hW hsW)
+
+end CapFrame
+
+/-! # 5. Row 6g residue: THE GLUE OVER CERTIFIED HOPS (both interim premises retired)
+
+`frameWinOf` (§4) takes 6a's interim premises `CapSync.lockNzExclP` / `startedFloorPcP`.  Q2 [OWN.153]
+(D4) and Q4 [OWN.154] (L1) now export conjuncts 12 (`chainOkCertAtP`) and 13 (`startedFloorPcAt`), so
+the frame fact is restated over CERTIFIED hops, as 6a's `CapSync.syncRealizedOfX`:
+`CapFrame.hopAcqAfterC` (a certified hop acquire of `j` after the spill), the corollary
+`foreignFloorSyncC` of conjunct 12, `restoreSrcSpillC` / `frameRfOfRestoreC`, the window interface
+`CapFrame.FrameWinC` (`acqIn` asked of certified hops only), `k1OfWindowC`–`k3OfWindowC`,
+**`CapFrame.frameRfC`** (the plug-in), and **`CapFrame.frameWinOfX`** — `FrameWinC` from the export
+(`CapSync.lockNzExclC`, `CapSync.startedFloorPcP_ofExport`, `lr := σ.ldPcAt`) with NO interim premise.
+The proofs are `PinTrapFrame`'s, read at conjunct 12.  Spec: FAITHFUL. -/
+
+namespace CapFrame
+
+open SbWalk SbAgree PfStepTsoMem PinTrapFrame
+open Xv6.AccessDiscipline (custAtP chainOkCertAtP chainOkCertAtP_ofExport certHopAt hopByteAt xv6Env
+  xv6AccessDisc xv6Rsv)
+
+/-- Hart `j` made a CERTIFIED hop-byte acquire entry at a position in `(s, σ.top]`. -/
+def hopAcqAfterC (σ : MState) (j : CPU) (s : Nat) : Prop :=
+  ∃ (b : PAddr) (C : CPU) (r a : Nat), s < a ∧ a ≤ σ.top ∧ certHopAt σ b a ∧ syncHop σ.mem b C r j a
+
+theorem hopAcqAfterCMono {σ : MState} {j : CPU} {s t : Nat} (hst : s ≤ t) :
+    CapFrame.hopAcqAfterC σ j t → CapFrame.hopAcqAfterC σ j s :=
+  fun ⟨b, C, r, a, h1, h2, h3, h4⟩ => ⟨b, C, r, a, Nat.lt_of_le_of_lt hst h1, h2, h3, h4⟩
+
+/-- **THE WINDOW'S REALIZATION OVER CERTIFIED HOPS** (`PinTrapFrame.FrameWin` with `acqIn` asked of
+certified hop acquires only). -/
+structure FrameWinC (G : Gexec) (σ : MState) (j : CPU) (pa : PAddr) (s w k : Nat) : Prop where
+  acqIn : ∀ W, W ∈ gwrites G → W.1 = hartAgent j → s < gwix G W → gwix G W ≤ σ.top →
+    (∃ (b : PAddr) (C : CPU) (r : Nat), certHopAt σ b (gwix G W) ∧ syncHop σ.mem b C r j (gwix G W)) →
+    glblIs G W lbAq ∧ w < W.2 ∧ W.2 < k
+  pubIn : pubSeenAfter σ j s → ∃ x, w < x ∧ x < k ∧ greadsPub G σ (hartAgent j, x)
+  ownIn : ∀ W, W ∈ gwrites G → W.1 = hartAgent j → s < gwix G W → gwix G W ≤ σ.top →
+    (∃ v, gwritesByte G W (paZ pa) v) → w < W.2 ∧ W.2 < k
+
+theorem foreignFloorSyncC (σ : MState) (hC : chainOkCertAtP σ) (hd : memDesc σ.mem) (heo : σ.mem.eagerOn σ.lp)
+    (j : CPU) (pa : PAddr) (H : Hist) (e : HEnt) (hH : σ.mem[pa]? = some H) (he : e ∈ H) (ht0 : e.t ≠ 0)
+    (hcoh : e.t = (σ.hr j).coh pa) (hA : e.tid < NCPU) (hne : e.tid ≠ hartAgent j)
+    (hu : frameUnexempt σ pa e.t) : CapFrame.hopAcqAfterC σ j e.t ∨ pubSeenAfter σ j e.t := by
+  obtain ⟨h1, h2, h3, h4⟩ := hu
+  have hlo : σ.mem.landedOnly σ.lp = σ.mem := RvwmoXv6Adequacy.landedOnlyEager σ.mem σ.lp heo
+  have hlp : σ.lp e.t = some ((σ.hr j).coh pa) := by rw [← hcoh]; exact heo pa H hH e he
+  rcases hC j pa H e hH he ht0 hlp hA hne (by rw [← hcoh]; exact h1) (by rw [← hcoh]; exact h2)
+    (by rw [← hcoh]; exact h3) with hs | ⟨hr, -⟩
+  · rcases hs with ⟨a, ha, hc⟩ | ⟨f, w, r, v, Hf, hjw, hp, hf, hew, hrc, harm⟩
+    · rw [hlo] at hc
+      obtain ⟨hta, b, C, r, hb, hh⟩ := hopChainLast hd hc
+      exact .inl ⟨b, C, r, a, hta, by simp only [MState.top] at ha ⊢; omega, hb, hh⟩
+    · have hf' : σ.mem[f]? = some Hf := by
+        have : (xv6Env σ).lm = σ.mem := hlo
+        rw [← this]; exact hf
+      have hrc' : r ≤ (σ.hr j).coh f := by
+        obtain ⟨q, hq, hqle⟩ := hrc
+        have hr' : σ.lp r = some r := heo f Hf hf' _ hew
+        have : (xv6Env σ).lp = σ.lp := rfl
+        rw [this, hr'] at hq
+        cases hq
+        exact hqle
+      have hlt : e.t < r := by
+        rcases harm with ⟨-, h⟩ | ⟨a, ha, hc⟩
+        · exact h
+        · have : (xv6Env σ).lm = σ.mem := hlo
+          rw [this] at hc
+          exact Nat.lt_trans (hopChainLast (m := σ.mem) hd hc).1 ha
+      exact .inr ⟨f, w, r, v, Hf, hjw, hp, hf', hew, hlt, hrc'⟩
+  · exact absurd (by rw [hcoh]; exact hr) h4
+
+theorem restoreSrcSpillC (σ : MState) (hC : chainOkCertAtP σ) (hd : memDesc σ.mem) (heo : σ.mem.eagerOn σ.lp)
+    (j : CPU)
+    (pa : PAddr) (H : Hist) (hH : σ.mem[pa]? = some H) (es e0 : HEnt) (hes : es ∈ H)
+    (hesj : es.tid = hartAgent j) (tv : Nat)
+    (hsrc : H.find? (HEnt.visible (hartAgent j) tv) = some e0)
+    (hcoh : e0.tid ≠ hartAgent j → (σ.hr j).coh pa = e0.t)
+    (hu : frameUnexemptAfter σ pa es.t) (hdma : frameNoDmaAfter σ pa es.t)
+    (hk1 : ¬ CapFrame.hopAcqAfterC σ j es.t) (hk2 : ¬ pubSeenAfter σ j es.t)
+    (hk3 : ownClearAfter σ j pa es.t) : e0 = es := by
+  have hvis : HEnt.visible (hartAgent j) tv es = true := by
+    simp [HEnt.visible, hesj]
+  rcases findDesc (hd pa H hH) hsrc hes hvis with h | hlt
+  · exact h
+  · exfalso
+    have he0 : e0 ∈ H := List.mem_of_find?_eq_some hsrc
+    by_cases hown : e0.tid = hartAgent j
+    · exact hk3 H e0 hH he0 hown hlt
+    · rcases CapFrame.foreignFloorSyncC σ hC hd heo j pa H e0 hH he0 (by omega) (hcoh hown).symm
+          (hdma H e0 hH he0 hlt) hown (hu e0.t hlt) with h | h
+      · exact hk1 (CapFrame.hopAcqAfterCMono (Nat.le_of_lt hlt) h)
+      · exact hk2 (pubSeenAfterMono (Nat.le_of_lt hlt) h)
+
+theorem frameRfOfRestoreC (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab)
+    (st : List (Nat × Wlabel)) (σ : MState) (j : CPU) (pa : PAddr) (p k : Nat) (v : BitVec 8)
+    (Sp : Geid) (hre : restoreAt log c st σ j pa p) (hwf : gwf G) (hlog : logOf G log)
+    (hrd : greadsByte G (hartAgent j, k) (paZ pa) (p + 1) v)
+    (hSp : Sp ∈ gwrites G) (hSpj : Sp.1 = hartAgent j) (hSpb : ∃ v', gwritesByte G Sp (paZ pa) v')
+    (hSpx : gwix G Sp ≤ c.pcLog.length)
+    (hu : frameUnexemptAfter σ pa (gwix G Sp)) (hdma : frameNoDmaAfter σ pa (gwix G Sp))
+    (hk1 : ¬ CapFrame.hopAcqAfterC σ j (gwix G Sp)) (hk2 : ¬ pubSeenAfter σ j (gwix G Sp))
+    (hk3 : ownClearAfter σ j pa (gwix G Sp)) :
+    grfAt G (paZ pa) Sp (hartAgent j, k) := by
+  obtain ⟨hR, heg, hD, hpre, hram, H, tv, e0, hH, hsrc, he0t, hcoh⟩ := hre
+  have heo : σ.mem.eagerOn σ.lp := memEager c st σ hR heg
+  have hr := hR.2.2.1
+  obtain ⟨v', hv'⟩ := hSpb
+  have hgw := gwriteAtGwix G Sp hSp
+  have hix0 : gwix G Sp ≠ 0 := by
+    intro h0
+    rw [h0] at hgw
+    simp [gwriteAt] at hgw
+  obtain ⟨rest, hrest⟩ := hpre
+  obtain ⟨m, hm, hgm⟩ := logOfWrite G log Sp hwf hlog hSp
+    (by rw [← hrest, List.length_append]; omega)
+  have hmc : c.pcLog[gwix G Sp - 1]? = some m := by
+    rw [← hrest, lookup_app_l (by omega)] at hm
+    exact hm
+  have hmb : msgByte m (paZ pa) = some v' :=
+    (WeakRvwmoKillArms.gmsgByte G Sp m (paZ pa) v' hgm).2 hv'
+  have hes := RvwmoXv6Adequacy.histOfMem c.pcImg c.pcLog (paZ pa) (gwix G Sp - 1) m v' hmc hmb
+  rw [gmsgTid G Sp m hgm, Nat.sub_add_cancel (Nat.pos_of_ne_zero hix0)] at hes
+  simp only [Option.getD_some] at hes
+  rw [← RvwmoXv6Adequacy.rhistGet hr hH] at hes
+  have heq := CapFrame.restoreSrcSpillC σ (chainOkCertAtP_ofExport hD) (memDescOfRhist hr) heo j pa H hH ⟨gwix G Sp, Sp.1, v'⟩ e0 hes
+    hSpj tv hsrc (fun h => by rw [hcoh h, he0t]) hu hdma hk1 hk2 hk3
+  have hp : p + 1 = gwix G Sp := by rw [← he0t, heq]
+  exact ⟨p + 1, v, hrd, by rw [hp]; exact hgw⟩
+
+theorem k1OfWindowC (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel))
+    (σ : MState) (j : CPU) (pa : PAddr) (s w k : Nat) (hR : rmem c st σ) (hpre : c.pcLog <+: log)
+    (hwf : gwf G) (hlog : logOf G log) (hW : CapFrame.FrameWinC G σ j pa s w k) (hQ : PinTrapFrame.FrameQuiet G σ j pa w k) :
+    ¬ CapFrame.hopAcqAfterC σ j s := by
+  rintro ⟨b, C, r, a, hsa, hat, hb, hh⟩
+  obtain ⟨Hb, va, hHb, hmem⟩ := RvwmoXv6Adequacy.syncHopAcq hh
+  obtain ⟨W, hW', hix, hW1, -⟩ :=
+    RvwmoXv6Adequacy.entGraph hR hpre hwf hlog hHb hmem (by simp only; omega)
+  simp only at hix hW1
+  obtain ⟨haq, h1, h2⟩ := hW.acqIn W hW' hW1 (by omega) (by omega)
+    ⟨b, C, r, by rw [hix]; exact hb, by rw [hix]; exact hh⟩
+  obtain ⟨W1, W2⟩ := W
+  simp only at hW1 h1 h2
+  subst hW1
+  exact hQ.noAcq W2 h1 h2 haq
+
+theorem k2OfWindowC (G : Gexec) (σ : MState) (j : CPU) (pa : PAddr) (s w k : Nat)
+    (hW : CapFrame.FrameWinC G σ j pa s w k) (hQ : FrameQuiet G σ j pa w k) : ¬ pubSeenAfter σ j s :=
+  fun h => let ⟨x, h1, h2, h3⟩ := hW.pubIn h; hQ.noPub x h1 h2 h3
+
+theorem k3OfWindowC (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel))
+    (σ : MState) (j : CPU) (pa : PAddr) (s w k : Nat) (hR : rmem c st σ) (hpre : c.pcLog <+: log)
+    (hwf : gwf G) (hlog : logOf G log) (hW : CapFrame.FrameWinC G σ j pa s w k) (hQ : FrameQuiet G σ j pa w k) :
+    ownClearAfter σ j pa s := by
+  intro H e hH he hej hse
+  rw [RvwmoXv6Adequacy.rhistGet hR.2.2.1 hH] at he
+  rcases RvwmoXv6Adequacy.histOfMemInv _ _ _ _ he with h0 | ⟨mq, hq, hb, htq⟩
+  · omega
+  · obtain ⟨rest, hrest⟩ := hpre
+    have hlen := (List.getElem?_eq_some_iff.1 hq).1
+    have hq' : log[e.t - 1]? = some mq := by rw [← hrest]; exact lookup_app_l_Some hq
+    obtain ⟨W, -, hgm, hix, hW'⟩ := logOfLookup G log (e.t - 1) mq hwf hlog hq'
+    have hwb := (WeakRvwmoKillArms.gmsgByte G W mq (paZ pa) e.v hgm).1 hb
+    rw [gmsgTid G W mq hgm] at htq
+    simp only [Option.getD_some] at htq
+    have hll : c.pcLog.length = σ.log.length := by
+      have := congrArg List.length hR.1.1
+      simpa using this
+    obtain ⟨h1, h2⟩ := hW.ownIn W hW' (by rw [← htq]; exact hej) (by omega)
+      (by simp only [MState.top]; omega) ⟨e.v, hwb⟩
+    obtain ⟨W1, W2⟩ := W
+    simp only at h1 h2 htq
+    have e1 : W1 = hartAgent j := by rw [← htq]; exact hej
+    subst e1
+    exact hQ.noOwn W2 h1 h2 e.v hwb
+
+theorem frameRfC (G : Gexec) (log : List Wmsg) (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel))
+    (σ : MState) (j : CPU) (pa : PAddr) (p w k : Nat) (v : BitVec 8)
+    (hre : restoreAt log c st σ j pa p) (hwf : gwf G) (hlog : logOf G log)
+    (hrd : greadsByte G (hartAgent j, k) (paZ pa) (p + 1) v)
+    (hSp : (hartAgent j, w) ∈ gwrites G) (hSpb : ∃ v', gwritesByte G (hartAgent j, w) (paZ pa) v')
+    (hSpx : gwix G (hartAgent j, w) ≤ c.pcLog.length)
+    (hii : frameUnexemptAfter σ pa (gwix G (hartAgent j, w)))
+    (hiii : frameNoDmaAfter σ pa (gwix G (hartAgent j, w)))
+    (hW : CapFrame.FrameWinC G σ j pa (gwix G (hartAgent j, w)) w k) (hQ : FrameQuiet G σ j pa w k) :
+    WeakRvwmoAcyc.grf G (hartAgent j, w) (hartAgent j, k) := by
+  have hR := hre.1
+  have hpre := hre.2.2.2.1
+  exact grfAtGrf G (paZ pa) _ _
+    (CapFrame.frameRfOfRestoreC G log c st σ j pa p k v (hartAgent j, w) hre hwf hlog hrd hSp rfl hSpb hSpx
+      hii hiii (CapFrame.k1OfWindowC G log c st σ j pa _ w k hR hpre hwf hlog hW hQ)
+      (CapFrame.k2OfWindowC G σ j pa _ w k hW hQ) (CapFrame.k3OfWindowC G log c st σ j pa _ w k hR hpre hwf hlog hW hQ))
+
+
+theorem frameWinOfX (pol : SbPol) (N : Nat) (c : SbWalk.CandW) (GD : Gdexec)
+    (hG : GD.gdG = SbAgree.memberP N c) (hv : SbWalk.validW pol c)
+    (σ : MState) (j : CPU) (pa : PAddr) (w k : Nat) (ipc : Geid → Int)
+    (hD : xv6AccessDisc σ) (hAq : CapSync.amoAqAt GD.gdG)
+    (hRA : CapSync.exclHopReal GD σ) (hRB : CapSync.realBefore GD σ (hartAgent j, k))
+    (hRF : CapFrame.floorByteReal GD σ σ.ldPcAt ipc j (hartAgent j, k))
+    (rl : Bool) (sbase : Int) (svs : List (BitVec 8)) (skc : WmClass)
+    (hSp : gxLbl GD.gdG (hartAgent j, w) = some (LStore rl sbase svs skc))
+    (hSpW : (hartAgent j, w) ∈ gwrites GD.gdG)
+    (hSpb : ∃ v, gwritesByte GD.gdG (hartAgent j, w) (paZ pa) v)
+    (raq : Bool) (rbase : Int) (rts : List Nat) (rvs : List (BitVec 8))
+    (hRs : gxLbl GD.gdG (hartAgent j, k) = some (LLoad raq rbase rts rvs))
+    (hkSite : ipc (hartAgent j, k) ≠ CapSync.spinLoadPc) :
+    CapFrame.FrameWinC GD.gdG σ j pa (gwix GD.gdG (hartAgent j, w)) w k := by
+  have hnd : GD.gdG.gxGmo.Nodup := by rw [hG]; exact memberNodup pol N c hv
+  obtain ⟨hSpm, -⟩ := gwritesLbl _ _ hSpW
+  have hgr : SbWalk.gmoEv (LLoad raq rbase rts rvs) = true := rfl
+  -- a write gwix-after the spill is gpos-after it
+  have hafter : ∀ W, W ∈ gwrites GD.gdG → gwix GD.gdG (hartAgent j, w) < gwix GD.gdG W →
+      gpos GD.gdG (hartAgent j, w) < gpos GD.gdG W :=
+    fun W hW h => (gwixGposLt GD.gdG _ W hnd hSpW hW).1 h
+  -- an at-event write of `j` gmo-after the spill is po-after it
+  have evAfter : ∀ W lw, W.1 = hartAgent j → gxLbl GD.gdG W = some lw → SbWalk.gmoEv lw = true →
+      gpos GD.gdG (hartAgent j, w) < gpos GD.gdG W → w < W.2 := by
+    intro W lw hW1 hlw gw hpos
+    rcases Nat.lt_trichotomy W.2 w with h | h | h
+    · exfalso
+      have hm := hSpm; rw [hG] at hm; rw [hG] at hlw
+      have := (memberEvBefore pol N c hv W (hartAgent j, w) lw hm hW1 h hlw gw).2.2
+      rw [hG] at hpos; omega
+    · exfalso
+      have : W = (hartAgent j, w) := by rw [← hW1, ← h]
+      rw [this, hSp, Option.some.injEq] at hlw
+      subst hlw; simp [SbWalk.gmoEv, SbWalk.isSt] at gw
+    · exact h
+  -- a write of `j` realized before the restore is po-before it
+  have wBefore : ∀ W lw, W ∈ gwrites GD.gdG → W.1 = hartAgent j → gxLbl GD.gdG W = some lw →
+      gwix GD.gdG W ≤ σ.top → W.2 < k := by
+    intro W lw hW hW1 hlw htop
+    have hww : lbIsW lw = true := by
+      obtain ⟨-, l', hl', hw'⟩ := gwritesLbl _ _ hW
+      rw [hlw, Option.some.injEq] at hl'; subst hl'; exact hw'
+    rcases hRB W hW htop with h | h
+    · exfalso; rw [h, hRs, Option.some.injEq] at hlw; subst hlw; simp [lbIsW] at hww
+    · rcases wLblCases lw hww with ⟨rl', b', vs', kc', rfl⟩ | gw
+      · rcases Nat.lt_trichotomy W.2 k with h' | h' | h'
+        · exact h'
+        · exfalso
+          have : W = (hartAgent j, k) := by rw [← hW1, ← h']
+          rw [this, hRs, Option.some.injEq] at hlw; cases hlw
+        · exfalso
+          have hm := h.1; rw [hG] at hm h; rw [hG] at hRs
+          exact gposAsymm _ _ _ h
+            (memberEvBefore pol N c hv (hartAgent j, k) W _ hm hW1.symm h' hRs hgr)
+      · have h2 := h; rw [hG] at h2 hlw; rw [hG] at hRs
+        exact CapSync.memberPoOfGmo pol N c hv W (hartAgent j, k) lw _ h2 hW1 hlw gw hRs hgr
+  refine ⟨fun W hW hW1 hsW htop hhop => ?_, fun h => ?_, fun W hW hW1 hsW htop hby => ?_⟩
+  · -- acqIn: the hop's acquire is an exclusive write, hence an AMO, hence `.aq`
+    obtain ⟨b, C, r, hhb, hsh⟩ := hhop
+    have hpc := CapSync.lockNzExclC σ b C j r _ hhb hsh
+    obtain ⟨aq, rl', base, ts, rvs', wvs, kc, hlb⟩ := hRA W b C j r hW hW1 hhb.1 hsh hpc
+    have haq := hAq W aq rl' base ts rvs' wvs kc hlb
+    subst haq
+    refine ⟨⟨_, hlb, rfl⟩, evAfter W _ hW1 hlb rfl (hafter W hW hsW), wBefore W _ hW hW1 hlb htop⟩
+  · -- pubIn: the site-level arm
+    obtain ⟨x, h1, h2, h3, -⟩ := pubInSite pol N c GD hG hv σ j pa w k σ.ldPcAt ipc
+      (CapSync.startedFloorPcP_ofExport σ hD) hRF rl sbase svs skc
       hSp hSpW raq rbase rts rvs hRs hkSite h
     exact ⟨x, h1, h2, h3⟩
   · -- ownIn: an AMO arm as `acqIn`; a plain store to `pa` lands after an older own store to `pa`

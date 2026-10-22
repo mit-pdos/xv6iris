@@ -847,6 +847,13 @@ import Weak.SbRealPHart
 import Weak.SbRealPEv
 import Weak.SbIssueCoCensus
 import Weak.SbRealPLbl
+import Weak.SbIssueCoR
+import Weak.SbRealPStamp
+import Weak.SbRealPView
+import Weak.SbKillRG
+import Weak.SbRealPRView
+import Weak.SbRealPRViewStep
+import Weak.SbRealPSim
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2

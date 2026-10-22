@@ -12,9 +12,10 @@ retry (MachCSL takes no step: W4's "lost-SC retry = 0 steps") or ONE `evStep` an
 with the pf's answer — the post-state's registers the pf's, the other harts' and the devices unchanged,
 and `rmemP` kept AT THE SAME TWIN STATE (an admin step moves no twin memory).  Its premises are the matrix
 cells' (`notes/twin-machine-conformance.md` o, p): the armed register-write instrument (`excOk`, HSafe as
-W4's (5)), and at a FETCH the fetch cut **in MachCSL's own terms** — the fetched word is the landed bytes
-at some `itv ≤ tvn ≤ ltop`, the RAM footprint and the fetch guard (`fetchOk`, HSafe as W4's (6)): that is
-P-W6's `FetchCutP` (`PROGRESS-PW6.md` F-PW6-4; discharged by rows 6h/6m/(t3)).
+W4's (5)), and at a FETCH the fetch cut **in MachCSL's own terms** — MachCSL's `evStep` answers the pf's fetched word
+(`FetchCutAt`: at the tip the landed bytes at some `itv ≤ tvn ≤ ltop`, the RAM footprint and the fetch guard
+`fetchOk`, HSafe as W4's (6), `fetchCutOfCut`; after M-S2 the forwarding fetch): that is P-W6's `FetchCutP`
+(`PROGRESS-PW6.md` F-PW6-4, F-PW6-6; discharged by rows 6h/6m/(t3)).
 
 Spec: FAITHFUL (proof organisation; the premises are named plan items).  Lean-only helpers
 `SbRealPEv.*`.
@@ -29,14 +30,31 @@ open Lbl PfStepTsoMem SbRealP SbRealPHart
 
 namespace SbRealPEv
 
-/-- **`FetchCutP` at one fetch outcome** (stated in MachCSL's terms, F-PW6-4): the pf's fetched word `w`
-of a RAM fetch is MachCSL's landed bytes at a cut `itv ≤ tvn ≤ ltop`, the footprint is DRAM and the armed
-fetch guard allows it. -/
-def FetchCutAt (cpu : CPU) (σ : MState) (o : Outcome Register RegisterType) : Prop :=
-  ∀ (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak) (w : BitVec (8 * n)),
-    o = .memRead n va req → akIfetch req.access_kind = true → devAddr req.pa = false →
-    ramBytes req.pa n ∧ σ.fetchOk cpu req.pa ∧
-      ∃ tvn, σ.itv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧ σ.mem.readBytesP σ.lp (ifetchAgent cpu) tvn req.pa n w
+/-- **`FetchCutP` at one fetch outcome, AT THE PF'S FETCHED WORD** (stated in MachCSL's own terms, F-PW6-4;
+corrected, finding F-PW6-6: the earlier form quantified the word `w` universally — "MachCSL reads EVERY word"
+— which no RAM fetch satisfies): if the admin node step's label is the fetch `LIFetch (paZ req.pa) tvs` whose
+bytes are `w`, MachCSL's `evStep` answers `w` and moves nothing.  Agnostic to the machine's fetch rule: at the
+tip a cut `itv ≤ tvn ≤ ltop` of landed bytes (`SbRealPHart.evFetchP` builds it), after M-S2 ([OWN.156]) also
+forwarding the hart's own stores issued before its last `fence.i`.  Discharged by rows 6h/6m/(t3). -/
+def FetchCutAt (cpu : CPU) (σ : MState) (o : Outcome Register RegisterType) (l : Wlabel) : Prop :=
+  ∀ (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak) (w : BitVec (8 * n))
+    (tvs : List (Nat × BitVec 8)),
+    o = .memRead n va req → devAddr req.pa = false → l = .LIFetch (paZ req.pa) tvs → tvs.length = n →
+    (∀ j : Nat, j < n → (tvs.map Prod.snd)[j]? = some (nthByte w j)) →
+    evStep cpu (.memRead n va req) σ (.Ok (w, none)) σ
+
+/-- The tip's cut gives `FetchCutAt` (the fetch row `SbRealPHart.evFetchP`). -/
+theorem fetchCutOfCut (cpu : CPU) (σ : MState) (o : Outcome Register RegisterType) (l : Wlabel)
+    (h : ∀ (n va : Nat) (req : Mem_read_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (w : BitVec (8 * n)) (tvs : List (Nat × BitVec 8)),
+      o = .memRead n va req → devAddr req.pa = false → l = .LIFetch (paZ req.pa) tvs → tvs.length = n →
+      (∀ j : Nat, j < n → (tvs.map Prod.snd)[j]? = some (nthByte w j)) →
+      ramBytes req.pa n ∧ akIfetch req.access_kind = true ∧ σ.fetchOk cpu req.pa ∧
+        ∃ tvn, σ.itv cpu ≤ tvn ∧ tvn ≤ σ.ltop ∧ σ.mem.readBytesP σ.lp (ifetchAgent cpu) tvn req.pa n w) :
+    FetchCutAt cpu σ o l := by
+  intro n va req w tvs ho hda hl hlen hb
+  obtain ⟨hram, hif, hfo, hc⟩ := h n va req w tvs ho hda hl hlen hb
+  exact evFetchP cpu σ n va req w hram hif hfo hc
 
 /-- What an answered admin outcome leaves: the pf's continuation, the pf's registers for the hart, the
 other harts and the devices untouched, `rmemP` at the same twin state. -/
@@ -59,7 +77,7 @@ theorem adminEvP (img : Image) (c : SbCand.CandS) (σ : MState) (cpu : CPU)
     (obar : Option barrier_kind)
     (hst : pnodeStep (.impure (.ok o) k) rs ib d l m' ors fn' d' oib obar)
     (had : lbAdmin true l) (hR : rmemP img c σ) (hrs : σ.regs cpu = rs)
-    (hex : ∀ r v, o = .regWrite r v → σ.excOk cpu r v) (hcut : FetchCutAt cpu σ o) :
+    (hex : ∀ r v, o = .regWrite r v → σ.excOk cpu r v) (hcut : FetchCutAt cpu σ o l) :
     (m' = .impure (.ok o) k ∧ ors = none) ∨ AdminPost img c σ cpu o k rs m' ors := by
   cases o with
   | regRead r =>
@@ -80,10 +98,10 @@ theorem adminEvP (img : Image) (c : SbCand.CandS) (σ : MState) (cpu : CPU)
     · obtain ⟨w, -, rfl, -⟩ := hst
       exact absurd had (by simp [lbAdmin])
     · rename_i hda
-      rcases hst with ⟨hif, w, tvs, hlen, hbytes, rfl, rfl, rfl, -⟩ | ⟨-, ⟨-, w, tvs, -, -, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, -⟩⟩
+      rcases hst with ⟨-, w, tvs, hlen, hbytes, hl, rfl, rfl, -⟩ | ⟨-, ⟨-, w, tvs, -, -, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, -⟩⟩
       · right
-        obtain ⟨hram, hfo, hc⟩ := hcut n va req w rfl hif (by simpa using hda)
-        exact ⟨_, σ, rfl, evFetchP cpu σ n va req w hram hif hfo hc, hrs, fun _ _ => rfl, rfl, hR⟩
+        exact ⟨_, σ, rfl, hcut n va req w tvs rfl (by simpa using hda) hl hlen hbytes, hrs, fun _ _ => rfl,
+          rfl, hR⟩
       · exact absurd had (by simp [lbAdmin])
       · exact absurd had (by simp [lbAdmin])
   | memWrite n va req =>

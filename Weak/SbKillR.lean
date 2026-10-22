@@ -443,6 +443,25 @@ def SbKillR.relHopPcAt (σ : MState) : Prop :=
   ∀ (b : PAddr) (A B : CPU) (r a : Nat), Xv6.AccessDiscipline.certHopAt σ b a →
     syncHop (σ.mem.landedOnly σ.lp) b A r B a → σ.pcAt r = (KernelSyms.«release» : Int) + 0x1a
 
+/-- **THE INTERIM INPUT F-6J-1 (a) (NAMED; w1's write-side twin of conjunct 12, coordinator decision
+2026-10-22)**: a hart `j`'s landed store `e'` on a byte `a` ABOVE a post-power-on entry `e` of another
+hart is reached from `e`'s author at `e.t` by a CERTIFIED sync path whose last acquire precedes `e'`'s
+issue (`syncPathC … e'.t`), unless the byte is, as of `e`'s landing position `L`, a lock-layer,
+publication, page-table or audited racy byte — `chainOkCertAtP`'s exemptions, read at the WRITE (the
+co edge `e →co e'`, which no coherence floor witnesses).  w1 exports, append-only, the conjunct
+`Xv6.AccessDiscipline.chainOkCertWrAtP σ` with this body verbatim (`custAtP` / `syncPathC` are the
+export's own).  *Truth reason (xv6)*: a non-exempt byte is written by a second hart only after an
+ownership hand-off (`p->lock`, `kmem.lock`, the byte's lock), whose hops are winning AMOs
+(`memModel_chainHop`).  Spec: FAITHFUL (a fact of xv6's runs; RVWMO/Zifencei/PMAs silent). -/
+def SbKillR.chainOkCertWrAt (σ : MState) : Prop :=
+  ∀ (j : CPU) (a : PAddr) (H1 H2 : Hist) (e' e : HEnt) (L : Nat),
+    (σ.mem.landedOnly σ.lp)[a]? = some (H1 ++ e' :: H2) → e ∈ H2 → e'.tid = hartAgent j →
+    e.t ≠ 0 → σ.lp e.t = some L → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j →
+    (∀ b, Xv6.AccessDiscipline.custAtP σ a L ≠ .lockw b) →
+    (∀ w, Xv6.AccessDiscipline.custAtP σ a L ≠ .pub w) →
+    Xv6.AccessDiscipline.custAtP σ a L ≠ .pte → Xv6.AccessDiscipline.custAtP σ a L ≠ .racy →
+    Xv6.AccessDiscipline.syncPathC σ ⟨e.tid, hA⟩ e.t j e'.t
+
 /-- The stamp `t` is a landed entry above another (a post-power-on store). -/
 def SbKillR.landedEnt (σ : MState) (t : Nat) : Prop :=
   ∃ (b : PAddr) (H1 H2 : Hist) (e : HEnt),
@@ -541,6 +560,93 @@ theorem SbKillR.csHypsHOfChain (GD : Gdexec) (GR : Gexec) (σ : MState) (ev : Na
     (hex : ev a = s.sgExit ∨ (WeakRvwmoGraph.gpo GD.gdG (ev a) s.sgExit ∧ gmem GD.gdG s.sgExit)) :
     SbKillR.csHypsH GD GR (ev t) s :=
   ⟨hxG, ev a, (SbKillR.hopsROfChain GR σ ev hR hpc hAq h ht hx1 hxW).1, hex⟩
+
+/-! ## 5.0 F-6J-2: a READ predecessor — the release's fence is the store's immediate predecessor
+
+`relStampOf` puts a po-earlier WRITE before the fence from (L3)'s "no write between"; a po-earlier READ
+(the predecessor of an fr edge) needs more: no event at all between the fence and the store.  The TEXT
+half is decided over the image (`relGapText`: no instruction address of the text walk lies strictly
+between `release+0x16` and `release+0x1a`; with `LockFacts.relAdj` the fence is the store's immediate
+predecessor in the stream); the RUN half is the realization interface `relNextReal` (`spinFenceNext`'s
+kind, R-b2: Sail executes the two adjacent instructions with interrupts off — `push_off` is held — and no
+exception at the fence, and an instruction fetch is not a row event).  `hopsROfChainX` is
+`hopsROfChain` for ANY read/write source issued before the observed stamp. -/
+
+/-- **THE TEXT FACT (decided over the image)**: no text-walk address strictly between the release
+fence (`release+0x16`) and the release store (`release+0x1a`). -/
+theorem SbKillR.relGapText :
+    textPcs.all (fun p => !(decide (LockFacts.relPc - 4 < p) && decide (p < LockFacts.relPc))) = true := by
+  decide +kernel
+
+/-- …as a statement over the walk. -/
+theorem SbKillR.relGap (p : Int) (hp : p ∈ textPcs) : ¬ (LockFacts.relPc - 4 < p ∧ p < LockFacts.relPc) := by
+  intro ⟨h1, h2⟩
+  have h := List.all_eq_true.1 SbKillR.relGapText p hp
+  simp [h1, h2] at h
+
+/-- **REALIZATION INTERFACE (NAMED; P-W6, R-b2's kind)**: the row event immediately before a realized
+store issued at `release+0x1a` is `release+0x16`'s fence (text: `LockFacts.relAdj`, `relGap`). -/
+def SbKillR.relNextReal (GR : Gexec) (σ : MState) (ev : Nat → Geid) : Prop :=
+  ∀ t, SbKillR.landedEnt σ t → σ.pcAt t = LockFacts.relPc →
+    0 < (ev t).2 ∧ gxLbl GR ((ev t).1, (ev t).2 - 1) = some LockFacts2.relFenceLbl
+
+/-- The stamp for a read-or-write predecessor from adjacency. -/
+theorem SbKillR.relStampOfAdj (GR : Gexec) (x R : Geid) (hx1 : x.1 = R.1) (hxR : x.2 < R.2)
+    (hxRW : glblIs GR x lbIsR ∨ glblIs GR x lbIsW) (hpos : 0 < R.2)
+    (hfl : gxLbl GR (R.1, R.2 - 1) = some LockFacts2.relFenceLbl) : SbKillR.relStampR GR x R := by
+  refine ⟨hx1, R.2 - 1, ?_, by omega, hfl⟩
+  rcases Nat.lt_or_ge x.2 (R.2 - 1) with h | h
+  · exact h
+  · exfalso
+    have heq : x = (R.1, R.2 - 1) := Prod.ext hx1 (by omega)
+    rw [heq] at hxRW
+    rcases hxRW with ⟨l, hl, hb⟩ | ⟨l, hl, hb⟩ <;>
+      (rw [hfl, Option.some.injEq] at hl; subst hl; simp [LockFacts2.relFenceLbl, lbIsR, lbIsW] at hb)
+
+/-- **THE DERIVATION, ANY READ/WRITE SOURCE** (F-6J-2): `x` on author `A`'s hart, issued before every
+later stamp of its hart (P-W6's issue order for the source), and the certified chain from `A` at `t`. -/
+theorem SbKillR.hopsROfChainX (GR : Gexec) (σ : MState) (ev : Nat → Geid)
+    (hR : SbKillR.HopReal GR σ ev) (hN : SbKillR.relNextReal GR σ ev) (hpc : SbKillR.relHopPcAt σ)
+    (hAq : CapSync.amoAqAt GR) (x : Geid) (hxRW : glblIs GR x lbIsR ∨ glblIs GR x lbIsW)
+    {A : CPU} {t : Nat} {B : CPU} {a : Nat}
+    (h : hopChain (σ.mem.landedOnly σ.lp) (Xv6.AccessDiscipline.certHopAt σ) A t B a) :
+    x.1 = hartAgent A →
+    (∀ r, SbKillR.landedEnt σ r → t < r → (ev r).1 = x.1 → x.2 < (ev r).2) →
+    SbKillR.hopsR GR x (ev a) ∧ (ev a).1 = hartAgent B ∧ SbKillR.landedEnt σ a := by
+  have hop : ∀ (b : PAddr) (C D : CPU) (r a : Nat), Xv6.AccessDiscipline.certHopAt σ b a →
+      syncHop (σ.mem.landedOnly σ.lp) b C r D a →
+      SbKillR.landedEnt σ r ∧ SbKillR.landedEnt σ a ∧ (ev r).1 = hartAgent C ∧
+      (ev a).1 = hartAgent D ∧ lockRel GR (paZ b) (ev r) ∧ lockAcq GR (paZ b) (ev a) ∧
+      gwix GR (ev r) < gwix GR (ev a) ∧ SbKillR.acqAmo GR (ev a) ∧ σ.pcAt r = LockFacts.relPc := by
+    intro b C D r a hcert hsh
+    have hpcr := hpc b C D r a hcert hsh
+    obtain ⟨aq, rl, base, ts, rvs, wvs, kc, hl⟩ := hR.acq b C D r a hcert hsh
+    have haq := hAq _ aq rl base ts rvs wvs kc hl
+    subst haq
+    obtain ⟨H1, H2, e0, va, hb, hva, -, -, -, -⟩ := hsh
+    have hb' : (σ.mem.landedOnly σ.lp)[b]? =
+        some ((H1 ++ [⟨a, hartAgent D, va⟩]) ++ ⟨r, hartAgent C, 0⟩ :: e0 :: H2) := by
+      rw [hb]; simp
+    obtain ⟨-, hr1, hrw⟩ := hR.wr b _ _ _ hb' (List.cons_ne_nil _ _)
+    obtain ⟨-, ha1, haw⟩ := hR.wr b H1 _ _ hb (List.cons_ne_nil _ _)
+    have hco := hR.co b H1 (e0 :: H2) _ _ hb (List.cons_ne_nil _ _)
+    exact ⟨⟨b, _, _, _, hb', List.cons_ne_nil _ _, rfl⟩, ⟨b, H1, _, _, hb, List.cons_ne_nil _ _, rfl⟩,
+      hr1, ha1, hrw, ⟨va, haw, hva⟩, hco, ⟨rl, base, ts, rvs, wvs, kc, hl⟩, hpcr⟩
+  induction h with
+  | base b hcert hsh htr =>
+    intro hx1 hxpo
+    obtain ⟨hlr, hla, hr1, ha1, hrel, hacq, hlt, hamo, hpcr⟩ := hop b _ _ _ _ hcert hsh
+    obtain ⟨hpos, hfl⟩ := hN _ hlr hpcr
+    have hxR := hx1.trans hr1.symm
+    exact ⟨.base (paZ b) _ _ (SbKillR.relStampOfAdj GR x _ hxR (hxpo _ hlr htr hxR.symm) hxRW hpos hfl)
+      hrel hacq hlt hamo, ha1, hla⟩
+  | step b _ hcert hsh ha1r ih =>
+    intro hx1 hxpo
+    obtain ⟨ih1, ih2, ih3⟩ := ih hx1 hxpo
+    obtain ⟨hlr, hla, hr1, ha1, hrel, hacq, hlt, hamo, -⟩ := hop b _ _ _ _ hcert hsh
+    have hAR := ih2.trans hr1.symm
+    exact ⟨.step (paZ b) _ _ _ ih1 hAR (hR.po _ _ ih3 hlr ha1r hAR) hrel hacq hlt
+      hamo, ha1, hla⟩
 
 /-! ## 5.1 (t3) D3 — G7's fetch certificate with the own-hart corners split off
 

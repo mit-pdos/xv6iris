@@ -134,6 +134,45 @@ theorem evFenceP (img : Image) (c : SbCand.CandS) (σ : MState) (cpu : CPU) (b :
   ⟨⟨fenceGuardOf img c σ cpu b pr pw sr sw hl hR hdr hfi, rfl⟩,
     rmemPFence img c σ cpu b pr pw sr sw (fenceEpochOfEbar b htso pr pw sr sw hl) hR⟩
 
+/-- **M-S2's MACHINE RULE, NAMED** ([OWN.156], supersedes [OWN.146]): MachCSL's `fence.i` is NON-DRAINING —
+the barrier guard `fenceDrainsSb` is the data-side W→R drain `fenceDrains` alone (Zifencei: `fence.i` orders
+no data access; riscv.cat has no `fence.i`).  FALSE at the current tip (`fenceDrainsSb` still joins
+`fenceIfetch`, the kept drain EX-FENCEI-1); TRUE by definition once w1's M-S2 lands (`fenceDrainsSb b :=
+fenceDrains b`), so every row below stated against it closes then with `fun _ => rfl`. -/
+def MS2FenceINoDrain : Prop := ∀ b : barrier_kind, fenceDrainsSb b = fenceDrains b
+
+/-- The barrier guard under M-S2: the twin's data drain alone. -/
+theorem fenceGuardNd (img : Image) (c : SbCand.CandS) (σ : MState) (cpu : CPU) (b : barrier_kind)
+    (pr pw sr sw : Bool) (hl : ebarLabel b = .LFence pr pw sr sw) (hR : rmemP img c σ)
+    (hms2 : MS2FenceINoDrain) (hdr : SbCand.drains pw sr = true → c.sb (hartAgent cpu) = []) :
+    fenceDrainsSb b = true → σ.sb cpu = [] := by
+  intro h
+  rw [hms2 b, fenceDrainsOfEbar b pr pw sr sw hl] at h
+  have := hdr (by simpa [SbCand.drains] using h)
+  have hf := hR.2.2.2.2.1 cpu
+  rw [this] at hf
+  exact forall2NilRight hf
+
+/-- **THE FENCE ROW FOR THE NON-DRAINING MACHINE** [c, d] (M-S2, [OWN.156]): a barrier other than `fence.tso`
+(F-PW6-3), its twin label `ebarLabel b`, its drain from the twin's (`pw ∧ sr`) ALONE — `fence.i` (twin label
+`LFence false false false false`, no S-R gate: `SbOrdR.enbLR`'s fence arm asks nothing) goes with the hart's
+buffer non-empty (the `userret` shape of F-CM-3).  No walk gate and no fetch marker. -/
+theorem evFenceNdP (img : Image) (c : SbCand.CandS) (σ : MState) (cpu : CPU) (b : barrier_kind)
+    (pr pw sr sw : Bool) (hR : rmemP img c σ) (htso : b ≠ .Barrier_RISCV_tso)
+    (hl : ebarLabel b = .LFence pr pw sr sw) (hms2 : MS2FenceINoDrain)
+    (hdr : SbCand.drains pw sr = true → c.sb (hartAgent cpu) = []) :
+    evStep cpu (.barrier b) σ () (σ.fence cpu b) ∧
+      rmemP img (SbCand.nextE c (hartAgent cpu) (LFence pr pw sr sw)) (σ.fence cpu b) :=
+  ⟨⟨fenceGuardNd img c σ cpu b pr pw sr sw hl hR hms2 hdr, rfl⟩,
+    rmemPFence img c σ cpu b pr pw sr sw (fenceEpochOfEbar b htso pr pw sr sw hl) hR⟩
+
+/-- `fence.i`'s twin label asks no drain (so the S-R gate asks nothing of it). -/
+theorem fenceIDrainsFalse (pr pw sr sw : Bool) (hl : ebarLabel .Barrier_RISCV_i = .LFence pr pw sr sw) :
+    SbCand.drains pw sr = false := by
+  have h : (Wlabel.LFence false false false false) = .LFence pr pw sr sw := hl
+  cases h
+  rfl
+
 /-! # 7. The exclusive pair -/
 
 /-- **INSIDE THE EXCLUSIVE PAIR**: the MachCSL state is the exclusive read's post-state of a related
