@@ -6,7 +6,7 @@
 | what | run (on a build machine or in CI, against a built tree) | checked against | fails when |
 |---|---|---|---|
 | assumption audit: what the PROOFS assume | `tools/ci/audit.sh` (`tools/audit/Audit.lean`) | `tools/audit/baseline.json` (hand-kept) | a theorem's axioms outside the `bv_decide` certificate family, or the `opaque` constants in its cone, differ from the baseline in either direction; a certificate-named axiom has the wrong shape; a platform hook is not a definition; any declaration of `MachCSL`/`Xv6` depends on `sorryAx` |
-| trusted base: what a reader must READ | `tools/ci/tcb.sh` (`tools/tcb/Tcb.lean`) | `tools/tcb/expected.json` (`tools/ci/tcb.sh --update`) | for some theorem, the set of this tree's modules its STATEMENT reaches, or the axioms/opaques it reaches, moved |
+| trusted base: what a reader must READ | `tools/ci/tcb.sh` (`tools/tcb/Tcb.lean`), then `tools/ci/tcb.sh --self-test` | `tools/tcb/expected.json` (`tools/ci/tcb.sh --update`) | for some theorem, the set of this tree's modules its STATEMENT reaches, or the axioms/opaques it reaches, moved; or (since 2026-10-23) the CONTENT of a trusted constant of `MachCSL`/`Xv6`/`LeanRV64D.Xv6Extras` -- a hash of its elaborated type and value, pinned per source declaration -- moved, entered or left; the self-test fails when the tool does not fail on a doctored baseline |
 
 Both write `.lake/ci/{audit,tcb}.{json,md}` (and `tcb.txt`), append the markdown to `$GITHUB_STEP_SUMMARY`
 when set, and exit non-zero on a regression.  Audited theorems (the 13 of `tools/ci/roots.txt`):
@@ -64,6 +64,21 @@ theorems had 5 lines fewer -- `HRead.afterExcl` grew -- and the four statements 
 state interpretation had one declaration and 14 lines fewer: `resvInv`); "image" is
 `MachCSL/KernelElf.lean` (1345 counted lines of 1379) + `Xv6/FsImgRaw.lean` (2272 of 2416), the raw kernel
 ELF and `fs.img`, which Rocq keeps outside `iris/` in `kernel-rocq/`.
+
+Since 2026-10-23 the baseline also pins the CONTENT of the project's trusted definitions (the C3 lane
+had changed `HRead.afterExcl` and `MState.afterExcl` and added `resvInv` to `memModelAt` while the
+module sets stayed put, and the set check passed; the C3 audit's finding S2, which also listed
+`evStep` from its moved line range -- its content did not change, as the pin shows): for every trusted constant of
+`MachCSL/`, `Xv6/` and `model/Xv6Extras.lean` in the cone of some theorem, a hash of its elaborated
+type and value, grouped under the source declaration that made it (`tools/tcb/Tcb.lean`'s header,
+"THE HASH"; the generated model is pinned byte for byte by `tools/check_gen.py` instead).  At
+`49b8aef37`'s tree: 2,582 constants under 2,238 declarations (a structure's fields and constructor
+count as declarations of their own, with their own line ranges; the per-theorem tables above fold
+them into the structure).  Demonstrated on the case: with this baseline, the check run on the pre-C3
+tree (`0a2b015d7`, rebuilt) fails with exactly four problems -- `HRead.afterExcl` changed in type and
+value, `MState.afterExcl` and `memModelAt` in value, `resvInv` left -- and a docstring-only, a
+body-comment and a proof-only edit made in the same rebuild moved nothing (`notes/design-rulings.md`,
+2026-10-23).  Process rule: `notes/model-policy.md` section 6, "The trusted base's content".
 
 | Rocq theorem | files / defs / lines | Lean theorem | files / decls / lines | without the image bytes |
 |---|---|---|---|---|

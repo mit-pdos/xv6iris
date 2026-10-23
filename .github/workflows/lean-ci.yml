@@ -211,8 +211,12 @@ jobs:
       # for the statement to mean what they think -- the definitions each top
       # theorem's STATEMENT unfolds to, per file.  Fails when the set of
       # modules (or axioms/opaques) a statement reaches differs from
-      # tools/tcb/expected.json.  The plain tables also go to the log
-      # (`=== TCB <theorem> ===`), because a step summary is served by no API.
+      # tools/tcb/expected.json, or when the CONTENT of a trusted definition
+      # of MachCSL/, Xv6/ or model/Xv6Extras.lean moved (a hash of its
+      # elaborated type and value, pinned there per declaration); then runs
+      # its self-test (the tool must fail on a doctored baseline).  The plain
+      # tables also go to the log (`=== TCB <theorem> ===`), because a step
+      # summary is served by no API.
       - name: Trusted base of the top theorems' statements
         run: tools/ci/run_all.sh tcb
 

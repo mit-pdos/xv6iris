@@ -222,6 +222,30 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   live in `MachCSL.WpPtWalkKpt`; the owned-bytes leaves in `MachCSL.WpCtxBytes`; the TLB-hit rules
   take the miss as an obligation (the cached copy's A/D bits need not match memory's).
 
+- **The trusted-base check pins content (2026-10-23).**  Owner ruling on the C3 audit's finding S2
+  (the check compared module/axiom/`opaque` sets, so the C3 lane's changes to `HRead.afterExcl` and
+  `MState.afterExcl`, and `resvInv`'s entry into `memModelAt`, passed it): `tools/tcb/expected.json`
+  now also pins, for every trusted constant of `MachCSL/`, `Xv6/` and `model/Xv6Extras.lean` in the
+  cone of some top theorem, a hash of its elaborated type and value, keyed by constant and grouped
+  under the source declaration that made it (`Lean.Expr.hash`, 32 bits for the type and 32 for the
+  value or shape; an `opaque` or axiom by its type alone, as the walk reads it).  Per constant rather
+  than one aggregate per declaration (the integrator's recommendation, taken by the owner): which
+  auxiliaries of a declaration the cones reach depends on OTHER definitions (`S.brecOn`, `S.rec`, a
+  projection), so an aggregate would move with them and name an untouched declaration.  The scope
+  excludes the generated model, which `tools/check_gen.py` pins byte for byte.  The CI step runs the
+  check and then its self-test (`tools/tcb/selftest.py`: a doctored copy of the baseline must fail
+  naming exactly the three doctored constants).  Process: `notes/model-policy.md` section 6, "The
+  trusted base's content"; decision (20).  Demonstrated on the case itself: with this baseline, the
+  check run on the pre-C3 tree (`0a2b015d7`, rebuilt) fails with exactly four problems and no set
+  problem -- `HRead.afterExcl` CHANGED (type and value; `MachCSL/TsoMem.lean:277-278` there),
+  `MState.afterExcl` CHANGED (value only), `memModelAt` CHANGED (value only), `resvInv` LEFT -- while a
+  docstring-only edit (`HRead.afterLoad`), a comment inside a trusted body (`HRead.cohOk`) and a
+  proof-only edit (`ownPub_le`) made in the same rebuild moved nothing.  A precision for the C3
+  record: S2 listed `evStep` as changed, from its moved line range; its elaborated content is
+  identical before and after the lane (the lane changed comments in its range and the body of
+  `MState.afterExcl`, which it calls).  Baseline at `49b8aef37`'s tree: 2,582 constants under 2,238
+  declarations; the tool's runtime is unchanged (~1.8 s), the self-test adds a second run.
+
 ## From `notes/briefs/crash_layer.md`
 
 **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.

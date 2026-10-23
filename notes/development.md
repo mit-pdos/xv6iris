@@ -33,9 +33,11 @@ Hard-won rules for working on this tree.  Design notes are in `notes/design/` an
 
 - Full `lake build Xv6 MachCSL`, `tools/ci/lint.sh` and no `sorry` before every push (module builds miss
   cross-file name clashes).  Push each green commit to `origin lean`.
-- A change that moves axioms/opaques, the TCB module set, coverage or generated files must update the
-  baseline in the same commit: `tools/audit/baseline.json`, `tools/tcb/expected.json`
-  (`tools/ci/tcb.sh --update`), `tools/ci/coverage_*.txt`, the generators.  Docs-only pushes:
+- A change that moves axioms/opaques, the TCB module set or the content of a trusted definition
+  (`tools/ci/tcb.sh` names it with its `file:lines`; `notes/model-policy.md` section 6), coverage or
+  generated files must update the baseline in the same commit: `tools/audit/baseline.json`,
+  `tools/tcb/expected.json` (`tools/ci/tcb.sh --update`, then read the diff), `tools/ci/coverage_*.txt`,
+  the generators.  Docs-only pushes:
   `[skip ci]`.
 - CI (`lean-ci.yml`) runs on the shared `coqdev` runner (24 cores); runs can queue behind Rocq jobs.
 
