@@ -21,8 +21,10 @@
 #                    tools/ci/timed_build.sh so the profile has its log
 #   audit            tools/ci/audit.sh: axioms / opaques of the top theorems
 #                    against tools/audit/baseline.json            (BLOCKING)
-#   tcb              tools/ci/tcb.sh: what the STATEMENTS depend on, against
-#                    tools/tcb/expected.json                      (BLOCKING)
+#   tcb              tools/ci/tcb.sh: what the STATEMENTS depend on -- the
+#                    module sets and the content of the trusted definitions
+#                    -- against tools/tcb/expected.json, then its self-test
+#                    (tcb.sh --self-test)                         (BLOCKING)
 #   reports          tools/ci/reports.sh: environment facts and proof coverage
 #                    (BLOCKING), build profile and dead code (informational)
 #   vtest            tools/ci/vtest.sh check-ci: the device-conformance suite
@@ -192,7 +194,9 @@ step_build() {
 
 step_audit() { tools/ci/audit.sh; }
 
-step_tcb() { tools/ci/tcb.sh; }
+# The check, then the check of the check: the tool against a doctored
+# baseline must fail (tools/tcb/selftest.py; ~3 s more).
+step_tcb() { tools/ci/tcb.sh && tools/ci/tcb.sh --self-test; }
 
 step_reports() {
   # Source-file attribution for the coverage report: best effort, never
