@@ -290,7 +290,7 @@ system theorem's "no hart is stuck" then obliges the proofs to rule out; (17) co
 re-check of fork 1 is dropped (redundant on the equal branch, and not what step 7 says); (18) the
 language's delta 2 ("a conditional write never fails") is unchanged, so fork 1's `Ok(false)` arm stays
 an `internal_error` (the integrator's recommendation, explained to the owner on 2026-10-22 together
-with its rationale and not objected to; recorded as tacit until the owner confirms it explicitly); (19) an exclusive read stamps its footprint's coherence floors (register section
+with its rationale; approved explicitly by the owner on 2026-10-23); (19) an exclusive read stamps its footprint's coherence floors (register section
 5) -- the one semantics change, needed because without it the model let a hart re-read a stale entry
 after its exclusive read and exhaust the bound in a run no coherent machine has; RVWMO's rule for an
 explicit load after an LR, and for the page walker's implicit reads a modelling assumption narrower
