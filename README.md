@@ -48,7 +48,10 @@ the model leaves unspecified are `opaque` (arbitrary but fixed), as is the seale
 `MachCSL.bootImageSealed`, whose value `bootImage_eq` proves (`notes/adequacy_axioms_baseline.md`).
 CI checks this on every push, and
 also reports the *trusted base* of each statement: the definitions a reader must check to trust it
-(the machine model, the generated Sail model, the trace and application specifications).
+(the machine model, the generated Sail model, the trace and application specifications) -- and pins
+their content: a hash of each trusted definition's elaborated type and body (`tools/tcb/expected.json`),
+so a change to what a theorem says fails CI until the baseline is updated in the same commit
+(`notes/model-policy.md`, section 6, "The trusted base's content").
 
 Two restrictions of the modelled machine bound these statements and are recorded rather than hidden
 (`notes/model-diffs.md`): the memory never fails a conditional write, so the page walker's atomic A/D
@@ -200,7 +203,9 @@ and in each file's "Deviations from Rocq" header.
   `native_decide` in the proofs), no orphan modules; generated files equal their generators' output.
 - **build**: the Sail model and libraries (cached), then `lake build Xv6 MachCSL` from clean, timed.
 - **audit**: the axioms and `opaque`s of every top theorem against `tools/audit/baseline.json`.
-- **tcb**: the definitions each top theorem's statement depends on, against `tools/tcb/expected.json`.
+- **tcb**: the definitions each top theorem's statement depends on -- the module sets and, for
+  `MachCSL/`, `Xv6/` and `model/Xv6Extras.lean`, the content of every trusted definition (a hash of its
+  elaborated type and body) -- against `tools/tcb/expected.json`; then the check's self-test.
 - **reports**: proof coverage of the pinned images — every kernel function proven, linked and reached,
   every user-program byte either stepped by a proof or explained (unreachable library code, uncalled
   functions, dead branch arms); the build profile with its critical path; dead code (informational).

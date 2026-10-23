@@ -172,6 +172,23 @@ H).  The clause stands, as the test future cases are held to.
   the `Register` count matches (`MachCSL.regCount`);
   `#print axioms` of the top theorem shows the three standard axioms; the cold-boot proof
   evaluates `config_is_valid`; and the device-conformance runs (`tools/ci/vtest.sh`) stay green.
+- **The trusted base's content** (owner, 2026-10-23; section 8, decision (20)).  `tools/ci/tcb.sh`
+  pins, besides the module, axiom and `opaque` sets each top theorem's statement reaches, the
+  CONTENT of every trusted constant of the project's own code -- `MachCSL/`, `Xv6/`,
+  `model/Xv6Extras.lean` -- as a hash of its elaborated type and value, grouped by source
+  declaration in `tools/tcb/expected.json` (the generated model is pinned by the regeneration check
+  above, byte for byte).  A moved hash means a top theorem's STATEMENT changed meaning, or a trusted
+  definition was refactored equivalently (renaming a constant moves every hash that mentions it), or
+  a toolchain bump re-elaborated it.  The committer reads the named declarations (the failure gives
+  each one's `file:lines`), re-baselines with `tools/ci/tcb.sh --update` IN THE SAME COMMIT, reads
+  the diff of `expected.json` line by line, records a semantics change in `notes/model-diffs.md`
+  section 5 or `notes/design-rulings.md`, and obtains the owner's ruling where this policy already
+  requires one (M1-M4 above, the kernel's and the user tier's contracts, T5).  Proofs, comments,
+  docstrings, formatting, binder names and implicit/explicit markers never move a hash; a toolchain
+  bump is expected to move many at once, and that diff is reviewed as the bump's.  The case this
+  rule exists for: the C3 lane changed `HRead.afterExcl` and `MState.afterExcl` and added `resvInv`
+  to `memModelAt` while the module sets stayed put, and the step passed (audit finding S2,
+  2026-10-22; with the pin, the pre-C3 tree fails against today's baseline on exactly those four).
 - **Bumps.** The model moves release to release, never to a `master` commit.  The compiler moves
   to a release once one contains the fixes; until then a pinned upstream commit plus the fixes.  A
   bump: reads the ChangeLog since the previous pin and lists every item touching a recorded
@@ -299,3 +316,11 @@ consequence is liveness-only (register section 5; audit of 2026-10-22); the alte
 presetting A and D in the kernel's `mappages` (the liveness plan's R2-D3(a)), is deferred until it is
 needed.  The lane also found that the compare can fail in xv6 (two harts first touching one kernel
 page), so the kernel-table rules cover the re-walk rather than assume the equal branch.
+
+**Decided by the owner (2026-10-23), on the C3 audit's finding S2** (the trusted-base step compared
+module/axiom/`opaque` sets only, so the lane's changes to `HRead.afterExcl`, `MState.afterExcl` and
+`memModelAt` passed it; lane `tcb-content`, `local-plan/tcb-content/`, outside the repository): (20) the
+trusted-base check pins the content of the project's trusted declarations -- per constant, grouped by
+source declaration, a hash of the elaborated type and value, for `MachCSL`, `Xv6` and
+`LeanRV64D.Xv6Extras`, with a self-test of the check in the same CI step -- under the process rule of
+section 6, "The trusted base's content".

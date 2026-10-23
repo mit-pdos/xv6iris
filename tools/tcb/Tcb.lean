@@ -64,7 +64,7 @@ THE CHECK (Rocq's step only reports; "what to watch is the FILE COUNT").
      part of the tree.
 
   2. THE CONTENT, shared by all theorems (2026-10-23; the C3 lane had
-     changed the meaning of `HRead.afterExcl` and `evStep` and added a
+     changed the meaning of `HRead.afterExcl` and `MState.afterExcl` and added a
      conjunct to `memModelAt` while the sets stayed put, and the step passed):
      for every trusted constant of the PROJECT'S OWN code -- the modules
      under `MachCSL` and `Xv6`, and `LeanRV64D.Xv6Extras`, the hand-written
