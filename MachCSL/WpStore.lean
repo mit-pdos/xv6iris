@@ -39,7 +39,7 @@ theorem swp_checked_mem_write_store8 [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
   unfold checked_mem_write
   swp_run 60
   iapply swp_bind
-  iapply (hok.2 cpu dq pa 8 _ _ (by simp [kernelAccess]) hram)
+  iapply (hok.2 cpu dq pa 8 _ _ (by simp [kernelAccess]) hram (pmpSafe_of_aligned hal (by decide)))
   iframe
   inext
   iintro Hpmpcfg_n Hpmpaddr_n
@@ -102,7 +102,7 @@ theorem execSpec_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   mconf_cases HmConf
   swp_run 40
   iapply swp_bind
-  iapply (hok.2 cpu dq _ 8 _ _ (by simp [kernelAccess]) hram)
+  iapply (hok.2 cpu dq _ 8 _ _ (by simp [kernelAccess]) hram (pmpSafe_of_aligned hal (by decide)))
   iframe
   inext
   iintro Hpmpcfg_n Hpmpaddr_n

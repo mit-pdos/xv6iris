@@ -51,7 +51,8 @@ macro "checked_mem_read_conf_load_proof" pa:ident n:num hram:ident hal:ident : t
     unfold checked_mem_read
     swp_run 60
     iapply swp_bind
-    iapply (hok.2 cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hok.2 cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram
+      (pmpSafe_of_aligned $hal (by decide)))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
@@ -71,7 +72,8 @@ macro "checked_mem_read_conf_proof" pa:ident n:num hram:ident hal:ident : tactic
     unfold checked_mem_read
     swp_run 60
     iapply swp_bind
-    iapply (hok.2 cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram)
+    iapply (hok.2 cpu dq $pa $n _ _ (by simp [kernelAccess]) $hram
+      (pmpSafe_of_aligned $hal (by decide)))
     iframe
     inext
     iintro Hpmpcfg_n Hpmpaddr_n
