@@ -196,6 +196,55 @@ Each is conditional and reports itself in the regeneration log.
   the four statements that quantify over the state interpretation (`riscvPowerAdequacy`,
   `xv6PowerAdequacy`, `xv6FsAdequacy_xv6GF`, `userProof`) through `memModelAt`; the closed
   statements (`xv6TracePure`, `mmOk`) do not mention it.
+- **A reservation is released at the cycle boundary and at a blocked plain store, unless it is an
+  LR's** (owner, 2026-10-24; `notes/model-policy.md` section 8, decision (21); lane `lang-drop`, the
+  liveness plan's R2 B2): the reservation record carries its origin (`MachCSL.ResvKind`: `rmw` for
+  an AMO's window, `pte` for the page walker's A/D update, `lr` for an LR; `kindOf` of the exclusive
+  read's access kind), and `MState.dropWindow` releases a non-LR reservation in two new arms,
+  `hartStep`'s boundary arm and `blockedStep`'s plain-store arm.  Why: MachCSL makes a
+  read-modify-write atomic by a reservation that blocks the other harts' stores and exclusive reads
+  into its footprint; three paths left one standing after its operation was over -- the walker's
+  A/D update finding the bits already set (`PTE_Update_Done none`, no write; reachable in xv6 when
+  two harts first touch one kernel page, as the C3 lane showed), a failed AMOCAS, and an LR until
+  its SC -- and a reservation that outlives its operation has no hardware counterpart: it makes
+  another hart's access wait on an unrelated later instruction of the holder, possibly for ever,
+  and two harts could deadlock on each other's.  The spec's permission (the removed behaviours are
+  ones its sentences exclude): an aligned AMO "gives rise to a single memory operation"
+  (`norm:rvwmo_aligned_amo_memop`, `unpriv/rvwmo.adoc:73`) that atomically loads, operates and
+  stores (`norm:amo_op`, `unpriv/zaamo.adoc:8`), so no architectural state survives it; the A/D
+  update "must be atomic with respect to other accesses to the PTE" and is its compare-and-store,
+  and "a trap may occur between the PTE update and the memory access" (`priv/supervisor.adoc:1622-1624`,
+  `:1642-1645`), so nothing ties the PTE to the hart after it; and "no memory operation may be
+  preceded in the global memory order by an infinite sequence of other memory operations" (the
+  Progress Axiom, `unpriv/rvwmo.adoc:347-351`), which a reservation kept for ever violates.  Neither
+  arm fires inside an atomic operation -- an AMO's and the walker's event sequences contain no
+  boundary and no plain store (the re-walk after a failed compare is plain reads) -- so every AMO and
+  every A/D compare-and-store behaves exactly as before and the kernel-table rules that carry a
+  reservation through the re-walk are unchanged; a conditional write holding its own reservation is
+  never blocked (`resvInv`'s disjointness), so the `if akExcl` guard on the blocked-write arm is inert
+  and kept as the smaller change.  An LR's reservation is untouched: it lives until the hart's next
+  store or exclusive read, as before, because the SC's outcome is the opaque predicate (above) and
+  releasing it would trade a liveness artefact for a safety over-approximation of successful LR/SC
+  pairs; the faithful semantics (the reservation as per-hart state the model reads, an LR excluding
+  nobody, the SC's outcome coupled to interference) is the recorded target for when a theorem over
+  arbitrary user code needs it.  History: the Rocq prototype cleared the reservation at the boundary
+  (`iris/RiscvLang.v:1860-1862` on `origin/rocq`; its design note calls it "the per-cycle garbage
+  collection"); the Lean port omitted it to keep the boundary rule resource-free
+  (`notes/design/tso-memory-model.md`, now superseded) and rejected the blocked-store release on
+  2026-08-18 because pairwise disjointness of reservations was not then an invariant -- since
+  decision (19) it is.  Policy class: a change to M3 (section 1 of the policy); A5's "removal of
+  behaviour recorded together with the spec's permission".  What moved in the trusted base
+  (`tools/tcb/expected.json`, re-pinned in this commit; the check against the old baseline named
+  exactly these 25 constants and no set problem): CHANGED -- `Resv` (a structure now), `snapOf` (type
+  and value: the kind parameter), `Resv.overlaps`, `mmOk` and `resvInv` (they read `r.snap`),
+  `MState.afterExcl` (type and value), `evStep` (its exclusive-read arm passes the kind), `blockedStep`,
+  `hartStep`; ENTERED -- `ResvKind` with `rmw`/`pte`/`lr`, `rec`, `casesOn`, `ctorIdx` and
+  `instDecidableEqResvKind`, `Resv.mk`/`snap`/`kind`, `kindOf`, `akLR` and `akPteRe` (reached through
+  it), `MState.dropWindow` and its `match_1`.  Nothing LEFT; no module, axiom or `opaque` set changed;
+  the constants that merely NAME `Resv` (`MState`, `resvMap`, `memModelAt`, ...) did not move, as the
+  hash covers a constant's name, not its definition.  The conformance harness mirrors both arms
+  (`vtest-lean/Vtest/HartExec.lean`, `blockedExec` and `hartExec`) and no green result changed
+  (every capture is sequential, so no run takes a blocked step).
 
 ## 6. Open decisions
 

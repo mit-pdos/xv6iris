@@ -46,13 +46,13 @@ theorem execSpec_jalr_x0 (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVe
     iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 /-- `jalr x0, 0(rs1)`: jump to `rs1` with bit 0 cleared (`ret`, `c.jr`). -/
-theorem wp_m_jalr_x0 (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_jalr_x0 [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.JALR (0#12, regidx.Regidx rs1, regidx.Regidx 0#5)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rs1 (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗ ctxTok cpu curCtx -∗
         gpr cpu rs1 (DFrac.own 1) v -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_jalr_x0 cpu dq c pc _ rs1 hrs1 v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_jalr_x0 cpu dq c pc _ rs1 hrs1 v)
 
 end MachCSL

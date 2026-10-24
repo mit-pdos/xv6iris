@@ -549,6 +549,9 @@ theorem ctxTok_uResvTok (cpu : CPU) (ξ : CtxId) :
   iexists r
   iexact Hf
 
+/-- The walk's hold on the reservation is the hart's reservation token. -/
+theorem uResvTok_eq_resvAny (cpu : CPU) (rv : Bool) : uResvTok (GF := GF) cpu rv = resvAny cpu := rfl
+
 theorem uResvTok_ctxTok (cpu : CPU) (ξ : CtxId) (rv : Bool) :
     ownCtx cpu ξ ∗ uResvTok (GF := GF) cpu rv ⊢ ctxTok cpu ξ := by
   unfold uResvTok
@@ -772,7 +775,8 @@ theorem swp_memRead_excl_au_k (cpu : CPU) (R : MemRequest) (acq : Bool)
     (k : ERet (.memRead R) → SailM X) (Φ : X → IProp GF) :
     ⊢@{IProp GF} ∀ r : Option Resv, resvFragAny cpu r -∗
     exclReadAU R.pa R.size (fun w =>
-      iprop(resvFrag cpu (some (snapOf R.pa R.size w)) acq -∗ swp cpu (k (Except.ok (w, 0#R.numTag))) Φ)) -∗
+      iprop(resvFrag cpu (some (snapOf R.pa R.size w (kindOf R.accessKind))) acq -∗
+        swp cpu (k (Except.ok (w, 0#R.numTag))) Φ)) -∗
     swp cpu (FreeM.impure (.inl (.ok (.memRead R))) k) Φ := by
   subst hacq
   unfold exclReadAU
@@ -840,13 +844,13 @@ theorem swp_memRead_excl_au_k (cpu : CPU) (R : MemRequest) (acq : Bool)
           rw [h1] at h2
           exact (Option.some.inj h2).symm
         subst hww
-        imod memModel_read_excl _ σ cpu R.pa R.size w' r b (akAcq R.accessKind) hn htop hno
-          $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
+        imod memModel_read_excl _ σ cpu R.pa R.size w' r b (akAcq R.accessKind) (kindOf R.accessKind) hn
+          htop hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
         imod Hcont $$ %w' %hheads Hb Hlc with HΦ
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.afterExcl cpu R.pa R.size w' (akAcq R.accessKind)) %⟨fun _ _ => rfl, rfl⟩
-            Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.afterExcl cpu R.pa R.size w' (akAcq R.accessKind) (kindOf R.accessKind))
+            %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
         · iapply HΦ $$ Hfrag
     · iintro %Hbk _
       obtain ⟨_, hno', _⟩ := Hbk
@@ -882,7 +886,7 @@ theorem swp_memWrite_plain_k (cpu : CPU) (R : MemRequest) (w' : BitVec (8 * R.si
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu R.pa R.size
-    · exact Or.inr ⟨σ, hno, rfl⟩
+    · exact Or.inr ⟨σ.dropWindow cpu, hno, by rw [ite_eq_right (by simp [hk])]⟩
     · exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
@@ -906,12 +910,19 @@ theorem swp_memWrite_plain_k (cpu : CPU) (R : MemRequest) (w' : BitVec (8 * R.si
       iframe Hctx Hfrag
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk
-    subst σ'
+    rw [ite_eq_right (by simp [hk])] at hσ
+    subst hσ
+    icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
+    icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+    imod memModel_dropWindow _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-    · iapply IH $$ Htok Hb
+    · iapply machInterp_close_dropWindow σ cpu
+      iframe Hclose Hregs Hmem Hmm
+    · iapply IH $$ [Hctx Hfrag] Hb
+      · iapply ctxTok_introB cpu ξ (dropKind r) b
+        iframe Hctx Hfrag
       inext
       iexact HΦ
 
@@ -945,7 +956,7 @@ theorem swp_memWrite_excl_ctx_k (cpu : CPU) (R : MemRequest) (w' : BitVec (8 * R
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu R.pa R.size
-    · exact Or.inr ⟨σ, hno, rfl⟩
+    · exact Or.inr ⟨σ, hno, by rw [ite_eq_left (by simp [hk])]⟩
     · exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
@@ -966,6 +977,7 @@ theorem swp_memWrite_excl_ctx_k (cpu : CPU) (R : MemRequest) (w' : BitVec (8 * R
     · iapply HΦ $$ Hctx Hfrag Hb
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk
+    rw [ite_eq_left (by simp [hk])] at hσ
     subst σ'
     imod Hmask
     imodintro

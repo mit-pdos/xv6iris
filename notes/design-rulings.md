@@ -246,6 +246,43 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   `MState.afterExcl`, which it calls).  Baseline at `49b8aef37`'s tree: 2,582 constants under 2,238
   declarations; the tool's runtime is unchanged (~1.8 s), the self-test adds a second run.
 
+- **The reservation drop (2026-10-24).**  Owner ruling, on the liveness plan's question whether
+  releasing a dangling reservation brings MachCSL closer to the hardware.  MachCSL makes a
+  read-modify-write atomic by a reservation: the exclusive read records its footprint in `σ.resv cpu`,
+  and every other hart's store or exclusive read into it self-loops until the matching conditional
+  write releases it.  Three paths left a reservation standing after its operation was over -- the
+  walker's A/D update finding the bits already set (`PTE_Update_Done none`, no write; the C3 lane
+  showed two harts first touching one kernel page reach it), a failed AMOCAS, and an LR until its SC
+  -- and such a reservation has no hardware counterpart: an aligned AMO "gives rise to a single memory
+  operation", the A/D update's atomic unit is its compare-and-store after which nothing ties the
+  location to the hart, and RVWMO's Progress Axiom forbids an access preceded by infinitely many
+  others (the register, section 5, quotes the sentences).  Ruling: the reservation record carries its
+  origin (`MachCSL.ResvKind`, from the access kind the exclusive read already carries), and a
+  reservation that is not an LR's is released at the holder's cycle boundary and when the holder is
+  blocked on a plain store (`MState.dropWindow`; `hartStep`'s `.pure` arm, `blockedStep`'s write arm).
+  Since no AMO or A/D window contains a boundary or a plain store, the two arms act only on
+  reservations that have outlived their operation: every interleaving they admit is one hardware
+  exhibits, and every behaviour they remove -- the unbounded wait on an unrelated later instruction
+  of the holder, the two-hart deadlock the Rocq design note accepted -- is one hardware cannot.  An
+  LR's reservation is left as it was: today's semantics matches hardware's safety for a successful
+  SC and a release would match its liveness, and the faithful semantics needs the SC's outcome
+  coupled to interference, which the opaque reservation predicates prevent (the recorded LR/SC
+  limitation; the watch model is the target, decision (21)).  The Rocq prototype had the boundary
+  clear (`iris/RiscvLang.v:1860-1862` on `origin/rocq`); the Lean port omitted it to keep
+  `wpLoop_restart` resource-free, and rejected the blocked-store release (2026-08-18) because
+  pairwise disjointness of reservations was not then an invariant -- since decision (19) it is
+  (`resvInv`), so the objection is answered.  Proof structure: the drop is paid in the boundary rule
+  `wpLoop_restart`, which now takes and returns the hart's reservation fragment (the kernel's cycle
+  rules get it from `transTok`, which carries `ctxTok`; the machine-mode instruction rules thread
+  `ctxTok` as the store rules did; the user-return trampolines' cycle rules take an accessor on their
+  frame; the user cycle takes it explicitly), and in the blocked plain-store leaves
+  (`swp_sail_mem_write_plain` and its accessor and user-tier variants) through `memModel_dropWindow`;
+  the generic event lemmas are untouched, their blocked successor state having always been universal.
+  Process: an M3 change; the register's section 5 bullet with the spec's permission; `tcb.sh --update`
+  in the same commit with the diff read (the register names the constants; `evStep`'s hash moves this
+  time, its arm now passing the kind); the conformance harness mirrors both arms
+  (`vtest-lean/Vtest/HartExec.lean`) and no green run changed; decision (21).
+
 ## From `notes/briefs/crash_layer.md`
 
 **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.

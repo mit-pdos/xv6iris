@@ -52,6 +52,7 @@ theorem userret_ualu [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk 
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc i iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R')
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
     (hexec.frameL _))
@@ -132,6 +133,7 @@ theorem userret_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat))) 8 (DFrac.own 1)
       (tfW ws (4 + n.toNat)))
     _
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hvp)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hvp2)
     (userret_exec_conseq hexec
@@ -182,6 +184,7 @@ theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk
       Register.hstatus ↦ᵣ[cpu] hs)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ emp ∗
       Register.hstatus ↦ᵣ[cpu] hstatusSret hs)
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
     ((execSpecF_sretU cpu c false hok.phys hspp pc (pc + instrLen false) epc hs R emp).frameL _))

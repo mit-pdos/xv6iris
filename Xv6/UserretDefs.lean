@@ -316,6 +316,47 @@ theorem userret_transSpecA_congr {cpu : CPU} {c : MConf} {T T' : IProp GF} {va :
   iapply HΦ $$ HmConf
   iapply hT.2; iexact HT
 
+/-! ## §5' The reservation lent across the cycle boundary
+
+The S-mode cycle schema (`wpLoop_sT_instr`) takes the hart's reservation
+fragment at the boundary (a non-LR reservation is released there) from the
+translation resource `T` and hands it back: `T ⊢ resvAny cpu ∗ (resvAny cpu -∗ T)`.
+The context token is its second conjunct (`ctxTok_resvAny`). -/
+
+/-- The context token lends the reservation fragment and takes it back. -/
+theorem ctxTok_lendResv (cpu : CPU) (ξ : CtxId) :
+    ctxTok cpu ξ ⊢@{IProp GF} resvAny cpu ∗ (resvAny cpu -∗ ctxTok cpu ξ) := by
+  iintro Ht
+  icases ctxTok_resvAny cpu ξ $$ Ht with ⟨Ho, Hr⟩
+  iframe Hr
+  iintro Hr
+  iapply ctxTok_of_resvAny cpu ξ
+  iframe Ho Hr
+
+/-- The user-table steps' translation resource lends the reservation. -/
+theorem uptT_lendResv [CurCtx] (cpu : CPU) (P : UPtd) :
+    iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ⊢@{IProp GF}
+      resvAny cpu ∗ (resvAny cpu -∗ uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) := by
+  iintro ⟨Hs, #Hk, Ht⟩
+  icases ctxTok_lendResv cpu curCtx $$ Ht with ⟨Hr, Hw⟩
+  iframe Hr
+  iintro Hr
+  iframe Hs Hk
+  iapply Hw $$ Hr
+
+/-- The translation token (`transTok`, its slot and the context token)
+lends the reservation. -/
+theorem transTok_lendResv [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) :
+    transTok cpu tier root ⊢@{IProp GF} resvAny cpu ∗ (resvAny cpu -∗ transTok cpu tier root) := by
+  iintro Htt
+  icases transTok_cases cpu tier root $$ Htt with ⟨Hsl, Ht⟩
+  icases ctxTok_lendResv cpu curCtx $$ Ht with ⟨Hr, Hw⟩
+  iframe Hr
+  iintro Hr
+  iapply transTok_intro cpu tier root
+  iframe Hsl
+  iapply Hw $$ Hr
+
 end
 
 /-! ## §6 The running block and the trapframe page -/

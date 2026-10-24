@@ -135,9 +135,13 @@ theorem devWrite_diskOf (ds ds' : DevStates) (pa : PAddr) (n : Nat) (w : BitVec 
 
 theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM Unit} {σ' : MState}
     (h : hartStep cpu m σ m' σ') : diskOf σ'.devs = diskOf σ.devs := by
+  -- releasing a reservation leaves the devices alone (`MState.dropWindow_devs`,
+  -- `MachCSL.ObsTrace`, is not visible here)
+  have hdw : (σ.dropWindow cpu).devs = σ.devs := by
+    unfold MState.dropWindow; split <;> (try split) <;> rfl
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rw [hdw]
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hev⟩ | ⟨hb, _⟩
@@ -160,7 +164,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
       all_goals first
         | exact hb.elim
         | (obtain ⟨_, _, rfl⟩ := hb; rfl)
-        | (obtain ⟨_, rfl⟩ := hb; rfl)
+        | (obtain ⟨_, rfl⟩ := hb; split <;> simp only [hdw])
   · -- a finite choice: nothing moves
     obtain ⟨_, _, rfl⟩ := h; rfl
 

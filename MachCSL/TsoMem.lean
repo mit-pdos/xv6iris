@@ -27,15 +27,24 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   fence with a W-only successor (`fence rw,w`, `w,w`, `r,w`) is a no-op:
   W→W and R→W order come free from the single order.
 * **Exclusive / AMO accesses.**  An exclusive read reads memory at the top
-  and records a *reservation* (a snapshot of the bytes); like a plain load
-  at the top it raises the read watermark and stamps the footprint's
-  coherence floors at the top (RVWMO ppo rule 2 applies to it as to a plain
-  load; until 2026-10-22 it left the floors alone, so a plain load after an
-  exclusive read of the same byte could read back in time -- owner ruling
-  2026-10-22, the C3 lane).  While a hart holds a reservation, every other
-  hart's store or exclusive read overlapping it is blocked (the hart
-  self-loops).  The paired write appends like any store; an acquire pair
-  (`.aq`) takes the floor past its own append.
+  and records a *reservation* (a snapshot of the bytes, tagged with its
+  origin: an AMO's window, the page walker's A/D update, or an LR); like a
+  plain load at the top it raises the read watermark and stamps the
+  footprint's coherence floors at the top (RVWMO ppo rule 2 applies to it as
+  to a plain load; until 2026-10-22 it left the floors alone, so a plain load
+  after an exclusive read of the same byte could read back in time -- owner
+  ruling 2026-10-22, the C3 lane).  While a hart holds a reservation, every
+  other hart's store or exclusive read overlapping it is blocked (the hart
+  self-loops).  The paired write appends like any store and releases the
+  reservation; an acquire pair (`.aq`) takes the floor past its own append.
+  A reservation that is not an LR's is also released at its holder's cycle
+  boundary and when its holder is blocked on a plain store (`MachCSL.Lang`,
+  `MState.dropWindow`): once its atomic operation is over it has no hardware
+  counterpart, and keeping it would block the other harts until the holder's
+  next store, possibly for ever (owner ruling 2026-10-24, policy decision
+  (21)).  An LR's reservation lives, as before, until the hart's next store
+  or exclusive read: its SC comes in a later instruction, so its window spans
+  instructions by design.
 * **The non-coherent instruction cache.**  A fetch reads at a view at or
   above the hart's *instruction view* `itv`, as an agent that never authors
   a store (no forwarding: a hart's own store to code is not fetched until
@@ -211,10 +220,26 @@ theorem exists_bv_of_bytes : ∀ (n : Nat) (bs : Nat → BitVec 8),
 
 /-! ## Reservations -/
 
-/-- A hart's reservation: the snapshot an exclusive read took. -/
-abbrev Resv := Mem
+/-- Who took a reservation: an AMO's window (`rmw`), the page walker's atomic
+A/D update (`pte`), or an LR (`lr`), whose SC comes in a later instruction so
+that its window spans instructions by design.  The cycle boundary and a
+blocked plain store release every reservation but an LR's (`MachCSL.Lang`,
+`MState.dropWindow`; owner ruling 2026-10-24, policy decision (21)). -/
+inductive ResvKind
+  | rmw
+  | pte
+  | lr
+  deriving DecidableEq
 
-def snapOf (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Resv := Mem.writeBytes ∅ pa n w
+/-- A hart's reservation: the snapshot an exclusive read took, and its origin. -/
+structure Resv where
+  snap : Mem
+  kind : ResvKind := .rmw
+
+/-- The reservation an exclusive read of `w` at `pa` takes: the snapshot of
+the footprint's bytes, of the given origin (an AMO's by default). -/
+def snapOf (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (kind : ResvKind := .rmw) : Resv :=
+  ⟨Mem.writeBytes ∅ pa n w, kind⟩
 
 theorem Mem.foldl_insert_get? (m : Mem) (pa : PAddr) (bs : Nat → BitVec 8) :
     ∀ n : Nat, n < 2 ^ 64 → ∀ j, j < n →
@@ -242,13 +267,14 @@ theorem Mem.writeBytes_get?_in {n : Nat} (m : Mem) (pa : PAddr) (w : BitVec (8 *
     (j : Nat) (hj : j < n) : (m.writeBytes pa n w)[pa + BitVec.ofNat 64 j]? = some (nthByte w j) :=
   Mem.foldl_insert_get? m pa (nthByte w) n hn j hj
 
-theorem snapOf_get? (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (hn : n < 2 ^ 64) (j : Nat) (hj : j < n) :
-    (snapOf pa n w)[pa + BitVec.ofNat 64 j]? = some (nthByte w j) :=
+theorem snapOf_get? (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) {kind : ResvKind} (hn : n < 2 ^ 64)
+    (j : Nat) (hj : j < n) :
+    (snapOf pa n w kind).snap[pa + BitVec.ofNat 64 j]? = some (nthByte w j) :=
   Mem.writeBytes_get?_in ∅ pa w hn j hj
 
 /-- The snapshot overlaps the footprint of an `n`-byte access at `pa`. -/
 def Resv.overlaps (r : Resv) (pa : PAddr) (n : Nat) : Prop :=
-  ∃ j, j < n ∧ (r[pa + BitVec.ofNat 64 j]?).isSome
+  ∃ j, j < n ∧ (r.snap[pa + BitVec.ofNat 64 j]?).isSome
 
 /-- Some *other* hart reserves a byte of the footprint. -/
 def othersReserve (resv : CPU → Option Resv) (cpu : CPU) (pa : PAddr) (n : Nat) : Prop :=
@@ -425,7 +451,7 @@ theorem akExcl_of_ifetch (k : AK) (h : akIfetch k = true) : akExcl k = false := 
   rcases k with ⟨wk, acc⟩ | ⟨rk, acc⟩ <;> cases acc <;> simp_all [akIfetch, akExcl] <;>
     cases rk <;> simp_all
 
-/-! ### Finer classes (not used by the safety semantics; the liveness `Lang` drop keys on them) -/
+/-! ### Finer classes (the origin of a reservation, `kindOf`, keys on them) -/
 
 /-- The read or write half of an AMO (`Atomic …` access type). -/
 def akRmw (k : AK) : Bool := ak_is_atomic_rmw k
@@ -435,6 +461,10 @@ def akLR (k : AK) : Bool := ak_is_exclusive k
 
 /-- The atomic A/D update's exclusive re-read or conditional write-back of a PTE. -/
 def akPteRe (k : AK) : Bool := akExcl k && ak_is_ttw k
+
+/-- The origin an exclusive read's access kind gives its reservation: an LR's
+(`akLR`), the page walker's (`akPteRe`), otherwise an AMO's. -/
+def kindOf (k : AK) : ResvKind := if akLR k then .lr else if akPteRe k then .pte else .rmw
 
 /-! ## Well-formed histories -/
 

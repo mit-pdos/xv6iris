@@ -275,15 +275,18 @@ theorem afterExclHR_eq (hr : HRead) (pa : PAddr) (n : Nat) (top : Nat) (acq : Bo
   · rw [ite_eq_left (this.2 h), ite_eq_left h]
   · rw [ite_eq_right (fun h' => h (this.1 h')), ite_eq_right h]
 
-def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool) :
-    XState :=
+/-- After an exclusive read: the reservation records its origin `kind`
+(`kindOf` of the access kind, as `evStep`'s exclusive-read arm passes it). -/
+def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool)
+    (kind : ResvKind) : XState :=
   x.setHart cpu { x.hart cpu with
     tv := if acq then x.log.length else (x.hart cpu).tv,
     hr := afterExclHR (x.hart cpu).hr pa n x.log.length acq,
-    resv := some (snapOf pa n w) }
+    resv := some (snapOf pa n w kind) }
 
 theorem abs_afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (acq : Bool) : (x.afterExcl cpu pa n w acq).abs = x.abs.afterExcl cpu pa n w acq := by
+    (acq : Bool) (kind : ResvKind) :
+    (x.afterExcl cpu pa n w acq kind).abs = x.abs.afterExcl cpu pa n w acq kind := by
   rw [afterExcl, abs_setHart, afterExclHR_eq]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
@@ -293,6 +296,26 @@ def dropResv (x : XState) (cpu : CPU) : XState :=
 theorem abs_dropResv (x : XState) (cpu : CPU) : (x.dropResv cpu).abs = x.abs.dropResv cpu := by
   rw [dropResv, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
+
+/-- Release the hart's reservation unless it is an LR's: the cycle boundary
+and a blocked plain store (`MState.dropWindow`; owner ruling 2026-10-24,
+policy decision (21)). -/
+def dropWindow (x : XState) (cpu : CPU) : XState :=
+  match (x.hart cpu).resv with
+  | some r => if r.kind = .lr then x else x.dropResv cpu
+  | none => x
+
+theorem abs_dropWindow (x : XState) (cpu : CPU) :
+    (x.dropWindow cpu).abs = x.abs.dropWindow cpu := by
+  have hr : x.abs.resv cpu = (x.hart cpu).resv := rfl
+  unfold dropWindow MState.dropWindow
+  rw [hr]
+  cases (x.hart cpu).resv with
+  | none => rfl
+  | some r =>
+    by_cases hk : r.kind = ResvKind.lr
+    · simp only [hk, ↓reduceIte]
+    · simp only [hk, ↓reduceIte, abs_dropResv]
 
 def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
     XState :=

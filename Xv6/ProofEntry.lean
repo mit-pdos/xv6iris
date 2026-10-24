@@ -54,7 +54,7 @@ theorem EntryProof : ENTRY where
     entry_norm
     -- 80000000: auipc sp, 0xa
     entry_step wp_m_auipc cpu dq (bootConfOf z) (bootConfOf_ok z) _ false 0xa#20 2#5 (by decide) v2
-    iintro HmBoot Hclock Hpc Hx2
+    iintro HmBoot Hclock Hpc Htok Hx2
     entry_norm
     -- 80000004: ld sp, 600(sp)
     entry_step wp_m_ld_same cpu dq dqg (bootConfOf z) (bootConfOf_ok z) _ false 1000#12 2#5 (by decide) (KA.«_entry» + 0xa000#64) s0
@@ -62,27 +62,27 @@ theorem EntryProof : ENTRY where
     entry_norm
     -- 80000008: c.lui a0, 0x1
     entry_step wp_m_lui cpu dq (bootConfOf z) (bootConfOf_ok z) _ true (BitVec.signExtend 20 1#6) 10#5 (by decide) v10
-    iintro HmBoot Hclock Hpc Hx10
+    iintro HmBoot Hclock Hpc Htok Hx10
     entry_norm
     -- 8000000a: csrr a1, mhartid
     entry_step wp_m_csrr_mhartid cpu dq dqh (bootConfOf z) (bootConfOf_ok z) _ false 11#5 (by decide) v11 hartid
-    iintro HmBoot Hclock Hpc Hx11 Hmhartid
+    iintro HmBoot Hclock Hpc Htok Hx11 Hmhartid
     entry_norm
     -- 8000000e: c.addi a1, a1, 1
     entry_step wp_m_addi_same cpu dq (bootConfOf z) (bootConfOf_ok z) _ true (BitVec.signExtend 12 1#6) 11#5 (by decide) hartid
-    iintro HmBoot Hclock Hpc Hx11
+    iintro HmBoot Hclock Hpc Htok Hx11
     entry_norm
     -- 80000010: mul a0, a0, a1
     entry_step wp_m_mul_same cpu dq (bootConfOf z) (bootConfOf_ok z) _ false 10#5 11#5 (by decide) (by decide) _ _
-    iintro HmBoot Hclock Hpc Hx10 Hx11
+    iintro HmBoot Hclock Hpc Htok Hx10 Hx11
     entry_norm
     -- 80000014: c.add sp, sp, a0
     entry_step wp_m_add_same cpu dq (bootConfOf z) (bootConfOf_ok z) _ true 2#5 10#5 (by decide) (by decide) _ _
-    iintro HmBoot Hclock Hpc Hx2 Hx10
+    iintro HmBoot Hclock Hpc Htok Hx2 Hx10
     entry_norm
     -- 80000016: jal start
     entry_step wp_m_jal cpu dq (bootConfOf z) (bootConfOf_ok z) (KA.«_entry» + 0x16#64) false 66#21 1#5 (by decide) v1
-    iintro HmBoot Hclock Hpc Hx1
+    iintro HmBoot Hclock Hpc Htok Hx1
     entry_norm
     iapply HΦ $$ [HmBoot] Hmhartid Hclock Htok Hslot Hpc Hx1 Hx2 Hx10 Hx11
     iexists z

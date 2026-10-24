@@ -85,6 +85,7 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
     (hmie : c.mie &&& ~~~c.mideleg = 0#64) (p' : Privilege)
     (hp' : p' = Privilege.Supervisor ∨ p' = Privilege.User)
     (pc npc : BitVec 64) (w : BitVec 32) (ast : instruction) (T R P Q : IProp GF)
+    (hT : T ⊢ resvAny cpu ∗ (resvAny cpu -∗ T))
     (hfetch : fetchSpecS cpu (DFrac.own 1) c pc T R (FetchResult.F_Base w))
     (hdec : decodes32P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c w ast)
     (hexec : execSpecClkPP cpu (DFrac.own 1) Privilege.Supervisor c p' c' ast pc (pc + 4#64) npc
@@ -97,9 +98,15 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  -- the boundary releases a reservation that is not an LR's: `T` lends the
+  -- hart's token (`hT`) through `wpLoop_restart_any` and takes it back
+  ihave ⟨Hresv, HT⟩ := hT $$ HT
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
+  ispecialize HT $$ Hresv
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf
@@ -154,6 +161,7 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
     (hmie : c.mie &&& ~~~c.mideleg = 0#64) (p' : Privilege)
     (hp' : p' = Privilege.Supervisor ∨ p' = Privilege.User)
     (pc npc : BitVec 64) (h : BitVec 16) (ast ast' : instruction) (T R P Q : IProp GF)
+    (hT : T ⊢ resvAny cpu ∗ (resvAny cpu -∗ T))
     (hfetch : fetchSpecS cpu (DFrac.own 1) c pc T R (FetchResult.F_RVC h))
     (hdec : decodes16P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c h ast)
     (hexp : Functions.execute ast = pure (ExecutionResult.ExecuteAs ast'))
@@ -167,9 +175,15 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  -- the boundary releases a reservation that is not an LR's: `T` lends the
+  -- hart's token (`hT`) through `wpLoop_restart_any` and takes it back
+  ihave ⟨Hresv, HT⟩ := hT $$ HT
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
+  ispecialize HT $$ Hresv
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf

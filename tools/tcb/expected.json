@@ -4096,7 +4096,7 @@
   "MachCSL.stvecDirect": {"MachCSL.stvecDirect": "57acad8ce5f19895"},
   "MachCSL.startCount": {"MachCSL.startCount": "4cd587e14d1d94df"},
   "MachCSL.startAuth": {"MachCSL.startAuth": "a56d0e063c712348"},
-  "MachCSL.snapOf": {"MachCSL.snapOf": "38f96837e7681c14"},
+  "MachCSL.snapOf": {"MachCSL.snapOf": "962fe5070cf5ddd3"},
   "MachCSL.segStep":
   {"MachCSL.segStep.match_1": "98ca655335c5e724",
    "MachCSL.segStep": "c293ce95020ec588"},
@@ -4118,7 +4118,7 @@
    "MachCSL.resvMapAux._f": "711a40bec1799a5f",
    "MachCSL.resvMapAux": "61be6e36b809bfaa"},
   "MachCSL.resvMap": {"MachCSL.resvMap": "c30fa6629d26050e"},
-  "MachCSL.resvInv": {"MachCSL.resvInv": "a2afeeaaba8bb476"},
+  "MachCSL.resvInv": {"MachCSL.resvInv": "a2afeeaab2094088"},
   "MachCSL.resvFragAt": {"MachCSL.resvFragAt": "58135ca76fd62d0d"},
   "MachCSL.resvFragAnyAt": {"MachCSL.resvFragAnyAt": "3242ec2f6498657d"},
   "MachCSL.resetVector": {"MachCSL.resetVector": "e51086ce4ac0395e"},
@@ -4193,7 +4193,7 @@
    "MachCSL.obsBoots": "be4c9855b74d2852"},
   "MachCSL.obsAuth": {"MachCSL.obsAuth": "73f29bb8e5373053"},
   "MachCSL.nthByte": {"MachCSL.nthByte": "8f99216c4d09b871"},
-  "MachCSL.mmOk": {"MachCSL.mmOk": "a2afeeaa12376ac0"},
+  "MachCSL.mmOk": {"MachCSL.mmOk": "a2afeeaa95e9160b"},
   "MachCSL.mkPte": {"MachCSL.mkPte": "a1e52e92bfb6a6a3"},
   "MachCSL.memRam": {"MachCSL.memRam": "bf847dcf6665e7fa"},
   "MachCSL.memModelAt": {"MachCSL.memModelAt": "99da1d3160fe3881"},
@@ -4209,6 +4209,7 @@
   "MachCSL.kmapStaticAt": {"MachCSL.kmapStaticAt": "69457af851d61884"},
   "MachCSL.kmapStatic": {"MachCSL.kmapStatic": "af4abcc037c2f912"},
   "MachCSL.kmapAt": {"MachCSL.kmapAt": "ca49a5ba9e972a70"},
+  "MachCSL.kindOf": {"MachCSL.kindOf": "31b3efa0cdade418"},
   "MachCSL.killCredTriv": {"MachCSL.killCredTriv": "cb83dd0dbd696616"},
   "MachCSL.keyAt": {"MachCSL.keyAt": "3a30c8291a00a37f"},
   "MachCSL.kPtr": {"MachCSL.kPtr": "bc6f9537b89622b9"},
@@ -4257,6 +4258,8 @@
   {"MachCSL.instDecidableEqVioReq": "08315b48d5e321c1"},
   "MachCSL.instDecidableEqUartId":
   {"MachCSL.instDecidableEqUartId": "f81437ec5d64108a"},
+  "MachCSL.instDecidableEqResvKind":
+  {"MachCSL.instDecidableEqResvKind": "2dd798b021336f70"},
   "MachCSL.instDecidableEqDevId.decEq":
   {"MachCSL.instDecidableEqDevId.decEq.match_1": "e4d6a330399febf9",
    "MachCSL.instDecidableEqDevId.decEq": "48979011c201ca03"},
@@ -4273,7 +4276,7 @@
   "MachCSL.hartViewsAt": {"MachCSL.hartViewsAt": "7fce1bdd20b8a5d2"},
   "MachCSL.hartStep":
   {"MachCSL.hartStep.match_1": "e74845ef0d01cd40",
-   "MachCSL.hartStep": "98d500c4ce4d4d05"},
+   "MachCSL.hartStep": "98d500c431487e58"},
   "MachCSL.hartObsW":
   {"MachCSL.hartObsW.match_1": "97151b314f260827",
    "MachCSL.hartObsW._sparseCasesOn_1": "e875b00b2278972b",
@@ -4326,7 +4329,7 @@
    "MachCSL.fenceAcq": "73af16ed519378f1"},
   "MachCSL.evStep":
   {"MachCSL.evStep.match_1": "b7f7f6adf6903145",
-   "MachCSL.evStep": "39bd04015000c6a8"},
+   "MachCSL.evStep": "39bd04012019fd2d"},
   "MachCSL.eraRegistered": {"MachCSL.eraRegistered": "626c1eca6b766af4"},
   "MachCSL.eraInterp": {"MachCSL.eraInterp": "99da1d31b9fc647e"},
   "MachCSL.eraCur":
@@ -4432,7 +4435,7 @@
   "MachCSL.blockedStep":
   {"MachCSL.blockedStep.match_1": "1e7bb33bcbb18323",
    "MachCSL.blockedStep._sparseCasesOn_1": "e7516877a7f9810b",
-   "MachCSL.blockedStep": "93127c586c0c9060"},
+   "MachCSL.blockedStep": "93127c58141dac97"},
   "MachCSL.authoredByAt": {"MachCSL.authoredByAt": "a850657b160e1247"},
   "MachCSL.authMapAux":
   {"MachCSL.authMapAux.match_1": "e2603a27224c6ab9",
@@ -4442,7 +4445,9 @@
   "MachCSL.anyReserve": {"MachCSL.anyReserve": "f2bd12cb78414db6"},
   "MachCSL.allRegs": {"MachCSL.allRegs": "2ee849a4daf188f5"},
   "MachCSL.allIdx": {"MachCSL.allIdx": "b5baae0998861a78"},
+  "MachCSL.akPteRe": {"MachCSL.akPteRe": "3b8f4a3221eb3234"},
   "MachCSL.akPlain": {"MachCSL.akPlain": "3b8f4a32d4b9bd99"},
+  "MachCSL.akLR": {"MachCSL.akLR": "3b8f4a322305f885"},
   "MachCSL.akIfetch":
   {"MachCSL.akIfetch.match_1": "e3d80456b7478628",
    "MachCSL.akIfetch._sparseCasesOn_3": "d7cc7339f9d381cf",
@@ -4774,8 +4779,19 @@
   "MachCSL.SlotReg.mk": {"MachCSL.SlotReg.mk": "b1ac2919293c8fe9"},
   "MachCSL.SlotReg": {"MachCSL.SlotReg": "892a36c741ba852a"},
   "MachCSL.ResvVal": {"MachCSL.ResvVal": "ea5019a64c3212ee"},
-  "MachCSL.Resv.overlaps": {"MachCSL.Resv.overlaps": "2e417591210a79ae"},
-  "MachCSL.Resv": {"MachCSL.Resv": "ea5019a656900816"},
+  "MachCSL.ResvKind.rmw": {"MachCSL.ResvKind.rmw": "9590b412a5b2dc12"},
+  "MachCSL.ResvKind.rec": {"MachCSL.ResvKind.rec": "207e4cf602882754"},
+  "MachCSL.ResvKind.pte": {"MachCSL.ResvKind.pte": "9590b412ccde965e"},
+  "MachCSL.ResvKind.lr": {"MachCSL.ResvKind.lr": "9590b4123d8c2cfe"},
+  "MachCSL.ResvKind.casesOn": {"MachCSL.ResvKind.casesOn": "bc1a456bbf8a0242"},
+  "MachCSL.ResvKind":
+  {"MachCSL.ResvKind.ctorIdx": "49f8005395b5e990",
+   "MachCSL.ResvKind": "ea5019a6137d8a07"},
+  "MachCSL.Resv.snap": {"MachCSL.Resv.snap": "c14a508f8b2eaec8"},
+  "MachCSL.Resv.overlaps": {"MachCSL.Resv.overlaps": "2e41759105c569fb"},
+  "MachCSL.Resv.mk": {"MachCSL.Resv.mk": "18d3ac51f205123c"},
+  "MachCSL.Resv.kind": {"MachCSL.Resv.kind": "e5c46b1124714636"},
+  "MachCSL.Resv": {"MachCSL.Resv": "ea5019a6475b13f5"},
   "MachCSL.RegVal": {"MachCSL.RegVal": "ea5019a638aaac2d"},
   "MachCSL.RegMapF": {"MachCSL.RegMapF": "48abdd915d395edb"},
   "MachCSL.RegMap.set": {"MachCSL.RegMap.set": "39d85badca5fcd8a"},
@@ -5009,11 +5025,14 @@
   "MachCSL.MState.itv": {"MachCSL.MState.itv": "26d4a1e18bd5bf7d"},
   "MachCSL.MState.hr": {"MachCSL.MState.hr": "a9944bb55c6bd401"},
   "MachCSL.MState.fence": {"MachCSL.MState.fence": "037843fbf281ac50"},
+  "MachCSL.MState.dropWindow":
+  {"MachCSL.MState.dropWindow.match_1": "9428f106954933dd",
+   "MachCSL.MState.dropWindow": "26f64f2b18013205"},
   "MachCSL.MState.dropResv": {"MachCSL.MState.dropResv": "26f64f2b7db99e25"},
   "MachCSL.MState.devs": {"MachCSL.MState.devs": "354da6cb24748d81"},
   "MachCSL.MState.devrt": {"MachCSL.MState.devrt": "572221b90f165fb1"},
   "MachCSL.MState.afterLoad": {"MachCSL.MState.afterLoad": "376d8dcd12f7b11d"},
-  "MachCSL.MState.afterExcl": {"MachCSL.MState.afterExcl": "226f9228f174b820"},
+  "MachCSL.MState.afterExcl": {"MachCSL.MState.afterExcl": "1f4af6a89d431837"},
   "MachCSL.MState": {"MachCSL.MState": "ea5019a67439fefb"},
   "MachCSL.Loop": {"MachCSL.Loop": "900b2e06a375477b"},
   "MachCSL.LogMirror.view": {"MachCSL.LogMirror.view": "5870f1a84fbd1b4a"},

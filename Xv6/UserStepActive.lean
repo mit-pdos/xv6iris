@@ -126,9 +126,13 @@ theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTota
   have hmm : (ustS0 C P v mm).file .mie &&& ~~~((ustS0 C P v mm).file .mideleg) = 0#64 := by
     rw [hl.cfg.mie, hl.cfg.mideleg]; exact C.mm
   iintro ⟨#Hhw, #Hwi, Hfr, Hht, HK⟩
+  icases uFr_resvAny (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustS0 C P v mm) $$ Hfr with ⟨Hresv, Hfr⟩
   iapply wpLoop_ucStep
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
+  ihave Hfr := Hfr $$ Hresv
   iapply swp_mono
   isplitr [Hfr Hht]
   rotate_left

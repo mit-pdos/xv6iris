@@ -389,48 +389,6 @@ theorem swp_wpHart (cpu : CPU) (m : SailM Unit) :
 
 /-! ## The per-event rules -/
 
-/-- The cycle boundary: to be safe forever it suffices to be safe for the next
-cycle, whichever way the clock-tick and exit-wait choices go. -/
-theorem wpLoop_restart (cpu : CPU) :
-    (∀ tick : Bool, ∀ ew : Bool, ▷ wpHart cpu (riscvStep tick ew)) ⊢@{IProp GF} wpLoop cpu := by
-  unfold wpLoop
-  iintro H
-  iapply wpHart_lift
-  iintro %σ Hσ
-  iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hclose
-  isplit
-  · ipureintro
-    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
-  inext
-  iintro %m' %σ' %Hs _
-  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
-  imod Hclose
-  imodintro
-  iframe Hσ
-  iexact H
-
-/-- `wpLoop_restart`, handing the step's later credit (`wpHart_lift`'s `£ 1`)
-to the continuation: the source of every `wpNext`'s credit. -/
-theorem wpLoop_restart_lc (cpu : CPU) :
-    (∀ tick : Bool, ∀ ew : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick ew))) ⊢@{IProp GF} wpLoop cpu := by
-  unfold wpLoop
-  iintro H
-  iapply wpHart_lift
-  iintro %σ Hσ
-  iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hclose
-  isplit
-  · ipureintro
-    exact ⟨rfl, riscvStep false false, σ, false, false, rfl, rfl⟩
-  inext
-  iintro %m' %σ' %Hs Hlc
-  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
-  imod Hclose
-  imodintro
-  iframe Hσ
-  iapply H $$ %tick Hlc
-
 /-- Extract one hart's register interpretation from the state
 interpretation, with a closing wand that accepts an updated register file. -/
 theorem machInterp_acc (σ : MState) (cpu : CPU) :
@@ -482,6 +440,21 @@ theorem machInterp_acc_mem (σ : MState) (cpu : CPU) :
     simp only [hσ'.1 y hy]
     iexact Hy
   · iexact Hf
+
+/-- Close `machInterp_acc_mem` at the state after `MState.dropWindow`: the
+hart's registers, the heap and the devices are those of `σ`. -/
+theorem machInterp_close_dropWindow (σ : MState) (cpu : CPU) :
+    (∀ (σ' : MState), ⌜(∀ c, c ≠ cpu → σ'.regs c = σ.regs c) ∧ σ'.devs = σ.devs⌝ -∗
+        regInterp cpu (σ'.regs cpu) -∗ genHeapInterp σ'.mem -∗ memModel σ' -∗ machInterp σ') ∗
+      regInterp cpu (σ.regs cpu) ∗ genHeapInterp σ.mem ∗ memModel (σ.dropWindow cpu)
+    ⊢@{IProp GF} machInterp (σ.dropWindow cpu) := by
+  iintro ⟨Hcl, Hregs, Hmem, Hmm⟩
+  ihave Hregs := (show regInterp (GF := GF) cpu (σ.regs cpu) ⊢ regInterp cpu ((σ.dropWindow cpu).regs cpu)
+    from by rw [MState.dropWindow_regs]) $$ Hregs
+  ihave Hmem := (show genHeapInterp (GF := GF) σ.mem ⊢ genHeapInterp (σ.dropWindow cpu).mem
+    from by rw [MState.dropWindow_mem]) $$ Hmem
+  iapply Hcl $$ %(σ.dropWindow cpu)
+    %⟨fun c _ => by rw [MState.dropWindow_regs], MState.dropWindow_devs σ cpu⟩ Hregs Hmem Hmm
 
 theorem MState.update_self (σ : MState) (cpu : CPU) :
     { σ with regs := updCpu σ.regs cpu (σ.regs cpu) } = σ := by
@@ -1376,6 +1349,70 @@ theorem memModel_resv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
   have := Option.some.inj Hl
   exact ⟨congrArg Prod.fst this, congrArg Prod.snd this⟩
 
+theorem hartViews_dropResv (σ : MState) (cpu c : CPU) :
+    hartViewsAt (GF := GF) E (σ.dropResv cpu) c = hartViewsAt E σ c := by
+  unfold hartViewsAt
+  rfl
+
+theorem hartViews_dropWindow (σ : MState) (cpu c : CPU) :
+    hartViewsAt (GF := GF) E (σ.dropWindow cpu) c = hartViewsAt E σ c := by
+  unfold hartViewsAt
+  rw [MState.dropWindow_tv, MState.dropWindow_itv, MState.dropWindow_hr]
+
+/-- After a blocked exclusive read: the hart's reservation, whatever it was,
+is dropped. -/
+theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
+      |==> (memModelAt E (σ.dropResv cpu) ∗ resvFragAt E cpu none b) := by
+  iintro ⟨Hmm, Hfrag⟩
+  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
+    iframe
+  unfold memModelAt
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
+  unfold resvFragAt
+  imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imodintro
+  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
+  rw [hresv]
+  iframe Hfrag Htop Hauth Hresv
+  isplitl [Hviews]
+  · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
+    iexact Hviews
+  · isplit
+    · ipureintro
+      exact mmOk_dropResv σ cpu hmm
+    · ipureintro
+      exact resvInv_dropResv σ cpu hri
+
+/-- The cycle boundary and a blocked plain store (`MState.dropWindow`): the
+hart's reservation is released unless it is an LR's (`dropKind`). -/
+theorem memModel_dropWindow (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
+      |==> (memModelAt E (σ.dropWindow cpu) ∗ resvFragAt E cpu (dropKind r) b) := by
+  iintro ⟨Hmm, Hfrag⟩
+  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
+    iframe
+  obtain ⟨hr, _⟩ := hres
+  cases r with
+  | none =>
+    rw [MState.dropWindow_of_none hr]
+    simp only [dropKind]
+    imodintro
+    iframe Hmm Hfrag
+  | some r =>
+    by_cases hk : r.kind = .lr
+    · rw [MState.dropWindow_of_lr hr hk]
+      simp only [dropKind, hk, ite_true]
+      imodintro
+      iframe Hmm Hfrag
+    · rw [MState.dropWindow_of_not_lr hr hk]
+      simp only [dropKind, hk, ite_false]
+      iapply memModel_dropResv E σ cpu (some r) b
+      iframe Hmm Hfrag
+
 /-- Take one hart's view mirrors out of the big-sep, to be put back at a state
 that agrees with `σ` on the other harts. -/
 theorem hartViews_acc (σ : MState) (cpu : CPU) :
@@ -1969,7 +2006,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n nt : Nat}
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.address n
-    · exact Or.inr ⟨σ, hno, rfl⟩
+    · exact Or.inr ⟨σ.dropWindow cpu, hno, by rw [ite_eq_right (by simp [hk])]⟩
     · exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
@@ -1994,12 +2031,19 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n nt : Nat}
       iframe Hctx Hfrag
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk
-    subst σ'
+    rw [ite_eq_right (by simp [hk])] at hσ
+    subst hσ
+    icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
+    icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+    imod memModel_dropWindow _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-    · iapply IH $$ Htok Hb
+    · iapply machInterp_close_dropWindow σ cpu
+      iframe Hclose Hregs Hmem Hmm
+    · iapply IH $$ [Hctx Hfrag] Hb
+      · iapply ctxTok_introB cpu ξ (dropKind r) b
+        iframe Hctx Hfrag
       inext
       iexact HΦ
 
@@ -2037,5 +2081,103 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
     iexact HΦ
 
 end bytes
+
+/-! ## The cycle boundary
+
+At the boundary the hart's reservation is released unless it is an LR's
+(`hartStep`'s `.pure` arm ends in `MState.dropWindow`), so the boundary rule
+threads the hart's reservation fragment (`dropKind`). -/
+
+section restart
+variable [MachGS GF]
+
+/-- The cycle boundary: to be safe forever it suffices to be safe for the next
+cycle, whichever way the clock-tick and exit-wait choices go; the hart's
+reservation `r` is released unless it is an LR's (`dropKind`). -/
+theorem wpLoop_restart (cpu : CPU) (r : Option Resv) :
+    resvFragAny cpu r ∗
+    (∀ tick : Bool, ∀ ew : Bool, ▷ (resvFragAny cpu (dropKind r) -∗ wpHart cpu (riscvStep tick ew)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  unfold wpLoop
+  iintro ⟨Hfrag, H⟩
+  iapply wpHart_lift
+  iintro %σ Hσ
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨rfl, riscvStep false false, σ.dropWindow cpu, false, false, rfl, rfl⟩
+  inext
+  iintro %m' %σ' %Hs _
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
+  icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+  imod memModel_dropWindow _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
+  imod Hmask
+  imodintro
+  isplitl [Hregs Hmem Hmm Hclose]
+  · iapply machInterp_close_dropWindow σ cpu
+    iframe Hclose Hregs Hmem Hmm
+  · iapply H $$ %tick %ew
+    iapply resvFragAny_of cpu (dropKind r) b $$ Hfrag
+
+/-- `wpLoop_restart`, handing the step's later credit (`wpHart_lift`'s `£ 1`)
+to the continuation: the source of every `wpNext`'s credit. -/
+theorem wpLoop_restart_lc (cpu : CPU) (r : Option Resv) :
+    resvFragAny cpu r ∗
+    (∀ tick : Bool, ∀ ew : Bool, ▷ (resvFragAny cpu (dropKind r) -∗ £ 1 -∗ wpHart cpu (riscvStep tick ew)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  unfold wpLoop
+  iintro ⟨Hfrag, H⟩
+  iapply wpHart_lift
+  iintro %σ Hσ
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨rfl, riscvStep false false, σ.dropWindow cpu, false, false, rfl, rfl⟩
+  inext
+  iintro %m' %σ' %Hs Hlc
+  obtain ⟨tick, ew, rfl, rfl⟩ := Hs
+  icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+  imod memModel_dropWindow _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
+  imod Hmask
+  imodintro
+  isplitl [Hregs Hmem Hmm Hclose]
+  · iapply machInterp_close_dropWindow σ cpu
+    iframe Hclose Hregs Hmem Hmm
+  · iapply H $$ %tick %ew [Hfrag] Hlc
+    iapply resvFragAny_of cpu (dropKind r) b $$ Hfrag
+
+/-- `wpLoop_restart` at the hart's reservation token, whatever it holds. -/
+theorem wpLoop_restart_any (cpu : CPU) :
+    resvAny cpu ∗ (∀ tick : Bool, ∀ ew : Bool, ▷ (resvAny cpu -∗ wpHart cpu (riscvStep tick ew)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  iintro ⟨⟨%r, Hfrag⟩, H⟩
+  iapply wpLoop_restart cpu r
+  iframe Hfrag
+  iintro %tick %ew
+  ispecialize H $$ %tick %ew
+  inext
+  iintro Hfrag
+  iapply H
+  iapply resvAny_ofAny cpu (dropKind r) $$ Hfrag
+
+/-- `wpLoop_restart_lc` at the hart's reservation token, whatever it holds. -/
+theorem wpLoop_restart_any_lc (cpu : CPU) :
+    resvAny cpu ∗ (∀ tick : Bool, ∀ ew : Bool, ▷ (resvAny cpu -∗ £ 1 -∗ wpHart cpu (riscvStep tick ew)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  iintro ⟨⟨%r, Hfrag⟩, H⟩
+  iapply wpLoop_restart_lc cpu r
+  iframe Hfrag
+  iintro %tick %ew
+  ispecialize H $$ %tick %ew
+  inext
+  iintro Hfrag Hlc
+  iapply H $$ [Hfrag] Hlc
+  iapply resvAny_ofAny cpu (dropKind r) $$ Hfrag
+
+end restart
 
 end MachCSL

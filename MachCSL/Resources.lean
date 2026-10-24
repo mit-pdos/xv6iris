@@ -647,6 +647,78 @@ theorem resvMap_upd (σ σ' : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
       rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2]
     · rw [resvMap_get?_ge σ j (by omega), resvMap_get?_ge σ' j (by omega)]
 
+/-! ### Releasing a reservation at the boundary (`MState.dropWindow`)
+
+The cycle boundary and a blocked plain store release the hart's reservation
+unless it is an LR's (`MachCSL.Lang`, owner ruling 2026-10-24, policy
+decision (21)).  `dropKind` is what is left of it. -/
+
+/-- What `MState.dropWindow` leaves of a reservation. -/
+def dropKind : Option Resv → Option Resv
+  | some r => if r.kind = .lr then some r else none
+  | none => none
+
+/-- The page walker's exclusive re-read of an entry (the A/D update's read
+half) takes a reservation of origin `.pte`. -/
+theorem kindOf_pteRe :
+    kindOf (.AK_Read (.Read_RISCV_reserved, .Load .PageTableEntry)) = .pte := rfl
+
+/-- An AMO's read half takes a reservation of origin `.rmw` (the default). -/
+theorem kindOf_amo (rk : read_kind) (a : amoop × Bool × Bool × mem_payload × mem_payload) :
+    kindOf (.AK_Read (rk, .Atomic a)) = .rmw := by
+  cases rk <;> rfl
+
+/-- The three cases of `MState.dropWindow`: an LR's reservation and no
+reservation stay, any other is dropped. -/
+theorem MState.dropWindow_of_lr {σ : MState} {cpu : CPU} {r : Resv} (h : σ.resv cpu = some r)
+    (hk : r.kind = .lr) : σ.dropWindow cpu = σ := by
+  unfold MState.dropWindow; rw [h]; simp only [hk, ite_true]
+
+theorem MState.dropWindow_of_not_lr {σ : MState} {cpu : CPU} {r : Resv} (h : σ.resv cpu = some r)
+    (hk : r.kind ≠ .lr) : σ.dropWindow cpu = σ.dropResv cpu := by
+  unfold MState.dropWindow; rw [h]; simp only [hk, ite_false]
+
+theorem MState.dropWindow_of_none {σ : MState} {cpu : CPU} (h : σ.resv cpu = none) :
+    σ.dropWindow cpu = σ := by
+  unfold MState.dropWindow; rw [h]
+
+theorem MState.resv_dropWindow (σ : MState) (cpu : CPU) :
+    (σ.dropWindow cpu).resv = updCpu σ.resv cpu (dropKind (σ.resv cpu)) := by
+  funext c
+  cases h : σ.resv cpu with
+  | none =>
+    rw [MState.dropWindow_of_none h]; simp only [dropKind, updCpu]; split <;> simp_all
+  | some r =>
+    by_cases hk : r.kind = .lr
+    · rw [MState.dropWindow_of_lr h hk]; simp only [dropKind, hk, ite_true, updCpu]
+      split <;> simp_all
+    · rw [MState.dropWindow_of_not_lr h hk]; simp only [dropKind, hk, ite_false, updCpu]
+
+theorem MState.dropWindow_regs (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).regs = σ.regs := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_mem (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).mem = σ.mem := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_log (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).log = σ.log := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_tv (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).tv = σ.tv := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_itv (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).itv = σ.itv := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_hr (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).hr = σ.hr := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_devrt (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).devrt = σ.devrt := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+theorem MState.dropWindow_top (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).top = σ.top := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+
+/-- The reservation map after `MState.dropWindow`: the hart's entry is what
+`dropKind` leaves, its acquire bit unchanged. -/
+theorem resvMap_dropWindow (σ : MState) (cpu : CPU) :
+    resvMap (σ.dropWindow cpu) = insert (resvMap σ) cpu.val (dropKind (σ.resv cpu), (σ.hr cpu).acq) :=
+  resvMap_upd σ _ cpu _ _
+    (by rw [MState.resv_dropWindow, MState.dropWindow_hr]; simp [updCpu])
+    (fun c hc => by rw [MState.resv_dropWindow, MState.dropWindow_hr]; simp [updCpu, hc])
+
 /-! ### The DRAM bank in the memory model
 
 Byte histories exist at DRAM addresses only: the boot image is loaded into
@@ -756,7 +828,7 @@ theorem inRam_of_top {m : FlatMem} (hm : memRam m) {a : PAddr} {v : BitVec 8}
 /-- A footprint some other hart reserves is not an MMIO footprint: a
 reserved byte mirrors the memory, and the memory is DRAM. -/
 theorem not_devBytes_of_othersReserve {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
-    (hres : ∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+    (hres : ∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r.snap[a]? = some v →
              (σ.mem[a]?).bind Hist.top = some v)
     (hram : memRam σ.mem) (h : othersReserve σ.resv cpu pa n) : ¬ devBytes pa n := by
   obtain ⟨c, _, r, hr, j, hj, hsome⟩ := h
@@ -783,7 +855,7 @@ DRAM address. -/
 def mmOk (σ : MState) : Prop :=
   (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) ∧
   (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
-  (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+  (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r.snap[a]? = some v →
     (σ.mem[a]?).bind Hist.top = some v) ∧
   memRam σ.mem ∧
   devRtOk σ
@@ -824,6 +896,25 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
     · exact b2
   · simp only [updCpu, hc, ite_false]
     exact ⟨a1, a2, a3, a4⟩
+
+/-- Dropping the hart's reservation: the remaining ones still agree with the
+top of memory. -/
+theorem mmOk_dropResv (σ : MState) (cpu : CPU) (h : mmOk σ) : mmOk (σ.dropResv cpu) := by
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨h1, h2, fun c r hr => ?_, h4⟩
+  simp only [updCpu] at hr
+  split at hr
+  · cases hr
+  · exact h3 c r hr
+
+/-- Releasing the hart's reservation unless it is an LR's. -/
+theorem mmOk_dropWindow (σ : MState) (cpu : CPU) (h : mmOk σ) : mmOk (σ.dropWindow cpu) := by
+  unfold MState.dropWindow
+  split
+  · split
+    · exact h
+    · exact mmOk_dropResv σ cpu h
+  · exact h
 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
     (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
@@ -941,8 +1032,8 @@ floors at the top (`HRead.afterExcl`), is what makes the hart's plain loads
 of them read the head (its snapshot) at every view they may pick. -/
 
 /-- An address outside the footprint is not in the snapshot. -/
-theorem snapOf_get?_notin {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (a : PAddr)
-    (ha : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) : (snapOf pa n w)[a]? = none := by
+theorem snapOf_get?_notin {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) {κ : ResvKind} (a : PAddr)
+    (ha : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) : (snapOf pa n w κ).snap[a]? = none := by
   unfold snapOf Mem.writeBytes
   have key : ∀ (l : List Nat), (∀ j ∈ l, a ≠ pa + BitVec.ofNat 64 j) → ∀ m : Mem,
       (l.foldl (fun (m : Mem) j => m.insert (pa + BitVec.ofNat 64 j) (nthByte w j)) m : Mem)[a]? =
@@ -961,8 +1052,8 @@ theorem snapOf_get?_notin {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (a : PAddr
   simp
 
 /-- A byte of the snapshot is a byte of the footprint. -/
-theorem snapOf_mem {n : Nat} {pa : PAddr} {w : BitVec (8 * n)} {a : PAddr}
-    (h : ((snapOf pa n w)[a]?).isSome) : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
+theorem snapOf_mem {n : Nat} {pa : PAddr} {w : BitVec (8 * n)} {κ : ResvKind} {a : PAddr}
+    (h : ((snapOf pa n w κ).snap[a]?).isSome) : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
   refine Classical.byContradiction fun hc => ?_
   rw [snapOf_get?_notin pa w a (fun j hj heq => hc ⟨j, hj, heq⟩)] at h
   cases h
@@ -971,15 +1062,15 @@ theorem snapOf_mem {n : Nat} {pa : PAddr} {w : BitVec (8 * n)} {a : PAddr}
 reservation misses every byte of it. -/
 theorem not_othersReserve_get? {resv : CPU → Option Resv} {cpu : CPU} {pa : PAddr} {n : Nat}
     (hno : ¬ othersReserve resv cpu pa n) {c : CPU} (hc : c ≠ cpu) {r : Resv} (hr : resv c = some r)
-    {j : Nat} (hj : j < n) : r[pa + BitVec.ofNat 64 j]? = none :=
+    {j : Nat} (hj : j < n) : r.snap[pa + BitVec.ofNat 64 j]? = none :=
   Option.not_isSome_iff_eq_none.1 fun hs => hno ⟨c, hc, r, hr, j, hj, hs⟩
 
 /-- The reservation invariant: reservations of distinct harts are disjoint,
 and a reserved byte's head is under its holder's coherence floor. -/
 def resvInv (σ : MState) : Prop :=
   (∀ (c c' : CPU) (r r' : Resv), c ≠ c' → σ.resv c = some r → σ.resv c' = some r' →
-    ∀ a : PAddr, (r[a]?).isSome → r'[a]? = none) ∧
-  (∀ (c : CPU) (r : Resv), σ.resv c = some r → ∀ a : PAddr, (r[a]?).isSome →
+    ∀ a : PAddr, (r.snap[a]?).isSome → r'.snap[a]? = none) ∧
+  (∀ (c : CPU) (r : Resv), σ.resv c = some r → ∀ a : PAddr, (r.snap[a]?).isSome →
     ∀ (e : HEnt) (H : Hist), σ.mem[a]? = some (e :: H) → e.t ≤ (σ.hr c).coh a)
 
 /-- A plain load at a view above the footprint's coherence floors only
@@ -1005,8 +1096,8 @@ theorem resvInv_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
 from the others' reservations, and its footprint's floors go to the top,
 which every entry is under (`mmOk`). -/
 theorem resvInv_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (acq : Bool) (hmm : mmOk σ) (hno : ¬ othersReserve σ.resv cpu pa n) (h : resvInv σ) :
-    resvInv (σ.afterExcl cpu pa n w acq) := by
+    (acq : Bool) (kind : ResvKind) (hmm : mmOk σ) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (h : resvInv σ) : resvInv (σ.afterExcl cpu pa n w acq kind) := by
   obtain ⟨h1, h2⟩ := h
   refine ⟨fun c c' r r' hcc' hr hr' a ha => ?_, fun c r hr a ha e H hget => ?_⟩
   · simp only [updCpu] at hr hr'
@@ -1058,6 +1149,15 @@ theorem resvInv_dropResv (σ : MState) (cpu : CPU) (h : resvInv σ) : resvInv (�
     split at hr
     · cases hr
     · exact h2 c r hr a ha e H hget
+
+/-- Releasing the hart's reservation unless it is an LR's. -/
+theorem resvInv_dropWindow (σ : MState) (cpu : CPU) (h : resvInv σ) : resvInv (σ.dropWindow cpu) := by
+  unfold MState.dropWindow
+  split
+  · split
+    · exact h
+    · exact resvInv_dropResv σ cpu h
+  · exact h
 
 /-- A hart's store: its own reservation clears, and the other harts'
 reserved bytes are outside the footprint (`¬ othersReserve`), so their

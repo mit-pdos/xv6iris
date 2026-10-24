@@ -324,3 +324,18 @@ trusted-base check pins the content of the project's trusted declarations -- per
 source declaration, a hash of the elaborated type and value, for `MachCSL`, `Xv6` and
 `LeanRV64D.Xv6Extras`, with a self-test of the check in the same CI step -- under the process rule of
 section 6, "The trusted base's content".
+
+**Decided by the owner (2026-10-24), on the liveness plan's hardware-fidelity argument** (its
+`lang-drop-justification.md`, outside the repository; lane `lang-drop`): (21) a hart's reservation
+records its origin (`MachCSL.ResvKind`: an AMO's window, the page walker's A/D update, an LR), and a
+reservation that is not an LR's is released at the holder's cycle boundary and when the holder is
+blocked on a plain store (`MState.dropWindow`; the boundary arm of `hartStep` and the write arm of
+`blockedStep`) -- a change to M3, recorded in the register's section 5 with the spec's sentences that
+exclude the removed behaviours (a reservation that outlives its atomic operation has no hardware
+counterpart; neither arm fires inside an operation).  An LR's reservation is untouched, its SC's outcome
+being the opaque predicate; the LR/SC watch model -- the reservation as per-hart state the model reads,
+an LR excluding nobody, the SC's outcome coupled to interference, spurious failure a nondeterministic
+choice -- is the recorded target for when a theorem over arbitrary user code needs it.  The alternative
+decision (19) deferred, presetting A and D in the kernel's `mappages`, becomes optional.  The
+conformance harness mirrors both arms; the content pin moves with the change (`evStep` included, its
+exclusive-read arm now passing the kind).

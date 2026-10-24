@@ -106,6 +106,27 @@ failed compare, every time, and exhaust the retry bound.  The change only
 narrows the machine: nothing but a plain load's choice of view (`cohOk`)
 reads the floors.
 
+The reservation drop (owner ruling, 2026-10-24; `notes/model-policy.md`
+decision (21); the liveness plan's R2 B2).  A reservation records its origin
+(`MachCSL.ResvKind`: an AMO's window, the page walker's A/D update, an LR;
+`evStep`'s exclusive-read arm passes `kindOf` of the access kind), and a
+reservation that is not an LR's is released at two more points: the hart's
+cycle boundary (`hartStep`'s `.pure` arm) and a blocked plain store
+(`blockedStep`'s write arm), both through `MState.dropWindow`.  Neither point
+lies inside an atomic operation -- an AMO's and the walker's event sequences
+contain no boundary and no plain store -- so the two arms act only on a
+reservation that has outlived its operation: the walker's after a
+`PTE_Update_Done none` (another hart set the bits first), a failed AMOCAS's.
+Such a reservation has no hardware counterpart, and before this change it
+kept the other harts' stores and exclusive reads into its footprint, and the
+disk's DMA writes, blocked until the holder happened to store or read
+exclusively, possibly for ever (two harts could deadlock that way).  The Rocq
+prototype cleared the reservation at the boundary (`RiscvLang.v`); the Lean
+port had omitted it to keep the boundary rule resource-free.  An LR's
+reservation is left exactly as before, until the hart's next store or
+exclusive read: the SC's outcome is the opaque predicate (`notes/model-diffs.md`
+§5, the LR/SC limitation).
+
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
 interrupt; `MSIP`/`STIP`/`MTIP` are recomputed from `msip` and the timer at
@@ -194,16 +215,27 @@ noncomputable abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n 
 
 /-- After an exclusive read of `w` at `pa`: the watermark and the
 footprint's coherence floors to the top, the floor to the top iff an
-acquire, the acquire bit recorded, the snapshot reserved. -/
+acquire, the acquire bit recorded, the snapshot reserved with the origin
+`kind` (`kindOf` of the access kind). -/
 abbrev MState.afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (acq : Bool) : MState :=
+    (acq : Bool) (kind : ResvKind) : MState :=
   { σ with tv := updCpu σ.tv cpu (if acq then σ.top else σ.tv cpu),
            hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl pa n σ.top acq),
-           resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
+           resv := updCpu σ.resv cpu (some (snapOf pa n w kind)) }
 
 /-- A blocked exclusive read abandons the hart's own reservation. -/
 abbrev MState.dropResv (σ : MState) (cpu : CPU) : MState :=
   { σ with resv := updCpu σ.resv cpu none }
+
+/-- Release the hart's reservation unless it is an LR's: the cycle boundary
+and a blocked plain store (owner ruling 2026-10-24, policy decision (21)).
+An AMO's or the walker's reservation found here has outlived its atomic
+operation (neither contains a boundary or a plain store); an LR's window
+spans instructions by design and is left standing. -/
+abbrev MState.dropWindow (σ : MState) (cpu : CPU) : MState :=
+  match σ.resv cpu with
+  | some r => if r.kind = .lr then σ else σ.dropResv cpu
+  | none => σ
 
 /-- After a store of `w` at `pa` by `cpu`: the bytes' histories grow, the
 author log grows, the floor passes the store iff it is the write half of an
@@ -449,7 +481,7 @@ abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
       (ramBytes req.pa req.size ∧ akExcl req.accessKind = true ∧
         ¬ othersReserve σ.resv cpu req.pa req.size ∧
         ∃ w : BitVec (8 * req.size), σ.mem.topBytes req.pa req.size w ∧ v = .ok (w, 0#req.numTag) ∧
-          σ' = σ.afterExcl cpu req.pa req.size w (akAcq req.accessKind))
+          σ' = σ.afterExcl cpu req.pa req.size w (akAcq req.accessKind) (kindOf req.accessKind))
   | .memWrite req w _ => fun v σ' =>
       (devBytes req.pa req.size ∧
         ∃ ds', devWrite σ.devs req.pa req.size w = some ds' ∧
@@ -470,13 +502,17 @@ abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
 
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
 reservation; the hart self-loops (the event is retried), a blocked exclusive
-read dropping the hart's own reservation. -/
+read dropping the hart's own reservation, a blocked plain store releasing it
+unless it is an LR's (`MState.dropWindow`; a blocked conditional write keeps
+it -- by `resvInv`'s disjointness it is never blocked anyway). -/
 abbrev blockedStep (cpu : CPU) (o : InstructionEffect) (σ σ' : MState) : Prop :=
   match o with
   | .memRead req =>
       akExcl req.accessKind = true ∧ othersReserve σ.resv cpu req.pa req.size ∧
         σ' = σ.dropResv cpu
-  | .memWrite req _ _ => othersReserve σ.resv cpu req.pa req.size ∧ σ' = σ
+  | .memWrite req _ _ =>
+      othersReserve σ.resv cpu req.pa req.size ∧
+        σ' = (if akExcl req.accessKind then σ else σ.dropWindow cpu)
   | _ => False
 
 /-! ## The user boundary (NI M2-W1)
@@ -572,11 +608,12 @@ theorem hartObs_regWrite_quiet (cpu : CPU) (σ : MState) (r : Register) (a : Opt
     · exact hartObsW_ne cpu _ r w hr
 
 /-- `hartStep cpu m σ m' σ'`: hart `cpu`, with `m` left to run in state `σ`,
-consumes one event (or restarts the cycle at the boundary, or is blocked and
+consumes one event (or restarts the cycle at the boundary, releasing a
+reservation that is not an LR's -- `MState.dropWindow` -- or is blocked and
 retries the event) and continues with `m'` in state `σ'`. -/
 def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState) : Prop :=
   match m with
-  | .pure _ => ∃ tick ew : Bool, m' = riscvStep tick ew ∧ σ' = σ
+  | .pure _ => ∃ tick ew : Bool, m' = riscvStep tick ew ∧ σ' = σ.dropWindow cpu
   | .impure (.inl (.error _)) _ => False
   | .impure (.inl (.ok o)) k =>
       (∃ v : InstructionEffect.ret o, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)

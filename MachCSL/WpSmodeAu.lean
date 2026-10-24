@@ -147,6 +147,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
   mem_iapply (swp_sail_mem_read_excl_au cpu) true rfl rfl (by decide) r
+  rw [kindOf_amo]
   iframe Hfrag
   iapply exclReadAU_wand pa 4 _ _ $$ HAU
   inext

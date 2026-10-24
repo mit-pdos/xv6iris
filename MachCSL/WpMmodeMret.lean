@@ -90,23 +90,23 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
 
 /-- `mret` to supervisor mode: the continuation runs at `mepc` under the same
 configuration with `mstatus` updated and `cur_privilege = Supervisor`. -/
-theorem wp_m_mret (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
+theorem wp_m_mret [CurCtx] (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (hMPP : BitVec.extractLsb' 11 2 c.mstatus = 1#2)
     (hMPV : BitVec.extractLsb' 39 1 c.mstatus = 0#1)
     (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) :
     instr (GF := GF) pc is_rvc (instruction.MRET ()) ∗ mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗
-    pcIs cpu pc ∗
+    pcIs cpu pc ∗ ctxTok cpu curCtx ∗
     ▷ (sConf cpu (DFrac.own 1) { c with mstatus := mretMstatus c.mstatus } -∗ clockCells cpu -∗
-        pcIs cpu (c.mepc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ wpLoop cpu)
+        pcIs cpu (c.mepc &&& 0xFFFFFFFFFFFFFFFE#64) -∗ ctxTok cpu curCtx -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, HΦ⟩
-  iapply wpLoop_m_instrP cpu (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, HΦ⟩
+  iapply wpLoop_m_instrP_tok cpu (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
     (execSpecP_mret cpu c pc _ hMPP hMPV hLPE)
   iframe
   isplitl []
   · ipureintro; trivial
   inext
-  iintro HS Hclock Hpc _
-  iapply HΦ $$ HS Hclock Hpc
+  iintro HS Hclock Hpc Htok _
+  iapply HΦ $$ HS Hclock Hpc Htok
 
 end MachCSL

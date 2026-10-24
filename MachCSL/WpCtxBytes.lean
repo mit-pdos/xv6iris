@@ -217,7 +217,7 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n nt : Nat}
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.address n
-    · exact Or.inr ⟨σ, hno, rfl⟩
+    · exact Or.inr ⟨σ, hno, by rw [ite_eq_left (by simp [hk])]⟩
     · exact Or.inl ⟨.ok (), _, Or.inr ⟨hram, hno, rfl, rfl⟩⟩
   inext
   iintro %σ'
@@ -239,6 +239,7 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n nt : Nat}
       iapply HΦ $$ Hctx Hfrag Hb
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk
+    rw [ite_eq_left (by simp [hk])] at hσ
     subst σ'
     imod Hmask
     imodintro
@@ -304,12 +305,12 @@ theorem swp_read_pte_exclusive_ctx [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (dq' : DFrac) (w : BitVec (8 * 8))
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ bytesPointsTo pa 8 dq' w ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w .pte)) false -∗
         bytesPointsTo pa 8 dq' w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, Hfrag, Hb, HΦ⟩
   iapply (swp_read_pte_exclusive cpu dq c sie hok pa hram hal r
-    (fun w0 => iprop(⌜w0 = w⌝ ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗ bytesPointsTo pa 8 dq' w)))
+    (fun w0 => iprop(⌜w0 = w⌝ ∗ resvFrag cpu (some (snapOf pa 8 w0 .pte)) false ∗ bytesPointsTo pa 8 dq' w)))
   iframe HmConf Hfrag
   isplitl [Hb]
   · iapply exclReadAU_wand pa 8 _ _ $$ [Hb]
@@ -332,7 +333,7 @@ theorem swp_checked_mem_write_pte8_cond_S_ctx [CurCtx] (cpu : CPU) (dq : DFrac) 
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w0 w data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0 .pte)) false ∗
     bytesPointsTo pa 8 (DFrac.own 1) w ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗ resvFrag cpu none false -∗
         bytesPointsTo pa 8 (DFrac.own 1) data -∗ Φ (.Ok true))
@@ -342,9 +343,9 @@ theorem swp_checked_mem_write_pte8_cond_S_ctx [CurCtx] (cpu : CPU) (dq : DFrac) 
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  mem_iapply (swp_sail_mem_write_excl_ctx cpu) curCtx (some (snapOf pa 8 w0)) w data
+  mem_iapply (swp_sail_mem_write_excl_ctx cpu) curCtx (some (snapOf pa 8 w0 .pte)) w data
     (vecbytes_to_bitvec_to_bytes_le_8 _) rfl
-  ihave Hfrag := resvFragAny_of cpu (some (snapOf pa 8 w0)) false $$ Hfrag
+  ihave Hfrag := resvFragAny_of cpu (some (snapOf pa 8 w0 .pte)) false $$ Hfrag
   iframe Hctx Hfrag Hb
   inext
   iintro Hctx Hfrag Hb
@@ -360,7 +361,7 @@ theorem swp_write_pte_conditional_ctx [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCo
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (w0 w data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0 .pte)) false ∗
     bytesPointsTo pa 8 (DFrac.own 1) w ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗ resvFrag cpu none false -∗
         bytesPointsTo pa 8 (DFrac.own 1) data -∗ Φ (.Ok true))

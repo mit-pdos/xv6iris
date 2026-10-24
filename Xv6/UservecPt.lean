@@ -55,6 +55,7 @@ theorem uservec_ux [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + instrLen is_rvc) is_rvc i iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) iprop(gprFile cpu R ∗ E)
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R' ∗ E')
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
     (hexec.frameL _))
@@ -131,6 +132,7 @@ theorem uservec_usd [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * (4 + n.toNat))) 8 (DFrac.own 1)
       (tfW ws (4 + n.toNat)))
     _
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hvp)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hvp2)
     (userret_exec_conseq hexec
@@ -214,6 +216,7 @@ theorem uservec_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     iprop(gprFile cpu R ∗ bytesPointsTo (pageAddr P.tfp + BitVec.ofNat 64 (8 * j.toNat)) 8 (DFrac.own 1)
       (tfW ws j.toNat))
     _
+    (uptT_lendResv cpu P)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hvp)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hvp2)
     (userret_exec_conseq hexec

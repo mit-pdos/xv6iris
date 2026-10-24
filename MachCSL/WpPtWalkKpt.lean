@@ -63,7 +63,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
         ∀ (p : Option (BitVec 64)), ⌜pteOptVariant ppn perm p⌝ -∗ Φ (.Ok (.PTE_Update_Done p, u))) ∧
      (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (a1 d1 : BitVec 1), ⌜kLeaf ppn perm a1 d1 ≠ kLeaf ppn perm a d⌝ -∗
-        resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false -∗
+        resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1) .pte)) false -∗
         Φ (.Ok (.PTE_Update_Retry (), u))))
     ⊢ swp cpu (update_and_write_pte39 (physaddr.Physaddr addr) (kLeaf ppn perm a d) acc u) Φ := by
   iintro ⟨HmConf, #Hkpt, Hctx, Hfrag, HΦ⟩
@@ -85,7 +85,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     ihave HAU := kpt_exclReadAU t M addr _ hmem $$ Hkpt
     iapply swp_bind
     iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0
-      (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w)) false)))
+      (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w .pte)) false)))
     iframe HmConf Hfrag
     isplitl [HAU]
     · iapply exclReadAU_wand addr 8 _ _ $$ HAU
@@ -206,15 +206,15 @@ theorem swp_checked_mem_read_pte8_S_resv (cpu : CPU) (dq : DFrac) (c : MConf) (s
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (w : BitVec (8 * 8)) (b : Bool)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w)) b ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) b -∗ Φ (.Ok (w, ())))
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 8 false false false false) Φ := by
   iintro ⟨HmConf, Hfrag, HΦ⟩
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  mem_iapply (swp_sail_mem_read_plain_resv cpu) rfl (by decide) w b
+  mem_iapply (swp_sail_mem_read_plain_resv_kind cpu) rfl (by decide) w b .pte
   iframe Hfrag
   inext
   iintro Hfrag
@@ -229,8 +229,8 @@ theorem swp_read_pte_resv (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (w : BitVec (8 * 8)) (b : Bool)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w)) b ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) b -∗ Φ (.Ok w))
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, Hfrag, HΦ⟩
   unfold read_pte mem_read mem_read_priv_meta
@@ -253,15 +253,15 @@ theorem swp_checked_mem_read_pte8_excl_S_resv (cpu : CPU) (dq : DFrac) (c : MCon
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (w : BitVec (8 * 8)) (b : Bool)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w)) b ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗ Φ (.Ok (w, ())))
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w .pte)) false -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 8 false false true false) Φ := by
   iintro ⟨HmConf, Hfrag, HΦ⟩
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  mem_iapply (swp_sail_mem_read_excl_resv cpu) false rfl rfl (by decide) w b
+  mem_iapply (swp_sail_mem_read_excl_resv cpu) false rfl rfl (by decide) w b .pte kindOf_pteRe
   iframe Hfrag
   inext
   iintro Hfrag
@@ -278,8 +278,8 @@ theorem swp_read_pte_exclusive_resv (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (w : BitVec (8 * 8)) (b : Bool)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w)) b ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗ Φ (.Ok w))
+    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu (some (snapOf pa 8 w .pte)) b ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w .pte)) false -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
   iintro ⟨HmConf, Hfrag, HΦ⟩
   unfold read_pte_exclusive mem_read mem_read_priv_meta
@@ -305,9 +305,9 @@ theorem swp_pt_walk_kpt_resv [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie 
     (hperm : perm.allows acc = true) (u : Unit) (a1 d1 : BitVec 1)
     (Φ : Result (PTW_Output 39 × Unit) (PTW_Error × Unit) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗
-    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false ∗
+    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1) .pte)) false ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
-        resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false -∗
+        resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1) .pte)) false -∗
         Φ (.Ok (kptWalkOut ppn (kLeaf ppn perm a1 d1) addr, u)))
     ⊢ swp cpu (pt_walk39 vpn acc Privilege.Supervisor mxr do_sum t.base 2 false u) Φ := by
   iintro ⟨HmConf, #Hkpt, Hctx, Hfrag, HΦ⟩
@@ -423,7 +423,7 @@ theorem swp_update_and_write_pte_kpt_resv [CurCtx] (cpu : CPU) (dq : DFrac) (c :
     (hmem : (addr, kLeaf ppn perm a0 d0) ∈ t.entries 2) (u : Unit)
     (Φ : Result (PTE_Update_Result 39 × Unit) (PTW_Error × Unit) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗
-    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false ∗
+    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1) .pte)) false ∗
     (confCells cpu dq Privilege.Supervisor c -∗
         ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (p : Option (BitVec 64)), ⌜pteOptVariant ppn perm p⌝ -∗ Φ (.Ok (.PTE_Update_Done p, u)))
@@ -489,7 +489,7 @@ theorem swp_translate_TLB_miss_retry_kpt_resv [CurCtx] (n : Nat) (cpu : CPU) (dq
     (hperm : perm.allows acc = true) (u : Unit) (a1 d1 : BitVec 1)
     (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗
-    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false ∗ Register.tlb ↦ᵣ[cpu] tlb ∗
+    resvFrag cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1) .pte)) false ∗ Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
         ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (a d : BitVec 1), Register.tlb ↦ᵣ[cpu]
