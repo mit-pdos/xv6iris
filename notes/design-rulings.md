@@ -250,10 +250,11 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   releasing a dangling reservation brings MachCSL closer to the hardware.  MachCSL makes a
   read-modify-write atomic by a reservation: the exclusive read records its footprint in `σ.resv cpu`,
   and every other hart's store or exclusive read into it self-loops until the matching conditional
-  write releases it.  Three paths left a reservation standing after its operation was over -- the
-  walker's A/D update finding the bits already set (`PTE_Update_Done none`, no write; the C3 lane
-  showed two harts first touching one kernel page reach it), a failed AMOCAS, and an LR until its SC
-  -- and such a reservation has no hardware counterpart: an aligned AMO "gives rise to a single memory
+  write releases it.  Several paths left a reservation standing after its operation was over -- the
+  walker's, when its step-7 compare fails and the re-walk finds the bits already set
+  (`PTE_Update_Done none`, no write; the C3 lane showed two harts first touching one kernel page
+  reach it) or when its write-back faults after the exclusive read, a failed AMOCAS, and an LR until
+  its SC -- and such a reservation has no hardware counterpart: an aligned AMO "gives rise to a single memory
   operation", the A/D update's atomic unit is its compare-and-store after which nothing ties the
   location to the hart, and RVWMO's Progress Axiom forbids an access preceded by infinitely many
   others (the register, section 5, quotes the sentences).  Ruling: the reservation record carries its
@@ -263,15 +264,19 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   Since no AMO or A/D window contains a boundary or a plain store, the two arms act only on
   reservations that have outlived their operation: every interleaving they admit is one hardware
   exhibits, and every behaviour they remove -- the unbounded wait on an unrelated later instruction
-  of the holder, the two-hart deadlock the Rocq design note accepted -- is one hardware cannot.  An
+  of the holder, the two-hart deadlock on dangling non-LR reservations the Rocq design note accepted
+  -- is one hardware cannot.  An
   LR's reservation is left as it was: today's semantics matches hardware's safety for a successful
   SC and a release would match its liveness, and the faithful semantics needs the SC's outcome
   coupled to interference, which the opaque reservation predicates prevent (the recorded LR/SC
-  limitation; the watch model is the target, decision (21)).  The Rocq prototype had the boundary
-  clear (`iris/RiscvLang.v:1860-1862` on `origin/rocq`); the Lean port omitted it to keep
-  `wpLoop_restart` resource-free, and rejected the blocked-store release (2026-08-18) because
-  pairwise disjointness of reservations was not then an invariant -- since decision (19) it is
-  (`resvInv`), so the objection is answered.  Proof structure: the drop is paid in the boundary rule
+  limitation; the watch model is the target, decision (21); until then two harts can still deadlock
+  on two LR reservations, user level only).  The Rocq prototype had the boundary clear
+  (`iris/RiscvLang.v:1860-1862` on `origin/rocq`; its boundary step also cleared the pending acquire
+  bit, which `dropWindow` leaves alone, the ruling saying nothing about it), and its design note had
+  rejected the blocked-store release (2026-08-18) because pairwise disjointness of reservations was
+  not then an invariant -- since decision (19) it is (`resvInv`), so the objection is answered; the
+  Lean port kept that choice and omitted the boundary clear to keep `wpLoop_restart` resource-free.
+  Proof structure: the drop is paid in the boundary rule
   `wpLoop_restart`, which now takes and returns the hart's reservation fragment (the kernel's cycle
   rules get it from `transTok`, which carries `ctxTok`; the machine-mode instruction rules thread
   `ctxTok` as the store rules did; the user-return trampolines' cycle rules take an accessor on their
