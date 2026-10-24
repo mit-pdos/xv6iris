@@ -125,7 +125,7 @@ prototype cleared the reservation at the boundary (`RiscvLang.v`); the Lean
 port had omitted it to keep the boundary rule resource-free.  An LR's
 reservation is left exactly as before, until the hart's next store or
 exclusive read: the SC's outcome is the opaque predicate (`notes/model-diffs.md`
-§5, the LR/SC limitation).
+§5, the platform hooks: the reservation predicates are opaque parameters).
 
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
@@ -503,8 +503,10 @@ abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
 reservation; the hart self-loops (the event is retried), a blocked exclusive
 read dropping the hart's own reservation, a blocked plain store releasing it
-unless it is an LR's (`MState.dropWindow`; a blocked conditional write keeps
-it -- by `resvInv`'s disjointness it is never blocked anyway). -/
+unless it is an LR's (`MState.dropWindow`); a blocked conditional write keeps
+it (an AMO's or the walker's write holds its own reservation on the footprint
+and is never blocked, by `resvInv`'s disjointness; an SC writing without one
+can be, and then keeps whatever it holds -- the owner's smaller change). -/
 abbrev blockedStep (cpu : CPU) (o : InstructionEffect) (σ σ' : MState) : Prop :=
   match o with
   | .memRead req =>

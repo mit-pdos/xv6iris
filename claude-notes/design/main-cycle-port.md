@@ -166,7 +166,8 @@ device arms read `gresv` directly).  Initial/reset: all `None`.
   SUPERSEDED in the Lean tree on 2026-10-24: a blocked PLAIN write releases
   a reservation that is not an LR's, pairwise disjointness being an
   invariant since decision (19) -- `notes/design-rulings.md`, "The
-  reservation drop"; the deadlock is gone with it.)
+  reservation drop"; the deadlock on dangling non-LR reservations is gone
+  with it, while two LR reservations can still form one, user level only.)
 - **RAM `MemRead`, `ak_excl = false`**: unchanged, and NEVER blocked by
   anyone's reservation (a reader linearizes before the RMW; the reserving
   hart's stretch is register-only, so nothing observes the difference).

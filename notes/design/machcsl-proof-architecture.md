@@ -16,8 +16,9 @@ Design settled in Sept 2026 for this tree (user-approved constraints):
   Since the reservation drop (2026-10-24, `notes/design-rulings.md`) the cycle
   boundary takes and gives back the hart's reservation half, so the schemas
   take `resvAny cpu` and hand it to the execute stage, and every `wp_m_*`
-  rule threads `ctxTok cpu curCtx` (via `wpLoop_m_instr_tok`), as the store
-  rules always did.
+  rule threads `ctxTok cpu curCtx` (the store rules did already; the others
+  through the derived schemas `wpLoop_m_instr_tok`, `_instrP_tok`,
+  `_instrClk_tok`).
   The user rejected an earlier design with an abstract resource `R` and
   fetch/decode hypotheses on every rule ("that's ridiculous").
 - Instruction facts (since Sept 12 2026, commits 10912ce + the search-tree
