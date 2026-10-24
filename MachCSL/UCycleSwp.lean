@@ -419,21 +419,34 @@ theorem swp_ucTick (hT : UcTickFoot D) (s : UWSt) (hm : UcMisa D s) (Φ : Unit �
   unfold uFr
   iframe
 
+/-- The frames' hold on the reservation, lent out and taken back (the
+boundary rule threads it). -/
+theorem uFr_resvAny (s : UWSt) : uFr RF BF s ⊢ resvAny cpu ∗ (resvAny cpu -∗ uFr RF BF s) := by
+  unfold uFr
+  rw [uResvTok_eq_resvAny]
+  iintro ⟨HF, HB, Hc, Hr⟩
+  iframe Hr
+  iintro Hr
+  iframe HF HB Hc Hr
+
 /-- The machine step, as the loop sees it: the cycle (at the harness's
 `exit_wait`), then the tick if the machine chose one. -/
 theorem wpLoop_ucStep :
-    (∀ tick : Bool, ∀ ew : Bool, ▷ swp cpu (try_step 0 ew)
-        (fun _ => swp cpu (if tick then tick_clock () else pure ()) (fun _ => wpLoop cpu)))
+    resvAny cpu ∗
+    (∀ tick : Bool, ∀ ew : Bool, ▷ (resvAny cpu -∗ swp cpu (try_step 0 ew)
+        (fun _ => swp cpu (if tick then tick_clock () else pure ()) (fun _ => wpLoop cpu))))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro H
-  iapply wpLoop_restart
+  iintro ⟨Hresv, H⟩
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   ispecialize H $$ %tick %ew
   inext
+  iintro Hresv
   iapply swp_wpHart
   unfold riscvStep
   iapply swp_bind
-  iexact H
+  iapply H $$ Hresv
 
 theorem uwLand_misa (ew : Bool) (wr : WaitReason) (s : UWSt) (meip seip : BitVec 1) :
     (uwLand ew wr s meip seip).2.file .misa = s.file .misa := by
@@ -457,9 +470,15 @@ theorem wpLoop_uwStep (hD : UcFoot D) (hW : UwFoot D) (hT : UcTickFoot D) (s : U
     ⊢ wpLoop cpu := by
   have hwfi : ∀ ew, wr = .WAIT_WFI → ew = false := fun _ hw => by subst hw; simp [uwIsWrs] at hwrs
   iintro ⟨Hfr, HK⟩
+  -- the boundary releases a reservation that is not an LR's: the frame's
+  -- token (`uResvTok` = `resvAny`) goes through `wpLoop_ucStep` and comes back
+  icases uFr_resvAny RF BF s $$ Hfr with ⟨Hr, Hfr⟩
   iapply wpLoop_ucStep
+  iframe Hr
   iintro %tick %ew
   inext
+  iintro Hr
+  ispecialize Hfr $$ Hr
   iapply swp_uwTryStep RF BF hD hW s wr ii ew hm hpriv htw (hwfi ew) h hwt
   iframe Hfr
   iintro %meip %seip Hfr

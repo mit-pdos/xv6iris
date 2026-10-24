@@ -162,7 +162,11 @@ device arms read `gresv` directly).  Initial/reset: all `None`.
   inductive only together with pairwise disjointness of all reservations
   — decided against, 2026-08-18.  The residual, accepted deadlock is two
   harts each with a DANGLING reservation each blocked at a plain write
-  into the other's; DMA cannot close a cycle since it reserves nothing.)
+  into the other's; DMA cannot close a cycle since it reserves nothing.
+  SUPERSEDED in the Lean tree on 2026-10-24: a blocked PLAIN write releases
+  a reservation that is not an LR's, pairwise disjointness being an
+  invariant since decision (19) -- `notes/design-rulings.md`, "The
+  reservation drop"; the deadlock is gone with it.)
 - **RAM `MemRead`, `ak_excl = false`**: unchanged, and NEVER blocked by
   anyone's reservation (a reader linearizes before the RMW; the reserving
   hart's stretch is register-only, so nothing observes the difference).
@@ -183,7 +187,10 @@ device arms read `gresv` directly).  Initial/reset: all `None`.
 - **device `MemRead`/`MemWrite`**: unchanged (never blocked, never
   reserved; `dev_addr` and RAM are disjoint).
 - **boundary `Ret tt`**: `gresv cpu := None` — the per-cycle garbage
-  collection; a dangling reservation never crosses an instruction.
+  collection; a dangling reservation never crosses an instruction.  (The
+  Lean port omitted this clear until 2026-10-24; it is back, keyed on the
+  reservation's origin so that an LR's survives to its SC:
+  `notes/design-rulings.md`, "The reservation drop".)
 - **device threads' RAM writes** (the disk's DMA burst into RAM): the same
   overlapping-reservation SELF-LOOP guard as a hart's plain store.  Device
   RAM reads: unblocked.

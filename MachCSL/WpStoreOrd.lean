@@ -68,6 +68,9 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n nt : Nat}
   subst hv
   unfold writeAUT
   iintro ⟨Hfrag, H⟩
+  -- a blocked attempt releases a reservation that is not an LR's
+  -- (`MState.dropWindow`): the Löb induction runs over the token at any reservation
+  ihave Hfrag := resvAny_ofAny cpu r $$ Hfrag
   iloeb as IH
   iapply swp_event_step_at cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags)
     (.memWrite (memReq req) (vecbytes_to_bitvec bytes) (vecbool_to_bitvec tags))
@@ -76,13 +79,14 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n nt : Nat}
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
+  icases Hfrag with ⟨%r, Hfrag⟩
   by_cases hno : othersReserve σ.resv cpu req.address n
-  · -- blocked: retry
+  · -- blocked: release the reservation unless it is an LR's, retry
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     isplit
     · ipureintro
-      exact Or.inr ⟨σ, hno, rfl⟩
+      exact Or.inr ⟨σ.dropWindow cpu, hno, by rw [ite_eq_right (by simp [hk])]⟩
     inext
     iintro %σ'
     isplit
@@ -92,12 +96,17 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n nt : Nat}
       · exact absurd hno hno'
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
-      subst σ'
+      rw [ite_eq_right (by simp [hk])] at hσ
+      subst hσ
+      icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+      imod memModel_dropWindow _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-      · iapply IH $$ Hfrag H
+      · iapply machInterp_close_dropWindow σ cpu
+        iframe Hclose Hregs Hmem Hmm
+      · iapply IH $$ H [Hfrag]
+        iapply resvAny_of cpu (dropKind r) b $$ Hfrag
   · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
     ihave %hget : ⌜histsAt σ.mem req.address n Hs⌝ $$ [Hmem Hb]
     · iapply histBytes_valid σ.mem req.address n _ Hs $$ [Hmem Hb]

@@ -500,11 +500,16 @@ theorem evStep_wire (cpu : CPU) (o : InstructionEffect) (σ : MState) (v : Instr
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
   all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
 
+/-- Releasing a reservation (`MState.dropWindow`) leaves the devices alone (the
+rest of the lemma pack is in `MachCSL.Resources`). -/
+theorem MState.dropWindow_devs (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).devs = σ.devs := by
+  unfold MState.dropWindow; split <;> (try split) <;> rfl
+
 theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
     (j : UartId) : σ'.devs.wire j = σ.devs.wire j := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rw [MState.dropWindow_devs]
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hs⟩ | ⟨hb, _⟩
@@ -512,7 +517,7 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
     · unfold blockedStep at hb
       split at hb
       · obtain ⟨_, _, rfl⟩ := hb; rfl
-      · obtain ⟨_, rfl⟩ := hb; rfl
+      · obtain ⟨_, rfl⟩ := hb; split <;> simp only [MState.dropWindow_devs]
       · exact hb.elim
   · obtain ⟨_, _, rfl⟩ := h; rfl
 
@@ -538,7 +543,7 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
     (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
   unfold hartStep at h
   split at h
-  · obtain ⟨_, _, _, rfl⟩ := h; rfl
+  · obtain ⟨_, _, _, rfl⟩ := h; rw [MState.dropWindow_devs]
   · exact h.elim
   · rename_i o k
     rcases h with ⟨v, _, hs⟩ | ⟨hb, _⟩
@@ -546,7 +551,7 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
     · unfold blockedStep at hb
       split at hb
       · obtain ⟨_, _, rfl⟩ := hb; rfl
-      · obtain ⟨_, rfl⟩ := hb; rfl
+      · obtain ⟨_, rfl⟩ := hb; split <;> simp only [MState.dropWindow_devs]
       · exact hb.elim
   · obtain ⟨_, _, rfl⟩ := h; rfl
 

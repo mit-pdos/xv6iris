@@ -95,7 +95,7 @@ macro "wfi_retire " hp:term : tactic =>
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
                    Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
-                 iapply HΦ $$ HmConf Hclock Hpc HF
+                 iapply HΦ $$ HmConf Hclock Hpc Hresv HF
                · swp_run 40
                  conf_intro HmConf
                  iapply swp_tick_clock_cells (hp := $hp)
@@ -106,7 +106,7 @@ macro "wfi_retire " hp:term : tactic =>
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
                    Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
-                 iapply HΦ $$ HmConf Hclock Hpc HF))
+                 iapply HΦ $$ HmConf Hclock Hpc Hresv HF))
 
 set_option maxHeartbeats 4000000 in
 /-- A hart parked in `HART_WAITING (WAIT_WFI, ii)`, by Löb induction over
@@ -140,17 +140,21 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     (htw : p = Privilege.Supervisor → BitVec.extractLsb' 21 1 c.mstatus = 0#1)
     (ii : instr_info) (pc npc : BitVec 64) (F : IProp GF) :
     confCellsHS cpu (DFrac.own 1) p c (HartState.HART_WAITING (WaitReason.WAIT_WFI, ii)) ∗
-    clockCells cpu ∗ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] npc ∗ F ∗
-    (confCells cpu (DFrac.own 1) p c -∗ clockCells cpu -∗ pcIs cpu npc -∗ F -∗ wpLoop cpu)
+    clockCells cpu ∗ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] npc ∗ resvAny cpu ∗ F ∗
+    (confCells cpu (DFrac.own 1) p c -∗ clockCells cpu -∗ pcIs cpu npc -∗ resvAny cpu -∗ F -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HmConf, Hclock, HPC, HnextPC, HF, HΦ⟩
+  iintro ⟨HmConf, Hclock, HPC, HnextPC, Hresv, HF, HΦ⟩
   iloeb as IH
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
-  iapply wpLoop_restart
+  -- every boundary releases a reservation that is not an LR's: the token goes
+  -- through `wpLoop_restart_any` and comes back as some fragment
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
   unfold riscvStep
   iapply swp_wpHart
   confhs_cases HmConf
@@ -177,7 +181,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
         confhs_intro HmConf
         ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
         ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Haux
-        iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
+        iapply IH $$ HmConf Hclock HPC HnextPC Hresv HF HΦ
       · swp_run 5
         confhs_intro HmConf
         iapply swp_tick_clock_cellsHS (hp := hp)
@@ -186,7 +190,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
         iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
         ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
         ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Haux
-        iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
+        iapply IH $$ HmConf Hclock HPC HnextPC Hresv HF HΦ
     · -- `exit_wait = true`: the forced exit; `hart_state := HART_ACTIVE`, and the
       -- instruction retires (in S-mode because `mstatus.TW = 0`)
       rcases hp with rfl | rfl
@@ -226,9 +230,17 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  -- the boundary releases a reservation that is not an LR's: the token's
+  -- fragment goes through `wpLoop_restart_any` and comes back as some fragment
+  icases transTok_cases cpu tier root $$ HT with ⟨Hslot, Htok⟩
+  icases ctxTok_resvAny cpu curCtx $$ Htok with ⟨Hown, Hresv⟩
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
+  ihave Htok := ctxTok_of_resvAny cpu curCtx $$ [$Hown $Hresv]
+  ihave HT := transTok_intro cpu tier root $$ [$Hslot $Htok]
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf
@@ -273,18 +285,24 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   iintro HmConf
   conf_cases HmConf
   swp_run 40
+  -- the parked steps thread the token's fragment (`wpLoop_wait_wfi`'s `resvAny`)
   ihave Hcont : (confCells cpu (DFrac.own 1) Privilege.Supervisor c -∗ clockCells cpu -∗
-      pcIs cpu (pc + 4#64) -∗ (transTok cpu tier root ∗ R) -∗ wpLoop cpu) $$ [HΦ]
-  · iintro HmConf Hclock Hpc ⟨HT, HR⟩
+      pcIs cpu (pc + 4#64) -∗ resvAny cpu -∗ (transSlotAt cpu tier root ∗ ownCtx cpu curCtx ∗ R) -∗
+      wpLoop cpu) $$ [HΦ]
+  · iintro HmConf Hclock Hpc Hresv ⟨Hslot, Hown, HR⟩
+    ihave Htok := ctxTok_of_resvAny cpu curCtx $$ [$Hown $Hresv]
+    ihave HT := transTok_intro cpu tier root $$ [$Hslot $Htok]
     iapply HΦ $$ HmConf Hclock Hpc HT HR
+  icases transTok_cases cpu tier root $$ HT with ⟨Hslot, Htok⟩
+  icases ctxTok_resvAny cpu curCtx $$ Htok with ⟨Hown, Hresv⟩
   cases tick
   · swp_run 10
     confhs_intro HmConf
     ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
     ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Haux
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c (fun _ => htw) _ pc (pc + 4#64)
-      iprop(transTok cpu tier root ∗ R))
-    iframe HmConf Hclock HPC HnextPC HT HR Hcont
+      iprop(transSlotAt cpu tier root ∗ ownCtx cpu curCtx ∗ R))
+    iframe HmConf Hclock HPC HnextPC Hresv Hslot Hown HR Hcont
   · swp_run 5
     confhs_intro HmConf
     iapply swp_tick_clock_cellsHS (hp := hp')
@@ -294,8 +312,8 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
     ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip Haux
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c (fun _ => htw) _ pc (pc + 4#64)
-      iprop(transTok cpu tier root ∗ R))
-    iframe HmConf Hclock HPC HnextPC HT HR Hcont
+      iprop(transSlotAt cpu tier root ∗ ownCtx cpu curCtx ∗ R))
+    iframe HmConf Hclock HPC HnextPC Hresv Hslot Hown HR Hcont
 
 /-! ## The rule on the kernel execution context -/
 

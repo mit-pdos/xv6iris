@@ -59,9 +59,11 @@ audit 33 s / 4.6 GB, trusted base 15 s / 3 GB.)  Rocq's pair of `Print Assumptio
 ## The statements' trusted base, against Rocq's report
 
 Rocq numbers: CI run 36625019173 (main 456141b5b, Sept 29), `tcb_report.py --only iris`.  Lean numbers:
-`tools/ci/tcb.sh` at 4e21348a4 (the C3 lane merged, Oct 22 2026; at the bump's a31d988e8 the closed
-theorems had 5 lines fewer -- `HRead.afterExcl` grew -- and the four statements that quantify over the
-state interpretation had one declaration and 14 lines fewer: `resvInv`); "image" is
+`tools/ci/tcb.sh` on the `lang-drop` lane's tree (Oct 24 2026, the reservation drop; at the C3 lane's
+4e21348a4 every statement had 5 declarations and 37 lines fewer -- `ResvKind`, `kindOf`,
+`MState.dropWindow`, `akLR` and `akPteRe` entered, `Resv` and `snapOf` grew -- and at the bump's a31d988e8
+the closed theorems had a further 5 lines fewer -- `HRead.afterExcl` grew -- and the four statements that
+quantify over the state interpretation one declaration and 14 lines fewer: `resvInv`); "image" is
 `MachCSL/KernelElf.lean` (1345 counted lines of 1379) + `Xv6/FsImgRaw.lean` (2272 of 2416), the raw kernel
 ELF and `fs.img`, which Rocq keeps outside `iris/` in `kernel-rocq/`.
 
@@ -74,7 +76,10 @@ type and value, grouped under the source declaration that made it (`tools/tcb/Tc
 "THE HASH"; the generated model is pinned byte for byte by `tools/check_gen.py` instead).  At
 `49b8aef37`'s tree: 2,582 constants under 2,238 declarations (a structure's fields and constructor
 count as declarations of their own, with their own line ranges; the per-theorem tables above fold
-them into the structure).  Demonstrated on the case: with this baseline, the check run on the pre-C3
+them into the structure); after the reservation drop (2026-10-24, `notes/model-diffs.md` section 5):
+2,598 under 2,252 -- the 16 constants of `ResvKind`, `Resv`'s constructor and fields, `kindOf`, `akLR`,
+`akPteRe` and `MState.dropWindow` entered, 9 hashes moved (`Resv`, `snapOf`, `Resv.overlaps`,
+`MState.afterExcl`, `evStep`, `blockedStep`, `hartStep`, `mmOk`, `resvInv`), none left.  Demonstrated on the case: with this baseline, the check run on the pre-C3
 tree (`0a2b015d7`, rebuilt) fails with exactly four problems -- `HRead.afterExcl` changed in type and
 value, `MState.afterExcl` and `memModelAt` in value, `resvInv` left -- and a docstring-only, a
 body-comment and a proof-only edit made in the same rebuild moved nothing (`notes/design-rulings.md`,
@@ -82,16 +87,16 @@ body-comment and a proof-only edit made in the same rebuild moved nothing (`note
 
 | Rocq theorem | files / defs / lines | Lean theorem | files / decls / lines | without the image bytes |
 |---|---|---|---|---|
-| `riscv_power_adequacy` | 18 / 611 / 5342 | `MachCSL.riscvPowerAdequacy` | 26 / 477 / 3986 | 25 / 461 / 2641 |
-| `xv6_power_adequacy_xv6Σ` | 48 / 797 / 6669 | `Xv6.xv6PowerAdequacy` | 110 / 913 / 6702 | 109 / 897 / 5357 |
-| `xv6_fs_adequacy_xv6Σ` | 28 / 499 / 4035 | `Xv6.xv6FsAdequacy_closed` | 42 / 624 / 6055 | 40 / 480 / 2438 |
-| | | `Xv6.xv6FsAdequacy_xv6GF` (still takes `USER`) | 67 / 831 / 7406 | 65 / 687 / 3789 |
-| `union_adequacy_closed` | 24 / 630 / 4627 | `Xv6.unionAdequacyClosed` | 35 / 737 / 6505 | 33 / 593 / 2888 |
-| (not reported) | | `Xv6.unionSyncCutNeg` | 23 / 538 / 5484 | 21 / 394 / 1867 |
-| (not reported) | | `Xv6.unionResults` | 37 / 760 / 6541 | 35 / 616 / 2924 |
-| (no target: `UserProof` is a functor instance) | | `Xv6.userProof` | 40 / 572 / 4460 | 39 / 556 / 3115 |
-| (no Rocq counterpart) | | `Xv6.xv6NiAdequacy` | 50 / 752 / 6718 | 48 / 608 / 3101 |
-| (no Rocq counterpart) | | the other six NI theorems | 48-49 / 734-766 / 6606-6780 | 46-47 / 590-622 / 2989-3163 |
+| `riscv_power_adequacy` | 18 / 611 / 5342 | `MachCSL.riscvPowerAdequacy` | 26 / 482 / 4023 | 25 / 466 / 2678 |
+| `xv6_power_adequacy_xv6Σ` | 48 / 797 / 6669 | `Xv6.xv6PowerAdequacy` | 110 / 918 / 6739 | 109 / 902 / 5394 |
+| `xv6_fs_adequacy_xv6Σ` | 28 / 499 / 4035 | `Xv6.xv6FsAdequacy_closed` | 42 / 629 / 6092 | 40 / 485 / 2475 |
+| | | `Xv6.xv6FsAdequacy_xv6GF` (still takes `USER`) | 67 / 836 / 7443 | 65 / 692 / 3826 |
+| `union_adequacy_closed` | 24 / 630 / 4627 | `Xv6.unionAdequacyClosed` | 35 / 742 / 6542 | 33 / 598 / 2925 |
+| (not reported) | | `Xv6.unionSyncCutNeg` | 23 / 543 / 5521 | 21 / 399 / 1904 |
+| (not reported) | | `Xv6.unionResults` | 37 / 765 / 6578 | 35 / 621 / 2961 |
+| (no target: `UserProof` is a functor instance) | | `Xv6.userProof` | 40 / 577 / 4497 | 39 / 561 / 3152 |
+| (no Rocq counterpart) | | `Xv6.xv6NiAdequacy` | 50 / 757 / 6755 | 48 / 613 / 3138 |
+| (no Rocq counterpart) | | the other six NI theorems | 48-49 / 739-771 / 6643-6817 | 46-47 / 595-627 / 3026-3200 |
 
 Outside the project proper, every Lean statement also reaches the generated Sail model (`LeanRV64D`: 95 of
 the 100 files the model's root loads, 1836 declarations, 32,829 of 80,236 lines at 4e21348a4; 1833,

@@ -40,10 +40,17 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart_lc
+  -- the boundary releases a reservation that is not an LR's: the token's
+  -- fragment goes through `wpLoop_restart_any_lc` and comes back as some fragment
+  icases transTok_cases cpu tier root $$ HT with ⟨Hslot, Htok⟩
+  icases ctxTok_resvAny cpu curCtx $$ Htok with ⟨Hown, Hresv⟩
+  iapply wpLoop_restart_any_lc
+  iframe Hresv
   iintro %tick %ew
   inext
-  iintro Hlc
+  iintro Hresv Hlc
+  ihave Htok := ctxTok_of_resvAny cpu curCtx $$ [$Hown $Hresv]
+  ihave HT := transTok_intro cpu tier root $$ [$Hslot $Htok]
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf

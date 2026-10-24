@@ -425,6 +425,31 @@ theorem ctxTok_introB (cpu : CPU) (ξ : CtxId) (r : Option Resv) (b : Bool) :
   iframe H
   iapply resvFragAny_of cpu r b $$ Hf
 
+/-- The hart's reservation fragment at ANY reservation and any acquire bit: the second conjunct of `ctxTok`. -/
+abbrev resvAny (cpu : CPU) : IProp GF := iprop(∃ r : Option Resv, resvFragAny cpu r)
+
+theorem resvAny_of (cpu : CPU) (r : Option Resv) (b : Bool) :
+    resvFrag cpu r b ⊢@{IProp GF} resvAny cpu := by
+  iintro H
+  iexists r
+  iapply resvFragAny_of cpu r b $$ H
+
+theorem resvAny_ofAny (cpu : CPU) (r : Option Resv) :
+    resvFragAny cpu r ⊢@{IProp GF} resvAny cpu := by
+  iintro H
+  iexists r
+  iexact H
+
+theorem ctxTok_resvAny (cpu : CPU) (ξ : CtxId) :
+    ctxTok cpu ξ ⊢@{IProp GF} ownCtx cpu ξ ∗ resvAny cpu :=
+  ctxTok_cases cpu ξ
+
+theorem ctxTok_of_resvAny (cpu : CPU) (ξ : CtxId) :
+    ownCtx cpu ξ ∗ resvAny cpu ⊢@{IProp GF} ctxTok cpu ξ := by
+  iintro ⟨H, %r, Hf⟩
+  iapply ctxTok_intro cpu ξ r
+  iframe H Hf
+
 /-! ## Memory points-to -/
 
 /-- The byte at `a` holds `v`, justified at context ξ: its latest write is at

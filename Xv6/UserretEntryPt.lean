@@ -40,6 +40,29 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 /-- The trampoline claim, as the translation lemmas name it. -/
 abbrev urTrampCl : IProp GF := kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1)
 
+/-- The kernel-table steps' translation resource lends the reservation
+(`wpLoop_sT_instr`'s `hT`). -/
+theorem ktrampT_lendResv [CurCtx] (cpu : CPU) (kroot : BitVec 44) :
+    iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) ⊢@{IProp GF}
+      resvAny cpu ∗ (resvAny cpu -∗ transTok cpu KTier.kpt kroot ∗ urTrampCl) := by
+  iintro ⟨Htt, Hcl⟩
+  icases transTok_lendResv cpu KTier.kpt kroot $$ Htt with ⟨Hr, Hw⟩
+  iframe Hr
+  iintro Hr
+  iframe Hcl
+  iapply Hw $$ Hr
+
+/-- The window step's translation resource lends the reservation. -/
+theorem winT_lendResv [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
+    iprop(pt2Win cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ⊢@{IProp GF}
+      resvAny cpu ∗ (resvAny cpu -∗ pt2Win cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) := by
+  iintro ⟨Hw, #Hcl, #Hk, Ht⟩
+  icases ctxTok_lendResv cpu curCtx $$ Ht with ⟨Hr, Hb⟩
+  iframe Hr
+  iintro Hr
+  iframe Hw Hcl Hk
+  iapply Hb $$ Hr
+
 set_option maxHeartbeats 1000000 in
 /-- **One trampoline step fetched through the KERNEL table** (Rocq
 `wp_instr_ktramp_pt_share`): a 32-bit instruction whose execute stage runs
@@ -63,7 +86,8 @@ theorem userret_kstep [CurCtx] (cpu : CPU) (c c' : MConf) (kroot : BitVec 44)
   subst hnpc
   iintro ⟨#HI, HmConf, Hclock, Hpc, Htt, #Hcl, HP, HΦ⟩
   iapply (wpLoop_sT_instr cpu c c' hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
-    (pc + 4#64) false i iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) P Q htr htr2 hexec)
+    (pc + 4#64) false i iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) P Q (ktrampT_lendResv cpu kroot) htr htr2
+    hexec)
   iframe HI HmConf Hclock Hpc HP HΦ
   iframe Htt
   iexact Hcl
@@ -117,7 +141,8 @@ theorem userret_wstep [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44) (P : 
   iapply (wpLoop_sT_instr cpu c c hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
     (pc + 4#64) false urSfence
     iprop(pt2Win cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
-    iprop((uptSlot cpu P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R) htr htr2
+    iprop((uptSlot cpu P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R)
+    (winT_lendResv cpu kroot P) htr htr2
     (userret_exec_sfence_win cpu c hok.phys kroot P pc (pc + 4#64) R _))
   iframe HI HmConf Hclock Hpc HR
   isplitl [Hwin Htok]

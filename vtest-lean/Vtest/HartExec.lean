@@ -3,7 +3,8 @@ Vtest: ONE EVENT OF ONE HART, executably, and the proof that it is a step of
 the language.
 
 `hartExec pol cpu m x` takes the hart whose remaining computation is `m` one
-step: at the cycle boundary it restarts the model's cycle, and otherwise it
+step: at the cycle boundary it restarts the model's cycle (releasing a
+reservation that is not an LR's, `XState.dropWindow`), and otherwise it
 answers the event at the head of `m` from the executable state `x`.  The
 language's relation (`MachCSL.hartStep`) leaves several things open -- the
 clock tick at a boundary, the view a load or a fetch reads at, the value of a
@@ -62,7 +63,7 @@ theorem cohOkB_iff (hr : HRead) (pa : PAddr) (n : Nat) (tvn : Nat) :
 
 /-- Does the snapshot overlap the footprint? -/
 def overlapsB (r : Resv) (pa : PAddr) (n : Nat) : Bool :=
-  (List.range n).any fun j => (r[pa + BitVec.ofNat 64 j]?).isSome
+  (List.range n).any fun j => (r.snap[pa + BitVec.ofNat 64 j]?).isSome
 
 theorem overlapsB_iff (r : Resv) (pa : PAddr) (n : Nat) :
     overlapsB r pa n = true ↔ r.overlaps pa n := by
@@ -241,7 +242,8 @@ def memReadExec (pol : HPol) (cpu : CPU) (x : XState) (req : MemRequest) :
       else
         let w := gather n fun j => (x.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top
         if topBytesB x.mem pa n w then
-          some (.ok (w, 0#req.numTag), x.afterExcl cpu pa n w (akAcq req.accessKind))
+          some (.ok (w, 0#req.numTag),
+            x.afterExcl cpu pa n w (akAcq req.accessKind) (kindOf req.accessKind))
         else none
     else
       let tvn := loadView pol h pa n x.log.length
@@ -416,12 +418,16 @@ theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : InstructionEffec
     rfl
 
 /-- The event is blocked by another hart's reservation: the state the
-self-loop leaves. -/
+self-loop leaves (a blocked exclusive read drops the hart's own reservation, a
+blocked plain store releases it unless it is an LR's, `XState.dropWindow`). -/
 def blockedExec (cpu : CPU) (x : XState) : InstructionEffect → Option XState
   | .memRead req =>
     if akExcl req.accessKind && othersReserveB x cpu req.pa req.size then some (x.dropResv cpu)
     else none
-  | .memWrite req _ _ => if othersReserveB x cpu req.pa req.size then some x else none
+  | .memWrite req _ _ =>
+    if othersReserveB x cpu req.pa req.size then
+      some (if akExcl req.accessKind then x else x.dropWindow cpu)
+    else none
   | _ => none
 
 theorem blockedExec_sound (cpu : CPU) (x : XState) (o : InstructionEffect)
@@ -442,7 +448,10 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : InstructionEffect)
     · rename_i hc
       simp only [Option.some.injEq] at h
       subst h
-      exact ⟨(othersReserveB_iff _ _ _ _).1 hc, rfl⟩
+      refine ⟨(othersReserveB_iff _ _ _ _).1 hc, ?_⟩
+      cases akExcl req.accessKind
+      · exact XState.abs_dropWindow ..
+      · rfl
     · exact absurd h (by simp)
   | _ => simp [blockedExec] at h
 
@@ -453,7 +462,7 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : InstructionEffect)
 alternative. -/
 def hartExec (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) : Option (SailM Unit × XState) :=
   match m with
-  | .pure _ => some (riscvStep pol.tick pol.ew, x)
+  | .pure _ => some (riscvStep pol.tick pol.ew, x.dropWindow cpu)
   | .impure (.inl (.error _)) _ => none
   | .impure (.inl (.ok o)) k =>
     match evExec pol cpu x o with
@@ -472,7 +481,7 @@ theorem hartExec_sound (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) (m
   | pure u =>
     simp only [hartExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨pol.tick, pol.ew, rfl, rfl⟩
+    exact ⟨pol.tick, pol.ew, rfl, XState.abs_dropWindow ..⟩
   | impure call k =>
     cases call with
     | inl e =>

@@ -13,6 +13,11 @@ Design settled in Sept 2026 for this tree (user-approved constraints):
   `InstrBytes.instr`: fetch footprint + decode fact; compressed encodings are
   named by their expanded base instruction).  `wp_m_<instr>` rules are stated
   once per base instruction with an `is_rvc` flag and `instrLen is_rvc`.
+  Since the reservation drop (2026-10-24, `notes/design-rulings.md`) the cycle
+  boundary takes and gives back the hart's reservation half, so the schemas
+  take `resvAny cpu` and hand it to the execute stage, and every `wp_m_*`
+  rule threads `ctxTok cpu curCtx` (via `wpLoop_m_instr_tok`), as the store
+  rules always did.
   The user rejected an earlier design with an abstract resource `R` and
   fetch/decode hypotheses on every rule ("that's ridiculous").
 - Instruction facts (since Sept 12 2026, commits 10912ce + the search-tree

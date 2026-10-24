@@ -14,9 +14,14 @@ Design (trims vs Rocq `RiscvLang.mnode_step`/`TsoMemPa`/`TsoCtx`):
   log `log : List Agent` (top = length).  Read = first entry visible
   (`t ≤ tvn ∨ tid = h`).  Per hart: `tv` (floor), `itv` (icache), `hr`
   (rv, coh, acq), `resv`.  Agents: harts, disk = NCPU, ifetchAgent = NCPU+1+c.
-- Reservations are NOT dropped at the cycle boundary (keeps `wpLoop_restart`
-  resource-free); xv6 never does a bare LR.  Store arm blocked by others'
-  reservations -> `blockedStep` (hart retries; leaf proofs use `iloeb`).
+- Reservations: until 2026-10-24 NOT dropped at the cycle boundary (to keep
+  `wpLoop_restart` resource-free; xv6 never does a bare LR).  Since the
+  owner's ruling of 2026-10-24 (`notes/design-rulings.md`, "The reservation
+  drop"; `notes/model-policy.md` decision (21)) the record carries its origin
+  (`ResvKind`) and a non-LR reservation is released at the boundary and at a
+  blocked plain store (`MState.dropWindow`); `wpLoop_restart` takes and returns
+  the hart's `resvFragAny`.  Store arm blocked by others' reservations ->
+  `blockedStep` (hart retries; leaf proofs use `iloeb`).
 - Resources: `a ↦ₕ{dq} H` (gen_heap over histories); mono_nat mirrors
   (`topName`, per-hart `viewName/iviewName/rviewName`); `authName` ghost map
   timestamp -> author (persistent `authoredBy`); `resvName` ghost map

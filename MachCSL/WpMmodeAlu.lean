@@ -275,134 +275,134 @@ theorem execSpec_or_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVe
 /-! ### The `wpLoop` rules -/
 
 /-- `addi rd, rs1, imm` (`rd ≠ rs1`). -/
-theorem wp_m_addi (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_addi [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (imm : BitVec 12) (rd rs1 : BitVec 5) (hrd : rd ≠ 0#5) (hrs1 : rs1 ≠ 0#5) (v v1 : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rs1, regidx.Regidx rd, iop.ADDI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
     gpr cpu rs1 (DFrac.own 1) v1 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v1 + BitVec.signExtend 64 imm) -∗ gpr cpu rs1 (DFrac.own 1) v1 -∗
         wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addi cpu dq c pc _ imm rd rs1 hrd hrs1 v v1)
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, Hrd, Hrs1, HΦ⟩
+  iapply wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addi cpu dq c pc _ imm rd rs1 hrd hrs1 v v1)
   iframe
   inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs1⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs1
+  iintro HmConf Hclock Hpc Htok ⟨Hrd, Hrs1⟩
+  iapply HΦ $$ HmConf Hclock Hpc Htok Hrd Hrs1
 
 /-- `li rd, imm` (`addi rd, x0, imm`; also `c.li`). -/
-theorem wp_m_li (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_li [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx 0#5, regidx.Regidx rd, iop.ADDI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (BitVec.signExtend 64 imm) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_li cpu dq c pc _ imm rd hrd v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_li cpu dq c pc _ imm rd hrd v)
 
 /-- `ori rd, rd, imm`. -/
-theorem wp_m_ori_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_ori_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.ITYPE (imm, regidx.Regidx rd, regidx.Regidx rd, iop.ORI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v ||| BitVec.signExtend 64 imm) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_ori_same cpu dq c pc _ imm rd hrd v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_ori_same cpu dq c pc _ imm rd hrd v)
 
 /-- `srli rd, rd, shamt` (also `c.srli`). -/
-theorem wp_m_srli_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_srli_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (shamt : BitVec 6) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc
       (instruction.SHIFTIOP (shamt, regidx.Regidx rd, regidx.Regidx rd, sop.SRLI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v >>> shamt.toNat) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_srli_same cpu dq c pc _ shamt rd hrd v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_srli_same cpu dq c pc _ shamt rd hrd v)
 
 /-- `slli rd, rd, shamt` (also `c.slli`). -/
-theorem wp_m_slli_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_slli_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (shamt : BitVec 6) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc
       (instruction.SHIFTIOP (shamt, regidx.Regidx rd, regidx.Regidx rd, sop.SLLI)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v <<< shamt.toNat) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_slli_same cpu dq c pc _ shamt rd hrd v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_slli_same cpu dq c pc _ shamt rd hrd v)
 
 /-- `addiw rd, rd, imm` (`sext.w rd, rd` is `imm = 0`). -/
-theorem wp_m_addiw_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_addiw_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (imm : BitVec 12) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.ADDIW (imm, regidx.Regidx rd, regidx.Regidx rd)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1)
           (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (v + BitVec.signExtend 64 imm))) -∗
         wpLoop cpu)
     ⊢ wpLoop cpu :=
-  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addiw_same cpu dq c pc _ imm rd hrd v)
+  wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_addiw_same cpu dq c pc _ imm rd hrd v)
 
 /-- `mv rd, rs2` (`add rd, x0, rs2`; also `c.mv`). -/
-theorem wp_m_mv (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_mv [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (rd rs2 : BitVec 5) (hrd : rd ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (v v2 : BitVec 64) :
     instr (GF := GF) pc is_rvc
       (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx 0#5, regidx.Regidx rd, rop.ADD)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
     gpr cpu rs2 (DFrac.own 1) v2 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) v2 -∗ gpr cpu rs2 (DFrac.own 1) v2 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs2, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_mv cpu dq c pc _ rd rs2 hrd hrs2 v v2)
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, Hrd, Hrs2, HΦ⟩
+  iapply wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_mv cpu dq c pc _ rd rs2 hrd hrs2 v v2)
   iframe
   inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs2⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs2
+  iintro HmConf Hclock Hpc Htok ⟨Hrd, Hrs2⟩
+  iapply HΦ $$ HmConf Hclock Hpc Htok Hrd Hrs2
 
 /-- `and rd, rd, rs2` (also `c.and`). -/
-theorem wp_m_and_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_and_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (rd rs2 : BitVec 5) (hrd : rd ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (v v2 : BitVec 64) :
     instr (GF := GF) pc is_rvc
       (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rd, regidx.Regidx rd, rop.AND)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
     gpr cpu rs2 (DFrac.own 1) v2 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v &&& v2) -∗ gpr cpu rs2 (DFrac.own 1) v2 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs2, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_and_same cpu dq c pc _ rd rs2 hrd hrs2 v v2)
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, Hrd, Hrs2, HΦ⟩
+  iapply wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_and_same cpu dq c pc _ rd rs2 hrd hrs2 v v2)
   iframe
   inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs2⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs2
+  iintro HmConf Hclock Hpc Htok ⟨Hrd, Hrs2⟩
+  iapply HΦ $$ HmConf Hclock Hpc Htok Hrd Hrs2
 
 /-- `or rd, rd, rs2` (also `c.or`). -/
-theorem wp_m_or_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+theorem wp_m_or_same [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (rd rs2 : BitVec 5) (hrd : rd ≠ 0#5) (hrs2 : rs2 ≠ 0#5) (v v2 : BitVec 64) :
     instr (GF := GF) pc is_rvc
       (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rd, regidx.Regidx rd, rop.OR)) ∗
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ gpr cpu rd (DFrac.own 1) v ∗
     gpr cpu rs2 (DFrac.own 1) v2 ∗
-    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗ ctxTok cpu curCtx -∗
         gpr cpu rd (DFrac.own 1) (v ||| v2) -∗ gpr cpu rs2 (DFrac.own 1) v2 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs2, HΦ⟩
-  iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_or_same cpu dq c pc _ rd rs2 hrd hrs2 v v2)
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, Hrd, Hrs2, HΦ⟩
+  iapply wpLoop_m_instr_tok cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_or_same cpu dq c pc _ rd rs2 hrd hrs2 v v2)
   iframe
   inext
-  iintro HmConf Hclock Hpc ⟨Hrd, Hrs2⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs2
+  iintro HmConf Hclock Hpc Htok ⟨Hrd, Hrs2⟩
+  iapply HΦ $$ HmConf Hclock Hpc Htok Hrd Hrs2
 
 end MachCSL

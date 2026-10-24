@@ -15,6 +15,12 @@ checks (all disabled) and the breakpoint-reentrancy check around the fetch
 around them), and ends by clearing `written_event_index` and checking
 `written_trigger_index = none`: the cells `cycleAux` that `clockCells` now
 carries.  The statements are unchanged.
+
+Since the reservation drop (owner ruling 2026-10-24, policy decision (21)) the
+cycle boundary releases a reservation that is not an LR's (`hartStep`'s
+`.pure` arm, `MState.dropWindow`): the rules take the hart's reservation token
+`resvAny cpu`, thread it through `wpLoop_restart_any`, and hand it to the
+execute stage (`hexec`'s precondition `resvAny cpu ∗ P`).
 -/
 import MachCSL.WpCycleDefs
 import MachCSL.WpStagesM
@@ -115,18 +121,22 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     (ast : instruction) (R P Q : IProp GF)
     (hfetch : fetchSpec cpu dq c pc R (FetchResult.F_Base w))
     (hdec : decodes32 (GF := GF) cpu dq c w ast)
-    (hexec : execSpecClk cpu dq c p' c' ast pc (pc + 4#64) npc P Q) :
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ R ∗ P ∗
+    (hexec : execSpecClk cpu dq c p' c' ast pc (pc + 4#64) npc iprop(resvAny cpu ∗ P) Q) :
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ R ∗ resvAny cpu ∗ P ∗
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
+  iintro ⟨HmConf, Hclock, Hpc, HR, Hresv, HP, HΦ⟩
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  -- the boundary releases a reservation that is not an LR's; the token comes
+  -- back as some fragment and is handed to the instruction
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
   unfold riscvStep
   iapply swp_wpHart
   mconf_cases HmConf
@@ -186,18 +196,22 @@ theorem wpLoop_m_rvc (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     (hfetch : fetchSpec cpu dq c pc R (FetchResult.F_RVC h))
     (hdec : decodes16 (GF := GF) cpu dq c h ast)
     (hexp : Functions.execute ast = pure (ExecutionResult.ExecuteAs ast'))
-    (hexec : execSpecClk cpu dq c p' c' ast' pc (pc + 2#64) npc P Q) :
-    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ R ∗ P ∗
+    (hexec : execSpecClk cpu dq c p' c' ast' pc (pc + 2#64) npc iprop(resvAny cpu ∗ P) Q) :
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ R ∗ resvAny cpu ∗ P ∗
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HmConf, Hclock, Hpc, HR, HP, HΦ⟩
+  iintro ⟨HmConf, Hclock, Hpc, HR, Hresv, HP, HΦ⟩
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  -- the boundary releases a reservation that is not an LR's; the token comes
+  -- back as some fragment and is handed to the instruction
+  iapply wpLoop_restart_any
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
   unfold riscvStep
   iapply swp_wpHart
   mconf_cases HmConf
@@ -317,11 +331,11 @@ theorem wpLoop_m_instrClk (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     (hp' : p' = Privilege.Machine ∨ p' = Privilege.Supervisor) (c' : MConf) (hok : MConf.ok (GF := GF) c)
     (pc npc : BitVec 64) (is_rvc : Bool)
     (i : instruction) (P Q : IProp GF)
-    (hexec : execSpecClk cpu dq c p' c' i pc (pc + instrLen is_rvc) npc P Q) :
-    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ P ∗
+    (hexec : execSpecClk cpu dq c p' c' i pc (pc + instrLen is_rvc) npc iprop(resvAny cpu ∗ P) Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ resvAny cpu ∗ P ∗
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, HP, HΦ⟩
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hresv, HP, HΦ⟩
   unfold instr
   icases HI with ⟨%r, %hr, %hwf, #HB, %hdec⟩
   cases r with
@@ -356,8 +370,8 @@ theorem wpLoop_m_instrP (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
     (hp' : p' = Privilege.Machine ∨ p' = Privilege.Supervisor) (c' : MConf) (hok : MConf.ok (GF := GF) c)
     (pc npc : BitVec 64) (is_rvc : Bool)
     (i : instruction) (P Q : IProp GF)
-    (hexec : execSpecP cpu dq c p' c' i pc (pc + instrLen is_rvc) npc P Q) :
-    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ P ∗
+    (hexec : execSpecP cpu dq c p' c' i pc (pc + instrLen is_rvc) npc iprop(resvAny cpu ∗ P) Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ resvAny cpu ∗ P ∗
     ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instrClk cpu dq c p' hp' c' hok pc npc is_rvc i P Q hexec.clk
@@ -366,10 +380,111 @@ theorem wpLoop_m_instrP (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
 theorem wpLoop_m_instr (cpu : CPU) (dq : DFrac) (c c' : MConf) (hok : MConf.ok (GF := GF) c)
     (pc npc : BitVec 64) (is_rvc : Bool)
     (i : instruction) (P Q : IProp GF)
-    (hexec : execSpec cpu dq c c' i pc (pc + instrLen is_rvc) npc P Q) :
-    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ P ∗
+    (hexec : execSpec cpu dq c c' i pc (pc + instrLen is_rvc) npc iprop(resvAny cpu ∗ P) Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ resvAny cpu ∗ P ∗
     ▷ (mConf cpu dq c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instrP cpu dq c Privilege.Machine (Or.inl rfl) c' hok pc npc is_rvc i P Q hexec
+
+/-! ### The cycle over the context token
+
+A machine-mode instruction rule holds the hart's context token
+`ctxTok cpu curCtx` (`ownCtx cpu curCtx ∗ resvAny cpu`).  The schemas below
+open it around the cycle: the reservation half goes to the schema above (the
+boundary takes and gives it back), the context half rides the execute stage's
+frame, and the token comes back whole in the continuation, right after the pc
+cell.  An execute stage that itself takes the token (a memory leaf) uses the
+schemas above directly. -/
+
+/-- Strengthening an execute stage's precondition (a memory leaf whose
+resources hold `ctxTok` serves the schemas above once the token is opened:
+`resvAny cpu ∗ ownCtx cpu curCtx ∗ .. ⊢ .. ∗ ctxTok cpu curCtx ∗ ..`). -/
+theorem execSpecPP.pre {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege} {c' : MConf}
+    {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
+    (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) {P' : IProp GF} (hP : P' ⊢ P) :
+    execSpecPP cpu dq p c p' c' ast pc npc₀ npc P' Q := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HP, HΦ⟩
+  iapply (h Φ)
+  iframe HmConf HPC HnextPC HΦ
+  iapply hP $$ HP
+
+/-- An execute stage framed by the two halves of the context token, given back whole. -/
+theorem execSpecPP.tokFrame [CurCtx] {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege}
+    {c' : MConf} {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
+    (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) :
+    execSpecPP cpu dq p c p' c' ast pc npc₀ npc iprop(resvAny cpu ∗ ownCtx cpu curCtx ∗ P)
+      iprop(ctxTok cpu curCtx ∗ Q) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hresv, Hown, HP⟩, HΦ⟩
+  iapply (h Φ)
+  iframe HmConf HPC HnextPC HP
+  inext
+  iintro HmConf HPC HnextPC HQ
+  iapply HΦ $$ HmConf HPC HnextPC [Hresv Hown HQ]
+  isplitl [Hresv Hown]
+  · iapply ctxTok_of_resvAny cpu curCtx
+    iframe
+  · iexact HQ
+
+/-- `execSpecPP.tokFrame` for an execute stage with the clock cells. -/
+theorem execSpecClk.tokFrame [CurCtx] {cpu : CPU} {dq : DFrac} {c : MConf} {p' : Privilege} {c' : MConf}
+    {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
+    (h : execSpecClk cpu dq c p' c' ast pc npc₀ npc P Q) :
+    execSpecClk cpu dq c p' c' ast pc npc₀ npc iprop(resvAny cpu ∗ ownCtx cpu curCtx ∗ P)
+      iprop(ctxTok cpu curCtx ∗ Q) := by
+  intro ip mt Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨⟨Hresv, Hown, HP⟩, Hmip, Hmtime⟩, HΦ⟩
+  iapply (h ip mt Φ)
+  iframe HmConf HPC HnextPC HP Hmip Hmtime
+  inext
+  iintro HmConf HPC HnextPC ⟨HQ, Hclk⟩
+  iapply HΦ $$ HmConf HPC HnextPC [Hresv Hown HQ Hclk]
+  isplitl [Hresv Hown HQ]
+  · isplitl [Hresv Hown]
+    · iapply ctxTok_of_resvAny cpu curCtx
+      iframe
+    · iexact HQ
+  · iexact Hclk
+
+/-- `wpLoop_m_instrClk` over the context token. -/
+theorem wpLoop_m_instrClk_tok [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
+    (hp' : p' = Privilege.Machine ∨ p' = Privilege.Supervisor) (c' : MConf) (hok : MConf.ok (GF := GF) c)
+    (pc npc : BitVec 64) (is_rvc : Bool)
+    (i : instruction) (P Q : IProp GF)
+    (hexec : execSpecClk cpu dq c p' c' i pc (pc + instrLen is_rvc) npc P Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ P ∗
+    ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ ctxTok cpu curCtx -∗ Q -∗ wpLoop cpu)
+    ⊢ wpLoop cpu := by
+  iintro ⟨HI, HmConf, Hclock, Hpc, Htok, HP, HΦ⟩
+  icases ctxTok_resvAny cpu curCtx $$ Htok with ⟨Hown, Hresv⟩
+  iapply (wpLoop_m_instrClk cpu dq c p' hp' c' hok pc npc is_rvc i iprop(ownCtx cpu curCtx ∗ P)
+    iprop(ctxTok cpu curCtx ∗ Q) hexec.tokFrame)
+  iframe
+  inext
+  iintro HmConf Hclock Hpc ⟨Htok, HQ⟩
+  iapply HΦ $$ HmConf Hclock Hpc Htok HQ
+
+/-- `wpLoop_m_instrP` over the context token. -/
+theorem wpLoop_m_instrP_tok [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
+    (hp' : p' = Privilege.Machine ∨ p' = Privilege.Supervisor) (c' : MConf) (hok : MConf.ok (GF := GF) c)
+    (pc npc : BitVec 64) (is_rvc : Bool)
+    (i : instruction) (P Q : IProp GF)
+    (hexec : execSpecP cpu dq c p' c' i pc (pc + instrLen is_rvc) npc P Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ P ∗
+    ▷ (confCells cpu dq p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ ctxTok cpu curCtx -∗ Q -∗ wpLoop cpu)
+    ⊢ wpLoop cpu :=
+  wpLoop_m_instrClk_tok cpu dq c p' hp' c' hok pc npc is_rvc i P Q hexec.clk
+
+/-- `wpLoop_m_instr` over the context token: the schema every register-only
+`wp_m_<instr>` uses. -/
+theorem wpLoop_m_instr_tok [CurCtx] (cpu : CPU) (dq : DFrac) (c c' : MConf) (hok : MConf.ok (GF := GF) c)
+    (pc npc : BitVec 64) (is_rvc : Bool)
+    (i : instruction) (P Q : IProp GF)
+    (hexec : execSpec cpu dq c c' i pc (pc + instrLen is_rvc) npc P Q) :
+    instr pc is_rvc i ∗ mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ ctxTok cpu curCtx ∗ P ∗
+    ▷ (mConf cpu dq c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ ctxTok cpu curCtx -∗ Q -∗ wpLoop cpu)
+    ⊢ wpLoop cpu :=
+  wpLoop_m_instrP_tok cpu dq c Privilege.Machine (Or.inl rfl) c' hok pc npc is_rvc i P Q hexec
 
 end MachCSL

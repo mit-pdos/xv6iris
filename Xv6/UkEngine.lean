@@ -198,9 +198,14 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   -- H's trap CSRs ride the cycle (a trapping arm writes them), `mepc` stays aside
   unfold ufAside
   icases Ha with ⟨Hmepc, Hht⟩
+  -- the frames lend the hart's reservation to the boundary and take it back
+  icases uFr_resvAny (ufRegF h C) (ubFrame curCtx D) s0 $$ Hfr with ⟨Hresv, Hfr⟩
   iapply wpLoop_ucStep
+  iframe Hresv
   iintro %tick %ew
   inext
+  iintro Hresv
+  ihave Hfr := Hfr $$ Hresv
   icases HKc with ⟨#Hmy, HKc⟩
   iapply swp_mono
   isplitr [Hfr HX Hht]
