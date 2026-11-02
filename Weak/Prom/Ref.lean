@@ -247,10 +247,14 @@ def rule11 (S : EvId → Skel) (a b : EvId) : Bool :=
   (S b).kind.isStore && a.1 == b.1 && (S b).cdep.contains a.2
 
 /-- Rule 13 (rvwmo.adoc:301–302): "b is a store, and there exists some instruction m between a and b in program
-order such that m has an address dependency on a".  `m` ranges over every event with address sources: memory
-operations and failed SCs (reading R-13, PROGRESS-S0P1.md: "instruction m" read literally). -/
+order such that m has an address dependency on a".  `m` ranges over MEMORY OPERATIONS only: a failed SC "does not
+give rise to any memory operations" (rvwmo.adoc:82) and is not an `m`.  This is the memory-operation reading,
+matching the manual's formal appendix (`r13 = [R];addr;[M];po;[W]`), chosen by the owner over the literal
+"instruction m" reading ([OWN.P6], 2026-11-02; K1-c in PROGRESS-S0P1.md).  It admits more executions than the
+literal reading, so theorems proved against it also hold under that reading. -/
 def rule13 (I : List EvId) (S : EvId → Skel) (a b : EvId) : Bool :=
-  (S b).kind.isStore && I.any (fun m => poS S a m && poS S m b && (S m).adep.contains a.2)
+  (S b).kind.isStore &&
+    I.any (fun m => (S m).kind.isMem && poS S a m && poS S m b && (S m).adep.contains a.2)
 
 /-- The value-independent rules 4–11 and 13 (no addresses, no rf; the I/O class only through `io`). -/
 def staticRules (I : List EvId) (S : EvId → Skel) (io : EvId → Bool) (a b : EvId) : Bool :=
