@@ -262,13 +262,18 @@ def fwdHit (ws : PState) (a : Int) (t : Nat) : Bool :=
   | none => false
 
 /-- THE FORWARDED VIEW of an answer (PARM `FwdItem.read_view`): a forwarded byte gets the store's forward view
-(M2, rule 12; M1, rule 3 for an exclusive write, whose forward view is its own timestamp); an acquire, or a
-non-forwarded byte, gets the timestamp itself. -/
+(M2, rule 12; M1, rule 3 for an exclusive write, whose forward view is its own timestamp); a non-forwarded byte
+gets the timestamp itself.  FIX S0P2-F1 (2026-11-02): an ACQUIRE forwarded byte also gets the forward view (was:
+the timestamp, `if aq then t`, STRONGER): no RVWMO rule orders a po-earlier plain store before an acquire load that
+reads it (rule 5 orders the acquire before LATER operations; rule 7 needs both RCsc, and a release store is already
+below `ldPre`'s `wVRel`); the load value axiom lets the load return a po-earlier store's value ("Stores that write
+that byte and that precede i in program order").  PARM `FwdItem.read_view` (Promising.v:528–531) likewise gives the
+forward view except for an exclusive write on RISC-V, whose forward view here is its own timestamp (M1).  `aq` is
+kept as an (unused) argument so the call sites are unchanged. -/
 def fwdView (ws : PState) (aq : Bool) (a : Int) (t : Nat) : Nat :=
-  if aq then t
-  else match get? ws.wFwd a with
-    | some (tf, vf) => if t = tf then vf else t
-    | none => t
+  match get? ws.wFwd a with
+  | some (tf, vf) => if t = tf then vf else t
+  | none => t
 
 /-- The common read point's closed form (M9, [R2.s1]): the max of the non-forwarded answers. -/
 def nonFwdMax (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
@@ -564,13 +569,18 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   view `ts` (M1), the success register's view `wLdv ⊔= ts` (M4), the reservation cleared ("Regardless of success or
   failure, executing an SC.W instruction invalidates any reservation held by this hart", zalrsc.adoc:23–24).
   WEAKER, optional refinement not taken (M16): another hart's store to SC bytes outside the LR's bytes is not
-  checked. -/
+  checked.  FIX S0P2-F2 (2026-11-02): every store the LR read precedes the SC's write (`∀ t ∈ R.rvTs, t < ts`;
+  Atomicity Axiom, rvwmo.adoc:330–334 "s is a store to byte x, and r returns a value written by s, then s must
+  precede w in the global memory order").  Without it a MISMATCHED pair whose LR forwarded from an own store `tf`
+  could write at `ts < tf` (`exclOk`'s window `(tf, ts - 1]` is then empty and the forward view is below `tf`):
+  WEAKER, found by `HAND/LR-SC-diff-loc4`.  For a matched pair `cohBelow` already implies it. -/
   | sc (prom : GSet Nat) (ws : PState) (rl : Bool) (base : Int) (data : List (BitVec 8))
       (asrc vsrc : List Dsrc) (ts : Nat) (R : PResv) :
       ws.wRes = some R →
       ts ∈ prom →
       log[ts - 1]? = some ⟨base, data, some i, .excl⟩ →
       exclOk log i R.rvBase R.rvTs ts →
+      (∀ t ∈ R.rvTs, t < ts) →
       cohBelow ws base data.length ts →
       max (stPre ws rl (srcsView ws asrc) (srcsView ws vsrc)) R.rvView < ts →
       memStep prom ws (LExStore rl base data asrc vsrc) (some ts)
