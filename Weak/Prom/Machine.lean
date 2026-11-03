@@ -243,15 +243,35 @@ def srcsView (ws : PState) (srcs : List Dsrc) : Nat :=
 /-- THE LOAD PRE-VIEW (PARM `read`'s `view_pre`): the address view `va` (rule 9, M3), the current instruction's
 fetch view (PA-1f, zifencei.adoc:107–108 "An instruction fetch is always ordered before any explicit memory accesses
 that instruction gives rise to"), the load floor `vrNew` (fences, acquire; rules 4, 5), and, for an acquire, the
-release view (rule 7 RCsc: "a and b both have RCsc annotations"). -/
-def ldPre (ws : PState) (aq : Bool) (va : Nat) : Nat :=
-  max va (max ws.wIfv (max ws.wVrNew (if aq then ws.wVRel else 0)))
+release view (rule 7 RCsc: "a and b both have RCsc annotations").
+FIX S0P2-D3 (2026-11-02): for a RELEASE load (`lr.aqrl`, Zalasr `l*.aqrl`) also `vrOld ⊔ vwOld` — rule 6
+(rvwmo.adoc:288 "b has a release annotation" orders every po-earlier memory operation `a` before `b`), as `stPre`
+does for a release store.  The annotation exists: rvwmo.adoc:124–128 "An AMO, lr, or sc instruction with both aq and
+rl set has both acquire-RCsc and release-RCsc annotations"; unpriv_zalasr.adoc:68–69 "The instruction always has an
+acquire-RCsc annotation, and if the bit rl is set the instruction has a release-RCsc annotation".  Rule 7 with the
+release load as `b` adds nothing (rule 6 already orders every earlier operation).  The read half of an AMO passes
+`rl = false`: the AMO's release is its write half's (`stPre`), and the single op is one access at `ts` (M0).
+Mark: FAITHFUL. -/
+def ldPre (ws : PState) (aq rl : Bool) (va : Nat) : Nat :=
+  max va (max ws.wIfv (max ws.wVrNew (max (if aq then ws.wVRel else 0)
+    (if rl then max ws.wVrOld ws.wVwOld else 0))))
 
 /-- THE STORE PRE-VIEW (PARM `writable`'s `view_pre`): address and data views `va`, `vd` (rules 9, 10), the fetch
 view (PA-1f), the capture view `vcap` (rules 11, 13), the store floor `vwNew` (fences, acquire), and for a release
 `vrOld ⊔ vwOld` (rule 6: "b has a release annotation"). -/
 def stPre (ws : PState) (rl : Bool) (va vd : Nat) : Nat :=
   max va (max vd (max ws.wIfv (max ws.wVcap (max ws.wVwNew (if rl then max ws.wVrOld ws.wVwOld else 0)))))
+
+/-- THE PRE-VIEW OF A PLAIN STORE OR SC WITH ITS ACQUIRE BIT (FIX S0P2-D3, 2026-11-02): `stPre`, and for an
+ACQUIRE store (`sc.aqrl`, Zalasr `s*.aqrl`) the release view `wVRel` — rule 7 (rvwmo.adoc:289 "a and b both have
+RCsc annotations") with the store as `b` and an earlier release-RCsc operation as `a`, exactly as `ldPre` does for an
+acquire load.  The annotation exists: rvwmo.adoc:124–128 "An AMO, lr, or sc instruction with both aq and rl set has
+both acquire-RCsc and release-RCsc annotations"; unpriv_zalasr.adoc:122–123 "The instruction always has a
+release-RCsc annotation, and if the bit aq is set the instruction has an acquire-RCsc annotation".  (Every such store
+also has `rl`, whose `vrOld ⊔ vwOld` already covers `wVRel`; the term keeps the arm faithful for any label.)
+Mark: FAITHFUL. -/
+def stPreA (ws : PState) (aq rl : Bool) (va vd : Nat) : Nat :=
+  max (stPre ws rl va vd) (if aq then ws.wVRel else 0)
 
 /-! ## 4. Reads -/
 
@@ -314,15 +334,22 @@ def loadBytes (aq : Bool) (vpre : Nat) : PState → Int → List (Nat × BitVec 
   | ws, _, [] => ws
   | ws, a, (t, _) :: r => loadBytes aq vpre (loadByte ws aq vpre a t) (a + 1) r
 
-/-- THE RUN-LEVEL READ: the byte fold, then `vcap ⊔= va` (PARM `vcap ⊔= view(addr)`, rule 13's address
-capture).  `va` is the address view only; no walk or fetch view reaches `vcap` (M14). -/
-def loadRun (ws : PState) (aq : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : PState :=
-  let ws1 := loadBytes aq (ldPre ws aq va) ws base tvs
-  { ws1 with wVcap := max va ws1.wVcap }
-
 /-- The read's post-view (the max per-byte post-view): an LR's rule-8 view (M5). -/
-def readView (ws : PState) (aq : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
-  max (ldPre ws aq va) (bytesMax (fun a t => fwdView ws aq a t) base tvs)
+def readView (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
+  max (ldPre ws aq rl va) (bytesMax (fun a t => fwdView ws aq a t) base tvs)
+
+/-- THE RUN-LEVEL READ: the byte fold, then `vcap ⊔= va` (PARM `vcap ⊔= view(addr)`, rule 13's address
+capture).  `va` is the address view only; no walk or fetch view reaches `vcap` (M14).
+FIX S0P2-D3 (2026-11-02): a RELEASE load raises the release view `wVRel` to its post-view (`readView`): rule 7
+(rvwmo.adoc:289 "a and b both have RCsc annotations") with the release-RCsc load as `a` orders it before a later
+acquire-RCsc operation `b`, which reads `wVRel` in its pre-view (`ldPre`, `stPreA`); a later RELEASE operation is
+already ordered after it by rule 6 (`vrOld`).  Annotation: rvwmo.adoc:124–128 / unpriv_zalasr.adoc:68–69 (quoted at
+`ldPre`).  Mark: FAITHFUL. -/
+def loadRun (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : PState :=
+  let ws1 := loadBytes aq (ldPre ws aq rl va) ws base tvs
+  { ws1 with
+    wVcap := max va ws1.wVcap
+    wVRel := if rl then max ws1.wVRel (readView ws aq rl va base tvs) else ws1.wVRel }
 
 /-! ## 5. Writes -/
 
@@ -371,6 +398,15 @@ No forward-bank entry (it writes no value). -/
 def cmoPost (ws : PState) (va : Nat) (base : Int) (len ts : Nat) : PState :=
   let ws1 := cohRaise ws base len ts
   { ws1 with wVwOld := max ws1.wVwOld ts, wVcap := max va ws1.wVcap }
+
+/-- THE ACQUIRE POST OF A STORE OR SC (FIX S0P2-D3, 2026-11-02): an acquire-RCsc store (`sc.aqrl`, Zalasr
+`s*.aqrl`; annotation quoted at `stPreA`) raises both new-floors to its timestamp — rule 5 (rvwmo.adoc:287 "a has an
+acquire annotation" orders `a` before every po-later memory operation `b`), as `loadByte` does for an acquire load
+and `amoPost` for an acquire AMO.  Mark: FAITHFUL. -/
+def acqPost (ws : PState) (aq : Bool) (ts : Nat) : PState :=
+  { ws with
+    wVrNew := if aq then max ws.wVrNew ts else ws.wVrNew
+    wVwNew := if aq then max ws.wVwNew ts else ws.wVwNew }
 
 /-- The class a fulfil must find on its message (INERT bookkeeping, N-10). -/
 def stClass (rl : Bool) : PClass := if rl then .rel else .plain
@@ -434,10 +470,12 @@ halves are their own labels `LAmoLd`/`LAmoSt` (M10 (1): they use `wRmw`, never `
 inductive PLabel where
   /-- No memory or view effect. -/
   | LSilent
-  /-- A plain or acquire load (no `lat`, SR-31). -/
-  | LLoad (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc)
-  /-- A plain or release store. -/
-  | LStore (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+  /-- A plain, acquire or acquire-release load (no `lat`, SR-31).  `rl` (FIX S0P2-D3): Zalasr `l*.aqrl`'s
+  release-RCsc annotation (unpriv_zalasr.adoc:68–69). -/
+  | LLoad (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc)
+  /-- A plain, release or acquire-release store.  `aq` (FIX S0P2-D3): Zalasr `s*.aqrl`'s acquire-RCsc
+  annotation (unpriv_zalasr.adoc:122–123). -/
+  | LStore (aq rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
   /-- A FUSED AMO, one label (for abstract-`pstep` litmus programs; Sail emits the split pair). -/
   | LRmw (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8))
       (asrc vsrc : List Dsrc)
@@ -457,10 +495,11 @@ inductive PLabel where
   | LCtrl (srcs : List Dsrc)
   /-- The instruction boundary: resets the per-instruction banks. -/
   | LInstr
-  /-- LR (load-reserved). -/
-  | LExLoad (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc)
-  /-- A SUCCESSFUL SC. -/
-  | LExStore (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+  /-- LR (load-reserved).  `rl` (FIX S0P2-D3): `lr.aqrl`'s release-RCsc annotation (rvwmo.adoc:124–128 "An AMO,
+  lr, or sc instruction with both aq and rl set has both acquire-RCsc and release-RCsc annotations"). -/
+  | LExLoad (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8)) (asrc : List Dsrc)
+  /-- A SUCCESSFUL SC.  `aq` (FIX S0P2-D3): `sc.aqrl`'s acquire-RCsc annotation (rvwmo.adoc:124–128). -/
+  | LExStore (aq rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
   /-- A retired SC that did not write (memory-level failure, or the end of any SC): clears the reservation (M16). -/
   | LExFail
   /-- An instruction fetch of the bytes `tvs` at `base` ([OWN.P2]). -/
@@ -482,20 +521,23 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   /-- `LSilent`. -/
   | silent (prom : GSet Nat) (ws : PState) :
       memStep prom ws LSilent none ws prom
-  /-- PLAIN/ACQUIRE LOAD: admissible at `ldPre` (rules 4, 5, 7, 9; PA-1f), single read point (M9). -/
-  | load (prom : GSet Nat) (ws : PState) (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
+  /-- PLAIN/ACQUIRE LOAD: admissible at `ldPre` (rules 4, 5, 6 for a release load, 7, 9; PA-1f), single read
+  point (M9). -/
+  | load (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
-      loadOk img log ws (ldPre ws aq (srcsView ws asrc)) base tvs →
-      memStep prom ws (LLoad aq base tvs asrc) none (loadRun ws aq (srcsView ws asrc) base tvs) prom
-  /-- PLAIN/RELEASE STORE: fulfils its promise `ts` (COH + EXT); forward view = address ⊔ data view (M2). -/
-  | store (prom : GSet Nat) (ws : PState) (rl : Bool) (base : Int) (data : List (BitVec 8))
+      loadOk img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs →
+      memStep prom ws (LLoad aq rl base tvs asrc) none (loadRun ws aq rl (srcsView ws asrc) base tvs) prom
+  /-- PLAIN/RELEASE STORE: fulfils its promise `ts` (COH + EXT); forward view = address ⊔ data view (M2).  An
+  acquire store (FIX S0P2-D3) has the pre-view `stPreA` and the post `acqPost`. -/
+  | store (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (data : List (BitVec 8))
       (asrc vsrc : List Dsrc) (ts : Nat) :
       ts ∈ prom →
       log[ts - 1]? = some ⟨base, data, some i, stClass rl⟩ →
       cohBelow ws base data.length ts →
-      stPre ws rl (srcsView ws asrc) (srcsView ws vsrc) < ts →
-      memStep prom ws (LStore rl base data asrc vsrc) (some ts)
-        (storeRun ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc)) base data.length ts)
+      stPreA ws aq rl (srcsView ws asrc) (srcsView ws vsrc) < ts →
+      memStep prom ws (LStore aq rl base data asrc vsrc) (some ts)
+        (acqPost (storeRun ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc)) base
+          data.length ts) aq ts)
         (prom \ {ts})
   /-- FUSED AMO (M0): the read at `ldPre` with the address view (rule 9 on the single op), the atomicity window
   (`exclOk`), the write at the post-read state's `stPre`; post: exclusive forward view `ts` (M1), `amoPost`. -/
@@ -504,20 +546,20 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
       tvs.length = data.length →
       ts ∈ prom →
       log[ts - 1]? = some ⟨base, data, some i, .excl⟩ →
-      loadOk img log ws (ldPre ws aq (srcsView ws asrc)) base tvs →
+      loadOk img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs →
       exclOk log i base (tvs.map Prod.fst) ts →
-      cohBelow (loadRun ws aq (srcsView ws asrc) base tvs) base data.length ts →
-      stPre (loadRun ws aq (srcsView ws asrc) base tvs) rl (srcsView ws asrc) (srcsView ws vsrc) < ts →
+      cohBelow (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts →
+      stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) (srcsView ws vsrc) < ts →
       memStep prom ws (LRmw aq rl base tvs data asrc vsrc) (some ts)
-        (amoPost (storeRun (loadRun ws aq (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
+        (amoPost (storeRun (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
           data.length ts) aq ts)
         (prom \ {ts})
   /-- SPLIT AMO, read half (M10): a load-like read; records the AMO slot (never `wRes`). -/
   | amoLd (prom : GSet Nat) (ws : PState) (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
-      loadOk img log ws (ldPre ws aq (srcsView ws asrc)) base tvs →
+      loadOk img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs →
       memStep prom ws (LAmoLd aq base tvs asrc) none
-        { loadRun ws aq (srcsView ws asrc) base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }
+        { loadRun ws aq false (srcsView ws asrc) base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }
         prom
   /-- SPLIT AMO, write half (M10 (2), (3)): needs the slot at the same base and width, the atomicity window, COH
   and EXT; post as the fused AMO with the READ half's aq; the slot is consumed. -/
@@ -554,13 +596,14 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   | instr (prom : GSet Nat) (ws : PState) :
       memStep prom ws LInstr none { ws with wLdv := 0, wRmw := none, wIfv := 0 } prom
   /-- LR (M3: the address view is in the pre-view; M16: the reservation records the LR's own bytes and its
-  post-view, M5). -/
-  | lr (prom : GSet Nat) (ws : PState) (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
+  post-view, M5).  `lr.aqrl` (FIX S0P2-D3): the release bit's rule 6 pre-view and rule 7 `wVRel` raise
+  (`ldPre`, `loadRun`). -/
+  | lr (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
-      loadOk img log ws (ldPre ws aq (srcsView ws asrc)) base tvs →
-      memStep prom ws (LExLoad aq base tvs asrc) none
-        { loadRun ws aq (srcsView ws asrc) base tvs with
-          wRes := some ⟨base, tvs.map Prod.fst, readView ws aq (srcsView ws asrc) base tvs⟩ }
+      loadOk img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs →
+      memStep prom ws (LExLoad aq rl base tvs asrc) none
+        { loadRun ws aq rl (srcsView ws asrc) base tvs with
+          wRes := some ⟨base, tvs.map Prod.fst, readView ws aq rl (srcsView ws asrc) base tvs⟩ }
         prom
   /-- SUCCESSFUL SC (M16): needs a reservation; the SC's base and width are FREE (§rvwmo: "The Atomicity Axiom
   theoretically supports LR/SC pairs of different widths and to mismatched addresses"; the reservation set is the
@@ -573,8 +616,9 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   Atomicity Axiom, rvwmo.adoc:330–334 "s is a store to byte x, and r returns a value written by s, then s must
   precede w in the global memory order").  Without it a MISMATCHED pair whose LR forwarded from an own store `tf`
   could write at `ts < tf` (`exclOk`'s window `(tf, ts - 1]` is then empty and the forward view is below `tf`):
-  WEAKER, found by `HAND/LR-SC-diff-loc4`.  For a matched pair `cohBelow` already implies it. -/
-  | sc (prom : GSet Nat) (ws : PState) (rl : Bool) (base : Int) (data : List (BitVec 8))
+  WEAKER, found by `HAND/LR-SC-diff-loc4`.  For a matched pair `cohBelow` already implies it.
+  `sc.aqrl` (FIX S0P2-D3): the acquire bit's rule 7 pre-view (`stPreA`) and rule 5 post (`acqPost`). -/
+  | sc (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (data : List (BitVec 8))
       (asrc vsrc : List Dsrc) (ts : Nat) (R : PResv) :
       ws.wRes = some R →
       ts ∈ prom →
@@ -582,9 +626,9 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
       exclOk log i R.rvBase R.rvTs ts →
       (∀ t ∈ R.rvTs, t < ts) →
       cohBelow ws base data.length ts →
-      max (stPre ws rl (srcsView ws asrc) (srcsView ws vsrc)) R.rvView < ts →
-      memStep prom ws (LExStore rl base data asrc vsrc) (some ts)
-        { storeRun ws rl (srcsView ws asrc) ts base data.length ts with
+      max (stPreA ws aq rl (srcsView ws asrc) (srcsView ws vsrc)) R.rvView < ts →
+      memStep prom ws (LExStore aq rl base data asrc vsrc) (some ts)
+        { acqPost (storeRun ws rl (srcsView ws asrc) ts base data.length ts) aq ts with
           wLdv := max (storeRun ws rl (srcsView ws asrc) ts base data.length ts).wLdv ts
           wRes := none }
         (prom \ {ts})
@@ -696,8 +740,8 @@ def fulfilsOf (h : Nat) (es : List PEvt) : List Nat :=
 /-- The read answers a label carries (load-like entries: `LLoad`, `LExLoad`, `LRmw`, `LAmoLd`; and `LIFetch`),
 with their base. -/
 def labelReads : PLabel → Option (Int × List (Nat × BitVec 8))
-  | LLoad _ base tvs _ => some (base, tvs)
-  | LExLoad _ base tvs _ => some (base, tvs)
+  | LLoad _ _ base tvs _ => some (base, tvs)
+  | LExLoad _ _ base tvs _ => some (base, tvs)
   | LRmw _ _ base tvs _ _ _ => some (base, tvs)
   | LAmoLd _ base tvs _ => some (base, tvs)
   | LIFetch base tvs => some (base, tvs)
@@ -705,8 +749,8 @@ def labelReads : PLabel → Option (Int × List (Nat × BitVec 8))
 
 /-- The write a label performs (`LStore`, `LExStore`, `LRmw`, `LAmoSt`; `LCmo`, with no bytes), with its base. -/
 def labelWrite : PLabel → Option (Int × List (BitVec 8))
-  | LStore _ base data _ _ => some (base, data)
-  | LExStore _ base data _ _ => some (base, data)
+  | LStore _ _ base data _ _ => some (base, data)
+  | LExStore _ _ base data _ _ => some (base, data)
   | LRmw _ _ base _ data _ _ => some (base, data)
   | LAmoSt _ base data _ _ => some (base, data)
   | LCmo _ base _ _ => some (base, [])

@@ -32,6 +32,8 @@ PROGRESS-S1Mdef.md): page walks (M14, M18), the translation cache (M21), A/D upd
   register write, so a NOT-TAKEN branch's rule-11 dependency is emitted with the views of `rs1`/`rs2` it reads.
 * M10 — an exclusive read/write is classified by the decoded instruction: LR/SC (`LExLoad`/`LExStore`) or an AMO
   half (`LAmoLd`/`LAmoSt`, the `wRmw` slot).  aq is the read's `akSync`, rl the write's (M10 (2)).
+* FIX S0P2-D3 — a read label's release bit and a write label's acquire bit are `akStrong` (Sail's `aq && rl`
+  kinds, `AK_arch`): `lr.aqrl`'s release-RCsc and `sc.aqrl`'s acquire-RCsc annotations (rvwmo.adoc:124–128).
 * FC-1 — the SC failure answer is `.Err ()` at an SC write only: Sail maps every `.Ok _` of `sail_mem_write` to
   success (PhysMemInterface.lean:325–329), `.Err ()` to `false`, and `execute_STORECON` writes `rd := 1`.  The
   label is `LExFail`.  Never offered to an AMO write (`internal_error "AMO got false …"`).
@@ -198,6 +200,21 @@ def barLabel (b : barrier_kind) : PLabel :=
     | some (pr, pw, sr, sw) => LFence pr pw sr sw
     | none => LFence false false false false
 
+/-- THE SECOND ANNOTATION OF AN `aqrl` ACCESS (FIX S0P2-D3, 2026-11-02).  Sail encodes an LR's and an SC's flags as
+`aq` / `aq && rl` (LR: `vmem_read … aq (aq && rl) true`, InstsEnd.lean:18236) and `aq && rl` / `rl` (SC:
+`vmem_write … (aq && rl) rl true`, :17769–17770), mapped by `read_kind_of_flags`/`write_kind_of_flags`
+(Mem.lean:222–255) and `read_ram`/`write_ram` (PhysMemInterface.lean:296–365): `(aq, aq && rl) = (true, true)` is
+`Read_RISCV_reserved_strong_acquire` ↦ `AK_arch`, `(true, true)` on a write is
+`Write_RISCV_conditional_strong_release` ↦ `AK_arch`; a one-bit kind is `AK_explicit` with `AS_rel_or_acq`.  So
+`AK_arch` is exactly an `lr.aqrl` / `sc.aqrl`, whose second annotation (release on the LR, acquire on the SC) is
+rvwmo.adoc:124–128 "An AMO, lr, or sc instruction with both aq and rl set has both acquire-RCsc and release-RCsc
+annotations".  (Sail has no Zalasr kind: an unreserved acquire load or release store is an `internal_error`, so a
+plain access is never `AK_arch`.)  Mark: FAITHFUL. -/
+def akStrong (k : AK) : Bool :=
+  match k with
+  | .AK_arch _ => true
+  | _ => false
+
 /-- A page-table walk read (`AK_ttw`): no arm in this increment (translation deferred, [OWN.P3]). -/
 def isTtw (k : AK) : Bool :=
   match k with
@@ -280,7 +297,7 @@ def ramRead (h : HState) (n : Nat) (pa : PAddr) (ak : AK) (k : Result ((BitVec (
       answers n w tvs ∧ h'.m = k (.Ok (w, none)) ∧ h'.cpu = h.cpu ∧ h'.rs = h.rs ∧ h'.fn = h.fn ∧
       (if isLR h.ix.bits then
          -- LR (M3: address sources on the label)
-         l = LExLoad (akAcq ak) (paZ pa) tvs (depsAddr (v2Roles h.ix.bits)) ∧ h'.ix = h.ix
+         l = LExLoad (akAcq ak) (akStrong ak) (paZ pa) tvs (depsAddr (v2Roles h.ix.bits)) ∧ h'.ix = h.ix
        else
          -- AMO read half (M10)
          l = LAmoLd (akAcq ak) (paZ pa) tvs (depsAddr (v2Roles h.ix.bits)) ∧
@@ -290,7 +307,7 @@ def ramRead (h : HState) (n : Nat) (pa : PAddr) (ak : AK) (k : Result ((BitVec (
     ∃ (tvs : List (Nat × BitVec 8)),
       tvs ≠ [] ∧ h.ix.racc.length + tvs.length ≤ n ∧
       (splittable h.ix.bits n = true ∨ tvs.length = n) ∧
-      l = LLoad (akAcq ak) (paZ pa + h.ix.racc.length) tvs (depsAddr (v2Roles h.ix.bits)) ∧
+      l = LLoad (akAcq ak) (akStrong ak) (paZ pa + h.ix.racc.length) tvs (depsAddr (v2Roles h.ix.bits)) ∧
       (if h.ix.racc.length + tvs.length = n then
          ∃ w : BitVec (8 * n), answers n w (h.ix.racc ++ tvs) ∧
            h' = { h with m := k (.Ok (w, none)), ix := { h.ix with racc := [] } }
@@ -306,7 +323,7 @@ def ramWrite (h : HState) (n : Nat) (pa : PAddr) (ak : AK) (v : BitVec (8 * n))
   if akExcl ak then
     if isSC h.ix.bits then
       -- SC: success, or the memory-level failure answer `.Err ()` (FC-1)
-      (l = LExStore (akAcq ak) (paZ pa) bs asrc vsrc ∧
+      (l = LExStore (akStrong ak) (akRel ak) (paZ pa) bs asrc vsrc ∧
         h' = { h with m := k (.Ok (some true)), ix := { h.ix with scOk := true } }) ∨
       (l = LExFail ∧ h' = { h with m := k (.Err ()) })
     else
@@ -316,7 +333,7 @@ def ramWrite (h : HState) (n : Nat) (pa : PAddr) (ak : AK) (v : BitVec (8 * n))
   else
     -- plain RAM store, possibly decomposed ([OWN.P1])
     ∃ c : Nat, 0 < c ∧ h.ix.woff + c ≤ n ∧ (splittable h.ix.bits n = true ∨ c = n) ∧
-      l = LStore (akAcq ak) (paZ pa + h.ix.woff) ((bs.drop h.ix.woff).take c) asrc vsrc ∧
+      l = LStore (akStrong ak) (akRel ak) (paZ pa + h.ix.woff) ((bs.drop h.ix.woff).take c) asrc vsrc ∧
       (if h.ix.woff + c = n then h' = { h with m := k (.Ok (some true)), ix := { h.ix with woff := 0 } }
        else h' = { h with ix := { h.ix with woff := h.ix.woff + c } })
 

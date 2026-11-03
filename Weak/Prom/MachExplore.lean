@@ -12,7 +12,8 @@ successor's post-state is computed by Machine.lean's own post-state functions (`
   `explorerStep_sound : s ∈ succ img log i prom ws t → memStep img log i prom ws s.l s.ots s.ws s.prom`
 
 and needs only the Bool transcriptions below to be equivalent to the `Prop` premises (`writesInB`, `exclOkB`,
-`invalReadB`, `loadOkB`, `cohBelowB`; one lemma each), plus `ExtTreeSet.contains ↔ ∈`.
+`invalReadB`, `loadOkB`, `cohBelowB`; one lemma each), plus `ExtTreeSet.contains ↔ ∈`.  PROVED in
+`Weak/Prom/MachSound.lean` (milestone 2).
 
 ## Completeness (what milestone 1 relies on; proof sketch, not yet a Lean theorem)
 
@@ -156,14 +157,14 @@ def readCands (img : Image) (log : List PMsg) (ws : PState) (vpre : Nat) (base :
 inductive Tmpl where
   /-- A label with no answer (silent, fence, FENCE.I, register write, control, boundary, SC end). -/
   | fix (l : PLabel)
-  /-- `LLoad aq base tvs asrc` with `|tvs| = sz`. -/
-  | ld (aq : Bool) (base : Int) (sz : Nat) (asrc : List Dsrc)
-  /-- `LExLoad aq base tvs asrc` with `|tvs| = sz`. -/
-  | lr (aq : Bool) (base : Int) (sz : Nat) (asrc : List Dsrc)
-  /-- `LStore rl base data asrc vsrc` with its fulfil timestamp. -/
-  | st (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
-  /-- `LExStore rl base data asrc vsrc` with its fulfil timestamp. -/
-  | sc (rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+  /-- `LLoad aq rl base tvs asrc` with `|tvs| = sz`. -/
+  | ld (aq rl : Bool) (base : Int) (sz : Nat) (asrc : List Dsrc)
+  /-- `LExLoad aq rl base tvs asrc` with `|tvs| = sz`. -/
+  | lr (aq rl : Bool) (base : Int) (sz : Nat) (asrc : List Dsrc)
+  /-- `LStore aq rl base data asrc vsrc` with its fulfil timestamp. -/
+  | st (aq rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
+  /-- `LExStore aq rl base data asrc vsrc` with its fulfil timestamp. -/
+  | sc (aq rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc)
   /-- `LRmw aq rl base tvs (f values) asrc vsrc`: the written bytes are a function of the read bytes. -/
   | rmw (aq rl : Bool) (base : Int) (sz : Nat) (f : List (BitVec 8) → List (BitVec 8)) (asrc vsrc : List Dsrc)
 
@@ -201,46 +202,48 @@ def succ (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PStat
     match fixPost ws l with
     | some ws' => [⟨l, none, ws', prom⟩]
     | none => []
-  | .ld aq base sz asrc =>
+  | .ld aq rl base sz asrc =>
     let va := srcsView ws asrc
-    let vpre := ldPre ws aq va
+    let vpre := ldPre ws aq rl va
     (readCands img log ws vpre base sz).filterMap (fun tvs =>
       if loadOkB img log ws vpre base tvs then
-        some ⟨LLoad aq base tvs asrc, none, loadRun ws aq va base tvs, prom⟩
+        some ⟨LLoad aq rl base tvs asrc, none, loadRun ws aq rl va base tvs, prom⟩
       else none)
-  | .lr aq base sz asrc =>
+  | .lr aq rl base sz asrc =>
     let va := srcsView ws asrc
-    let vpre := ldPre ws aq va
+    let vpre := ldPre ws aq rl va
     (readCands img log ws vpre base sz).filterMap (fun tvs =>
       if loadOkB img log ws vpre base tvs then
-        some ⟨LExLoad aq base tvs asrc, none,
-          { loadRun ws aq va base tvs with wRes := some ⟨base, tvs.map Prod.fst, readView ws aq va base tvs⟩ },
+        some ⟨LExLoad aq rl base tvs asrc, none,
+          { loadRun ws aq rl va base tvs with
+            wRes := some ⟨base, tvs.map Prod.fst, readView ws aq rl va base tvs⟩ },
           prom⟩
       else none)
-  | .st rl base data asrc vsrc =>
+  | .st aq rl base data asrc vsrc =>
     let va := srcsView ws asrc
     let vd := srcsView ws vsrc
-    (writeTs log i prom ws base data (stClass rl) (stPre ws rl va vd)).map (fun ts =>
-      ⟨LStore rl base data asrc vsrc, some ts, storeRun ws rl va (max va vd) base data.length ts, prom \ {ts}⟩)
-  | .sc rl base data asrc vsrc =>
+    (writeTs log i prom ws base data (stClass rl) (stPreA ws aq rl va vd)).map (fun ts =>
+      ⟨LStore aq rl base data asrc vsrc, some ts,
+        acqPost (storeRun ws rl va (max va vd) base data.length ts) aq ts, prom \ {ts}⟩)
+  | .sc aq rl base data asrc vsrc =>
     match ws.wRes with
     | none => []
     | some R =>
       let va := srcsView ws asrc
       let vd := srcsView ws vsrc
-      ((writeTs log i prom ws base data .excl (max (stPre ws rl va vd) R.rvView)).filter (fun ts =>
+      ((writeTs log i prom ws base data .excl (max (stPreA ws aq rl va vd) R.rvView)).filter (fun ts =>
           exclOkB log i R.rvBase R.rvTs ts && R.rvTs.all (fun t => decide (t < ts)))).map (fun ts =>
         let s1 := storeRun ws rl va ts base data.length ts
-        ⟨LExStore rl base data asrc vsrc, some ts, { s1 with wLdv := max s1.wLdv ts, wRes := none },
+        ⟨LExStore aq rl base data asrc vsrc, some ts, { acqPost s1 aq ts with wLdv := max s1.wLdv ts, wRes := none },
           prom \ {ts}⟩)
   | .rmw aq rl base sz f asrc vsrc =>
     let va := srcsView ws asrc
     let vd := srcsView ws vsrc
-    let vpre := ldPre ws aq va
+    let vpre := ldPre ws aq false va
     (readCands img log ws vpre base sz).flatMap (fun tvs =>
       if !loadOkB img log ws vpre base tvs then [] else
       let data := f (tvs.map Prod.snd)
-      let ws1 := loadRun ws aq va base tvs
+      let ws1 := loadRun ws aq false va base tvs
       if tvs.length != data.length then [] else
       ((writeTs log i prom ws1 base data .excl (stPre ws1 rl va vd)).filter (fun ts =>
           exclOkB log i base (tvs.map Prod.fst) ts)).map (fun ts =>

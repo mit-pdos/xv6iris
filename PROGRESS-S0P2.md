@@ -1,6 +1,69 @@
-# PROGRESS — S0-P part (2), milestone 1: machine v2 over the litmus corpus (label level)
+# PROGRESS — S0-P part (2): machine v2 over the litmus corpus (label level); milestone 2 (certification)
 
-Worker: Opus (S0P2), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Plan of record rev 7 (§1A, §8 S0-P).
+Worker: Opus (S0P2, S0P2b), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Plan of record rev 7 (§1A, §8 S0-P).
+
+## LATEST (S0P2b part A, 2026-11-02): D3 FIXED; corpus re-run
+
+- `machine-cap8-D3.txt` (cap 8, machine + reference + fresh herd logs): 7869 compared, **machine = reference on all
+  7869** (Never/Sometimes/Always verdicts all agree; `HAND/LR-SC-NOT-FENCE` now eq).  Machine vs herd: 7863 eq,
+  3 herd-has-more = the 3 known appendix-bug tests (`LR-SC-diff-loc3`, `LR-SC-diff-loc4`, `PPOLDSTLD02`), 3 `na`
+  (herd timeouts, `ATOMICS/CO/2+2W+…sxx…`).  19 parse-out-of-scope, 19 over the cap (as before).  4 min 36 s wall.
+- `machine-cap99-noref-D3.txt` (machine vs herd, no cap): 7888 parsed, 7876 eq, 9 `na` (herd timeouts), the same 3
+  appendix-bug tests; 189 CPU-s machine.
+- No new disagreement.
+
+## LATEST (S0P2b part B, 2026-11-02): MILESTONE 2 (certification) GREEN
+
+- `Weak/Prom/MachSound.lean` — Bool↔Prop lemmas (`writesInB_iff`, `writesInOtherB_iff`, `exclOkB_iff`,
+  `cmoAtB_iff`, `invalReadB_sound`, `bytesAllB_sound`, `loadOkB_sound`, `cohBelowB_iff`, `promHas_iff` =
+  `ExtTreeSet.contains_iff_mem`, `writeTs_mem`) and
+  `explorerStep_sound : s ∈ succ img log i prom ws t → memStep img log i prom ws s.l s.ots s.ws s.prom` (PROVED, every
+  template); `memStepF` (the memory half as a function of the full label + fulfil timestamp) and
+  `memStepF_sound : memStepF … l ots = some (ws', prom') → memStep … l ots ws' prom'` (PROVED, every label).
+- `Weak/Prom/MachCert.lean` — the litmus PROGRAM HALF `litStep` (= `litNext s l = some s'`: RefProg's ISA, each
+  instruction's label sequence of MachLitmus's table, first label with the answers, the rest queued in `LP.q`);
+  `allowedMach T := ∃ evs cfg, validRun litStep (testImg T) () (progs T) evs cfg ∧ allDone cfg ∧
+  T.cond.eval (regOf cfg) (memOf T cfg) = true`; checker `certOk T evs` (replays `evs` with `stepF` = `pmStep` as a
+  function: promise arm, or `litNext` + `memStepF`; then `noPromB`, `doneB`, the condition);
+  `certOk_sound : certOk T evs = true → allowedMach T` (PROVED via `stepF_sound`, `runF_sound`). `PLabel` gets a
+  standalone `deriving instance DecidableEq` there (Machine.lean untouched for it).
+- `Weak/Prom/MachLitmus.lean` — `MH.tr` records each hart's trace (label, fulfil ts) in the DFS; outcome sets
+  unchanged (`machine-cap99-noref-M2.txt` = `…-D3.txt` line for line).
+- `Weak/Prom/MachCertGen.lean` — generator (`lake env lean --run Weak/Prom/MachCertGen.lean > Weak/Prom/MachCerts.lean`,
+  0.7 s): per row, the first explorer run (all harts done) satisfying the condition, printed as
+  `[.prom … (M in order)] ++ per-hart .st events`; it also evaluates `certOk` (all passed).
+- `Weak/Prom/MachCerts.lean` (GENERATED, 77 theorems, each `certOk_sound _ cert (by decide +kernel)`):
+  ALLOWED rows (29): `mach_lb, mach_mp, mach_sbT, mach_sbFwd, mach_ppoca, mach_datacoirfi, mach_datacoirfiR,
+  mach_frirfi, mach_rsw, mach_w22, mach_isa2, mach_wrc, mach_iriwCtrlFi, mach_iriw, mach_mix26d, mach_mix26e,
+  mach_mix26f, mach_mix26g, mach_lbAmoPo, mach_lbAmoAd, mach_lrsc, mach_lrldsc, mach_lrsdsc_a … _d, mach_lrAmoSc,
+  mach_lbMisa, mach_updStuck` (every ALLOWED `ref_*` of RefLitmus*.lean); FORBIDDEN rows (48): `mach_<test>_exec :
+  allowedMach (anyOutcome <test>)` (the machine has a complete valid run: forbidden verdicts are not vacuous).
+- `#print axioms` (`mach_lb`, `mach_lrsdsc_d`, `explorerStep_sound`, `certOk_sound`): `[propext, Classical.choice,
+  Quot.sound]` only.  No sorry/axiom/native_decide.  Lint: only the expected drift findings (Weak/Prom/* not under
+  a root, by rule).
+
+### Milestone 2b — explorer COMPLETENESS (statements, not proved)
+
+Notation: `T` a litmus test, `img := testImg T`, `ps := progs T`, `pstep := litStep`.
+1. `PF.validRun_factorL`: `validRun pstep img () ps evs cfg → validRun pstep img () ps
+   ((cfg.pcLog.map (fun m => PEvt.prom (m.tid.getD 0) m)) ++ evs.filter PEvt.isSt) cfg` (promises first in log
+   order, state events in their order; append-stability + own-promise-monotonicity of every arm).
+2. HART SEPARATION: after all promises, `pmSteps pstep c0 sts cfg ↔ ∀ h, pmSteps pstep c0 (sts.filter (·.tid = h))
+   (c0.update h (cfg.pcAgs[h]))` (memStep reads only the log and the hart's own state; harts commute).
+3. `succ_complete`: `memStep img log i prom ws l ots ws' prom' → ∀ t, Tmpl.Inst t l →
+   ∃ s ∈ succ img log i prom ws t, s.l = l ∧ s.ots = ots ∧ s.ws = ws' ∧ s.prom = prom'` (`Tmpl.Inst t l`: `l`
+   instantiates `t`), with `readCands_complete : loadOk img log ws vpre base tvs → tvs.length = sz →
+   tvs ∈ readCands img log ws vpre base sz` and `writeTs_complete` (every fulfilled `ts ≤ |log|`).
+4. `runM_complete`: every solo run of hart `i` (`litStep` × `memStep` against `M`, from `mhInit T M i`, done, no
+   outstanding promise) has its final registers in `(hartRuns T M i).fin` (with `runM`'s fuel `|prog| + 1`:
+   forward-only programs).
+5. NOTA / `sigmaAll_complete`: `validRun … cfg → sigmaAll T b = some (sig, _) → ∀ h, ownMsgs h cfg.pcLog ∈ sig[h]`
+   (a message's address/data/existence depend only on answers below its EXT bound, so value chains have ≤ K
+   messages).
+6. `arrange_complete`: the final log of every valid run is in `arrange (n + 1) ch` for `ch = (ownMsgs h M)_h`
+   (own overlapping messages in program order: `cohBelow` + `coh` monotone).
+Composed: `machOutcomes T obs = {o | ∃ evs cfg, validRun … ∧ allDone cfg ∧ outcome cfg = o}` (⊆ by milestone 2's
+soundness applied to each enumerated run, ⊇ by 1–6).
 
 ## Defects of machine v2 found by the corpus (each with its fix status)
 
@@ -28,8 +91,19 @@ Worker: Opus (S0P2), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Pl
 - Spec: Atomicity Axiom, rvwmo.adoc:330–334 "s is a store to byte x, and r returns a value written by s, then s must
   precede w in the global memory order". For matched pairs `cohBelow` already implied it. Mark after fix: FAITHFUL.
 
-**S0P2-D3 — OPEN (not fixed: label-alphabet change, needs a decision). LR/SC and Zalasr second annotation dropped
+**S0P2-D3 — FIXED (S0P2b, coordinator decision under the fidelity rule). LR/SC and Zalasr second annotation dropped
 (WEAKER).**
+- Fix (2026-11-02), every item FAITHFUL, docstrings quote rvwmo.adoc:124–128 / unpriv_zalasr.adoc:68–69, 122–123:
+  `LLoad aq rl`, `LExLoad aq rl`, `LStore aq rl`, `LExStore aq rl` (Machine.lean §7); `ldPre ws aq rl va` adds
+  `vrOld ⊔ vwOld` for `rl` (rule 6); `loadRun`/`readView` take `rl`, and a release load raises `wVRel` to its
+  post-view (rule 7 RCsc, the load as `a`); new `stPreA ws aq rl va vd = stPre ⊔ (aq ? wVRel)` (rule 7, the store as
+  `b`) in the `store`/`sc` arms; new `acqPost ws aq ts` (rule 5: `vrNew/vwNew ⊔= ts`) on the `store`/`sc` posts.
+  AMO read halves pass `rl = false` (the AMO's release is its write's, M0).  Front end: `lr` → `LExLoad aq (aq&&rl)`,
+  `sc` → `LExStore (aq&&rl) rl`, `l*.aq[rl]` → `LLoad true rl`, `s*.[aq]rl` → `LStore aq true` (RefProg's own
+  annotations).  Emit.lean: new `akStrong` (`AK_arch` = Sail's `aq && rl` LR/SC kinds, PhysMemInterface.lean:
+  296–365, Mem.lean:222–255); `LExLoad (akAcq ak) (akStrong ak)`, `LExStore (akStrong ak) (akRel ak)`, plain
+  `LLoad`/`LStore` likewise (Sail has no Zalasr kind, so plain accesses get `false`).  `MachExplore.succ` mirrors
+  every arm.  Result: `LR-SC-NOT-FENCE` eq; no other test changed.
 - Where: `PLabel.LExLoad`/`LLoad` have no release bit, `LExStore`/`LStore` no acquire bit (Machine.lean §7); Emit.lean
   passes only `akAcq ak` (ramRead/ramWrite). So `lr.aqrl` (release-RCsc), `sc.aqrl` (acquire-RCsc), `l*.aqrl`,
   `s*.aqrl` lose one annotation.
@@ -73,7 +147,7 @@ Worker: Opus (S0P2), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Pl
   k-th file of that name, LC_ALL=C path order).
 - Machine.lean: F1, F2 (above). Emit.lean rebuilds unchanged. Lint: only the expected drift findings.
 
-## Explorer completeness (what milestone 1's exactness rests on; to be proved in milestone 2)
+## Explorer completeness (what milestone 1's exactness rests on; statements: milestone 2b above)
 
 1. `PF.validRun_factorL` (promises-first normal form; append-stability + own-promise-monotonicity, Machine.lean
    header). 2. `succ` complete per template (MachExplore header). 3. NOTA: a message's address/data/existence depend
@@ -83,12 +157,10 @@ Worker: Opus (S0P2), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Pl
 
 ## Next
 
-- Milestone 2: prove `explorerStep_sound` (`succ` ⊆ `memStep`: five Bool↔Prop lemmas + `contains ↔ ∈`), emit run
-  certificates (promise events in M order + per-hart traces) checked against `validRun`; then the completeness side
-  (`PF.validRun_factorL`, NOTA, `readCands`).
+- Milestone 2: DONE (above).  Milestone 2b: the completeness statements 1–6 above.
 - Milestone 3: the same corpus through `pstepV2` (Sail): fetch labels, split AMOs (`amoSplitFused`), decoder sources
-  vs litmus operands, `match_reservation` both ways, parked FENCE.TSO half.
-- D3: owner/coordinator decision on the alphabet change.
+  vs litmus operands, `match_reservation` both ways, parked FENCE.TSO half; and `litStep` vs Emit.lean's labels
+  (gap list 1–8 in MachLitmus's header; item 8 closed by D3).
 
 ## Runner (was `litmus-appx/run.sh`; `litmus-appx/` = `model-results/herd.logs` (copy of
 herdcheck/herd-appendix-lrscdiffok.logs) + `tests/` of litmus-tests-riscv 08728edc, created in the workspace for the

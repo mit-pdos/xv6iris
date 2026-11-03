@@ -11,12 +11,12 @@ v2's alphabet; register views travel through `LRegW` sources, the SYNTACTIC depe
 | instruction | labels |
 |---|---|
 | `op rd, rs1[, rs2/imm]`        | `LRegW rd [rs1, rs2]`, `LInstr` |
-| `l{b,h,w,d}[u] rd, off(rs1)`    | `LLoad false a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` |
-| `l*.aq[rl] rd, (rs1)` (Zalasr)  | `LLoad true a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` (the `rl` bit has no v2 label field: GAP-RL) |
-| `s{b,h,w,d} rs2, off(rs1)`      | `LStore false a data [rs1] [rs2]` (fulfils `ts`), `LInstr` |
-| `s*.[aq]rl rs2, (rs1)` (Zalasr) | `LStore true a data [rs1] [rs2]`, `LInstr` (the `aq` bit has no v2 field: GAP-AQ) |
-| `lr.{w,d}[.aq][.rl]`            | `LExLoad aq a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` (`lr.aqrl`'s release: GAP-RL) |
-| `sc` success                    | `LExStore rl a data [rs1] [rs2]`, `LRegW rd [DLdRes]` (value 0, M4), `LExFail` (end of SC, M16 (c1)), `LInstr` (`sc.aqrl`'s acquire: GAP-AQ) |
+| `l{b,h,w,d}[u] rd, off(rs1)`    | `LLoad false false a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` |
+| `l*.aq[rl] rd, (rs1)` (Zalasr)  | `LLoad true rl a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` |
+| `s{b,h,w,d} rs2, off(rs1)`      | `LStore false false a data [rs1] [rs2]` (fulfils `ts`), `LInstr` |
+| `s*.[aq]rl rs2, (rs1)` (Zalasr) | `LStore aq true a data [rs1] [rs2]`, `LInstr` |
+| `lr.{w,d}[.aq][.rl]`            | `LExLoad aq (aq && rl) a tvs [rs1]`, `LRegW rd [DLdRes]`, `LInstr` (`lr.rl` alone carries nothing) |
+| `sc` success                    | `LExStore (aq && rl) rl a data [rs1] [rs2]`, `LRegW rd [DLdRes]` (value 0, M4), `LExFail` (end of SC, M16 (c1)), `LInstr` (`sc.aq` alone carries nothing) |
 | `sc` failure                    | `LExFail`, `LRegW rd []` (value 1), `LExFail`, `LInstr` |
 | `amo<op>.{w,d}[.aq][.rl]`       | FUSED `LRmw aq rl a tvs data [rs1] [rs2]`, `LRegW rd [DLdRes]`, `LInstr` |
 | `fence p,s`                     | `LFence pr pw sr sw` (i/o bits dropped, SAIL-GAP-1), `LInstr` |
@@ -45,9 +45,11 @@ drops the run and is COUNTED (`Res.oos`), the scope of RefProg's `condsOk`.  Ref
    consults its opaque reservation predicate (`match_reservation`) and may fail with `.Err ()`.  Either way a
    failure is `LExFail` + `rd := 1` with no sources.
 7. Misaligned accesses are out of scope here; Sail decomposes them ([OWN.P1] `splittable`).
-8. GAP-RL / GAP-AQ: v2's `LLoad`/`LExLoad` carry no release bit and `LStore`/`LExStore` no acquire bit, so
-   `l*.aqrl`, `lr.aqrl` (release-RCsc) and `s*.aqrl`, `sc.aqrl` (acquire-RCsc) lose one annotation — at label level
-   AND in Emit.lean (`akAcq ak` is the only bit passed).  Machine-side, this is WEAKER (fewer orderings).
+8. (Closed by FIX S0P2-D3, 2026-11-02: `LLoad`/`LExLoad` carry a release bit and `LStore`/`LExStore` an acquire
+   bit, set here as RefProg's annotations (rvwmo.adoc:124–128: `lr` has release only with `aq`, `sc` acquire only
+   with `rl`) and in Emit.lean from the access kind (`akStrong`: Sail's `aq && rl` kinds).)  Sail has no Zalasr
+   access kind: its `read_kind_of_flags`/`write_kind_of_flags` raise `internal_error` for an unreserved acquire load
+   or release store (Mem.lean:222–255), so `l*.aq`/`s*.rl` exist at label level only.
 
 ## The explorer (exact within the bound)
 
@@ -119,12 +121,14 @@ def readsOf (l : PLabel) : List (Nat × BitVec 8) :=
 
 /-! ## 2. The hart state and one instruction -/
 
-/-- A hart under machine v2 at label level: pc, concrete registers, v2 state, promise set. -/
+/-- A hart under machine v2 at label level: pc, concrete registers, v2 state, promise set, and the trace so far
+(newest first: every state step's label and fulfil timestamp, for the run certificates of MachCert.lean). -/
 structure MH where
   pc : Nat
   regs : List Nat
   ws : PState
   prom : GSet Nat
+  tr : List (PLabel × Option Nat) := []
 
 def MH.rd (h : MH) (r : Nat) : Nat := if r = 0 then 0 else (h.regs[r]?).getD 0
 
@@ -138,7 +142,8 @@ structure Env where
 
 /-- One template, then the continuation on each successor. -/
 def thenT (E : Env) (h : MH) (t : Tmpl) (k : Succ → MH → List MH) : List MH :=
-  (succ E.img E.log E.i h.prom h.ws t).flatMap (fun s => k s { h with ws := s.ws, prom := s.prom })
+  (succ E.img E.log E.i h.prom h.ws t).flatMap (fun s =>
+    k s { h with ws := s.ws, prom := s.prom, tr := (s.l, s.ots) :: h.tr })
 
 /-- A sequence of answer-free labels, then `pc := pc'`. -/
 def fixes (E : Env) : MH → List PLabel → Nat → List MH
@@ -163,37 +168,37 @@ def stepM (E : Env) (n : Nat) (h : MH) : Instr → StepR
   | .load sz sgn rd rs1 off =>
       let a := (h.rd rs1 + off) % two64
       if !aligned a sz then .oos "misaligned" else
-      .next (thenT E h (.ld false a sz (srcR rs1)) (fun s h1 =>
+      .next (thenT E h (.ld false false a sz (srcR rs1)) (fun s h1 =>
         let raw := ofBytes ((readsOf s.l).map Prod.snd)
         fixes E (h1.wr rd (if sgn then sext sz raw else raw)) (regWL rd [.DLdRes] ++ [LInstr]) (h.pc + 1)))
   | .store sz rs2 rs1 off =>
       let a := (h.rd rs1 + off) % two64
       if !aligned a sz then .oos "misaligned" else
-      .next (thenT E h (.st false a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
+      .next (thenT E h (.st false false a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
         fixes E h1 [LInstr] (h.pc + 1)))
-  | .loadAq sz _ rd rs1 =>
+  | .loadAq sz rl rd rs1 =>
       let a := h.rd rs1
       if !aligned a sz then .oos "misaligned" else
-      .next (thenT E h (.ld true a sz (srcR rs1)) (fun s h1 =>
+      .next (thenT E h (.ld true rl a sz (srcR rs1)) (fun s h1 =>
         fixes E (h1.wr rd (sext sz (ofBytes ((readsOf s.l).map Prod.snd)))) (regWL rd [.DLdRes] ++ [LInstr])
           (h.pc + 1)))
-  | .storeRl sz _ rs2 rs1 =>
+  | .storeRl sz aq rs2 rs1 =>
       let a := h.rd rs1
       if !aligned a sz then .oos "misaligned" else
-      .next (thenT E h (.st true a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
+      .next (thenT E h (.st aq true a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
         fixes E h1 [LInstr] (h.pc + 1)))
   | .loadAqPc .. => .oos "RCpc load (no v2 label)"
   | .storeRlPc .. => .oos "RCpc store (no v2 label)"
-  | .lr sz aq _ rd rs1 =>
+  | .lr sz aq rl rd rs1 =>
       let a := h.rd rs1
       if !aligned a sz then .oos "misaligned" else
-      .next (thenT E h (.lr aq a sz (srcR rs1)) (fun s h1 =>
+      .next (thenT E h (.lr aq (aq && rl) a sz (srcR rs1)) (fun s h1 =>
         fixes E (h1.wr rd (sext sz (ofBytes ((readsOf s.l).map Prod.snd)))) (regWL rd [.DLdRes] ++ [LInstr])
           (h.pc + 1)))
-  | .sc sz _ rl rd rs2 rs1 =>
+  | .sc sz aq rl rd rs2 rs1 =>
       let a := h.rd rs1
       if !aligned a sz then .oos "misaligned" else
-      let ok := thenT E h (.sc rl a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
+      let ok := thenT E h (.sc (aq && rl) rl a (toBytes (h.rd rs2) sz) (srcR rs1) (srcR rs2)) (fun _ h1 =>
         fixes E (h1.wr rd 0) (regWL rd [.DLdRes] ++ [LExFail, LInstr]) (h.pc + 1))
       let ko := fixes E (h.wr rd 1) ([LExFail] ++ regWL rd [] ++ [LExFail, LInstr]) (h.pc + 1)
       .next (ok ++ ko)
