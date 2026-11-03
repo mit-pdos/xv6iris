@@ -33,6 +33,12 @@ Marks: STRONGER = forbids executions the manual's prose allows; WEAKER = allows 
 Ambiguity (not counted as a bug): ppo rule 13's "instruction m" (`rvwmo.adoc:301-302`) vs the formal `r13 = [R];addr;[M];po;[W]`
 (a failed SC issues no memory operation). Owner ruling [OWN.P6]: memory-operation reading (= the formal model).
 
+## Sail RISC-V model (our generated Lean copy, `model/Lean_RV64D`)
+
+| # | Gap | Evidence | Mark | Tests affected | Upstream status |
+|---|---|---|---|---|---|
+| S1 | No Zalasr: load-acquire / store-release instructions (`l*.aq`, `s*.rl`) raise `internal_error` | `model/Lean_RV64D/.../Mem.lean:222-255` (found by the Sail-level litmus run, S0-P(2) m3, 2026-11-02) | missing feature (executions stuck) | 3801 corpus tests (2705 `s*.rl`, 1096 `l*.aq`) can only be checked at label level | not checked whether upstream sail-riscv has Zalasr |
+
 ## litmus-tests-riscv
 
 | # | Bug | Evidence | Mark | Tests affected |
