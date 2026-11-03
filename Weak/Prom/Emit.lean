@@ -19,6 +19,17 @@ programs, not an ordering assumption.  Not modelled yet (each listed with what a
 PROGRESS-S1Mdef.md): page walks (M14, M18), the translation cache (M21), A/D updates (M20), `sfence.vma`
 (`LSfence`), PBMT, the disk agent and the PLIC wire (today's `pstepDisk`/`pstepPlic`).
 
+## FIX S0rest-F1 (2026-11-03, S0-P part (4), probe family G2): the OLD CSR view of a CSR read-modify-write
+
+Found by G2 (`Weak/Prom/ProbeG2.lean`, CARRY variant of every `csrrw/csrrs/csrrc` on a tracked CSR, 63 probes):
+Sail writes the CSR BEFORE `rd` (`csr_val ← read; write_CSR; X(rd) := csr_val`), so `rd`'s source `[p]`
+(`depsRd2`) was evaluated AFTER `p`'s own `LRegW p [rs1, …]` — `rd` inherited `rs1`'s view (STRONGER: the LB
+outcome through `ld a0; add x6,x6,s(a0); csrrw x5,csr,x6; … sd f(x5)` was forbidden; the text allows it:
+rvwmo.adoc:487–495 "carries a dependency from rs1 to csr and from csr to rd", rd receives the OLD csr).  Fix: at
+the FIRST read of the CSR's register in such an instruction (`csrCapture`), the instance emits `LRegW 53 [p]` into
+a fresh dependency key (`csrOldKey`, the view of the old CSR), and `rd`'s sources are `[DReg 53]` (`regSrcs`).
+Mark after the fix: FAITHFUL (rd depends on the CSR's previous writer, not on rs1).
+
 ## What changes from today's emission, item by item
 
 * M19 / NA-4 — EVERY register write of a tracked register is `LRegW r srcs`, never `LSilent`: `srcs` is the
@@ -172,6 +183,17 @@ def splittable (ib : Option (BitVec 32)) (n : Nat) : Bool :=
    | some wd => decide (n < wd)
    | none => false)
 
+/-- FIX S0rest-F1: the dependency key that holds a CSR instruction's OLD CSR view (one past `WeakDeps`' keys
+32–52; `wRegv` is a map, every key is fresh). -/
+def csrOldKey : Nat := 53
+
+/-- FIX S0rest-F1: the second destination with the old-CSR source: a Zicsr read-modify-write's `rd` receives the
+CSR's OLD value, whose view `csrOldKey` captured at the CSR read (`csrCapture`). -/
+def v2Rd2 (ib : Option (BitVec 32)) : Option (Nat × List Dsrc) :=
+  match v2Roles ib with
+  | .ORcsr p s rd => (depsRd2 (.ORcsr p s rd)).map (fun e => (e.1, [.DReg csrOldKey]))
+  | r => depsRd2 r
+
 /-- THE SOURCES OF A REGISTER WRITE (M19, D-S0-4): the decoded destination's syntactic sources, else `[]`.  An SC's
 `rd` gets `[DLdRes]` only after a successful write (M4); a failed SC's `rd` gets `[]` ([R3.s2]). -/
 def regSrcs (ib : Option (BitVec 32)) (scOk : Bool) (n : Nat) : List Dsrc :=
@@ -180,11 +202,11 @@ def regSrcs (ib : Option (BitVec 32)) (scOk : Bool) (n : Nat) : List Dsrc :=
     match depsRd (v2Roles ib) with
     | some (rd, srcs) =>
         if rd = n then srcs
-        else (match depsRd2 (v2Roles ib) with
+        else (match v2Rd2 ib with
               | some (rd2, srcs2) => if rd2 = n then srcs2 else []
               | none => [])
     | none =>
-        (match depsRd2 (v2Roles ib) with
+        (match v2Rd2 ib with
          | some (rd2, srcs2) => if rd2 = n then srcs2 else []
          | none => [])
 
@@ -242,9 +264,11 @@ structure Ix where
   racc : List (Nat × BitVec 8)
   woff : Nat
   cmoDone : Bool
+  /-- FIX S0rest-F1: the old CSR view was captured into `csrOldKey` -/
+  csrOld : Bool
 
 /-- The empty channel (an instruction boundary). -/
-def ixNone : Ix := ⟨none, false, false, false, none, false, false, [], 0, false⟩
+def ixNone : Ix := ⟨none, false, false, false, none, false, false, [], 0, false, false⟩
 
 /-- A hart: its CPU, the residual Sail monad of the current step, its register file, the parked FENCE.TSO half
 (M6; it gates every later step of the hart, so it is applied before the next memory event), and the channel. -/
@@ -256,6 +280,19 @@ structure HState where
   ix : Ix
 
 /-! ## 3. The node dispatch -/
+
+/-- FIX S0rest-F1: is this register read the (first) read of the CSR of a Zicsr read-modify-write with a GPR
+destination?  Then the key of the CSR. -/
+def csrCapture (ix : Ix) (r : Register) : Option Nat :=
+  if ix.csrOld then none else
+  match v2Roles ix.bits with
+  | .ORcsr p _ rd =>
+    if rd = 0 then none else
+    match eregNum r with
+    | some n => if (n : Int) = p then some n else none
+    | none => none
+  | _ => none
+
 
 /-- The answered bytes `tvs` are the bytes of `w` (little-endian). -/
 def answers (n : Nat) (w : BitVec (8 * n)) (tvs : List (Nat × BitVec 8)) : Prop :=
@@ -355,7 +392,12 @@ def hnodeStep (h : HState) (d : DevStates) (l : PLabel) (h' : HState) (d' : DevS
   | .impure (.error _) _ => False      -- STOP-AND-ASK (PROGRESS-S1Mdef.md): the `.error` arm
   | .impure (.ok o) k =>
     match o, k with
-    | .regRead r, k => l = LSilent ∧ d' = d ∧ h' = { h with m := k (h.rs r) }
+    | .regRead r, k =>
+        d' = d ∧
+        (match csrCapture h.ix r with
+         | some n => l = LRegW csrOldKey [.DReg n] ∧                       -- FIX S0rest-F1
+             h' = { h with m := k (h.rs r), ix := { h.ix with csrOld := true } }
+         | none => l = LSilent ∧ h' = { h with m := k (h.rs r) })
     | .regWrite r v, k => d' = d ∧ regWriteStep h r v k l h'
     | .memRead n _va req, k =>
         if devAddr req.pa then

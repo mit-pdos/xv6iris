@@ -279,7 +279,11 @@ def sNext (P : BitVec 64 → Bool) (endPC : BitVec 64) (h : SH) : SEv :=
   | .impure (.error _) _ => .stop "sail-error"
   | .impure (.ok o) k =>
     match o, k with
-    | .regRead r, k => .lab LSilent { h with m := k (h.rs.get r) }
+    | .regRead r, k =>
+      -- FIX S0rest-F1 (Emit.lean `csrCapture`): the old CSR view of a Zicsr read-modify-write
+      match csrCapture h.ix r with
+      | some n => .lab (LRegW csrOldKey [.DReg n]) { h with m := k (h.rs.get r), ix := { h.ix with csrOld := true } }
+      | none => .lab LSilent { h with m := k (h.rs.get r) }
     | .regWrite r v, k =>
       if isReg r .mcause || isReg r .scause then .stop "trap" else
       let h' : SH := { h with m := k PUnit.unit, rs := h.rs.insert r v }
