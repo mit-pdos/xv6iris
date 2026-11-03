@@ -1,5 +1,80 @@
 # PROGRESS — S0-P part (2): machine v2 over the litmus corpus (label level); milestone 2 (certification)
 
+## m2b (S0P2c, 2026-11-02) — explorer completeness
+
+**COUNTEREXAMPLE to statement 5 as stated (`sigmaAll_complete`: "`ownMsgs h cfg.pcLog ∈ sig[h]`").**  `sig[h]`
+holds each hart's message lists in PROGRAM order (`FH.msgs` appends in po), but a hart may fulfil its stores out of
+timestamp order, so its own messages in LOG order need not be a member.  Example: one hart `sw 1,(x); sw 1,(y)`;
+the valid run `prom y; prom x; st sw-x (ts 2); st sw-y (ts 1)` (both EXT premises `0 < ts`, `coh = 0 < ts` hold)
+has log `[y:=1, x:=1]`, so `ownMsgs 0 = [y, x]`, while `sig[0] = [[x, y]]`.  The EXPLORER is not affected (it
+`arrange`s the po-order lists, and `arrange` reorders non-overlapping messages), only the statement: the correct
+form is "the hart's FULFILLED messages in program order are a member of `sig[h]`, and the log is a permutation of
+their concatenation" (statement 6 must then take the po-order lists).  The m2b checker below is built on that form.
+
+**SECOND COUNTEREXAMPLE to statement 5 (the free runs' alignment check).**  `FH`'s `stepF` (and RefProg/`litNext`)
+drop a run at a misaligned access.  Every access except a FAILING SC has its address view captured by `vcap`
+(rule 13), hence below the EXT bound of any later message; a failing SC (`LExFail`, no view effect) does not, so a
+free run over the domain may stop at an SC whose address the valid run computes from a not-yet-justified value.
+Example (init `x = 1`, `y = 0`): H0 `lw r1,0(x); sc.w r2,r3,0(r1); sw r5(=1),0(y)` ‖ H1 `lw r,0(y); xori r,r,1;
+sw r,0(x)`.  Valid run: `prom y:=1 (H0); prom x:=0 (H1)`; H1 reads `y = 1` (ts 1), writes `x := 0` (ts 2);
+H0 reads `x = 0` (ts 2), its SC fails at the ALIGNED address 0, `sw y` fulfils ts 1 (`stPre = 0`).  The closure:
+`D(y) = {0}` ⇒ H1's messages `x := 1` ⇒ `D(x) = {1}` ⇒ every free run of H0 stops at the SC (address 1) ⇒
+`sig[0] = []`: the milestone-1 explorer reports NO outcome for this test while the machine has one (STRONGER,
+explorer-only; no corpus test has a dependent SC address, so no corpus result changes).  The m2b checker's free runs
+(`litNextF`) skip the failing SC's alignment check (`scNextF`), which makes NOTA provable.
+
+Green increments (m2b):
+- `Weak/Prom/MachWf.lean` — [R7.s1] invariant: `memStep_bnd` (every arm keeps `psBounded ws |log|` and
+  `promWf`), `pmStep_wf`/`pmSteps_wf` (`runWf` = `cfgWf` + every log message non-trivial with an existing author),
+  `pmSteps_prefix` (append-only log), `pmSteps_len`.  PROVED.
+- `Weak/Prom/MachFactor.lean` — **statement 1 PROVED** for machine v2, any `pstep`, any fabric `D`, no premise:
+  `validRun_factorL : validRun pstep img d0 ps evs cfg → validRun pstep img d0 ps (cfg.pcLog.map promEv ++
+  evs.filter PEvt.isSt) cfg` and `validRun_factorL_trace` (+ `∀ h, traceOf h evs' = traceOf h evs`).  Core:
+  `memStep_extend` (every arm append-stable and own-promise-monotone, from `psBounded`).  Axioms: propext,
+  Classical.choice, Quot.sound.
+- `Weak/Prom/MachSolo.lean` — **statement 2 (the direction used) PROVED**: `sep` (a run of state events projects
+  to each hart's `soloSteps` against the fixed log), `validRun_statePhase`, `validRun_solo` (every valid run gives,
+  for every hart, a solo run against the final log from `(ps[h], psInit, own messages)` to its final agent, with
+  trace `traceOf h evs`); `memStep_prom`, `solo_fulfil` (a promise gone at the end was fulfilled by a step).
+- `Weak/Prom/MachComplete.lean` — **statements 3–4 PROVED for the new per-hart explorer**: `memStepF_complete`
+  (`memStepF` is exact, with milestone 2's `memStepF_sound`), `invalReadB_complete`, `loadOkB_complete`;
+  `insLabs`/`labCands` (every first label, answers from `ansRuns`: per byte every timestamp `0 … |M|` holding it),
+  `labCands_complete`; `soloDFS` + `soloDFS_complete` (no fuel-out ⇒ every solo run's final state is listed).
+- `Weak/Prom/MachNota.lean` + `Weak/Prom/MachNI.lean` — **statement 5 (corrected) PROVED, `nota`**: with a domain
+  `D` that holds the image and is CLOSED for every hart (`closedFrom`: every message of every free run
+  `freeSteps D` over `litNextF` has its bytes in `D`), every byte of the final memory is in `D`.  Proof: strong
+  induction on the message's timestamp `θ`; the noninterference simulation `ni_step`/`ni_run` (a free run copies
+  every LOW load — result view `< θ` — and answers every HIGH load from `D`; `agree` = equal on every register whose
+  syntactic view is `< θ`; `fwdInv` for forwarding; all addresses and branches are low because `vcap ≤ stPre < θ`)
+  and `ni_final` (the fulfilling step is a free step with the SAME label).
+- `Weak/Prom/MachFree.lean` — `freeDFS` (free runs over `D`, canonical answers) + `freeDFS_complete`;
+  `perms` + `perms_complete`; `choicesG` + `choicesG_complete`; `perm_owner` (statement 6, corrected: the final log
+  is a PERMUTATION of the concatenation of the harts' fulfilled-message lists; no `arrange` pruning is used).
+- `Weak/Prom/MachForbid.lean` — **the checker and its soundness, PROVED**:
+  `forbidMachB_sound (T) (K) : forbidMachB T K = true → ¬ allowedMach T`.  `forbidMachB`: untrusted domain
+  iteration (`domIter`, K rounds), closedness + fuel check of every hart's `freeDFS`, then for every choice of
+  complete free-run message lists and every permutation `M` of their concatenation, every hart's `soloDFS` against
+  `M` (fuel checked) and no combination of finished final states satisfies the condition.  Proof composes
+  statements 1, 2, 3–4, 5 (`nota`), 6 (`perm_owner`, every message fulfilled once by its author: `solo_fulfils`).
+- `Weak/Prom/MachForbidden{,2,3}.lean` — **46 kernel-checked theorems** `mach_<test>_forbidden : ¬ allowedMach
+  Lit.<test>` (`forbidMachB_sound _ 6 (by decide +kernel)`): lbdd (row 2), lbDatas (row 3, LB+fakedep), lbCtrls,
+  lbCtrlsBeq, lbLrsc, oota42, mpFF, mpFFrr, mpFAddr, mpAmoRlAq, mpFAmo, amoStorePart, sbFF, datarfi, addrpo, addrpoR,
+  w22F, coWW, coWR0, coWR, coRW1, coRW2, coRR, coRR2, isa2F, wrcF, iriwF, mix26a, mix26b, mix26c, mix26dNot,
+  mix26h, mix26i, mpAmoData, mpAmoCtrl, mixSca, lrScSc, wsub, armWeak, lbAcq, lbRel, coh, seqT, lbfd, disjLists,
+  ramAq.  Build: 41 s / 106 s / 143 s (three files in parallel; ≈ 20 GB peak).  Axioms: propext, Classical.choice,
+  Quot.sound.  No sorry/axiom/native_decide.
+- `rng` (row 60) and `parInc` (row 23): no closed domain exists (`x := y + 1`, `amoadd` grow values), so
+  `forbidMachB` returns false for them.  SOLVED by the DEPTH form: `nota_depth` (MachNI.lean; a chain
+  `Ds 0 ⊆ Ds 1 ⊆ …` holding the image with every free run over `Ds j` closing into `Ds (j+1)` for `j < N` puts the
+  byte at timestamp `t ≤ N` in `Ds t`), `valid_msgs_le` (a valid run has at most `Σ |prog|` messages: each
+  instruction emits at most one, `litNext_pc`/`solo_msgcount`), and `forbidChainB` + `forbidChainB_sound`.  This
+  needed FREE RUNS WITH OWN-STORE FORWARDING (`freeOk D w l`: a load answer is a domain byte OR the run's own latest
+  byte there, `lastByte w a`; `freeSteps` carries the emitted messages `w`): a low load may forward from an own store
+  fulfilled LATER than `t`, whose bytes are only in `Ds (t+1)`.  With forwarding in the free runs the simulation no
+  longer needs closedness at all (`ni_step` lost its closure premise).  `MachForbidden4.lean`:
+  `mach_rng_forbidden`, `mach_parInc_forbidden` (`forbidChainB_sound _ (by decide +kernel)`, 38 s).
+- ALL 48 FORBIDDEN rows of RefLitmus*.lean now have `mach_<test>_forbidden` (46 closed-domain + 2 chain).
+
 Worker: Opus (S0P2, S0P2b), 2026-11-02. Workspace `/home/bsdinis/dev/xv6iris-pcsl2`. Plan of record rev 7 (§1A, §8 S0-P).
 
 ## LATEST (S0P2b part A, 2026-11-02): D3 FIXED; corpus re-run
@@ -64,6 +139,13 @@ Notation: `T` a litmus test, `img := testImg T`, `ps := progs T`, `pstep := litS
    (own overlapping messages in program order: `cohBelow` + `coh` monotone).
 Composed: `machOutcomes T obs = {o | ∃ evs cfg, validRun … ∧ allDone cfg ∧ outcome cfg = o}` (⊆ by milestone 2's
 soundness applied to each enumerated run, ⊇ by 1–6).
+**m2b status (S0P2c):** 1 PROVED (`validRun_factorL`); 2 PROVED in the direction used (`validRun_solo`); 3–4 PROVED
+for the m2b checker's explorer (`memStepF_complete`, `labCands_complete`, `soloDFS_complete`; the brute-force
+answer generator `ansRuns` replaces `readCands`, so `readCands_complete` itself was not needed); 5 FALSE as stated
+(two counterexamples at the top), PROVED in corrected form (`nota`, `nota_depth`, over `litNextF` free runs with
+own-store forwarding); 6 PROVED in corrected form (`valid_perm`: permutation, no `arrange` pruning).  The
+milestone-1 `sigmaAll`/`arrange`/`runM` explorer itself is not proved complete (and is incomplete on the second
+counterexample's program class).
 
 ## Defects of machine v2 found by the corpus (each with its fix status)
 
