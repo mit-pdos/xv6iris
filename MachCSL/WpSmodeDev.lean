@@ -70,13 +70,13 @@ theorem devWrite_some {ds : DevStates} {pa : PAddr} {d : DevId} {off n : Nat} {w
 theorem not_ramBytes_of_devBytes {pa : PAddr} {n : Nat} (hd : devBytes pa n) (hn : 0 < n) :
     ¬ ramBytes pa n := fun hr => not_devBytes_of_ramBytes hr hn hd
 
-/-- The reservations are RAM's (`mmOk`): no hart reserves a device byte, so a
-device write is never blocked. -/
+/-- The blocking reservations are RAM's (`mmOk`): no hart holds a blocking
+reservation over a device byte, so a device write is never blocked. -/
 theorem not_othersReserve_dev {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
     (hmm : mmOk σ) (hdev : devBytes pa n) : ¬ othersReserve σ.resv cpu pa n := by
-  rintro ⟨c, _, r, hr, j, hj, hsome⟩
+  rintro ⟨c, _, r, hr, hb, j, hj, hsome⟩
   obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hsome
-  have htop := hmm.2.2.1 c r hr _ v hv
+  have htop := hmm.2.2.1 c r hr hb _ v hv
   obtain ⟨H, hH, -⟩ := Option.bind_eq_some_iff.1 htop
   have hram := hmm.2.2.2.1 _ H hH
   have hd := hdev j hj

@@ -10,7 +10,8 @@ language's relation (`MachCSL.hartStep`) leaves several things open -- the
 clock tick at a boundary, the view a load or a fetch reads at, the value of a
 `choose` -- and `pol` resolves them; every other premise of the relation is
 CHECKED here (the bus decode, the view bounds, the coherence floors, that the
-bytes read are the memory's, that no other hart reserves the footprint), so
+bytes read are the memory's, that no other hart holds a blocking reservation
+over the footprint), so
 
   hartExec pol cpu m x = some (m', x')  →  hartStep cpu m x.abs m' x'.abs
 
@@ -74,22 +75,32 @@ def allCpus : List CPU := List.finRange NCPU
 
 theorem mem_allCpus (c : CPU) : c ∈ allCpus := List.mem_finRange c
 
-/-- Does hart `c` reserve a byte of the footprint? -/
-def hartReservesB (x : XState) (c : CPU) (pa : PAddr) (n : Nat) : Bool :=
+/-- Is the reservation blocking (`Resv.blocking`: not an LR's)? -/
+def blockingB (r : Resv) : Bool := r.kind != .lr
+
+theorem blockingB_iff (r : Resv) : blockingB r = true ↔ r.blocking := by
+  simp [blockingB, Resv.blocking]
+
+/-- Does hart `c` hold a blocking reservation (`Resv.blocking`: not an LR's)
+over a byte of the footprint?  An LR's reservation is recorded but blocks
+nobody (owner ruling 2026-11-05, policy decision (22)). -/
+def hartBlocksB (x : XState) (c : CPU) (pa : PAddr) (n : Nat) : Bool :=
   match (x.hart c).resv with
-  | some r => overlapsB r pa n
+  | some r => blockingB r && overlapsB r pa n
   | none => false
 
-theorem hartReservesB_iff (x : XState) (c : CPU) (pa : PAddr) (n : Nat) :
-    hartReservesB x c pa n = true ↔ ∃ r, x.abs.resv c = some r ∧ r.overlaps pa n := by
-  show hartReservesB x c pa n = true ↔ ∃ r, (x.hart c).resv = some r ∧ r.overlaps pa n
-  unfold hartReservesB
+theorem hartBlocksB_iff (x : XState) (c : CPU) (pa : PAddr) (n : Nat) :
+    hartBlocksB x c pa n = true ↔
+      ∃ r, x.abs.resv c = some r ∧ r.blocking ∧ r.overlaps pa n := by
+  show hartBlocksB x c pa n = true ↔
+    ∃ r, (x.hart c).resv = some r ∧ r.blocking ∧ r.overlaps pa n
+  unfold hartBlocksB
   cases h : (x.hart c).resv with
   | none => simp
-  | some r => simp [overlapsB_iff]
+  | some r => simp [blockingB_iff, overlapsB_iff]
 
 def othersReserveB (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) : Bool :=
-  allCpus.any fun c => decide (c ≠ cpu) && hartReservesB x c pa n
+  allCpus.any fun c => decide (c ≠ cpu) && hartBlocksB x c pa n
 
 theorem othersReserveB_iff (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) :
     othersReserveB x cpu pa n = true ↔ othersReserve x.abs.resv cpu pa n := by
@@ -97,15 +108,15 @@ theorem othersReserveB_iff (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) :
   rw [List.any_eq_true]
   constructor
   · rintro ⟨c, -, hc⟩
-    rw [Bool.and_eq_true, decide_eq_true_eq, hartReservesB_iff] at hc
+    rw [Bool.and_eq_true, decide_eq_true_eq, hartBlocksB_iff] at hc
     exact ⟨c, hc.1, hc.2⟩
   · rintro ⟨c, hne, hr⟩
     refine ⟨c, mem_allCpus c, ?_⟩
-    rw [Bool.and_eq_true, decide_eq_true_eq, hartReservesB_iff]
+    rw [Bool.and_eq_true, decide_eq_true_eq, hartBlocksB_iff]
     exact ⟨hne, hr⟩
 
 def anyReserveB (x : XState) (pa : PAddr) (n : Nat) : Bool :=
-  allCpus.any fun c => hartReservesB x c pa n
+  allCpus.any fun c => hartBlocksB x c pa n
 
 theorem anyReserveB_iff (x : XState) (pa : PAddr) (n : Nat) :
     anyReserveB x pa n = true ↔ anyReserve x.abs.resv pa n := by
@@ -113,11 +124,11 @@ theorem anyReserveB_iff (x : XState) (pa : PAddr) (n : Nat) :
   rw [List.any_eq_true]
   constructor
   · rintro ⟨c, -, hc⟩
-    rw [hartReservesB_iff] at hc
-    obtain ⟨r, h1, h2⟩ := hc
-    exact ⟨c, r, h1, h2⟩
-  · rintro ⟨c, r, h1, h2⟩
-    exact ⟨c, mem_allCpus c, (hartReservesB_iff x c pa n).2 ⟨r, h1, h2⟩⟩
+    rw [hartBlocksB_iff] at hc
+    obtain ⟨r, h1, h2, h3⟩ := hc
+    exact ⟨c, r, h1, h2, h3⟩
+  · rintro ⟨c, r, h1, h2, h3⟩
+    exact ⟨c, mem_allCpus c, (hartBlocksB_iff x c pa n).2 ⟨r, h1, h2, h3⟩⟩
 
 /-- A value from the bytes a byte-wise read returned (absent bytes as 0; the
 caller re-checks the value against the memory, so nothing rests on this). -/
@@ -417,7 +428,8 @@ theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : InstructionEffec
     obtain ⟨-, rfl⟩ := Prod.mk.inj h
     rfl
 
-/-- The event is blocked by another hart's reservation: the state the
+/-- The event is blocked by another hart's blocking reservation (not an LR's,
+`Resv.blocking`): the state the
 self-loop leaves (a blocked exclusive read drops the hart's own reservation, a
 blocked plain store releases it unless it is an LR's, `XState.dropWindow`). -/
 def blockedExec (cpu : CPU) (x : XState) : InstructionEffect → Option XState

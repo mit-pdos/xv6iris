@@ -269,8 +269,9 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   LR's reservation is left as it was: today's semantics matches hardware's safety for a successful
   SC and a release would match its liveness, and the faithful semantics needs the SC's outcome
   coupled to interference, which the opaque reservation predicates prevent (the recorded LR/SC
-  limitation; the watch model is the target, decision (21); until then two harts can still deadlock
-  on two LR reservations, user level only).  The Rocq prototype had the boundary clear
+  limitation; the watch model is the target, decision (21).  Updated 2026-11-05, next entry: an LR's
+  reservation now blocks nobody, so the two-LR deadlock is gone, and what remains until the watch
+  model is that a successful SC may follow an intervening store).  The Rocq prototype had the boundary clear
   (`iris/RiscvLang.v:1860-1862` on `origin/rocq`; its boundary step also cleared the pending acquire
   bit, which `dropWindow` leaves alone, the ruling saying nothing about it), and its design note had
   rejected the blocked-store release (2026-08-18) because pairwise disjointness of reservations was
@@ -287,6 +288,33 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   in the same commit with the diff read (the register names the constants; `evStep`'s hash moves this
   time, its arm now passing the kind); the conformance harness mirrors both arms
   (`vtest-lean/Vtest/HartExec.lean`) and no green run changed; decision (21).
+
+- **LR reservations do not block (2026-11-05).**  Owner ruling, on the liveness plan's finding that the
+  harts-progress assumption had to exclude retries blocked by an LR reservation.  The drop of
+  2026-10-24 (above) made an AMO's and the walker's reservation die with its operation but left an LR's
+  standing until the hart's next store or exclusive read, and while it stood every other hart's store or
+  exclusive read into its bytes, and every DMA write, was blocked; a hart that never stored again after
+  its LR blocked them for ever, and two harts could deadlock on each other's LR reservation.  On
+  hardware an LR's reservation is a watch, not a lock: "the SC must fail if a store to the reservation
+  set from another hart can be observed to occur between the LR and SC" (`unpriv/zalrsc.adoc:118-120`);
+  the other hart's store occurs.  Ruling: the two blocking predicates, `othersReserve` and
+  `anyReserve`, ignore reservations of kind `lr` (`Resv.blocking`); the record stays as the future
+  watch, and `dropWindow`'s LR exemption stays with it.  Consequence for the LR/SC limitation (above):
+  the deadlock of two LR holders is gone, and a blocked retry is now always a wait on a bounded,
+  unblockable activity of its holder, which is what the liveness plan's harts-progress assumption
+  describes; in exchange a successful SC may follow an intervening store, since the SC's outcome is
+  still the opaque platform predicate, an over-approximation that invalidates no safety theorem and
+  touches no xv6 theorem (the kernel has no LR).  The target that removes it is the watch model: the
+  memory decides the SC through the write's answer (the Sail model already computes `write_success
+  && s` from an optional Boolean that lean-sail's interface v2 always answers `none`), so it needs
+  lean-sail's write event to answer the Boolean, a one-line change to `write_ram`, a regeneration, and
+  in MachCSL a watch per hart set at the LR, cleared by any other agent's overlapping store, and
+  consulted at the conditional write; recorded in the liveness plan's `lrsc-future.md`, outside the
+  repository.  Proof structure: `resvInv` and `mmOk` restrict their reservation clauses to blocking
+  reservations; the three `WpAtomic` leaves over a reservation of arbitrary kind take `κ ≠ .lr`; no
+  rule, contract or top theorem changes its statement.  Process: an M3 change by owner ruling; the
+  register's section 5 bullet with the manual's sentence; `tcb.sh --update` in the same commit with the
+  diff read; the harness mirrors the kind test and no green run changed; decision (22).
 
 ## From `notes/briefs/crash_layer.md`
 

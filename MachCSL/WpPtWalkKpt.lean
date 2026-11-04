@@ -214,7 +214,7 @@ theorem swp_checked_mem_read_pte8_S_resv (cpu : CPU) (dq : DFrac) (c : MConf) (s
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  mem_iapply (swp_sail_mem_read_plain_resv_kind cpu) rfl (by decide) w b .pte
+  mem_iapply (swp_sail_mem_read_plain_resv_kind cpu) rfl (by decide) w b .pte (by decide)
   iframe Hfrag
   inext
   iintro Hfrag
@@ -262,6 +262,7 @@ theorem swp_checked_mem_read_pte8_excl_S_resv (cpu : CPU) (dq : DFrac) (c : MCon
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
   mem_iapply (swp_sail_mem_read_excl_resv cpu) false rfl rfl (by decide) w b .pte kindOf_pteRe
+    (by decide)
   iframe Hfrag
   inext
   iintro Hfrag
