@@ -963,6 +963,14 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.PfxDefs
+import Weak.Prom.PfxSym
+import Weak.Prom.PfxRank
+import Weak.Prom.PfxCut
+import Weak.Prom.PfxVal
+import Weak.Prom.PfxPpo
+import Weak.Prom.PfxMain
+import Weak.Prom.PfxUnroll
 import Weak.Prom.AmoSplit
 import Weak.Prom.AmoSplitV2
 import Weak.Prom.AmoSplitLit

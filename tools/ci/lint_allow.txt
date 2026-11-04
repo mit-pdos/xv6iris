@@ -15,3 +15,4 @@ Weak/Prom/TableCxRun.lean      # driver: runs the `#tableCx` extractor at import
 Weak/Prom/MachFixCheck.lean    # audit printer: `#print axioms` only, no declarations (MachFix/HavocProm)
 Weak/Prom/RepairCheck.lean     # audit printer: `#print axioms` only, no declarations (rebase repair)
 Weak/Prom/AmoSplitCheck.lean   # audit printer: `#print axioms` only, no declarations (amoSplitFused)
+Weak/Prom/PfxAxioms.lean       # audit printer: `#print axioms` only, no declarations (S3d prefix lemma)
