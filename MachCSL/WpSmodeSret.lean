@@ -22,17 +22,16 @@ open LeanRV64D LeanRV64D.Functions
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- `mstatus` after `sret` (from `SPP = S`): `SIE := SPIE`, `SPIE := 1`,
-`SPP := U`, `MPRV := 0`, `SPELP := 0`. -/
+`SPP := U`, `MPRV := 0`.  (No `SPELP := 0`: since 2026-11-04 the hart has no
+Zicfilp, so `sret` leaves `SPELP` and `elp` alone.) -/
 def sretMs (ms : BitVec 64) : BitVec 64 :=
   BitVec.updateSubrange
     (BitVec.updateSubrange
-      (BitVec.updateSubrange
-        (~~~(1#64 <<< 5) &&&
-            (~~~(1#64 <<< 1) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 5 1 ms) <<< 1) |||
-          1#64 <<< 5)
-        8 8 0#1)
-      17 17 0#1)
-    23 23 0#1
+      (~~~(1#64 <<< 5) &&&
+          (~~~(1#64 <<< 1) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 5 1 ms) <<< 1) |||
+        1#64 <<< 5)
+      8 8 0#1)
+    17 17 0#1
 
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `sret` (`SPP = S`, `TSR = 0`, `menvcfg.LPE = 0`):

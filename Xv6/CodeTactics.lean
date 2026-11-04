@@ -48,7 +48,7 @@ noncomputable def textDecodeWith (dref : (r : Register) → Option (RegisterType
   | some k =>
     if k.width = 4 then
       match runRead dref (Functions.ext_decode (BitVec.ofNat 32 k.enc)) with
-      | some (i, true) =>
+      | some (i, _) =>
         if Functions.isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 k.enc)) = false ∧ inRam pc 4 ∧
             pc.toNat % 2 = 0 ∧ instrWf i ∧ textRx pc then some (false, i, i) else none
       | _ => none

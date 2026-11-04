@@ -98,9 +98,10 @@ def WeakLeafMret.cms3 (m : BitVec 64) : BitVec 64 :=
 /-- `WpGprMretWp.cms4`: `MPRV := 0`. -/
 def WeakLeafMret.cms4 (m : BitVec 64) : BitVec 64 :=
   Sail.BitVec.updateSubrange (WeakLeafMret.cms3 m) 17 17 0#1
-/-- `WpGprMretWp.cms5`: `MPELP := NO_LP_EXPECTED`. -/
-def WeakLeafMret.cms5 (m : BitVec 64) : BitVec 64 :=
-  Sail.BitVec.updateSubrange (WeakLeafMret.cms4 m) 41 41 (landing_pad_bits_backwards .NO_LP_EXPECTED)
+/-- `WpGprMretWp.cms5`: Rocq's `MPELP := NO_LP_EXPECTED`.  Since 2026-11-04 the hart has no
+Zicfilp and `mret` writes neither `MPELP` nor `elp`: `cms5` is `cms4` (kept as the name of the final
+`mstatus`, which its consumers use). -/
+abbrev WeakLeafMret.cms5 (m : BitVec 64) : BitVec 64 := WeakLeafMret.cms4 m
 /-- `RiscvExtras.ret_pc`: bit 0 cleared. -/
 def WeakLeafMret.retPc (v : BitVec 64) : BitVec 64 := BitVec.update v 0 0#1
 
@@ -113,9 +114,7 @@ theorem WeakLeafMret.cms3Fold (m : BitVec 64) :
       WeakLeafMret.cms3 m := rfl
 theorem WeakLeafMret.cms4Fold (m : BitVec 64) :
     Sail.BitVec.updateSubrange (WeakLeafMret.cms3 m) 17 17 0#1 = WeakLeafMret.cms4 m := rfl
-theorem WeakLeafMret.cms5Fold (m : BitVec 64) :
-    Sail.BitVec.updateSubrange (WeakLeafMret.cms4 m) 41 41 (landing_pad_bits_backwards .NO_LP_EXPECTED) =
-      WeakLeafMret.cms5 m := rfl
+theorem WeakLeafMret.cms5Fold (m : BitVec 64) : WeakLeafMret.cms4 m = WeakLeafMret.cms5 m := rfl
 theorem WeakLeafMret.retPcFold (v : BitVec 64) : BitVec.update v 0 0#1 = WeakLeafMret.retPc v := rfl
 
 /-- `WpMmodeLeafBase.mword1_not_lp`. -/
@@ -183,15 +182,13 @@ theorem execEffExecuteMRET (s : ExecSt) (newpriv : Privilege) (lpe : Bool)
         [])) :
     execEff (execute (.MRET ())) s =
       some (RETIRE_SUCCESS,
-        (((((((s.setReg .mstatus (WeakLeafMret.cms1 (s.regs .mstatus))).setReg .mstatus
+        (((((s.setReg .mstatus (WeakLeafMret.cms1 (s.regs .mstatus))).setReg .mstatus
           (WeakLeafMret.cms2 (s.regs .mstatus))).setReg .cur_privilege newpriv).setReg .mstatus
           (WeakLeafMret.cms3 (s.regs .mstatus))).setReg .mstatus
-          (WeakLeafMret.cms4 (s.regs .mstatus))).setReg .mstatus
-          (WeakLeafMret.cms5 (s.regs .mstatus))).setReg .elp
-          (if lpe then _get_Mstatus_MPELP (WeakLeafMret.cms4 (s.regs .mstatus))
-           else landing_pad_bits_backwards .NO_LP_EXPECTED)).setReg .nextPC
+          (WeakLeafMret.cms4 (s.regs .mstatus))).setReg .nextPC
           (WeakLeafMret.retPc (s.regs .mepc)),
         []) := by
+  -- (since 2026-11-04 no Zicfilp: no `MPELP`/`elp` restore; `lpe`/`Hlpe` are no longer used)
   show execEff (execute_MRET ()) s = _
   unfold execute_MRET
   cases lpe <;>
@@ -205,18 +202,17 @@ theorem execEffExecuteMRET (s : ExecSt) (newpriv : Privilege) (lpe : Bool)
         Hpriv, Hnp, Hnpm, Hlpe, execEffCurrentlyEnabledU, execEffCurrentlyEnabledZca,
         execEffHartSupportsZicfilp, execEffLongCsrWriteMstatus, WeakLeafMret.execEffSetNextPc,
         prepare_xret_target, get_xepc, align_pc, zicfilp_restore_elp_on_xret, WeakLeafMret.cms1Fold,
-        WeakLeafMret.cms2Fold, WeakLeafMret.cms3Fold, WeakLeafMret.cms4Fold, WeakLeafMret.cms5Fold,
+        WeakLeafMret.cms2Fold, WeakLeafMret.cms3Fold, WeakLeafMret.cms4Fold,
         WeakLeafMret.retPcFold, List.append_nil]
 
 /-! ## 2. The successor register frame for MRET -/
 
-/-- Rocq `mret_sexec_facts`: TEN `setReg`s deep; none of the written registers
-is `hart_state` or `minstret_increment`. -/
-theorem mretSexecFacts (s0 : ExecSt) (b : Bool) (npc npc2 : BitVec 64) (v1 v2 v3 v4 v5 : BitVec 64)
-    (p : Privilege) (ev : RegisterType .elp) :
-    let sExec := (((((((((s0.setReg .minstret_increment b).setReg .nextPC npc).setReg .mstatus v1).setReg
-      .mstatus v2).setReg .cur_privilege p).setReg .mstatus v3).setReg .mstatus v4).setReg .mstatus
-      v5).setReg .elp ev).setReg .nextPC npc2
+/-- Rocq `mret_sexec_facts`: EIGHT `setReg`s deep (Rocq: ten; since 2026-11-04 the `MPELP` and
+`elp` writes are gone); none of the written registers is `hart_state` or `minstret_increment`. -/
+theorem mretSexecFacts (s0 : ExecSt) (b : Bool) (npc npc2 : BitVec 64) (v1 v2 v3 v4 : BitVec 64)
+    (p : Privilege) :
+    let sExec := (((((((s0.setReg .minstret_increment b).setReg .nextPC npc).setReg .mstatus v1).setReg
+      .mstatus v2).setReg .cur_privilege p).setReg .mstatus v3).setReg .mstatus v4).setReg .nextPC npc2
     sExec.regs .hart_state = s0.regs .hart_state ∧
     sExec.regs .minstret_increment = b ∧
     sExec.mem = s0.mem ∧
@@ -242,11 +238,10 @@ theorem WeakLeafMret.execEffMretAt (s0 : ExecSt) (b : Bool) (pc : BitVec 64) (ne
     _get_MEnvcfg_LPE menvcfg1 = 0#1 →
     execEff (execute (.MRET ())) ((s0.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)) =
       some (RETIRE_SUCCESS,
-        (((((((((s0.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)).setReg .mstatus
+        (((((((s0.setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)).setReg .mstatus
           (WeakLeafMret.cms1 ms_cur)).setReg .mstatus (WeakLeafMret.cms2 ms_cur)).setReg .cur_privilege
           newpriv).setReg .mstatus (WeakLeafMret.cms3 ms_cur)).setReg .mstatus
-          (WeakLeafMret.cms4 ms_cur)).setReg .mstatus (WeakLeafMret.cms5 ms_cur)).setReg .elp
-          (landing_pad_bits_backwards .NO_LP_EXPECTED)).setReg .nextPC (WeakLeafMret.retPc mepc0),
+          (WeakLeafMret.cms4 ms_cur)).setReg .nextPC (WeakLeafMret.retPc mepc0),
         []) := by
   intro hpriv hmisa hms hmepc hmenv hnp hsup hlpe0
   subst hsup
@@ -390,8 +385,7 @@ theorem wwpMretLeaf (gen : Nat) (cpu : CPU) (al4 : Bool) (pc : BitVec 64) (w : B
       newpriv ms_cur mepc0 menvcfg1 Lpriv Lmisa Lms0 Lmepc Lmenv hnp hsup hlpe0
     have hF := mretSexecFacts ⟨σ.wmRegs, wmemRestrict σ (wwin pc pc 0), σ.wmDev⟩ b'
       (BitVec.addInt pc 4) (WeakLeafMret.retPc mepc0) (WeakLeafMret.cms1 ms_cur)
-      (WeakLeafMret.cms2 ms_cur) (WeakLeafMret.cms3 ms_cur) (WeakLeafMret.cms4 ms_cur)
-      (WeakLeafMret.cms5 ms_cur) newpriv (landing_pad_bits_backwards .NO_LP_EXPECTED)
+      (WeakLeafMret.cms2 ms_cur) (WeakLeafMret.cms3 ms_cur) (WeakLeafMret.cms4 ms_cur) newpriv
     refine ⟨_, hrun, ?_, hF.2.1, ?_⟩
     · rw [hF.1]; exact Lhart
     · rw [hF.2.2.1]; exact wmemRestrictDom σ _
@@ -415,8 +409,7 @@ theorem wwpMretLeaf (gen : Nat) (cpu : CPU) (al4 : Bool) (pc : BitVec 64) (w : B
     Lms0 Lmepc Lmenv hnp hsup hlpe0
   have hG := mretSexecFacts (wflatSt σ) b (BitVec.addInt pc 4) (WeakLeafMret.retPc mepc0)
     (WeakLeafMret.cms1 ms_cur) (WeakLeafMret.cms2 ms_cur) (WeakLeafMret.cms3 ms_cur)
-    (WeakLeafMret.cms4 ms_cur) (WeakLeafMret.cms5 ms_cur) newpriv
-    (landing_pad_bits_backwards .NO_LP_EXPECTED)
+    (WeakLeafMret.cms4 ms_cur) newpriv
   -- ---- the ghost writes mirroring the physical tower ----
   imod (wand_intro (reg_update cpu _ .nextPC npc0 (BitVec.addInt pc 4))) $$ Hreg Hnpc with ⟨Hreg, Hnpc⟩
   imod (wand_intro (reg_update cpu _ .mstatus ms_cur (WeakLeafMret.cms1 ms_cur))) $$ Hreg Hms
@@ -429,27 +422,21 @@ theorem wwpMretLeaf (gen : Nat) (cpu : CPU) (al4 : Bool) (pc : BitVec 64) (w : B
     $$ Hreg Hms with ⟨Hreg, Hms⟩
   imod (wand_intro (reg_update cpu _ .mstatus (WeakLeafMret.cms3 ms_cur) (WeakLeafMret.cms4 ms_cur)))
     $$ Hreg Hms with ⟨Hreg, Hms⟩
-  imod (wand_intro (reg_update cpu _ .mstatus (WeakLeafMret.cms4 ms_cur) (WeakLeafMret.cms5 ms_cur)))
-    $$ Hreg Hms with ⟨Hreg, Hms⟩
-  -- elp: a VALUE-PRESERVING physical write, so no ghost update (deviation 5)
+  -- (no `MPELP`/`elp` writes since 2026-11-04: the final `mstatus` is `cms4` = `cms5`)
   imod (wand_intro (reg_update cpu _ .nextPC (BitVec.addInt pc 4) (WeakLeafMret.retPc mepc0)))
     $$ Hreg Hnpc with ⟨Hreg, Hnpc⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hclose
   isplitr
   · ipureintro; exact HP
-  iexists (((((((((((wflatSt σ).setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)).setReg
+  iexists (((((((((wflatSt σ).setReg .minstret_increment b).setReg .nextPC (BitVec.addInt pc 4)).setReg
     .mstatus (WeakLeafMret.cms1 ms_cur)).setReg .mstatus (WeakLeafMret.cms2 ms_cur)).setReg
     .cur_privilege newpriv).setReg .mstatus (WeakLeafMret.cms3 ms_cur)).setReg .mstatus
-    (WeakLeafMret.cms4 ms_cur)).setReg .mstatus (WeakLeafMret.cms5 ms_cur)).setReg .elp
-    (landing_pad_bits_backwards .NO_LP_EXPECTED)).setReg .nextPC (WeakLeafMret.retPc mepc0))
+    (WeakLeafMret.cms4 ms_cur)).setReg .nextPC (WeakLeafMret.retPc mepc0))
   isplitr
   · ipureintro; exact execEffExec _ _ _ _ _ hexf
   isplitl [Hreg]
-  · rw [WeakLeafMret.setRegSameVal _ .elp (landing_pad_bits_backwards .NO_LP_EXPECTED) (by
-      simp (disch := decide) only [ExecSt.setReg_regs, RegFile.set_other]
-      exact Lelp0)]
-    simp only [ExecSt.setReg_regs]
+  · simp only [ExecSt.setReg_regs]
     iexact Hreg
   isplitl [Hti Hip]
   · iexists mt, ip

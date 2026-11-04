@@ -71,19 +71,19 @@ theorem rfFDp16 : rfF (ext_decode Wp16) := by
 /-! Lean-only (deviation 2): the decode walks on the supervisor reference map. -/
 
 /-- (Lean-only, deviation 2) the decode walk of `Wq30` on the supervisor reference map. -/
-theorem AxSpinPOd2.walkQ30S : runRead WkEntryNew.drefS0 (ext_decode Wq30) = some (q30, true) := by
+theorem AxSpinPOd2.walkQ30S : runRead WkEntryNew.drefS0 (ext_decode Wq30) = some (q30, false) := by
   kernel_rfl
 
 /-- (Lean-only, deviation 2) the decode walk of `Wp08` on the supervisor reference map. -/
-theorem AxSpinPOd2.walkP08S : runRead WkEntryNew.drefS0 (ext_decode Wp08) = some (p08, true) := by
+theorem AxSpinPOd2.walkP08S : runRead WkEntryNew.drefS0 (ext_decode Wp08) = some (p08, false) := by
   kernel_rfl
 
 /-- (Lean-only, deviation 2) the decode walk of `Wp0c` on the supervisor reference map. -/
-theorem AxSpinPOd2.walkP0cS : runRead WkEntryNew.drefS0 (ext_decode Wp0c) = some (p0c, true) := by
+theorem AxSpinPOd2.walkP0cS : runRead WkEntryNew.drefS0 (ext_decode Wp0c) = some (p0c, false) := by
   kernel_rfl
 
 /-- (Lean-only, deviation 2) the decode walk of `Wp16` on the supervisor reference map. -/
-theorem AxSpinPOd2.walkP16S : runRead WkEntryNew.drefS0 (ext_decode Wp16) = some (p16, true) := by
+theorem AxSpinPOd2.walkP16S : runRead WkEntryNew.drefS0 (ext_decode Wp16) = some (p16, false) := by
   kernel_rfl
 
 section toks

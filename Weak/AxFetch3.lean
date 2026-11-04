@@ -195,8 +195,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
 theorem AxFetch3.noSfAnnCEZicfilp (s : ExecSt) (hcp : s.regs .cur_privilege = .Machine) :
     WeakEvLang.noSfAnn (currentlyEnabled .Ext_Zicfilp) s := by
   rw [currentlyEnabled]
-  simp only [execEffHartSupportsZicfilp, ↓reduceIte]
-  unfold get_xLPE
+  simp only [execEffHartSupportsZicfilp, ↓reduceIte, Bool.false_eq_true]
+  try unfold get_xLPE
   nosf_run [execEffRecCEZicsrAny, WeakFetchEff.noSfAnnCurrentlyEnabledZicsr, hcp]
 
 theorem AxFetch3.noSfAnnSetNextPc (t : BitVec 64) (s : ExecSt) :

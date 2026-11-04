@@ -315,12 +315,13 @@ theorem sretFacts_on (ms : BitVec 64) (spie spp : Bool) : sretFacts ms true spie
 
 /-! ## The supervisor interrupt trap, on the configuration -/
 
-/-- `mstatus` after a supervisor trap: `SPELP := 0` (Zicfilp), `SPIE := SIE`,
-`SIE := 0`, `SPP := S` (the model's writes, in order). -/
+/-- `mstatus` after a supervisor trap: `SPIE := SIE`, `SIE := 0`, `SPP := S`
+(the model's writes, in order).  (Since 2026-11-04 the hart has no Zicfilp, so
+the trap no longer writes `SPELP`.) -/
 def trapMs (ms : BitVec 64) : BitVec 64 :=
   Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
-    (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange ms 23 23 0#1) 5 5
-      (Functions._get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 0#1))) 1 1 0#1) 8 8 1#1
+    (Sail.BitVec.updateSubrange ms 5 5
+      (Functions._get_Mstatus_SIE ms)) 1 1 0#1) 8 8 1#1
 
 /-- The configuration after a supervisor trap. -/
 def trapConf (c : MConf) : MConf := { c with mstatus := trapMs c.mstatus }

@@ -154,7 +154,7 @@ def WSfence : Int := 0x12000073
 /-- The supervisor-mode reference map without `mseccfg` (Lean-only; deviation 3). -/
 def AxSfence.drefSf : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Supervisor
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | _ => none
 

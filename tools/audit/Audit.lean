@@ -51,14 +51,15 @@ WHAT `#print axioms` CANNOT SEE, reported and pinned separately:
     `resv_is_valid`) and `MachCSL.bootImageSealed` (a SEALED definition:
     `bootImage_eq` pins its value, so it is opaque for performance, not an
     unknown).
-  * The Sail platform hooks.  The generated model calls six functions Sail
+  * The Sail platform hooks.  The generated model calls seven functions Sail
     declares without a body; `model/Xv6Extras.lean` realises them in
     `LeanRV64D.Functions`, and the fork's root-level `axiom`s of the same
     names stay declared but unused.  Checked: each hook is a DEFINITION in
     `LeanRV64D.Functions`, and no root-level hook axiom is in any audited
-    cone (that is item 3).  The unrealised hooks (`plat_term_read`,
-    `get_16_random_bits`, the softfloat family) are listed as declared and
-    unreached.
+    cone (that is item 3).  (`get_16_random_bits`, the Zkr `seed` entropy
+    source, is realised as a `choose` since 2026-11-04, when the Zkr module was
+    compiled in.)  The unrealised hooks (`plat_term_read`, the softfloat
+    family) are listed as declared and unreached.
 
 AND TREE-WIDE (cheap here, impossible in Rocq): every declaration of
 `MachCSL`/`Xv6` is looked up; one that depends on `sorryAx` FAILS the

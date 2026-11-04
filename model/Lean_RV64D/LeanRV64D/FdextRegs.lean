@@ -66,6 +66,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -290,7 +291,7 @@ def encdec_freg_backwards_matches (arg_ : (BitVec 5)) : Bool :=
   match arg_ with
   | r => true
 
-def freg_write_callback (x_0 : fregidx) (x_1 : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : Unit :=
+def freg_write_callback (x_0 : fregidx) (x_1 : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : Unit :=
   ()
 
 def dirty_fd_context (_ : Unit) : SailM Unit := do
@@ -306,7 +307,7 @@ def dirty_fd_context_if_present (_ : Unit) : SailM Unit := do
   then (dirty_fd_context ())
   else (pure ())
 
-def rF (app_0 : fregno) : SailM (BitVec (if ( true  : Bool) then 8 else 4 * 8)) := do
+def rF (app_0 : fregno) : SailM (BitVec (if ( false  : Bool) then 8 else 4 * 8)) := do
   let .Fregno r := app_0
   assert (hartSupports Ext_F) "extensions/FD/fdext_regs.sail:123.28-123.29"
   let v ← (( do
@@ -349,7 +350,7 @@ def rF (app_0 : fregno) : SailM (BitVec (if ( true  : Bool) then 8 else 4 * 8)) 
         throw Error.Exit) ) : SailM fregtype )
   (pure (fregval_from_freg v))
 
-def wF (typ_0 : fregno) (in_v : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : SailM Unit := do
+def wF (typ_0 : fregno) (in_v : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : SailM Unit := do
   let .Fregno r : fregno := typ_0
   assert (hartSupports Ext_F) "extensions/FD/fdext_regs.sail:164.28-164.29"
   let v := (fregval_into_freg in_v)
@@ -389,22 +390,22 @@ def wF (typ_0 : fregno) (in_v : (BitVec (if ( true  : Bool) then 8 else 4 * 8)))
   let _ : Unit := (freg_write_callback (Fregidx (to_bits (l := 5) r)) in_v)
   (dirty_fd_context ())
 
-def rF_bits (app_0 : fregidx) : SailM (BitVec (if ( true  : Bool) then 8 else 4 * 8)) := do
+def rF_bits (app_0 : fregidx) : SailM (BitVec (if ( false  : Bool) then 8 else 4 * 8)) := do
   let .Fregidx i := app_0
   (rF (Fregno (BitVec.toNatInt i)))
 
-def wF_bits (typ_0 : fregidx) (data : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : SailM Unit := do
+def wF_bits (typ_0 : fregidx) (data : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : SailM Unit := do
   let .Fregidx i : fregidx := typ_0
   (wF (Fregno (BitVec.toNatInt i)) data)
 
 def rF_BF16 (i : fregidx) : SailM (BitVec 16) := do
   let v ← do (rF_bits i)
-  if (((Sail.BitVec.extractLsb v (flen -i 1) 16) == (ones (n := ((((8 *i 8) -i 1) -i 16) +i 1)))) : Bool)
+  if (((Sail.BitVec.extractLsb v (flen -i 1) 16) == (ones (n := ((((4 *i 8) -i 1) -i 16) +i 1)))) : Bool)
   then (pure (Sail.BitVec.extractLsb v 15 0))
   else (pure canonical_NaN_BF16)
 
 def wF_BF16 (i : fregidx) (data : (BitVec 16)) : SailM Unit := do
-  (wF_bits i (nan_box (n := (8 *i 8)) data))
+  (wF_bits i (nan_box (n := (4 *i 8)) data))
 
 def rF_H (i : fregidx) : SailM (BitVec 16) := do
   assert (flen ≥b 16) "extensions/FD/fdext_regs.sail:227.19-227.20"
@@ -414,7 +415,7 @@ def rF_H (i : fregidx) : SailM (BitVec 16) := do
 def wF_H (i : fregidx) (data : (BitVec 16)) : SailM Unit := do
   assert (flen ≥b 16) "extensions/FD/fdext_regs.sail:233.19-233.20"
   assert ((hartSupports Ext_F) && (not (hartSupports Ext_Zfinx))) "extensions/FD/fdext_regs.sail:234.59-234.60"
-  (wF_bits i (nan_box (n := (8 *i 8)) data))
+  (wF_bits i (nan_box (n := (4 *i 8)) data))
 
 def rF_S (i : fregidx) : SailM (BitVec 32) := do
   assert (flen ≥b 32) "extensions/FD/fdext_regs.sail:239.19-239.20"
@@ -424,17 +425,15 @@ def rF_S (i : fregidx) : SailM (BitVec 32) := do
 def wF_S (i : fregidx) (data : (BitVec 32)) : SailM Unit := do
   assert (flen ≥b 32) "extensions/FD/fdext_regs.sail:245.19-245.20"
   assert ((hartSupports Ext_F) && (not (hartSupports Ext_Zfinx))) "extensions/FD/fdext_regs.sail:246.59-246.60"
-  (wF_bits i (nan_box (n := (8 *i 8)) data))
+  (wF_bits i (nan_box (n := (4 *i 8)) data))
 
 def rF_D (i : fregidx) : SailM (BitVec 64) := do
   assert (flen ≥b 64) "extensions/FD/fdext_regs.sail:251.19-251.20"
-  assert ((hartSupports Ext_F) && (not (hartSupports Ext_Zfinx))) "extensions/FD/fdext_regs.sail:252.59-252.60"
-  (rF_bits i)
+  throw Error.Exit
 
 def wF_D (i : fregidx) (data : (BitVec 64)) : SailM Unit := do
   assert (flen ≥b 64) "extensions/FD/fdext_regs.sail:257.19-257.20"
-  assert ((hartSupports Ext_F) && (not (hartSupports Ext_Zfinx))) "extensions/FD/fdext_regs.sail:258.59-258.60"
-  (wF_bits i data)
+  throw Error.Exit
 
 def rF_or_X_H (i : fregidx) : SailM (BitVec 16) := do
   assert (flen ≥b 16) "extensions/FD/fdext_regs.sail:268.19-268.20"
@@ -452,10 +451,7 @@ def rF_or_X_S (i : fregidx) : SailM (BitVec 32) := do
 
 def rF_or_X_D (i : fregidx) : SailM (BitVec 64) := do
   assert (flen ≥b 64) "extensions/FD/fdext_regs.sail:284.19-284.20"
-  assert (neq_bool (hartSupports Ext_F) (hartSupports Ext_Zfinx)) "extensions/FD/fdext_regs.sail:285.55-285.56"
-  if ((hartSupports Ext_F) : Bool)
-  then (rF_D i)
-  else (pure (Sail.BitVec.extractLsb (← (rX_bits (fregidx_to_regidx i))) 63 0))
+  throw Error.Exit
 
 def wF_or_X_H (i : fregidx) (data : (BitVec 16)) : SailM Unit := do
   assert (flen ≥b 16) "extensions/FD/fdext_regs.sail:298.19-298.20"
@@ -473,10 +469,7 @@ def wF_or_X_S (i : fregidx) (data : (BitVec 32)) : SailM Unit := do
 
 def wF_or_X_D (i : fregidx) (data : (BitVec 64)) : SailM Unit := do
   assert (flen ≥b 64) "extensions/FD/fdext_regs.sail:314.20-314.21"
-  assert (neq_bool (hartSupports Ext_F) (hartSupports Ext_Zfinx)) "extensions/FD/fdext_regs.sail:315.55-315.56"
-  if ((hartSupports Ext_F) : Bool)
-  then (wF_D i data)
-  else (wX_bits (fregidx_to_regidx i) (sign_extend (m := 64) data))
+  throw Error.Exit
 
 def freg_abi_name_raw_forwards (arg_ : (BitVec 5)) : String :=
   match arg_ with

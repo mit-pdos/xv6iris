@@ -63,6 +63,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -207,7 +208,7 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-def flen_bytes := 8
+def flen_bytes := 4
 
-def flen := (8 *i 8)
+def flen := (4 *i 8)
 

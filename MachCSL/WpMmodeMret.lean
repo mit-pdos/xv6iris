@@ -2,8 +2,8 @@
 MachCSL: `mret` from machine mode to supervisor mode.
 
 `mret` with `mstatus.MPP = S` moves the hart to supervisor mode at `mepc`:
-`mstatus.MIE := MPIE`, `MPIE := 1`, `MPP := U`, `MPRV := 0`; `elp` is
-restored from `mstatus.MPELP` (Zicfilp), which the boot code keeps clear.
+`mstatus.MIE := MPIE`, `MPIE := 1`, `MPP := U`, `MPRV := 0` (the hart has no
+Zicfilp since 2026-11-04, so no `elp` restore).
 The rule leaves machine mode, so its postcondition is not `mConf` but the
 same cells with `cur_privilege = Supervisor` (`sConf`, the seed of the
 supervisor-mode configuration bundle).
@@ -19,17 +19,16 @@ open LeanRV64D LeanRV64D.Functions
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- `mstatus` after `mret` (from `MPP = S`): `MIE := MPIE`, `MPIE := 1`,
-`MPP := U (00)`, `MPRV := 0`, `MPELP := 0`. -/
+`MPP := U (00)`, `MPRV := 0`.  (No `MPELP := 0`: since 2026-11-04 the hart
+has no Zicfilp, so `mret` leaves `MPELP` and `elp` alone.) -/
 def mretMstatus (ms : BitVec 64) : BitVec 64 :=
   BitVec.updateSubrange
     (BitVec.updateSubrange
-      (BitVec.updateSubrange
-        (~~~(1#64 <<< 7) &&&
-            (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) |||
-          1#64 <<< 7)
-        12 11 0#2)
-      17 17 0#1)
-    41 41 0#1
+      (~~~(1#64 <<< 7) &&&
+          (~~~(1#64 <<< 3) &&& ms ||| BitVec.zeroExtend 64 (BitVec.extractLsb' 7 1 ms) <<< 3) |||
+        1#64 <<< 7)
+      12 11 0#2)
+    17 17 0#1
 
 theorem mretMstatus_xv6 : mretMstatus 0xA00000800#64 = 0xA00000080#64 := by decide
 

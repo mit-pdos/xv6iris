@@ -385,8 +385,8 @@ theorem execEffHartSupportsU : hartSupports .Ext_U = true := by decide +kernel
 /-- Rocq `exec_eff_hartSupports_Zicsr`. -/
 theorem WeakLeafEffCommon.execEffHartSupportsZicsr : hartSupports .Ext_Zicsr = true := by
   decide +kernel
-/-- Rocq `exec_eff_hartSupports_Zicfilp`. -/
-theorem execEffHartSupportsZicfilp : hartSupports .Ext_Zicfilp = true := by decide +kernel
+/-- Rocq `exec_eff_hartSupports_Zicfilp` -- FLIPPED 2026-11-04 (no Zicfilp, [OWN.P9]). -/
+theorem execEffHartSupportsZicfilp : hartSupports .Ext_Zicfilp = false := by decide +kernel
 /-- Rocq `exec_eff_hartSupports_Sv32`. -/
 theorem execEffHartSupportsSv32 : hartSupports .Ext_Sv32 = false := by decide +kernel
 /-- Rocq `exec_eff_hartSupports_Sv39`. -/

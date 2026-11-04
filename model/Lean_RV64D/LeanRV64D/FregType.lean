@@ -58,6 +58,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -202,15 +203,15 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-def zero_freg : fregtype := (zeros (n := (8 *i 8)))
+def zero_freg : fregtype := (zeros (n := (4 *i 8)))
 
-def FRegStr (r : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : String :=
+def FRegStr (r : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : String :=
   (BitVec.toFormatted r)
 
-def fregval_from_freg (r : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : (BitVec (if ( true  : Bool) then 8 else 4 * 8)) :=
+def fregval_from_freg (r : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : (BitVec (if ( false  : Bool) then 8 else 4 * 8)) :=
   r
 
-def fregval_into_freg (v : (BitVec (if ( true  : Bool) then 8 else 4 * 8))) : (BitVec (if ( true  : Bool) then 8 else 4 * 8)) :=
+def fregval_into_freg (v : (BitVec (if ( false  : Bool) then 8 else 4 * 8))) : (BitVec (if ( false  : Bool) then 8 else 4 * 8)) :=
   v
 
 def undefined_f_madd_op_H (_ : Unit) : SailM f_madd_op_H := do

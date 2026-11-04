@@ -60,6 +60,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -234,11 +235,11 @@ def csr_full_read_callback (x_0 : String) (x_1 : (BitVec 12)) (x_2 : (BitVec 64)
 def redirect_callback (x_0 : (BitVec 64)) : Unit :=
   ()
 
-/-- Type quantifiers: k_ex673313_ : Bool -/
+/-- Type quantifiers: k_ex673353_ : Bool -/
 def trap_callback (x_0 : Bool) (x_1 : (BitVec 6)) : Unit :=
   ()
 
-/-- Type quantifiers: k_ex673314_ : Bool -/
+/-- Type quantifiers: k_ex673354_ : Bool -/
 def xret_callback (x_0 : Bool) : Unit :=
   ()
 
@@ -399,6 +400,7 @@ def csr_name_map_backwards (arg_ : String) : SailM (BitVec 12) := do
     | "sstateen2" => (pure (some 0x10E#12))
     | "sstateen3" => (pure (some 0x10F#12))
     | "satp" => (pure (some 0x180#12))
+    | "seed" => (pure (some 0x015#12))
     | "hpmcounter3" => (pure (some 0xC03#12))
     | "hpmcounter4" => (pure (some 0xC04#12))
     | "hpmcounter5" => (pure (some 0xC05#12))

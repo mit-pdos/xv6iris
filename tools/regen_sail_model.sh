@@ -49,8 +49,9 @@
 # Once upstream sail accepts the fix and releases a version with it, build
 # that release instead (and drop this paragraph).  Without the fix the backend hoists an
 # effectful right operand of `&`/`|` out of the condition and ALWAYS runs it
-# (e.g. `check_CSR` reaches `currentlyEnabled Ext_Zkr`, an `assert false`, on
-# a user access to mseccfg); Sail and Rocq short-circuit, and the proofs
+# (e.g. `check_CSR` reached `currentlyEnabled Ext_Zkr`, then an `assert false`
+# because the Zkr module was not compiled, on a user access to mseccfg); Sail
+# and Rocq short-circuit, and the proofs
 # assume the short-circuit form.  Do NOT use the unpatched opam `sail`.
 # Build the patched sail in a clone and put it first on PATH:
 #   git clone https://github.com/rems-project/sail sail-sc && cd sail-sc

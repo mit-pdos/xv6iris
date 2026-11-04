@@ -548,7 +548,7 @@ theorem AxSpinE8f.tlbExact8 : tlbExact AxSpinE8f.tT (AxSpinE8d.rsE .tlb) :=
 set_option maxHeartbeats 0 in
 theorem AxSpinE8f.Hc08 : ctrlOkSW AxSpinE8f.tT AxSpinE8f.satp8 AxSpinE8d.rsE := by
   unfold ctrlOkSW ctrlOkS AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts pmpW
-  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
+  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
     AxSpinE8f.tlbExact8, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   all_goals first | decide +kernel | ax_epi_ledger_krfl
 

@@ -12,6 +12,18 @@
 # V_core/V_types ARE compiled into the model, and are then disabled by
 # `sail-config-rv64d.json` (see its header).  Whether an extension is compiled
 # and whether `hartSupports` answers true for it are independent axes.
+#
+# The converse also matters: an extension the config enables but whose module
+# is absent here is a hart that advertises what it cannot execute.  Hence
+# (2026-11-04, owner ruling [OWN.P9], notes/riscv-model-bugs.md S2/S3):
+#   - `Zkr` (extensions/K/zkr_control.sail: the `seed` CSR and the
+#     `currentlyEnabled(Ext_Zkr)` clause) IS compiled: the config says
+#     `Zkr.supported: true`, and without the module `currentlyEnabled Ext_Zkr`
+#     fell through to `assert false`, reached from `is_CSR_accessible` on an
+#     M-mode access to mseccfg/mseccfgh.  The seed's entropy hook
+#     `get_16_random_bits` is realised in model/Xv6Extras.lean as a `choose`.
+#   - FD_core is compiled but FD_instructions is NOT, so the config clears F, D
+#     and their dependents (and Zicfilp, Zicfiss, Smmpm); see the config header.
 
 prelude core exceptions pmp sys postlude
 
@@ -41,4 +53,4 @@ PM_types PM_utils
 H
 FD_core
 V_core V_types
-K_core
+K_core Zkr

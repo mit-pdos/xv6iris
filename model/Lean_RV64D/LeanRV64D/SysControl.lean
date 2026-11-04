@@ -76,6 +76,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -466,6 +467,24 @@ def is_CSR_accessible (arg0 : (BitVec 12)) (arg1 : Privilege) (arg2 : CSRAccessT
                           | (0x10E, g__160, g__161) => (is_sstateen_accessible ())
                           | (0x10F, g__162, g__163) => (is_sstateen_accessible ())
                           | (0x180, g__94, g__164) => (satp_accessible g__94)
+                          | (0x015, g__94, g__95) =>
+                            (do
+                              if ((← (currentlyEnabled Ext_Zkr)) : Bool)
+                              then
+                                (do
+                                  if ((bne g__95 CSRRead) : Bool)
+                                  then
+                                    (do
+                                      match g__94 with
+                                      | .Machine => (pure true)
+                                      | .User =>
+                                        (pure ((_get_Seccfg_USEED (← readReg mseccfg)) == 1#1))
+                                      | .Supervisor =>
+                                        (pure ((_get_Seccfg_SSEED (← readReg mseccfg)) == 1#1))
+                                      | .VirtualSupervisor => (pure false)
+                                      | .VirtualUser => (pure false))
+                                  else (pure false))
+                              else (pure false))
                           | (v__1394, g__165, g__166) =>
                             (do
                               if ((((Sail.BitVec.extractLsb v__1394 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -710,7 +729,7 @@ def tval (excinfo : (Option (BitVec 64))) : (BitVec 64) :=
   | .some e => e
   | none => (zeros (n := 64))
 
-/-- Type quantifiers: k_ex673457_ : Bool -/
+/-- Type quantifiers: k_ex673497_ : Bool -/
 def track_trap (p : Privilege) (is_interrupt : Bool) (cause : (BitVec 6)) : SailM Unit := do
   (long_csr_write_callback "mstatus" "mstatush" (← readReg mstatus))
   match p with
@@ -875,8 +894,7 @@ def reset_misa (_ : Unit) : SailM Unit := do
   else (pure ())
   writeReg misa (Sail.BitVec.updateSubrange (← readReg misa) 5 5
     (bool_to_bit (hartSupports Ext_F)))
-  writeReg misa (Sail.BitVec.updateSubrange (← readReg misa) 3 3
-    (bool_to_bit (hartSupports Ext_D)))
+  writeReg misa (Sail.BitVec.updateSubrange (← readReg misa) 3 3 0#1)
   (csr_name_write_callback "misa" (← readReg misa))
 
 def set_pc_reset_address (addr : (BitVec 64)) : SailM Unit := do

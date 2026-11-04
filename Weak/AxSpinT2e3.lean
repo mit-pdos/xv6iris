@@ -56,14 +56,14 @@ namespace AxSpinT2e3
 set_option maxHeartbeats 0 in
 theorem ctrl0 : ctrlOkSW tX (BitVec.ofNat 64 satpX) (regsE 0) := by
   unfold ctrlOkSW ctrlOkS AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts pmpW
-  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
+  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
     AxSpinT2c5.tlbExactW, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   all_goals first | decide +kernel | ax_epi_ledger_krfl
 
 set_option maxHeartbeats 0 in
 theorem ctrl1 : ctrlOkSW tX (BitVec.ofNat 64 satpX) (regsE 1) := by
   unfold ctrlOkSW ctrlOkS AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts pmpW
-  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
+  refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
     AxSpinT2c5.tlbExactW, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   all_goals first | decide +kernel | ax_epi_ledger_krfl
 

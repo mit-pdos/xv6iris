@@ -67,15 +67,15 @@ theorem rfFDa24 : rfF (ext_decode Wa24) := by
 /-! Lean-only (deviation 2): the decode walks on the supervisor reference map. -/
 
 /-- (Lean-only, deviation 2) the decode walk of `Wa0c` on the supervisor reference map. -/
-theorem AxSpinAqd.walk0cS : runRead WkEntryNew.drefS0 (ext_decode Wa0c) = some (a0c, true) := by
+theorem AxSpinAqd.walk0cS : runRead WkEntryNew.drefS0 (ext_decode Wa0c) = some (a0c, false) := by
   kernel_rfl
 
 /-- (Lean-only, deviation 2) the decode walk of `Wa12` on the supervisor reference map. -/
-theorem AxSpinAqd.walk12S : runRead WkEntryNew.drefS0 (ext_decode Wa12) = some (a12, true) := by
+theorem AxSpinAqd.walk12S : runRead WkEntryNew.drefS0 (ext_decode Wa12) = some (a12, false) := by
   kernel_rfl
 
 /-- (Lean-only, deviation 2) the decode walk of `Wa24` on the supervisor reference map. -/
-theorem AxSpinAqd.walk24S : runRead WkEntryNew.drefS0 (ext_decode Wa24) = some (a24, true) := by
+theorem AxSpinAqd.walk24S : runRead WkEntryNew.drefS0 (ext_decode Wa24) = some (a24, false) := by
   kernel_rfl
 
 section toks

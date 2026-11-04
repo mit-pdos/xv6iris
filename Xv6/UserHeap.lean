@@ -971,13 +971,13 @@ theorem uinstrIs_of_facts (γt : GName) (m : ElfMem) (pc : Nat) (rvc : Bool) (i 
   · ipureintro; exact F.even
   cases rvc
   · simp only [Bool.false_eq_true, if_false]
-    obtain ⟨hn, -, hnr, hdec⟩ := F.base rfl
+    obtain ⟨hn, -, hnr, b, hdec⟩ := F.base rfl
     subst hn
     iexists (BitVec.ofNat 32 w)
     isplitr
     · ipureintro; exact hnr
     isplitr
-    · ipureintro; exact ⟨true, hdec⟩
+    · ipureintro; exact ⟨b, hdec⟩
     iapply Xv6.User.utextImg_run (utext γt) m pc 4 _ (fun j hj => by rw [uwin_byte32 w j hj]; exact F.bytes j hj) $$ H
   · simp only [if_true]
     obtain ⟨hn, hr, hdec, hex⟩ := F.rvc rfl

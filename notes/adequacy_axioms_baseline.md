@@ -41,6 +41,8 @@ when set, and exit non-zero on a regression.  Audited theorems: `Xv6.xv6FsAdequa
 4. **The Sail platform hooks** (section below): the six realised hooks are definitions in
    `LeanRV64D.Functions`; the fork's 75 root-level axioms (the six shadowed ones, `plat_term_read`,
    `get_16_random_bits`, the softfloat family) are declared and reached by no audited theorem.
+   (Since 2026-11-04 a SEVENTH hook is realised: `get_16_random_bits`, the Zkr `seed` entropy source,
+   as one `choose (.bitvector 16)` -- the Zkr module is compiled in; owner rulings [OWN.P9], SA-2.)
 5. **No `sorryAx` anywhere**: all 84,066 declarations of `MachCSL`/`Xv6` are looked up (Lean 4.32 stores each
    declaration's axioms in its `.olean`, so this is a table scan), and none uses an axiom outside kinds 1-2.
 
@@ -147,8 +149,9 @@ equations: `MachCSL/SailHooks.lean` (Rocq `ResvAxioms.v`).
 
 Still axioms in the fork's `RiscvExtras.lean`, deliberately NOT realised (as in
 Rocq; results are consumed, so a realisation would fabricate data) and NOT
-reached by the system theorem: `plat_term_read`, `get_16_random_bits`, the
-softfloat `riscv_f*` family.  Their appearance here would be a regression.
+reached by the system theorem: `plat_term_read`, the softfloat `riscv_f*`
+family.  Their appearance here would be a regression.  (`get_16_random_bits` was
+in this list until 2026-11-04; it is now realised nondeterministically.)
 
 ## Resolved since the previous measurement
 

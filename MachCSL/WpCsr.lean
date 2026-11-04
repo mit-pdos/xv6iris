@@ -50,8 +50,8 @@ def mstatusWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_Mstatus_TVM
   (_update_Mstatus_TW
   (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
+  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o 0#1)
+  0#1)
   (_get_Mstatus_TSR v))
   (_get_Mstatus_TW v))
   (_get_Mstatus_TVM v))
@@ -85,8 +85,8 @@ def mstatusWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_Mstatus_TVM
   (_update_Mstatus_TW
   (_update_Mstatus_TSR
-  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
+  (_update_Mstatus_SPELP (_update_Mstatus_MPELP o 0#1)
+  0#1)
   (_get_Mstatus_TSR v))
   (_get_Mstatus_TW v))
   (_get_Mstatus_TVM v))
@@ -121,8 +121,8 @@ def mstatusWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_Mstatus_TW
   (_update_Mstatus_TSR
   (_update_Mstatus_SPELP
-  (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
+  (_update_Mstatus_MPELP o 0#1)
+  0#1)
   (_get_Mstatus_TSR v))
   (_get_Mstatus_TW v))
   (_get_Mstatus_TVM v))
@@ -157,8 +157,8 @@ def mstatusWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_Mstatus_TW
   (_update_Mstatus_TSR
   (_update_Mstatus_SPELP
-  (_update_Mstatus_MPELP o (_get_Mstatus_MPELP v))
-  (_get_Mstatus_SPELP v))
+  (_update_Mstatus_MPELP o 0#1)
+  0#1)
   (_get_Mstatus_TSR v))
   (_get_Mstatus_TW v))
   (_get_Mstatus_TVM v))
@@ -197,8 +197,8 @@ def menvcfgWrite (o v : BitVec 64) : BitVec 64 :=
   (_update_MEnvcfg_CBCFE
   (_update_MEnvcfg_CBZE
   (_update_MEnvcfg_SSE
-  (_update_MEnvcfg_LPE (_update_MEnvcfg_FIOM o (_get_MEnvcfg_FIOM v)) (_get_MEnvcfg_LPE v))
-  (_get_MEnvcfg_SSE v))
+  (_update_MEnvcfg_LPE (_update_MEnvcfg_FIOM o (_get_MEnvcfg_FIOM v)) 0#1)
+  0#1)
   (_get_MEnvcfg_CBZE v))
   (_get_MEnvcfg_CBCFE v))
   0#2)

@@ -207,21 +207,21 @@ theorem nvITlbCold (T : PTree) (ms mieV mipV : Nat) :
 /-- Rocq `nvI_ctrl_ok_on`. -/
 theorem nvICtrlOkOn (T : PTree) : ctrlOkSI T nvSSatp nvIOn.regs := by
   unfold ctrlOkSI AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts sieOk AxIntr.stvecDirect
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
     nvITlbCold T 0xA00000002 0x2 0x2, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | decide +kernel | rfl
 
 /-- Rocq `nvI_ctrl_ok_quiet`. -/
 theorem nvICtrlOkQuiet (T : PTree) : ctrlOkSI T nvSSatp nvIQuiet.regs := by
   unfold ctrlOkSI AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts sieOk AxIntr.stvecDirect
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
     nvITlbCold T 0xA00000002 0x0 0x0, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | decide +kernel | rfl
 
 /-- Rocq `nvI_ctrl_ok_ext`. -/
 theorem nvICtrlOkExt (T : PTree) : ctrlOkSI T nvSSatp nvIExt.regs := by
   unfold ctrlOkSI AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts sieOk AxIntr.stvecDirect
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, Or.inr ?_, ?_, ?_,
     nvITlbCold T 0xA00000002 0x200 0x0, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | decide +kernel | rfl
 

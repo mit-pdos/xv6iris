@@ -180,7 +180,7 @@ def armOf (pc : Int) : List FeEnt → Option FetchArm
 (`MachCSL/DecodeBridge.lean:262`), supervisor mode, an active hart, `mstatus.TVM = 0`, no
 landing pad expected (`elp`, Zicfilp: `is_landing_pad_expected`, `Step.lean:362,386`). -/
 def kCfg (rv : RegFile) : Prop :=
-  rv .cur_privilege = Privilege.Supervisor ∧ rv .misa = 0x800000000014112D#64 ∧
+  rv .cur_privilege = Privilege.Supervisor ∧ rv .misa = 0x8000000000141105#64 ∧
   rv .menvcfg = menvcfgS ∧ rv .mseccfg = 0#64 ∧ rv .hart_state = HartState.HART_ACTIVE () ∧
   _get_Mstatus_TVM (rv .mstatus) = 0#1 ∧ rv .elp = 0#1
 

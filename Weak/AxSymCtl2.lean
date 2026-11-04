@@ -823,9 +823,9 @@ theorem cEZicfilpFalseS (s : ExecSt) :
     exec (currentlyEnabled .Ext_Zicfilp) s = some (false, s) := by
   intro Hpriv Hlpe
   rw [currentlyEnabled]
-  have h1 : hartSupports .Ext_Zicfilp = true := by decide +kernel
-  simp only [h1, ↓reduceIte]
-  unfold get_xLPE
+  have h1 : hartSupports .Ext_Zicfilp = false := by decide +kernel  -- no Zicfilp since 2026-11-04
+  simp only [h1, ↓reduceIte, Bool.false_eq_true]
+  try unfold get_xLPE
   exec_run [execCurrentlyEnabledZicsr, Hpriv, Hlpe]
 
 theorem ctlRegimeS (T : PTree) (satp0 : BitVec 64) : ctlRegime (ctrlOkS T satp0) := by

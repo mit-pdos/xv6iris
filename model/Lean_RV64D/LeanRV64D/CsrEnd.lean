@@ -58,6 +58,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -357,6 +358,7 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0x10E => true
   | 0x10F => true
   | 0x180 => true
+  | 0x015 => true
   | 0xC03 => true
   | 0xC04 => true
   | 0xC05 => true
@@ -705,6 +707,7 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "sstateen2" => (pure (some true))
     | "sstateen3" => (pure (some true))
     | "satp" => (pure (some true))
+    | "seed" => (pure (some true))
     | "hpmcounter3" => (pure (some true))
     | "hpmcounter4" => (pure (some true))
     | "hpmcounter5" => (pure (some true))

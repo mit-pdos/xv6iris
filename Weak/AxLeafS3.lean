@@ -139,7 +139,7 @@ def AxLeafS3.dk (a : Int) (n : Nat) : Int → Nat → Prop := fun a' n' => a' = 
 /-- (Lean-only) the supervisor reference map: the registers `cfgOfCK` fixes. -/
 def AxLeafS3.drefS : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Supervisor
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | _ => none
 

@@ -180,7 +180,8 @@
       "match_reservation",
       "valid_reservation",
       "plat_term_write",
-      "sys_enable_experimental_extensions"
+      "sys_enable_experimental_extensions",
+      "get_16_random_bits"
     ],
     "parameters": [
       "LeanRV64D.Functions.xv6_resv_matches",

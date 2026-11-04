@@ -315,21 +315,21 @@ theorem rfFDr1e : rfF (ext_decode Wr1e) := by
   simp (config := { decide := true }) only [↓reduceIte]
   rff_auto
 
-theorem AxSpinRl4.walk0cM : runRead drefM (ext_decode Wr0c) = some (rl0c, true) := by kernel_rfl
-theorem AxSpinRl4.walk0cS : runRead WkEntryNew.drefS0 (ext_decode Wr0c) = some (rl0c, true) := by
+theorem AxSpinRl4.walk0cM : runRead drefM (ext_decode Wr0c) = some (rl0c, false) := by kernel_rfl
+theorem AxSpinRl4.walk0cS : runRead WkEntryNew.drefS0 (ext_decode Wr0c) = some (rl0c, false) := by
   kernel_rfl
-theorem AxSpinRl4.walk12M : runRead drefM (ext_decode Wr12) = some (rl12, true) := by kernel_rfl
-theorem AxSpinRl4.walk12S : runRead WkEntryNew.drefS0 (ext_decode Wr12) = some (rl12, true) := by
+theorem AxSpinRl4.walk12M : runRead drefM (ext_decode Wr12) = some (rl12, false) := by kernel_rfl
+theorem AxSpinRl4.walk12S : runRead WkEntryNew.drefS0 (ext_decode Wr12) = some (rl12, false) := by
   kernel_rfl
-theorem AxSpinRl4.walk16M : runRead drefM (ext_decode Wr16) = some (fenceRwW, true) := by
+theorem AxSpinRl4.walk16M : runRead drefM (ext_decode Wr16) = some (fenceRwW, false) := by
   kernel_rfl
-theorem AxSpinRl4.walk16S : runRead WkEntryNew.drefS0 (ext_decode Wr16) = some (fenceRwW, true) := by
+theorem AxSpinRl4.walk16S : runRead WkEntryNew.drefS0 (ext_decode Wr16) = some (fenceRwW, false) := by
   kernel_rfl
-theorem AxSpinRl4.walk1aM : runRead drefM (ext_decode Wr1a) = some (rl1a, true) := by kernel_rfl
-theorem AxSpinRl4.walk1aS : runRead WkEntryNew.drefS0 (ext_decode Wr1a) = some (rl1a, true) := by
+theorem AxSpinRl4.walk1aM : runRead drefM (ext_decode Wr1a) = some (rl1a, false) := by kernel_rfl
+theorem AxSpinRl4.walk1aS : runRead WkEntryNew.drefS0 (ext_decode Wr1a) = some (rl1a, false) := by
   kernel_rfl
-theorem AxSpinRl4.walk1eM : runRead drefM (ext_decode Wr1e) = some (rl1e, true) := by kernel_rfl
-theorem AxSpinRl4.walk1eS : runRead WkEntryNew.drefS0 (ext_decode Wr1e) = some (rl1e, true) := by
+theorem AxSpinRl4.walk1eM : runRead drefM (ext_decode Wr1e) = some (rl1e, false) := by kernel_rfl
+theorem AxSpinRl4.walk1eS : runRead WkEntryNew.drefS0 (ext_decode Wr1e) = some (rl1e, false) := by
   kernel_rfl
 
 section toks

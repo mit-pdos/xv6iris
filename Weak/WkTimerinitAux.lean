@@ -325,10 +325,10 @@ theorem WkTimerinitAux.walk12S : runRead WkEntryNew.drefS0 (ext_decode_compresse
     some (.C_ADDI4SPN (.Cregidx 0#3, nz12), true) := by kernel_rfl
 
 theorem WkTimerinitAux.walk13M : runRead drefM (ext_decode 0x30a027f3#32) =
-    some (.CSRReg (0x30A#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0x30A#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk13S : runRead WkEntryNew.drefS0 (ext_decode 0x30a027f3#32) =
-    some (.CSRReg (0x30A#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0x30A#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk14M : runRead drefM (ext_decode_compressed 0x577d#16) =
     some (.C_LI (i14, .Regidx tiA4), true) := by kernel_rfl
@@ -349,46 +349,46 @@ theorem WkTimerinitAux.walk16S : runRead WkEntryNew.drefS0 (ext_decode_compresse
     some (.C_OR (.Cregidx 7#3, .Cregidx 6#3), true) := by kernel_rfl
 
 theorem WkTimerinitAux.walk17M : runRead drefM (ext_decode 0x30a79073#32) =
-    some (.CSRReg (0x30A#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x30A#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk17S : runRead WkEntryNew.drefS0 (ext_decode 0x30a79073#32) =
-    some (.CSRReg (0x30A#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x30A#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk18M : runRead drefM (ext_decode 0x306027f3#32) =
-    some (.CSRReg (0x306#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0x306#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk18S : runRead WkEntryNew.drefS0 (ext_decode 0x306027f3#32) =
-    some (.CSRReg (0x306#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0x306#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk19M : runRead drefM (ext_decode 0x0027e793#32) =
-    some (.ITYPE (i19, .Regidx tiA5, .Regidx tiA5, .ORI), true) := by kernel_rfl
+    some (.ITYPE (i19, .Regidx tiA5, .Regidx tiA5, .ORI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk19S : runRead WkEntryNew.drefS0 (ext_decode 0x0027e793#32) =
-    some (.ITYPE (i19, .Regidx tiA5, .Regidx tiA5, .ORI), true) := by kernel_rfl
+    some (.ITYPE (i19, .Regidx tiA5, .Regidx tiA5, .ORI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk20M : runRead drefM (ext_decode 0x30679073#32) =
-    some (.CSRReg (0x306#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x306#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk20S : runRead WkEntryNew.drefS0 (ext_decode 0x30679073#32) =
-    some (.CSRReg (0x306#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x306#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk21M : runRead drefM (ext_decode 0xc01027f3#32) =
-    some (.CSRReg (0xC01#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0xC01#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk21S : runRead WkEntryNew.drefS0 (ext_decode 0xc01027f3#32) =
-    some (.CSRReg (0xC01#12, zreg, .Regidx tiA5, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (0xC01#12, zreg, .Regidx tiA5, .CSRRS), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk22M : runRead drefM (ext_decode 0x000f4737#32) =
-    some (.UTYPE (i22, .Regidx tiA4, .LUI), true) := by kernel_rfl
+    some (.UTYPE (i22, .Regidx tiA4, .LUI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk22S : runRead WkEntryNew.drefS0 (ext_decode 0x000f4737#32) =
-    some (.UTYPE (i22, .Regidx tiA4, .LUI), true) := by kernel_rfl
+    some (.UTYPE (i22, .Regidx tiA4, .LUI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk23M : runRead drefM (ext_decode 0x24070713#32) =
-    some (.ITYPE (i23, .Regidx tiA4, .Regidx tiA4, .ADDI), true) := by kernel_rfl
+    some (.ITYPE (i23, .Regidx tiA4, .Regidx tiA4, .ADDI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk23S : runRead WkEntryNew.drefS0 (ext_decode 0x24070713#32) =
-    some (.ITYPE (i23, .Regidx tiA4, .Regidx tiA4, .ADDI), true) := by kernel_rfl
+    some (.ITYPE (i23, .Regidx tiA4, .Regidx tiA4, .ADDI), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk24M : runRead drefM (ext_decode_compressed 0x97ba#16) =
     some (.C_ADD (.Regidx tiA5, .Regidx tiA4), true) := by kernel_rfl
@@ -397,10 +397,10 @@ theorem WkTimerinitAux.walk24S : runRead WkEntryNew.drefS0 (ext_decode_compresse
     some (.C_ADD (.Regidx tiA5, .Regidx tiA4), true) := by kernel_rfl
 
 theorem WkTimerinitAux.walk25M : runRead drefM (ext_decode 0x14d79073#32) =
-    some (.CSRReg (0x14D#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x14D#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk25S : runRead WkEntryNew.drefS0 (ext_decode 0x14d79073#32) =
-    some (.CSRReg (0x14D#12, .Regidx tiA5, zreg, .CSRRW), true) := by kernel_rfl
+    some (.CSRReg (0x14D#12, .Regidx tiA5, zreg, .CSRRW), false) := by kernel_rfl
 
 theorem WkTimerinitAux.walk26M : runRead drefM (ext_decode_compressed 0x60a2#16) =
     some (.C_LDSP (u10, .Regidx tiRa), true) := by kernel_rfl
@@ -713,8 +713,9 @@ theorem WkTimerinitAux.tokBase (kbs : GMapF PAddr (BitVec 8)) (A : Int) (w : Bit
     (hacc : accWf (BitVec.ofInt 64 A) 4) (hram : inRam (BitVec.ofInt 64 A) 4)
     (hnrvc : isRVC (Sail.BitVec.extractLsb w 15 0) = false)
     (hlpad : is_lpad_instruction i = false)
-    (hM : runRead drefM (ext_decode w) = some (i, true))
-    (hS : runRead WkEntryNew.drefS0 (ext_decode w) = some (i, true))
+    {bM bS : Bool}
+    (hM : runRead drefM (ext_decode w) = some (i, bM))
+    (hS : runRead WkEntryNew.drefS0 (ext_decode w) = some (i, bS))
     (hgood : goodb0 dM (ext_decode w) dstateM = true)
     (hdec : exec (ext_decode w) dstateM = some (i, dstateM))
     (hkb : ∀ j : Nat, j < 4 → kernelBytes (A + (j : Int)) = some (nthByte (n := 4) w j)) :

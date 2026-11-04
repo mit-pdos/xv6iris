@@ -70,10 +70,11 @@ def scauseIntr (ip : InterruptType) (scOld : BitVec 64) : BitVec 64 :=
       (bool_to_bit (trapCause_is_interrupt (.Interrupt ip))))
     (64 - 2) 0 (zero_extend (m := 64 - 1) (trapCause_bits_forwards (.Interrupt ip)))
 
-/-- (Lean-only, deviation 3) Rocq `MstatusBits.trap_ms`: SPELP := elp; SPIE := SIE; SIE := 0;
-SPP := 1, in the model's update order. -/
-def AxIntr2.trapMs (elpV : BitVec 1) (ms : BitVec 64) : BitVec 64 :=
-  let ms_e := Sail.BitVec.updateSubrange ms 23 23 elpV
+/-- (Lean-only, deviation 3) Rocq `MstatusBits.trap_ms`: SPIE := SIE; SIE := 0; SPP := 1, in the
+model's update order.  (Rocq also had SPELP := elp; since 2026-11-04 the hart has no Zicfilp and the
+trap leaves SPELP alone; `elpV` is kept, unused.) -/
+def AxIntr2.trapMs (_elpV : BitVec 1) (ms : BitVec 64) : BitVec 64 :=
+  let ms_e := ms
   let ms_a := Sail.BitVec.updateSubrange ms_e 5 5 (_get_Mstatus_SIE ms_e)
   let ms_b := Sail.BitVec.updateSubrange ms_a 1 1 0#1
   Sail.BitVec.updateSubrange ms_b 8 8 1#1
@@ -131,9 +132,10 @@ theorem trapStMstatus (s : ExecSt) (ip : InterruptType) :
     RegFile.set_other]
   rfl
 
-/-- Rocq `trap_st_elp`. -/
+/-- Rocq `trap_st_elp` -- CHANGED 2026-11-04: with no Zicfilp the trap leaves `elp` alone (Rocq:
+`elp := NO_LP_EXPECTED`). -/
 theorem trapStElp (s : ExecSt) (ip : InterruptType) :
-    (trapSt s ip).regs .elp = landing_pad_bits_backwards .NO_LP_EXPECTED := by
+    (trapSt s ip).regs .elp = s.regs .elp := by
   simp (disch := decide) only [trapSt, trapSupS9, ExecSt.setReg_regs, RegFile.set_same,
     RegFile.set_other]
 
@@ -173,7 +175,7 @@ section bits
 local macro "trap_bits" : tactic =>
   `(tactic| (simp only [AxIntr2.trapMs, _get_Mstatus_SIE, _get_Mstatus_MPRV, _get_Mstatus_SXL,
                _get_Mstatus_MXR, _get_Mstatus_TSR, _get_Mstatus_XS, _get_Mstatus_FS,
-               _get_Mstatus_VS, _get_Mstatus_SD, _get_Mstatus_MPP, _get_Mstatus_TVM,
+               _get_Mstatus_VS, _get_Mstatus_SD, _get_Mstatus_MPP, _get_Mstatus_TVM, _get_Mstatus_SPELP, _get_Mstatus_MPELP,
                Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
                BitVec.extractLsb]
              bv_decide))
@@ -187,7 +189,7 @@ theorem AxIntr2.trapMsSIEFalse (e : BitVec 1) (ms : BitVec 64) :
 /-- Rocq `sconf_ms_facts_trap`. -/
 theorem sconfMsFactsTrap (e : BitVec 1) (ms : BitVec 64) :
     AxSpineOk6.sconfMsFacts ms → AxSpineOk6.sconfMsFacts (AxIntr2.trapMs e ms) := by
-  intro ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩
+  intro ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12⟩
   have e1 : _get_Mstatus_MPRV (AxIntr2.trapMs e ms) = _get_Mstatus_MPRV ms := by trap_bits
   have e2 : _get_Mstatus_SXL (AxIntr2.trapMs e ms) = _get_Mstatus_SXL ms := by trap_bits
   have e3 : _get_Mstatus_MXR (AxIntr2.trapMs e ms) = _get_Mstatus_MXR ms := by trap_bits
@@ -198,9 +200,11 @@ theorem sconfMsFactsTrap (e : BitVec 1) (ms : BitVec 64) :
   have e8 : _get_Mstatus_SD (AxIntr2.trapMs e ms) = _get_Mstatus_SD ms := by trap_bits
   have e9 : _get_Mstatus_MPP (AxIntr2.trapMs e ms) = _get_Mstatus_MPP ms := by trap_bits
   have e10 : _get_Mstatus_TVM (AxIntr2.trapMs e ms) = _get_Mstatus_TVM ms := by trap_bits
+  have e11 : _get_Mstatus_SPELP (AxIntr2.trapMs e ms) = _get_Mstatus_SPELP ms := by trap_bits
+  have e12 : _get_Mstatus_MPELP (AxIntr2.trapMs e ms) = _get_Mstatus_MPELP ms := by trap_bits
   unfold AxSpineOk6.sconfMsFacts
-  rw [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10]
-  exact ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩
+  rw [e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12]
+  exact ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12⟩
 
 end bits
 
@@ -213,11 +217,11 @@ theorem trapOkSI (T : PTree) (satp0 : BitVec 64) (s : ExecSt) (ip : InterruptTyp
     rw [trapStMstatus]; exact AxIntr2.trapMsSIEFalse _ _
   refine ⟨?_, by unfold intrOn; rw [hms]; decide⟩
   have ho := trapStOther s ip
-  obtain ⟨-, h2, h3, h4, h5, -, h7, h8, -, h10, h11, h12, h13⟩ := hc
+  obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, -, h10, h11, h12, h13⟩ := hc
   unfold AxSpineOk6.pmpOk at h13
   unfold ctrlOkSI AxSpineOk6.pmpOk sieOk
   simp (disch := decide) only [trapStPriv, trapStElp, trapStMstatus, ho]
-  exact ⟨by first | trivial | rfl, h2, h3, h4, h5, by first | trivial | decide, h7, sconfMsFactsTrap _ _ h8,
+  exact ⟨by first | trivial | rfl, h2, h3, h4, h5, h6, h7, sconfMsFactsTrap _ _ h8,
     Or.inl (AxIntr2.trapMsSIEFalse _ _), h10, h11, h12, h13⟩
 
 /-! # 2. The split dispatch field -/

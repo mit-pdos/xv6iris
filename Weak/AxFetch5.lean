@@ -344,14 +344,15 @@ theorem afCjrRaGprReadNested {B : Type} (i : BitVec 5) (hi : i.toNat ≠ 0)
   rw [afCjrBindAssoc (rX_bits (.Regidx i)) g h]
   exact afCjrRaGprRead i hi (fun x => g x >>= h) cpu rs ib d row kpos
 
-theorem afCjrHartSupportsZicfilpPure : hartSupports .Ext_Zicfilp = true := by decide +kernel
+-- FLIPPED 2026-11-04 (no Zicfilp, no F/D: model/sail-config-rv64d.json, [OWN.P9])
+theorem afCjrHartSupportsZicfilpPure : hartSupports .Ext_Zicfilp = false := by decide +kernel
 theorem afCjrHartSupportsZicsrPure : hartSupports .Ext_Zicsr = true := by decide +kernel
 theorem afCjrHartSupportsZcaPure : hartSupports .Ext_Zca = true := by decide +kernel
 theorem afCjrRecHsZcaPure : hartSupports .Ext_Zca = true := by decide +kernel
 theorem afCjrRecHsZcfPure : hartSupports .Ext_Zcf = false := by decide +kernel
-theorem afCjrRecHsFPure : hartSupports .Ext_F = true := by decide +kernel
-theorem afCjrRecHsZcdPure : hartSupports .Ext_Zcd = true := by decide +kernel
-theorem afCjrRecHsDPure : hartSupports .Ext_D = true := by decide +kernel
+theorem afCjrRecHsFPure : hartSupports .Ext_F = false := by decide +kernel
+theorem afCjrRecHsZcdPure : hartSupports .Ext_Zcd = false := by decide +kernel
+theorem afCjrRecHsDPure : hartSupports .Ext_D = false := by decide +kernel
 theorem afCjrHartSupportsCPure : hartSupports .Ext_C = true := by decide +kernel
 
 theorem afCjrRecCEZicsrPure : currentlyEnabled .Ext_Zicsr = pure true := by
@@ -376,12 +377,13 @@ theorem afCjrIbRdCarrierMem (ib0 : Ibch) (n : Nat) (r : Register) (hr : eregNum 
   rw [hr, ibReadRdsSome]
   exact List.mem_append_right _ (List.mem_singleton_self _)
 
-/-- (Lean-only) the `Ext_Zicfilp` probe as a term: under `Zicsr` and `hartSupports Zicfilp`, a
-`cur_privilege` read feeding `get_xLPE`. -/
+/-- (Lean-only) the `Ext_Zicfilp` probe as a term: since 2026-11-04 (`hartSupports Zicfilp =
+false`) it is `pure false`, reading nothing (it used to read `cur_privilege` and feed `get_xLPE`). -/
 theorem AxFetch5.cEZicfilpEq :
-    currentlyEnabled .Ext_Zicfilp = (readReg .cur_privilege >>= fun p => get_xLPE p) := by
+    currentlyEnabled .Ext_Zicfilp = pure false := by
   rw [currentlyEnabled]
-  simp only [afCjrRecCEZicsrPure, afCjrHartSupportsZicfilpPure, pure_bind, ↓reduceIte]
+  simp only [afCjrRecCEZicsrPure, afCjrHartSupportsZicfilpPure, pure_bind, ↓reduceIte,
+    Bool.false_eq_true]
 
 /-- (Lean-only) the `Ext_Zca` probe as a term: one `misa` read. -/
 theorem AxFetch5.cEZcaEq :
@@ -409,8 +411,9 @@ theorem AxFetch5.rtcExStep {A K : Type} {R : A → A → Prop} {x y : A} {Z : K 
     R x y → (∃ k, rtc R y (Z k)) → ∃ k, rtc R x (Z k) :=
   fun h ⟨k, hk⟩ => ⟨k, rtc_l h hk⟩
 
-/-- (Lean-only) `update_elp_state`'s admin run: two non-carrier config reads, landing at the
-continuation (M-mode, `mseccfg.MLPE` clear). -/
+/-- (Lean-only) `update_elp_state`'s admin run, landing at the continuation: since 2026-11-04 (no
+Zicfilp) an EMPTY run (it used to be two non-carrier config reads, M-mode, `mseccfg.MLPE` clear;
+`hpriv`/`hmlpe` are kept but no longer needed). -/
 theorem AxFetch5.updateElpRun (rs1 : regidx) (g : Unit → SailM Unit) (cpu : CPU) (rs : RegFile)
     (ib : Ibch) (d : Efab) (row : List Lbl) (kpos : Nat)
     (hpriv : rs .cur_privilege = .Machine)
@@ -419,11 +422,8 @@ theorem AxFetch5.updateElpRun (rs1 : regidx) (g : Unit → SailM Unit) (cpu : CP
       ⟨.PHart cpu (update_elp_state rs1 >>= g) rs none ib, kpos⟩
       ⟨.PHart cpu (g ()) rs none ib, kpos⟩ := by
   unfold update_elp_state
-  rw [AxFetch5.cEZicfilpEq, bind_assoc, bind_assoc]
-  refine rtc_l ⟨_, afCjrCurPrivilegeRead _ cpu rs ib d row kpos⟩ ?_
-  rw [hpriv, afCjrGetXLPEMachinePure, bind_assoc]
-  refine rtc_l ⟨_, afCjrMseccfgRead _ cpu rs ib d row kpos⟩ ?_
-  rw [hmlpe]
+  rw [AxFetch5.cEZicfilpEq]
+  simp only [pure_bind, Bool.false_eq_true, ↓reduceIte]
   exact rtc_refl _
 
 /-- (Lean-only) `jump_to t`'s admin run to the `nextPC` write, at a 0-aligned target under

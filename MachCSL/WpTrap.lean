@@ -173,8 +173,8 @@ theorem swp_handle_interrupt_S (cpu : CPU) (c : MConf) (i : InterruptType)
   have help : landing_pad_bits_backwards landing_pad_expectation.NO_LP_EXPECTED = 0#1 := rfl
   have hsc := scause_of_trap v2 i
   have hms : Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
-      (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange c.mstatus 23 23 0#1) 5 5
-        (_get_Mstatus_SIE (Sail.BitVec.updateSubrange c.mstatus 23 23 0#1))) 1 1 0#1) 8 8 1#1 = trapMs c.mstatus := rfl
+      (Sail.BitVec.updateSubrange c.mstatus 5 5
+        (_get_Mstatus_SIE c.mstatus)) 1 1 0#1) 8 8 1#1 = trapMs c.mstatus := rfl
   have ht : tval none = 0#64 := rfl
   unfold handle_interrupt
   swp_run 200

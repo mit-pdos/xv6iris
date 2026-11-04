@@ -27,13 +27,13 @@ variable {lent : Bool}
 /-! ## The status facts across the flips -/
 
 theorem smFacts_clear (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) :
-    smFacts (ms &&& 0xFFFFFFFFFFFFFFFD#64) false := by
+    smFacts (ms &&& 0xFFFFFDFFFF7FFFFD#64) false := by
   unfold smFacts at h ⊢
   obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ := h
   simp only [Bool.false_eq_true, ite_false]
   bv_decide
 
-theorem smFacts_set (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts (ms ||| 2#64) true := by
+theorem smFacts_set (ms : BitVec 64) (sie : Bool) (h : smFacts ms sie) : smFacts ((ms &&& 0xFFFFFDFFFF7FFFFF#64) ||| 2#64) true := by
   unfold smFacts at h ⊢
   obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11⟩ := h
   simp only [ite_true]
@@ -45,10 +45,10 @@ def sppOf (ms : BitVec 64) : Bool := decide (BitVec.extractLsb' 8 1 ms = 1#1)
 
 
 theorem sretFacts_clear (ms : BitVec 64) :
-    sretFacts (ms &&& 0xFFFFFFFFFFFFFFFD#64) false (spieOf ms) (sppOf ms) := by
+    sretFacts (ms &&& 0xFFFFFDFFFF7FFFFD#64) false (spieOf ms) (sppOf ms) := by
   intro _
-  have e5 : BitVec.extractLsb' 5 1 (ms &&& 0xFFFFFFFFFFFFFFFD#64) = BitVec.extractLsb' 5 1 ms := by bv_decide
-  have e8 : BitVec.extractLsb' 8 1 (ms &&& 0xFFFFFFFFFFFFFFFD#64) = BitVec.extractLsb' 8 1 ms := by bv_decide
+  have e5 : BitVec.extractLsb' 5 1 (ms &&& 0xFFFFFDFFFF7FFFFD#64) = BitVec.extractLsb' 5 1 ms := by bv_decide
+  have e8 : BitVec.extractLsb' 8 1 (ms &&& 0xFFFFFDFFFF7FFFFD#64) = BitVec.extractLsb' 8 1 ms := by bv_decide
   rw [e5, e8]
   unfold spieOf sppOf
   constructor
@@ -174,7 +174,7 @@ theorem wp_s_csrci_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     icases HT with ⟨Htrans, Htok⟩
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
     simp only [sConfOf_setMs, sConfOf_mstatus]
-    ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
+    ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFDFFFF7FFFFD#64)
       mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
     have hpure : k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp := fun hs => by
       rw [hs] at hsr; exact sretFacts_pinned ms k.spie k.spp hsr
@@ -256,7 +256,7 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     icases HT with ⟨Htrans, Htok⟩
     ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
     simp only [sConfOf_setMs, sConfOf_mstatus]
-    ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
+    ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFDFFFF7FFFFD#64)
       mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
     have hpure : (k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp) ∧ sstatusAt k.sie (lower_mstatus ms) :=
       ⟨fun hs => by rw [hs] at hsr; exact sretFacts_pinned ms k.spie k.spp hsr,
@@ -335,7 +335,7 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   icases HT with ⟨Htrans, Htok⟩
   ihave HΦ' := wpNext_off _ _ _ $$ HΦ
   simp only [sConfOf_setMs, sConfOf_mstatus]
-  ihave HConf := kConf_intro cpu curTier k.root true k.spie k.spp (ms ||| 2#64) mdl mepc stc lf
+  ihave HConf := kConf_intro cpu curTier k.root true k.spie k.spp ((ms &&& 0xFFFFFDFFFF7FFFFF#64) ||| 2#64) mdl mepc stc lf
     ⟨smFacts_set ms false hsm, sretFacts_on _ _ _, hmdl, hlf⟩ $$ HmConf
   have hn0 : k.noff = 0 := (hwf'.2.2.1 rfl).1
   ihave Hcpu := cpuOwn_zero cpu false false true k.noff k.intena true k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu

@@ -67,7 +67,7 @@ value) and clears `SIE` in `mstatus` (push_off's `csrrci`). -/
 theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
-      { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 }
+      { c with mstatus := c.mstatus &&& 0xFFFFFDFFFF7FFFFD#64 }
       (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx rd, csrop.CSRRC)) pc npc₀ npc₀
       (gprFile cpu R) (gprFile cpu (RegMap.set R rd (lower_mstatus c.mstatus))) := by
   intro Φ
@@ -98,7 +98,7 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   inext
   iintro HF
   swp_run 20
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFDFFFF7FFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
   case' _ => (iframe; iexact Hhw)
@@ -110,7 +110,7 @@ set_option maxHeartbeats 4000000 in
 theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
-      { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 }
+      { c with mstatus := c.mstatus &&& 0xFFFFFDFFFF7FFFFD#64 }
       (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx 0#5, csrop.CSRRC)) pc npc₀ npc₀
       (gprFile cpu R) (gprFile cpu R) := by
   intro Φ
@@ -138,7 +138,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFDFFFF7FFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
   case' _ => (iframe; iexact Hhw)
@@ -150,7 +150,7 @@ set_option maxHeartbeats 4000000 in
 theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
-      { c with mstatus := c.mstatus ||| 2#64 }
+      { c with mstatus := (c.mstatus &&& 0xFFFFFDFFFF7FFFFF#64) ||| 2#64 }
       (instruction.CSRImm (0x100#12, 2#5, regidx.Regidx 0#5, csrop.CSRRS)) pc npc₀ npc₀
       (gprFile cpu R) (gprFile cpu R) := by
   intro Φ
@@ -178,7 +178,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := (c.mstatus &&& 0xFFFFFDFFFF7FFFFF#64) ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
   case' _ => (iframe; iexact Hhw)

@@ -348,14 +348,21 @@ theorem MConf.ok_same {c c' : MConf} (h : MConf.ok (GF := GF) c) (hms : c'.mstat
 def menvcfgS : BitVec 64 := 0xA000000000000000#64
 
 /-- Decoding a 32-bit instruction word under the configuration `c` at
-privilege `p` yields `ast` (the decoder reads the privilege, `misa` and the
-landing-pad configuration).  A pure statement, so that `Code<F>` files can
+privilege `p` yields `ast` (the decoder may read the privilege, `misa` and the
+environment configuration).  A pure statement, so that `Code<F>` files can
 state it as a fact about the code and instruction rules take it as a
-hypothesis. -/
+hypothesis.
+
+NO LATER on the continuation (2026-11-04): since the hart has no Zicfilp and
+no Zicfiss, the decode of most 32-bit words reads NO register (the landing-pad
+and shadow-stack guards that used to read `cur_privilege`/`menvcfg`/`mseccfg`
+short-circuit on `hartSupports`), so the walk takes no event and cannot pay
+for a `▷`.  (The 16-bit decode still reads `misa` for Zca: `decodes16P` keeps
+its later.) -/
 def decodes32P (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (w : BitVec 32)
     (ast : instruction) : Prop :=
   ∀ Φ : instruction → IProp GF,
-    confCells cpu dq p c ∗ ▷ (confCells cpu dq p c -∗ Φ ast) ⊢ swp cpu (Functions.ext_decode w) Φ
+    confCells cpu dq p c ∗ (confCells cpu dq p c -∗ Φ ast) ⊢ swp cpu (Functions.ext_decode w) Φ
 
 /-- Decoding a 16-bit (compressed) instruction word at privilege `p`. -/
 def decodes16P (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (h : BitVec 16)

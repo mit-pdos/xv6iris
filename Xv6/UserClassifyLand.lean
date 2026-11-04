@@ -117,6 +117,7 @@ theorem ucl_uxrCfg {s : UWSt} (h : UstLand C P t0 mm0 s) : UxrCfg s where
   senvcfg := h.cfg.hw .senvcfg _ rfl
   mstateen0 := h.cfg.hw .mstateen0 _ rfl
   sstateen0 := h.cfg.hw .sstateen0 _ rfl
+  mseccfg := h.cfg.hw .mseccfg _ rfl
   fs := by
     have h13 := h.ms.2.2.2.1
     simp only [_get_Mstatus_FS, Sail.BitVec.extractLsb]

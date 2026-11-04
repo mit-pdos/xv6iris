@@ -427,7 +427,7 @@ theorem ctrlOkSFlush (T : PTree) (satp0 : BitVec 64) (rs : RegFile)
 /-- Rocq `ctrl_ok_S_TVM`. -/
 theorem ctrlOkSTVM (T : PTree) (satp0 : BitVec 64) (rs : RegFile) :
     ctrlOkS T satp0 rs → (_get_Mstatus_TVM (rs .mstatus) == 1#1) = false :=
-  fun h => h.2.2.2.2.2.2.2.1.2.2.2.2.2.2.2.2.2
+  fun h => h.2.2.2.2.2.2.2.1.2.2.2.2.2.2.2.2.2.1
 
 section xsfenceS
 variable {hlc : HasLC} {GF : BundledGFunctors} [InvGS_gen hlc GF] [AxirisG GF] [Axpol]
@@ -529,7 +529,7 @@ theorem sfenceWholeAgrees (tick : Bool) :
 
 /-- (Lean-only, deviation 4) the `runRead` decode walk of `fence rw,w` at `drefS`. -/
 theorem AxSfence2.walkFence :
-    runRead AxLeafS3.drefS (ext_decode (BitVec.ofNat 32 AxLeafS3.wFence)) = some (fenceRwW, true) := by
+    runRead AxLeafS3.drefS (ext_decode (BitVec.ofNat 32 AxLeafS3.wFence)) = some (fenceRwW, false) := by
   ax_epi_ledger_krfl
 
 /-- Rocq `sf_word_not_fence`: NON-TRIVIALITY of AxSfence's `sfWord` — the decode hypotheses
@@ -539,7 +539,7 @@ theorem sfWordNotFence : ¬ sfWord (BitVec.ofNat 32 AxLeafS3.wFence) := by
   obtain ⟨Hm, Hcfg⟩ := cfgOfCK (σL AxLeafS3.wFence) rsLCtrlOk
   have E := H _ Hm Hcfg
   have hc := rsLCtrlOk.1
-  have F := execOfRunRead AxLeafS3.drefS _ (σL AxLeafS3.wFence) fenceRwW true
+  have F := execOfRunRead AxLeafS3.drefS _ (σL AxLeafS3.wFence) fenceRwW false
     (fun r v hv => by
       unfold AxLeafS3.drefS at hv
       split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv <;> subst hv

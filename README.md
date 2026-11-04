@@ -115,7 +115,10 @@ cherry-picked onto it; the script's header has the commands.  With a Sail releas
 fix, this step goes away.  Three files decide what comes out: `model/sail-config-rv64d.json` (the xv6
 platform configuration), `model/sail-modules.txt` (the module subset) and `model/Xv6Extras.lean`, the one
 hand-written file: the realisation of the Sail platform hooks (the reservation hooks, terminal writes,
-the experimental-extensions flag), passed to sail as a second import file and never overwritten.
+the experimental-extensions flag, the Zkr `seed` entropy source as a nondeterministic choice), passed to
+sail as a second import file and never overwritten.  The hart is rv64imac-style: F, D, Zicfilp, Zicfiss
+and Smmpm are disabled in the configuration (their instruction modules are not compiled; see the
+configuration file's header).
 Before changing the configuration, regenerate with it unchanged and check that `git diff model/` is
 empty — that separates an intended change from drift in the checkout.
 

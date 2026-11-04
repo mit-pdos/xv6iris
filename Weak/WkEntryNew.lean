@@ -219,24 +219,24 @@ def WkEntryNew.mJal (m : RegMap) (vStack0 mhartidIn : BitVec 64) : RegMap :=
 /-- The supervisor-mode reference map without `mseccfg` (Lean-only; `AxSfence.drefSf`). -/
 def WkEntryNew.drefS0 : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.Supervisor
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | _ => none
 
 /-- Lean-only: a read-only walk evaluated on both reference maps is a decode fact at every
 state the funnel's decode premise admits. -/
-theorem WkEntryNew.execAnyCfg {X : Type} (m : SailM X) (x : X)
-    (hM : runRead drefM m = some (x, true)) (hS : runRead WkEntryNew.drefS0 m = some (x, true))
+theorem WkEntryNew.execAnyCfg {X : Type} (m : SailM X) (x : X) {bM bS : Bool}
+    (hM : runRead drefM m = some (x, bM)) (hS : runRead WkEntryNew.drefS0 m = some (x, bS))
     (t : ExecSt) (hm : t.regs .misa = misaC) (hc : cfgOk t) : exec m t = some (x, t) := by
   rcases hc with ⟨hp, hsec⟩ | ⟨hp, henv⟩
-  · refine execOfRunRead drefM _ t _ true ?_ hM
+  · refine execOfRunRead drefM _ t _ bM ?_ hM
     intro r v hv
     unfold drefM at hv
     split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv <;> subst hv
     · exact hp
     · exact hm
     · exact hsec
-  · refine execOfRunRead WkEntryNew.drefS0 _ t _ true ?_ hS
+  · refine execOfRunRead WkEntryNew.drefS0 _ t _ bS ?_ hS
     intro r v hv
     unfold WkEntryNew.drefS0 at hv
     split at hv <;> simp only [Option.some.injEq, reduceCtorEq] at hv <;> subst hv
@@ -245,9 +245,9 @@ theorem WkEntryNew.execAnyCfg {X : Type} (m : SailM X) (x : X)
     · exact henv
 
 /-- Lean-only: the `winstr` decode field of a full word. -/
-theorem WkEntryNew.decBase (w : BitVec 32) (i : instruction)
-    (hM : runRead drefM (ext_decode w) = some (i, true))
-    (hS : runRead WkEntryNew.drefS0 (ext_decode w) = some (i, true)) :
+theorem WkEntryNew.decBase (w : BitVec 32) (i : instruction) {bM bS : Bool}
+    (hM : runRead drefM (ext_decode w) = some (i, bM))
+    (hS : runRead WkEntryNew.drefS0 (ext_decode w) = some (i, bS)) :
     winstrDec (.F_Base w) i := by
   intro t _ _ _ hm hc
   simp only [fetchIsRvc, Bool.false_eq_true, ↓reduceIte]
@@ -272,21 +272,21 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports
   LeanRV64D.Functions.currentlyEnabled
 
 theorem WkEntryNew.walkE0M : runRead drefM (ext_decode wAuipc) =
-    some (.UTYPE (immAuipc, .Regidx iAuipc, .AUIPC), true) := by kernel_rfl
+    some (.UTYPE (immAuipc, .Regidx iAuipc, .AUIPC), false) := by kernel_rfl
 theorem WkEntryNew.walkE0S : runRead WkEntryNew.drefS0 (ext_decode wAuipc) =
-    some (.UTYPE (immAuipc, .Regidx iAuipc, .AUIPC), true) := by kernel_rfl
+    some (.UTYPE (immAuipc, .Regidx iAuipc, .AUIPC), false) := by kernel_rfl
 theorem WkEntryNew.walkE1M : runRead drefM (ext_decode wLd) =
-    some (.LOAD (immLd, .Regidx iLd, .Regidx iLd, false, 8), true) := by kernel_rfl
+    some (.LOAD (immLd, .Regidx iLd, .Regidx iLd, false, 8), false) := by kernel_rfl
 theorem WkEntryNew.walkE1S : runRead WkEntryNew.drefS0 (ext_decode wLd) =
-    some (.LOAD (immLd, .Regidx iLd, .Regidx iLd, false, 8), true) := by kernel_rfl
+    some (.LOAD (immLd, .Regidx iLd, .Regidx iLd, false, 8), false) := by kernel_rfl
 theorem WkEntryNew.walkE2M : runRead drefM (ext_decode_compressed hLui) =
     some (.C_LUI (immClui, rdClui), true) := by kernel_rfl
 theorem WkEntryNew.walkE2S : runRead WkEntryNew.drefS0 (ext_decode_compressed hLui) =
     some (.C_LUI (immClui, rdClui), true) := by kernel_rfl
 theorem WkEntryNew.walkE3M : runRead drefM (ext_decode wCsrr) =
-    some (.CSRReg (csrCsrr, zreg, .Regidx iRdCsrr, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (csrCsrr, zreg, .Regidx iRdCsrr, .CSRRS), false) := by kernel_rfl
 theorem WkEntryNew.walkE3S : runRead WkEntryNew.drefS0 (ext_decode wCsrr) =
-    some (.CSRReg (csrCsrr, zreg, .Regidx iRdCsrr, .CSRRS), true) := by kernel_rfl
+    some (.CSRReg (csrCsrr, zreg, .Regidx iRdCsrr, .CSRRS), false) := by kernel_rfl
 theorem WkEntryNew.walkE4M : runRead drefM (ext_decode_compressed hAddi) =
     some (.C_ADDI (immCaddi, rsdCaddi), true) := by kernel_rfl
 theorem WkEntryNew.walkE4S : runRead WkEntryNew.drefS0 (ext_decode_compressed hAddi) =
@@ -300,9 +300,9 @@ theorem WkEntryNew.walkE6M : runRead drefM (ext_decode_compressed hAdd) =
 theorem WkEntryNew.walkE6S : runRead WkEntryNew.drefS0 (ext_decode_compressed hAdd) =
     some (.C_ADD (rsdCadd, rs2Cadd), true) := by kernel_rfl
 theorem WkEntryNew.walkE7M : runRead drefM (ext_decode wJal) =
-    some (.JAL (immJal, .Regidx iJal), true) := by kernel_rfl
+    some (.JAL (immJal, .Regidx iJal), false) := by kernel_rfl
 theorem WkEntryNew.walkE7S : runRead WkEntryNew.drefS0 (ext_decode wJal) =
-    some (.JAL (immJal, .Regidx iJal), true) := by kernel_rfl
+    some (.JAL (immJal, .Regidx iJal), false) := by kernel_rfl
 
 end walks
 

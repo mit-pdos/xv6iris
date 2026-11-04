@@ -183,14 +183,14 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports
   LeanRV64D.Functions.currentlyEnabled
 
 /-- (Lean-only, deviation 5) the decode walk of `W0e` on the machine reference map. -/
-theorem AxSpinE7.walk0eM : runRead drefM (ext_decode W0e) = some (ins0e, true) := by kernel_rfl
+theorem AxSpinE7.walk0eM : runRead drefM (ext_decode W0e) = some (ins0e, false) := by kernel_rfl
 /-- (Lean-only, deviation 5) the decode walk of `W0e` on the supervisor reference map. -/
-theorem AxSpinE7.walk0eS : runRead WkEntryNew.drefS0 (ext_decode W0e) = some (ins0e, true) := by
+theorem AxSpinE7.walk0eS : runRead WkEntryNew.drefS0 (ext_decode W0e) = some (ins0e, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 5) the decode walk of `W12` on the machine reference map. -/
-theorem AxSpinE7.walk12M : runRead drefM (ext_decode W12) = some (ins12, true) := by kernel_rfl
+theorem AxSpinE7.walk12M : runRead drefM (ext_decode W12) = some (ins12, false) := by kernel_rfl
 /-- (Lean-only, deviation 5) the decode walk of `W12` on the supervisor reference map. -/
-theorem AxSpinE7.walk12S : runRead WkEntryNew.drefS0 (ext_decode W12) = some (ins12, true) := by
+theorem AxSpinE7.walk12S : runRead WkEntryNew.drefS0 (ext_decode W12) = some (ins12, false) := by
   kernel_rfl
 
 end walks

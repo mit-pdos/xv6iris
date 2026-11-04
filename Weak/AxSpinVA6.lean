@@ -244,8 +244,10 @@ theorem execExceptionDelegateeS (e : ExceptionType) (medl : BitVec 64) (s : Exec
 of an S-mode trap, for any cause and tval payload. -/
 def AxSpinVA6.trapS9 (s : ExecSt) (c : TrapCause) (info : Option (BitVec 64))
     (pc0 ms_v sc_old : BitVec 64) (elp_v : BitVec 1) : ExecSt :=
-  let ms_e := Sail.BitVec.updateSubrange ms_v 23 23 elp_v
-  let s1e := (s.setReg .mstatus ms_e).setReg .elp (landing_pad_bits_backwards .NO_LP_EXPECTED)
+  -- since 2026-11-04 (no Zicfilp) the trap neither banks `elp` into `SPELP` nor resets `elp`;
+  -- `elp_v` is kept (unused) so that the statements over this state are unchanged
+  let ms_e := ms_v
+  let s1e := s
   let c1 := Sail.BitVec.updateSubrange sc_old (64 - 1) (64 - 1) (bool_to_bit (trapCause_is_interrupt c))
   let c2 := Sail.BitVec.updateSubrange c1 (64 - 2) 0
     (zero_extend (m := 64 - 1) (trapCause_bits_forwards c))
@@ -265,7 +267,7 @@ theorem execTrapHandlerSGen (s : ExecSt) (c : TrapCause) (info : Option (BitVec 
     exec (trap_handler .Supervisor c pc0 info none) s =
       some (stvecBase stvec_v, AxSpinVA6.trapS9 s c info pc0 ms_v sc_old elp_v) := by
   subst hms hsc hstvec help
-  unfold trap_handler zicfilp_preserve_elp_on_trap reset_elp get_config_print_exception
+  unfold trap_handler get_config_print_exception
     get_config_print_interrupt prepare_trap_vector
   exec_run [hartSupportsZicfilp, execTrackTrapS]
   simp (config := { decide := true }) only [ExecSt.setReg_regs, RegFile.set_other, RegFile.set_same,
@@ -329,9 +331,9 @@ theorem xtrapStMstatus (s : ExecSt) (e : ExceptionType) (xv : BitVec 64) :
     RegFile.set_other]
   rfl
 
-/-- Rocq `xtrap_st_elp`. -/
+/-- Rocq `xtrap_st_elp` -- CHANGED 2026-11-04: with no Zicfilp the trap leaves `elp` alone. -/
 theorem xtrapStElp (s : ExecSt) (e : ExceptionType) (xv : BitVec 64) :
-    (xtrapSt s e xv).regs .elp = landing_pad_bits_backwards .NO_LP_EXPECTED := by
+    (xtrapSt s e xv).regs .elp = s.regs .elp := by
   simp (disch := decide) only [xtrapSt, AxSpinVA6.trapS9, ExecSt.setReg_regs, RegFile.set_same,
     RegFile.set_other]
 
@@ -351,11 +353,11 @@ theorem xtrapOkS (T : PTree) (satp0 : BitVec 64) (s : ExecSt) (e : ExceptionType
     ctrlOkS T satp0 s.regs → ctrlOkS T satp0 (xtrapSt s e xv).regs := by
   intro hc
   have ho := xtrapStOther s e xv
-  obtain ⟨-, h2, h3, h4, h5, -, h7, h8, -, h10, h11, h12, h13⟩ := hc
+  obtain ⟨-, h2, h3, h4, h5, h6, h7, h8, -, h10, h11, h12, h13⟩ := hc
   unfold AxSpineOk6.pmpOk at h13
   unfold ctrlOkS AxSpineOk6.pmpOk
   simp (disch := decide) only [xtrapStPriv, xtrapStElp, xtrapStMstatus, ho]
-  exact ⟨by first | trivial | rfl, h2, h3, h4, h5, by first | trivial | decide, h7,
+  exact ⟨by first | trivial | rfl, h2, h3, h4, h5, h6, h7,
     sconfMsFactsTrap _ _ h8, AxIntr2.trapMsSIEFalse _ _, h10, h11, h12, h13⟩
 
 end Weak

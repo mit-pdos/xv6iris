@@ -70,6 +70,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -482,6 +483,7 @@ def csr_name_map_forwards (arg_ : (BitVec 12)) : SailM String := do
   | 0x10E => (pure "sstateen2")
   | 0x10F => (pure "sstateen3")
   | 0x180 => (pure "satp")
+  | 0x015 => (pure "seed")
   | 0xC03 => (pure "hpmcounter3")
   | 0xC04 => (pure "hpmcounter4")
   | 0xC05 => (pure "hpmcounter5")
@@ -894,7 +896,7 @@ def itype_mnemonic_forwards (arg_ : iop) : String :=
   | .ORI => "ori"
   | .ANDI => "andi"
 
-/-- Type quantifiers: k_ex672503_ : Bool -/
+/-- Type quantifiers: k_ex672544_ : Bool -/
 def maybe_u_forwards (arg_ : Bool) : String :=
   match arg_ with
   | true => "u"
@@ -2100,8 +2102,8 @@ def hartSupports (merge_var : extension) : Bool :=
   match merge_var with
   | .Ext_M => true
   | .Ext_A => true
-  | .Ext_F => true
-  | .Ext_D => (true && (hartSupports Ext_F))
+  | .Ext_F => false
+  | .Ext_D => (false && (hartSupports Ext_F))
   | .Ext_B => false
   | .Ext_V => ((8 ≥b 7) && (vector_support_ge vector_support_level Full))
   | .Ext_S => true
@@ -2112,8 +2114,8 @@ def hartSupports (merge_var : extension) : Bool :=
   | .Ext_Zicbom => true
   | .Ext_Zicbop => true
   | .Ext_Zicboz => true
-  | .Ext_Zicfilp => true
-  | .Ext_Zicfiss => true
+  | .Ext_Zicfilp => false
+  | .Ext_Zicfiss => false
   | .Ext_Zicntr => true
   | .Ext_Zicond => true
   | .Ext_Zicsr => true
@@ -2131,15 +2133,15 @@ def hartSupports (merge_var : extension) : Bool :=
   | .Ext_Zawrs => true
   | .Ext_Za64rs => ((plat_reservation_set_size_exp ≤b 6) && ((false : Bool) || (true : Bool)))
   | .Ext_Za128rs => ((plat_reservation_set_size_exp ≤b 7) && ((false : Bool) || (true : Bool)))
-  | .Ext_Zfa => true
-  | .Ext_Zfbfmin => true
-  | .Ext_Zfh => true
-  | .Ext_Zfhmin => true
+  | .Ext_Zfa => false
+  | .Ext_Zfbfmin => false
+  | .Ext_Zfh => false
+  | .Ext_Zfhmin => false
   | .Ext_Zfinx => false
   | .Ext_Zdinx => false
   | .Ext_Zca => true
   | .Ext_Zcb => true
-  | .Ext_Zcd => true
+  | .Ext_Zcd => false
   | .Ext_Zcf => ((false : Bool) && (xlen == 32))
   | .Ext_Zcmop => true
   | .Ext_C =>
@@ -2224,7 +2226,7 @@ def hartSupports (merge_var : extension) : Bool :=
   | .Ext_Svrsw60t59b => true
   | .Ext_Svvptc => true
   | .Ext_Smcntrpmf => true
-  | .Ext_Smmpm => ((true : Bool) && (xlen == 64))
+  | .Ext_Smmpm => ((false : Bool) && (xlen == 64))
   | .Ext_Smnpm => ((true : Bool) && (xlen == 64))
   | .Ext_Smstateen => true
   | .Ext_Ssqosid => true
@@ -2926,6 +2928,7 @@ def currentlyEnabled (merge_var : extension) : SailM Bool := do
           then (virtual_memory_supported ())
           else (pure false))
       else (pure false))
+  | .Ext_Zkr => (pure (hartSupports Ext_Zkr))
   | .Ext_Zicsr => (pure (hartSupports Ext_Zicsr))
   | .Ext_Svinval => (pure (hartSupports Ext_Svinval))
   | .Ext_Zihpm =>
@@ -3311,7 +3314,7 @@ def lrsc_width_valid (width : Nat) : Bool :=
   | 8 => (xlen ≥b 64)
   | _ => false
 
-/-- Type quantifiers: k_ex673231_ : Bool, width : Nat, width ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: k_ex673271_ : Bool, width : Nat, width ∈ {1, 2, 4, 8} -/
 def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
   ((width <b xlen_bytes) || ((not is_unsigned) && (width ≤b xlen_bytes)))
 

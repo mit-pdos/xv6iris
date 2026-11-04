@@ -68,20 +68,15 @@ theorem cyDTrapIntr {Y : Type} (hG : ∀ r v, G r v → Rboot r v) (del : Privil
   unfold trap_handler
   simp only [get_config_print_exception, get_config_print_interrupt, Bool.or_false,
     Bool.false_eq_true, ↓reduceIte, bind_assoc, pure_bind]
-  have hz : hartSupports extension.Ext_Zicfilp = true := by
+  -- since 2026-11-04 no Zicfilp: the trap neither banks nor resets `elp`
+  have hz : hartSupports extension.Ext_Zicfilp = false := by
     simp [hartSupports]
-  rw [if_pos hz]
-  unfold zicfilp_preserve_elp_on_trap
+  rw [if_neg (by simp [hz])]
+  try simp only [pure_bind]
   have hint : trapCause_is_interrupt (TrapCause.Interrupt i) = true := rfl
   cases del with
   | Machine =>
     simp only [bind_assoc]
-    refine cyDReadBind _ _ _ _ (fun v1 _ _ => ?_)
-    refine cyDReadBind _ _ _ _ (fun v2 _ _ => ?_)
-    refine cyDWriteBind _ _ _ _ _ (Or.inl (by decide)) trivial ?_
-    unfold reset_elp
-    try simp only [bind_assoc]
-    refine cyDWriteBind _ _ _ _ _ (Or.inl (by decide)) trivial ?_
     refine cyDReadBind _ _ _ _ (fun v3 _ _ => ?_)
     have hc1 := PinCycRun.causeBitUpd (trapCause_is_interrupt (TrapCause.Interrupt i)) v3
     rw [hint] at hc1
@@ -102,12 +97,6 @@ theorem cyDTrapIntr {Y : Type} (hG : ∀ r v, G r v → Rboot r v) (del : Privil
     exact cyDOfYf _ hG _ _ (by yf_walk)
   | Supervisor =>
     simp only [bind_assoc]
-    refine cyDReadBind _ _ _ _ (fun v1 _ _ => ?_)
-    refine cyDReadBind _ _ _ _ (fun v2 _ _ => ?_)
-    refine cyDWriteBind _ _ _ _ _ (Or.inl (by decide)) trivial ?_
-    unfold reset_elp
-    try simp only [bind_assoc]
-    refine cyDWriteBind _ _ _ _ _ (Or.inl (by decide)) trivial ?_
     refine cyDBind (fun _ _ => True) _ _ _ _ (cyDOfYf _ hG _ _ (by yf_walk)) (fun b _ _ => ?_)
     cases b
     · simp only [assert]; exact trivial

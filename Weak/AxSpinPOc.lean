@@ -250,8 +250,10 @@ theorem AxSpinPOc.legalizeSieClearIdem (m : BitVec 64)
     (hFS : _get_Mstatus_FS m = extStatus_map_forwards .Off)
     (hVS : _get_Mstatus_VS m = extStatus_map_forwards .Off)
     (hSD : _get_Mstatus_SD m = 0#1)
-    (hMPP : haveNomVal (_get_Mstatus_MPP m) = true) :
+    (hMPP : haveNomVal (_get_Mstatus_MPP m) = true)
+    (hPELP : _get_Mstatus_SPELP m = 0#1 ∧ _get_Mstatus_MPELP m = 0#1) :
     legalizeSstatusVal m (sstatusWriteVal m 2#5) = m := by
+  obtain ⟨hSPELP, hMPELP⟩ := hPELP
   have eOff : extStatus_map_forwards .Off = 0#2 := rfl
   have eD : ∀ x : BitVec 2, (extStatus_map_backwards x == .Dirty) = (x == 3#2) := by decide
   have eB : ∀ b : Bool, bool_to_bit b = BitVec.ofBool b := by decide
@@ -278,7 +280,7 @@ theorem AxSpinPOc.legalizeSieClearIdem (m : BitVec 64)
     _get_Sstatus_FS, _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR,
     _get_Sstatus_SPELP, _get_Sstatus_UXL,
     Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
-    BitVec.extractLsb, zero_extend, Sail.BitVec.zeroExtend, zeros] at hSIE hXS hFS hVS hSD hMPP ⊢
+    BitVec.extractLsb, zero_extend, Sail.BitVec.zeroExtend, zeros] at hSIE hXS hFS hVS hSD hMPP hSPELP hMPELP ⊢
   bv_decide
 
 /-- Rocq `exec_q0a`: csrrci a5,sstatus,2 at a regime state writes a5 := the S-view of mstatus,
@@ -286,10 +288,10 @@ nothing else changes (SIE already 0). -/
 theorem execQ0a (T : PTree) (satp0 : BitVec 64) (s : ExecSt) (h : ctrlOkS T satp0 s.regs) :
     exec (execute q0a) s = some (RETIRE_SUCCESS, s.setGpr 15#5 (sstatusRead (s.regs .mstatus))) := by
   obtain ⟨hpriv, _, hmisa, _, _, _, _, hms, hSIE, _⟩ := h
-  obtain ⟨_, _, _, _, hXS, hFS, hVS, hSD, hMPP, _⟩ := hms
+  obtain ⟨_, _, _, _, hXS, hFS, hVS, hSD, hMPP, _, hPELP⟩ := hms
   exact execExecuteCsrrciSstatus 2#5 15#5 (s.regs .mstatus) s hpriv rfl hmisa (by decide) (by decide)
     (AxSpinPOc.mppNominal _ hMPP)
-    (AxSpinPOc.legalizeSieClearIdem _ hSIE hXS hFS hVS hSD hMPP)
+    (AxSpinPOc.legalizeSieClearIdem _ hSIE hXS hFS hVS hSD hMPP hPELP)
 
 /-- Rocq `exec_p0c`: csrr a5,sstatus at a regime state writes a5 := the S-view of mstatus. -/
 theorem execP0c (T : PTree) (satp0 : BitVec 64) (s : ExecSt) (h : ctrlOkS T satp0 s.regs) :

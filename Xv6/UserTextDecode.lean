@@ -46,7 +46,7 @@ noncomputable def utextDecodeWith (dref : (r : Register) → Option (RegisterTyp
   | some k =>
     if k.width = 4 then
       match runRead dref (ext_decode (BitVec.ofNat 32 k.enc)) with
-      | some (i, true) =>
+      | some (i, _) =>
         if isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 k.enc)) = false ∧ pc % 2 = 0 ∧ instrWf i then
           some (false, i, i, 4, k.enc)
         else none
@@ -76,7 +76,7 @@ structure UDecodeFacts (dref : (r : Register) → Option (RegisterType r)) (m : 
   bytes : ∀ j, j < n → m (pc + j) = some (BitVec.ofNat 8 (w >>> (8 * j)))
   base : rvc = false → n = 4 ∧ i₀ = i ∧
     isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 w)) = false ∧
-    runRead dref (ext_decode (BitVec.ofNat 32 w)) = some (i, true)
+    ∃ b, runRead dref (ext_decode (BitVec.ofNat 32 w)) = some (i, b)
   rvc : rvc = true → (n = if pc % 4 = 2 then 2 else 4) ∧
     isRVC (BitVec.ofNat 16 w) = true ∧
     runRead dref (ext_decode_compressed (BitVec.ofNat 16 w)) = some (i₀, true) ∧
@@ -120,7 +120,7 @@ theorem utextDecode_facts (dref : (r : Register) → Option (RegisterType r)) {t
         simp only [Option.some.injEq, Prod.mk.injEq] at h
         obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := h
         exact ⟨hgeo.2.1, hgeo.2.2, fun j hj => hbyte j (hw4 ▸ hj),
-          fun _ => ⟨rfl, rfl, hgeo.1, hdec⟩, fun h => absurd h (by simp)⟩
+          fun _ => ⟨rfl, rfl, hgeo.1, _, hdec⟩, fun h => absurd h (by simp)⟩
       · exact absurd h (by simp)
     · exact absurd h (by simp)
   · rw [if_neg hw4] at h
@@ -182,17 +182,17 @@ theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t :
     (hacc : ∀ (r : Register) (v : RegisterType r), dref r = some v →
       P ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P))
     (Φ : instruction → IProp GF) :
-    utextImg T m ∗ P ∗ ▷ (P -∗ Φ i) ⊢ utextWin T pc 4 w ∗ swp cpu (ext_decode (BitVec.ofNat 32 w)) Φ := by
+    utextImg T m ∗ P ∗ (P -∗ Φ i) ⊢ utextWin T pc 4 w ∗ swp cpu (ext_decode (BitVec.ofNat 32 w)) Φ := by
   have F := utextDecode_facts dref hok pc false i i₀ n w h
-  obtain ⟨hn, -, -, hdec⟩ := F.base rfl
+  obtain ⟨hn, -, -, b, hdec⟩ := F.base rfl
   subst hn
   iintro ⟨#Ht, HP, HΦ⟩
   isplitl []
   · iapply (utextImg_win T m pc 4 w F.bytes); iexact Ht
-  · iapply (swp_runRead cpu dref P hacc (ext_decode (BitVec.ofNat 32 w)) i true hdec Φ)
+  · iapply (swp_runRead cpu dref P hacc (ext_decode (BitVec.ofNat 32 w)) i b hdec Φ)
     isplitl [HP]
     · iexact HP
-    · simp only [laterIf, if_true]; iexact HΦ
+    · iapply laterIf_of_later; iexact HΦ
 
 /-- A compressed half: its window (2 or 4 bytes, by the pc's alignment), its
 decode step to the raw AST `i₀`, and the expansion `i₀ ↦ i`. -/

@@ -72,7 +72,10 @@ def AxSpineOk6.sconfMsFacts (ms : BitVec 64) : Prop :=
   _get_Mstatus_VS ms = extStatus_map_forwards .Off ∧
   _get_Mstatus_SD ms = 0#1 ∧
   haveNomVal (_get_Mstatus_MPP ms) = true ∧
-  (_get_Mstatus_TVM ms == 1#1) = false
+  (_get_Mstatus_TVM ms == 1#1) = false ∧
+  -- (Lean-only, 2026-11-04) SPELP/MPELP clear: with no Zicfilp the `sstatus` legalisation forces
+  -- them to 0, so the identity of a no-op `csrrci sstatus` needs them 0 (`legalizeSieClearIdem`)
+  (_get_Mstatus_SPELP ms = 0#1 ∧ _get_Mstatus_MPELP ms = 0#1)
 
 /-- Rocq `pmp_ok`: the kernel PMP entry 0 (TOR, R/X, covering RAM). -/
 def AxSpineOk6.pmpOk (rs : RegFile) : Prop :=

@@ -832,7 +832,7 @@ end leafMcounteren
 /-! ## 5. menvcfg (0x30A; Ext_U-and-gated check, MONADIC legalize) -/
 
 /-- Rocq `exec_eff_hartSupports_Zicfiss` (deviation 2). -/
-theorem execEffHartSupportsZicfiss : hartSupports .Ext_Zicfiss = true := by decide +kernel
+theorem execEffHartSupportsZicfiss : hartSupports .Ext_Zicfiss = false := by decide +kernel  -- no Zicfiss since 2026-11-04
 /-- Rocq `exec_eff_hartSupports_Zicboz` (deviation 2). -/
 theorem execEffHartSupportsZicboz : hartSupports .Ext_Zicboz = true := by decide +kernel
 /-- Rocq `exec_eff_hartSupports_Zicbom` (deviation 2). -/
@@ -910,8 +910,8 @@ def WeakLeafCsrw2.menvcfgLegalized (o v : BitVec 64) : BitVec 64 :=
                   (_update_MEnvcfg_LPE
                     (_update_MEnvcfg_FIOM o
                       (if sys_enable_writable_fiom then _get_MEnvcfg_FIOM v' else 0#1))
-                    (_get_MEnvcfg_LPE v'))
-                  (_get_MEnvcfg_SSE v'))
+                    0#1)  -- LPE/SSE: 0 (no Zicfilp/Zicfiss, 2026-11-04)
+                  0#1)
                 (_get_MEnvcfg_CBZE v'))
               (_get_MEnvcfg_CBCFE v'))
             (WeakLeafCsrw2.menvcfgCbie v))

@@ -610,7 +610,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-D.SSPOPCHK", "INERT", "reason:not decoded on this platform: Zicfiss inactive at boot: the encodings decode as Zimop/Zcmop (classes under ZIMOP_MOP_R/RR, ZCMOP)"),
   ("C-D.C_SSPOPCHK", "INERT", "reason:not decoded on this platform: Zicfiss inactive at boot: the encodings decode as Zimop/Zcmop (classes under ZIMOP_MOP_R/RR, ZCMOP)"),
   ("C-D.SSRDP", "INERT", "reason:not decoded on this platform: Zicfiss inactive at boot: the encodings decode as Zimop/Zcmop (classes under ZIMOP_MOP_R/RR, ZCMOP)"),
-  ("C-D.SSAMOSWAP", "WEAKER", "dec:Weak.Prom.Dec.v2_no_stronger,Weak.Prom.Dec.v2_weaker"),
+  ("C-D.SSAMOSWAP", "INERT", "reason:not decoded on this platform: Zicfiss not supported (since the 2026-11-04 regeneration, owner ruling OWN.P9): ssamoswap.w/.d decode as ILLEGAL and trap (decoder classes ssamoswap.w/.d, stop=trap; Weak.Prom.Dec.v2_trap_no_stronger)"),
   ("C-D.ZICOND_RTYPE", "FAITHFUL", "dec:Weak.Prom.Dec.v2_no_stronger"),
   ("C-D.ZICBOM", "FAITHFUL", "dec:Weak.Prom.Dec.v2_no_stronger"),
   ("C-D.ZICBOZ", "WEAKER", "dec:Weak.Prom.Dec.v2_no_stronger,Weak.Prom.Dec.v2_weaker"),

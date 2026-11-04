@@ -119,8 +119,8 @@ def WeakLeafCsrw.mstatusLegalized (o v : BitVec 64) : BitVec 64 :=
                               (_update_Mstatus_TW
                                 (_update_Mstatus_TSR
                                   (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus v)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus v)))
+                                    (_update_Mstatus_MPELP o 0#1)  -- MPELP/SPELP: 0 (no Zicfilp, 2026-11-04)
+                                     0#1)
                                   (_get_Mstatus_TSR (Mk_Mstatus v)))
                                 (_get_Mstatus_TW (Mk_Mstatus v)))
                               (_get_Mstatus_TVM (Mk_Mstatus v)))

@@ -457,8 +457,9 @@ theorem execSplitOnPageBoundaryAligned (a : BitVec 64) (w : Nat) (s : ExecSt) (h
 
 /-- Rocq `exec_hartSupports_Zca` (Lean's `hartSupports` is pure; ExecLib deviation 2). -/
 theorem hartSupportsZca : hartSupports .Ext_Zca = true := by decide +kernel
-/-- Rocq `WpDecode.exec_hartSupports_Zicfilp`. -/
-theorem hartSupportsZicfilp : hartSupports .Ext_Zicfilp = true := by decide +kernel
+/-- Rocq `WpDecode.exec_hartSupports_Zicfilp` -- FLIPPED 2026-11-04: the hart has no Zicfilp
+(model/sail-config-rv64d.json, owner ruling [OWN.P9]); Rocq's was `true`. -/
+theorem hartSupportsZicfilp : hartSupports .Ext_Zicfilp = false := by decide +kernel
 /-- Rocq `WpGprCsrwB.exec_hartSupports_Sv48`. -/
 theorem hartSupportsSv48 : hartSupports .Ext_Sv48 = true := by decide +kernel
 
@@ -513,7 +514,7 @@ theorem execCurrentlyEnabledSv39 (s : ExecSt) (h : (_get_Misa_S (s.regs .misa) =
   simp only [this, ↓reduceIte, execCurrentlyEnabledS, h]
 
 /-- Rocq `RiscvFetchExec.MISA_C`: the `misa` value of the platform. -/
-def misaC : BitVec 64 := 0x800000000014112D#64
+def misaC : BitVec 64 := 0x8000000000141105#64
 
 /-- Rocq `CommonWalk.exec_currentlyEnabled_Svnapot`. -/
 theorem execCurrentlyEnabledSvnapot (s : ExecSt) (h : s.regs .misa = misaC) :
@@ -540,10 +541,10 @@ theorem execGetXLPES (s : ExecSt) (h : _get_MEnvcfg_LPE (s.regs .menvcfg) = 0#1)
 theorem execCEZicfilpFalse (s : ExecSt) (hcp : s.regs .cur_privilege = .Machine)
     (hm : bool_bit_backwards (_get_Seccfg_MLPE (s.regs .mseccfg)) = false) :
     exec (currentlyEnabled .Ext_Zicfilp) s = some (false, s) := by
+  -- (since 2026-11-04 the gate is `false` without reading anything; `hcp`/`hm` are no longer needed)
   rw [currentlyEnabled]
-  simp only [execBind, execCurrentlyEnabledZicsr, ↓reduceIte, hartSupportsZicfilp]
-  unfold get_xLPE
-  exec_run [hcp, hm]
+  simp only [execBind, execCurrentlyEnabledZicsr, ↓reduceIte, hartSupportsZicfilp, Bool.false_eq_true]
+  rfl
 
 /-! ## 6. lean-sail's integer-range loops under `execR` (Rocq `RiscvTryStep`'s
 `execR_foreach_ZM_up'_*`) -/

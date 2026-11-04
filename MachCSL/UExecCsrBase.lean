@@ -52,7 +52,7 @@ open LeanRV64D LeanRV64D.Functions
 (besides the source GPR of `CSRReg`). -/
 def uxrReads : List Register :=
   [.cur_privilege, .misa, .mstatus, .menvcfg, .senvcfg, .mcounteren, .scounteren,
-   .mstateen0, .sstateen0, .mcycle, .mtime, .minstret, .mhpmcounter]
+   .mstateen0, .sstateen0, .mcycle, .mtime, .minstret, .mhpmcounter, .mseccfg]
 
 /-- The values the check chain runs at: User privilege, the frozen cells at
 their `hwVal` values, `menvcfg` at the kernel's user-time value; the DATA
@@ -67,6 +67,7 @@ def uxrPin (f : RegFile) : RegPin
   | .senvcfg => hwVal .senvcfg
   | .mstateen0 => hwVal .mstateen0
   | .sstateen0 => hwVal .sstateen0
+  | .mseccfg => hwVal .mseccfg
   | _ => none
 
 /-- The table's domain is the read set. -/
@@ -84,11 +85,13 @@ table's closed values (User, `misa`/`senvcfg`/`mstateen0`/`sstateen0` at
 about `mcounteren`/`scounteren` (Rocq `exec_check_CSR_U`'s premises). -/
 structure UxrCfg (s : UWSt) : Prop where
   priv : s.file .cur_privilege = Privilege.User
-  misa : s.file .misa = 0x800000000014112D#64
+  misa : s.file .misa = 0x8000000000141105#64
   menvcfg : s.file .menvcfg = menvcfgS
   senvcfg : s.file .senvcfg = 0#64
   mstateen0 : s.file .mstateen0 = 0#64
   sstateen0 : s.file .sstateen0 = 0#32
+  /-- the Zkr `seed` check (0x015) reads `mseccfg.USEED` at User (since 2026-11-04) -/
+  mseccfg : s.file .mseccfg = 0#64
   fs : _get_Mstatus_FS (s.file .mstatus) = 0#2
 
 /-- The file agrees with the table. -/
@@ -96,7 +99,7 @@ theorem UxrCfg.val {s : UWSt} (hc : UxrCfg s) (r : Register) (v : RegisterType r
     (h : uxrPin s.file r = some v) : s.file r = v := by
   unfold uxrPin at h
   split at h <;> simp only [hwVal, reduceCtorEq, Option.some.injEq] at h <;> subst h
-  all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mstateen0, hc.sstateen0]
+  all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mstateen0, hc.sstateen0, hc.mseccfg]
 
 /-- The bridge at the CSR table. -/
 theorem uxr_runRW_of_pin {X : Type} {D : UFoot} {s : UWSt} (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc)

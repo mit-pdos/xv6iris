@@ -19,7 +19,9 @@ to short-circuit `&`/`|` with effectful operands, the generated model reached
 `currentlyEnabled Ext_Zkr` -- which has no clause, `assert false` -- on a user
 access to `mseccfg`/`mseccfgh`, and this theorem carried a hypothesis `hZkr`
 for those two CSR rows.  The model is now regenerated with the fix,
-`tools/regen_sail_model.sh`; see notes/design-rulings.md.)
+`tools/regen_sail_model.sh`; see notes/design-rulings.md.  Since 2026-11-04 the
+Zkr module is compiled, so `currentlyEnabled Ext_Zkr` has its clause anyway;
+notes/riscv-model-bugs.md S2.)
 -/
 import Xv6.SpecUser
 import Xv6.UserStep

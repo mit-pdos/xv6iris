@@ -337,9 +337,10 @@ theorem WkStartNew.mretPriv (ms : BitVec 64) :
   rw [WkStartNew.cms2Mpp, (WkStartNew.ms1Bits ms).2.2.2]
   rfl
 
-/-- Rocq `menvcfg_legalized_LPE`: the legalized `menvcfg` takes the written `LPE`. -/
+/-- Rocq `menvcfg_legalized_LPE`: the legalized `menvcfg` takes the written `LPE` -- CHANGED
+2026-11-04: with no Zicfilp the legalisation forces `LPE := 0`. -/
 theorem WkStartNew.lpeLegal (o v : BitVec 64) :
-    _get_MEnvcfg_LPE (WeakLeafCsrw2.menvcfgLegalized o v) = _get_MEnvcfg_LPE v := by
+    _get_MEnvcfg_LPE (WeakLeafCsrw2.menvcfgLegalized o v) = 0#1 := by
   unfold WeakLeafCsrw2.menvcfgLegalized
   generalize WeakLeafCsrw2.menvcfgCbie v = cb
   generalize (if sys_enable_writable_fiom then _get_MEnvcfg_FIOM (Mk_MEnvcfg v) else 0#1) = fi
@@ -363,8 +364,7 @@ theorem WkStartNew.lpeFinal (menv0 : BitVec 64) (h : _get_MEnvcfg_LPE menv0 = 0#
     intro x c hc
     simp only [_get_MEnvcfg_LPE, Sail.BitVec.extractLsb, BitVec.extractLsb] at hc ⊢
     bv_decide
-  rw [WkStartNew.lpeLegal, WkTimerinit.tiMenv1, hor _ _ (by decide +kernel), stMenvAdue,
-    WkStartNew.lpeLegal, hor _ _ (by decide +kernel), h]
+  rw [WkStartNew.lpeLegal]
 
 /-! ### PMP (Rocq `pmp_allows_all_written`, `st_pmp_tor0_grants`) -/
 

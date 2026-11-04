@@ -67,8 +67,8 @@ def mstatusLegalize (o L : BitVec 64) : BitVec 64 :=
                               (_update_Mstatus_TW
                                 (_update_Mstatus_TSR
                                   (_update_Mstatus_SPELP
-                                    (_update_Mstatus_MPELP o (_get_Mstatus_MPELP (Mk_Mstatus L)))
-                                    (_get_Mstatus_SPELP (Mk_Mstatus L)))
+                                    (_update_Mstatus_MPELP o 0#1)
+                                    0#1)
                                   (_get_Mstatus_TSR (Mk_Mstatus L)))
                                 (_get_Mstatus_TW (Mk_Mstatus L)))
                               (_get_Mstatus_TVM (Mk_Mstatus L)))
@@ -94,7 +94,7 @@ def mstatusLegalize (o L : BitVec 64) : BitVec 64 :=
 
 /-- The reference map of `legalize_mstatus`: it reads `misa` only. -/
 def drefMisa : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | _ => none
 
 theorem misa_drefMisa_acc (cpu : CPU) (r : Register) (v : RegisterType r)
@@ -189,14 +189,16 @@ theorem bool_to_bit_eq (b : Bool) : bool_to_bit b = if b then 1#1 else 0#1 := by
 theorem legalize_extStatus_four (x : BitVec 2) : legalize_extStatus ExtContextPolicy.ExtContext_FourState x = x := rfl
 
 /-- Clearing `SIE` in `sstatus` (the supervisor view of an `mstatus` as
-`start` left it, at either `SIE`) clears exactly that bit of `mstatus`. -/
+`start` left it, at either `SIE`) clears that bit of `mstatus` -- and, since
+2026-11-04 (no Zicfilp: the legalisation forces `SPELP`/`MPELP` to 0), also
+bits 23 and 41 (mask `0xFFFFFDFFFF7FFFFD`). -/
 theorem sstatus_clear_sie' (o : BitVec 64)
     (hSXL : BitVec.extractLsb' 34 2 o = 2#2)
     (hFS : BitVec.extractLsb' 13 2 o = 0#2) (hXS : BitVec.extractLsb' 15 2 o = 0#2)
     (hVS : BitVec.extractLsb' 9 2 o = 0#2) (hSD : BitVec.extractLsb' 63 1 o = 0#1)
     (hMPP : BitVec.extractLsb' 11 2 o ≠ 2#2) :
     mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o &&& 0xFFFFFFFFFFFFFFFD#64)))) =
-      o &&& 0xFFFFFFFFFFFFFFFD#64 := by
+      o &&& 0xFFFFFDFFFF7FFFFD#64 := by
   have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
   unfold mstatusLegalize lift_sstatus lower_mstatus
   simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs, plat_mstatus_legal_vs,
@@ -205,7 +207,7 @@ theorem sstatus_clear_sie' (o : BitVec 64)
     _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_MPRV,
     _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
     _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD, _update_Mstatus_UXL,
-    _get_Mstatus_MPELP, _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
+    _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
     _get_Mstatus_SUM, _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_XS, _get_Mstatus_SPP, _get_Mstatus_MPIE,
     _get_Mstatus_SPIE, _get_Mstatus_SIE, _get_Mstatus_SD, _get_Mstatus_UXL,
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,
@@ -215,14 +217,15 @@ theorem sstatus_clear_sie' (o : BitVec 64)
     Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
-/-- Setting `SIE` in `sstatus` sets exactly that bit of `mstatus`. -/
+/-- Setting `SIE` in `sstatus` sets that bit of `mstatus` (and, since 2026-11-04,
+clears `SPELP`/`MPELP`, bits 23 and 41). -/
 theorem sstatus_set_sie' (o : BitVec 64)
     (hSXL : BitVec.extractLsb' 34 2 o = 2#2)
     (hFS : BitVec.extractLsb' 13 2 o = 0#2) (hXS : BitVec.extractLsb' 15 2 o = 0#2)
     (hVS : BitVec.extractLsb' 9 2 o = 0#2) (hSD : BitVec.extractLsb' 63 1 o = 0#1)
     (hMPP : BitVec.extractLsb' 11 2 o ≠ 2#2) :
     mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) (lower_mstatus o ||| 2#64)))) =
-      o ||| 2#64 := by
+      (o &&& 0xFFFFFDFFFF7FFFFF#64) ||| 2#64 := by
   have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
   unfold mstatusLegalize lift_sstatus lower_mstatus
   simp only [Mk_Mstatus, Mk_Sstatus, zero_extend_eq, BitVec.setWidth_eq, plat_mstatus_legal_fs, plat_mstatus_legal_vs,
@@ -231,7 +234,7 @@ theorem sstatus_set_sie' (o : BitVec 64)
     _update_Mstatus_MPP, _update_Mstatus_VS, _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_MPRV,
     _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_TVM, _update_Mstatus_TW, _update_Mstatus_TSR,
     _update_Mstatus_SPELP, _update_Mstatus_MPELP, _update_Mstatus_SD, _update_Mstatus_UXL,
-    _get_Mstatus_MPELP, _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
+    _get_Mstatus_SPELP, _get_Mstatus_TSR, _get_Mstatus_MPRV, _get_Mstatus_MPP, _get_Mstatus_MIE, _get_Mstatus_TW, _get_Mstatus_TVM, _get_Mstatus_MXR,
     _get_Mstatus_SUM, _get_Mstatus_FS, _get_Mstatus_VS, _get_Mstatus_XS, _get_Mstatus_SPP, _get_Mstatus_MPIE,
     _get_Mstatus_SPIE, _get_Mstatus_SIE, _get_Mstatus_SD, _get_Mstatus_UXL,
     _update_Sstatus_SIE, _update_Sstatus_SPIE, _update_Sstatus_SPP, _update_Sstatus_VS, _update_Sstatus_FS,

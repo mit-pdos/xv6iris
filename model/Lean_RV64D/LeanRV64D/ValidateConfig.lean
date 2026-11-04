@@ -70,6 +70,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -406,7 +407,7 @@ def check_vext_config (_ : Unit) : Bool :=
         valid)
       else valid)
   let valid : Bool :=
-    if (((vector_support_ge vector_support_level Float_single) && (not (true : Bool))) : Bool)
+    if (((vector_support_ge vector_support_level Float_single) && (not (false : Bool))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -484,7 +485,7 @@ def check_vext_config (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((false : Bool) && ((not (hartSupports Ext_Zve32f)) || (not (true : Bool)))) : Bool)
+    if (((false : Bool) && ((not (hartSupports Ext_Zve32f)) || (not (false : Bool)))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -626,7 +627,7 @@ def undefined_pma_check_opts (_ : Unit) : SailM pma_check_opts := do
           ssccptr := ← (undefined_bool ())
           svadu := ← (undefined_bool ()) })
 
-/-- Type quantifiers: k_ex673736_ : Bool -/
+/-- Type quantifiers: k_ex673776_ : Bool -/
 def check_pma_regions (regions : (List PMA_Region)) (prev_base : (BitVec 64)) (prev_size : (BitVec 64)) (check_opts : pma_check_opts) (found_valid_svadu_pma : Bool) : Bool := ExceptM.run do
   match regions with
   | [] =>
@@ -875,7 +876,7 @@ def check_pmp (_ : Unit) : Bool :=
     valid)
   else valid
 
-/-- Type quantifiers: k_ex673737_ : Bool -/
+/-- Type quantifiers: k_ex673777_ : Bool -/
 def check_required_sstvala_option (name : String) (value : Bool) : Bool :=
   if ((not value) : Bool)
   then
@@ -897,7 +898,7 @@ def check_misc_extension_dependencies (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((true : Bool) && (false : Bool)) : Bool)
+    if (((false : Bool) && (false : Bool)) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -960,7 +961,7 @@ def check_misc_extension_dependencies (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((true : Bool) && (not (true : Bool))) : Bool)
+    if (((false : Bool) && (not (true : Bool))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -969,7 +970,7 @@ def check_misc_extension_dependencies (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((true : Bool) && (not
+    if (((false : Bool) && (not
            ((true : Bool) && ((true : Bool) && ((false : Bool) || (true : Bool)))))) : Bool)
     then
       (let valid : Bool := false
@@ -979,7 +980,7 @@ def check_misc_extension_dependencies (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((true : Bool) && (not (true : Bool))) : Bool)
+    if (((false : Bool) && (not (false : Bool))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -997,7 +998,7 @@ def check_misc_extension_dependencies (_ : Unit) : Bool :=
       valid)
     else valid
   let valid : Bool :=
-    if (((false : Bool) && ((not (true : Bool)) || (not (false : Bool)))) : Bool)
+    if (((false : Bool) && ((not (false : Bool)) || (not (false : Bool)))) : Bool)
     then
       (let valid : Bool := false
       let _ : Unit :=
@@ -1212,7 +1213,7 @@ def check_mstatus_fields (_ : Unit) : Bool :=
         valid)
       else valid)
     else
-      (if ((true : Bool) : Bool)
+      (if ((false : Bool) : Bool)
       then
         (if ((legal_fs == ExtContext_Off) : Bool)
         then

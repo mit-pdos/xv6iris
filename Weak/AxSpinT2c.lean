@@ -84,7 +84,7 @@ def s0X (h : Agent) : Athread := AxEpiRun.st (cpuOf h) (.pure ()) (regsE h) ibNo
 /-- One `ctrlOkSW` conjunct of `regsE h` (closed). -/
 local macro "ax_t2c_ctrl" : tactic => `(tactic|
   (unfold ctrlOkSW ctrlOkS AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts pmpW
-   refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
+   refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
      tlbExactW, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
    all_goals first | rfl | decide +kernel))
 

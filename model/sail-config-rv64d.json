@@ -3,7 +3,7 @@
 // `make model-gen` (see root README.md "Regenerating the Sail model").
 //
 // This is sail-riscv's own config/config.json.in, fully resolved for the
-// rv64d_v256_e64 build, with exactly FOUR changes from upstream's default
+// rv64d_v256_e64 build, with exactly SIX changes from upstream's default
 // (each marked "xv6iris" inline):
 //   1. `platform.simple_interrupt_generator.supported` := false  (see below)
 //   2. `extensions.B.supported`                        := false  (see below)
@@ -14,7 +14,13 @@
 //      model's OWN `config_is_valid` rejects the config otherwise, since each
 //      of those requires Zve*, and Zve* comes from V's support_level.
 //   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
-// Everything else is unmodified sail-riscv default config.
+//   5. `extensions.{F,D}.supported` := false, together with the five F/D-
+//      DEPENDENT extensions upstream leaves on (Zfa Zfbfmin Zfh Zfhmin Zcd)
+//      -- see "Why disable F and D" below (2026-11-04, owner ruling [OWN.P9]).
+//   6. `extensions.{Zicfilp,Zicfiss,Smmpm}.supported` := false -- same reason.
+// Everything else is unmodified sail-riscv default config.  (Zkr stays
+// `supported: true`; since 2026-11-04 its module IS compiled, see
+// model/sail-modules.txt.)
 //
 // To refresh this file after a sail-riscv upstream bump: resolve the new
 // `config/config.json.in` (cmake's `configure_file` substitution) with the
@@ -26,7 +32,7 @@
 //   CONFIG_MIDELEG_DELEGATABLE_BITS_VALUE 0x0000_0000_0000_2222
 //   (any placeholder cmake leaves undefined resolves to the empty string)
 //
-// -- then re-apply the four edits above, and diff against the previous file to
+// -- then re-apply the six edits above, and diff against the previous file to
 // catch every other upstream default change. Two of the fields are load-bearing
 // for the proofs and worth re-reading on every bump: `memory.physaddr_bits`
 // (56 upstream, which is what `legalize_satp`'s PPN mask and `pmpaddr`'s
@@ -60,6 +66,28 @@
 // through that assert, so a bad config shows up there as a build failure.
 // Upstream already ships Zba/Zbb/Zbs disabled while B is enabled, so B has no
 // dependents here; V is the one with a family.
+//
+// Why disable F and D (and Zicfilp, Zicfiss, Smmpm) -- 2026-11-04, owner
+// ruling [OWN.P9] ("Clear"; notes/riscv-model-bugs.md S3): the module list
+// (model/sail-modules.txt) compiles FD_core but NOT FD_instructions, and
+// compiles no Smmpm-specific code; with these flags on, `reset_misa` set
+// misa.F and misa.D and the config claimed Zicfilp/Zicfiss/Smmpm, so the model
+// was a hart that ADVERTISES floating point (and CFI, M-mode pointer masking)
+// while every FP opcode traps as illegal -- not a faithful RISC-V hart.  With
+// them off the hart is an rv64imac-style hart: `reset_misa` produces
+// 0x8000000000141105 (I M A C S U; was 0x800000000014112D) and the F/D,
+// Zicfilp/Zicfiss and Smmpm gates all answer false.  The kernel image is
+// compiled without FP instructions, so no kernel path depended on F/D.
+// THE F/D CASCADE: Zfbfmin requires F in the model's own `config_is_valid`
+// (`check_misc_extension_dependencies`), so it must go with F; Zfa, Zfh,
+// Zfhmin and Zcd are F/D-only extensions whose instructions live in the
+// uncompiled FD_instructions module, so they are cleared too (the config then
+// claims nothing the compiled model cannot execute).  Zfinx/Zdinx/Zhinx stay
+// false as upstream ships them.  Ssnpm/Smnpm (S/U-mode pointer masking) are
+// left as upstream: their gates live in the compiled PM_* modules.
+// The full extension set (with FD_instructions etc.) is what upstream's own
+// `--all-modules` build uses; a Sail-level FP model would need the softfloat
+// `riscv_f*` hooks realised (model/Xv6Extras.lean), out of scope here.
 //
 // Why disable SIG: the Sail model's built-in "Simple Interrupt Generator"
 // test device (see sail-riscv/doc/SimpleInterruptGenerator.md) claims MMIO
@@ -550,7 +578,8 @@
       "supported": true
     },
     "F": {
-      "supported": true,
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false,
       // When to set mstatus[FS] and mstatus[SD] to 1, as a result of fflags
       // being set. There are three options:
       //
@@ -563,7 +592,8 @@
       "fflags_dirty_policy": "Fflags_Dirty_Precise"
     },
     "D": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false
     },
     "V": {
       // `support_level` must be one of the below strings:
@@ -663,10 +693,12 @@
       "supported": true
     },
     "Zicfilp": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false
     },
     "Zicfiss": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false
     },
     "Zicond": {
       "supported": true
@@ -729,16 +761,20 @@
       }
     },
     "Zfa": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- depends on F/D, see the header
+      "supported": false
     },
     "Zfbfmin": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- depends on F/D, see the header
+      "supported": false
     },
     "Zfh": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- depends on F/D, see the header
+      "supported": false
     },
     "Zfhmin": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- depends on F/D, see the header
+      "supported": false
     },
     "Zfinx": {
       "supported": false
@@ -753,7 +789,8 @@
       "supported": false
     },
     "Zcd": {
-      "supported": true
+      // xv6iris: DISABLED (upstream default: true) -- depends on F/D, see the header
+      "supported": false
     },
     "Zcb": {
       "supported": true
@@ -917,7 +954,8 @@
       "supported_pmlen_16": true
     },
     "Smmpm": {
-      "supported": true,
+      // xv6iris: DISABLED (upstream default: true) -- see the header
+      "supported": false,
       "supported_pmlen_7": true,
       "supported_pmlen_16": true
     },

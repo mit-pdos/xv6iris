@@ -106,9 +106,9 @@ def a28 : instruction := .STORE (16#12, .Regidx 10#5, .Regidx 9#5, 8)
 
 /-! Lean-only checks (deviation 1): the three jal words decode to the instructions above. -/
 
-theorem AxSpinAq.walk0cM : runRead drefM (ext_decode Wa0c) = some (a0c, true) := by kernel_rfl
-theorem AxSpinAq.walk12M : runRead drefM (ext_decode Wa12) = some (a12, true) := by kernel_rfl
-theorem AxSpinAq.walk24M : runRead drefM (ext_decode Wa24) = some (a24, true) := by kernel_rfl
+theorem AxSpinAq.walk0cM : runRead drefM (ext_decode Wa0c) = some (a0c, false) := by kernel_rfl
+theorem AxSpinAq.walk12M : runRead drefM (ext_decode Wa12) = some (a12, false) := by kernel_rfl
+theorem AxSpinAq.walk24M : runRead drefM (ext_decode Wa24) = some (a24, false) := by kernel_rfl
 
 /-- (Lean-only, deviation 1) acquire's 22 non-panic instructions as (offset from `acquire`,
 width, encoding), over the constants `acquireText` states. -/

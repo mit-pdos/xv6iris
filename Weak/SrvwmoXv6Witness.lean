@@ -30,8 +30,8 @@ THE BLOCK.  `_entry`'s FIRST memory instruction, `ld sp,1000(sp)` at `0x80000004
 plain 8-byte load of the GOT word at `0x8000a3e8`, every byte read from the image (timestamp 0),
 value `0x8000a420`.  The administrative run in front of it is BUILT BY KERNEL EVALUATION, not
 written down: `LInstr`, a silent stretch (106 nodes), the fetch of `auipc sp,0xa` (4 bytes at
-`0x80000000`), a silent stretch (16 nodes) to the instruction's `Ret`, `LInstr`, a silent stretch
-(106 nodes), the fetch of `ld sp,1000(sp)` (4 bytes at `0x80000004`), a silent stretch (96
+`0x80000000`), a silent stretch (14 nodes) to the instruction's `Ret`, `LInstr`, a silent stretch
+(106 nodes), the fetch of `ld sp,1000(sp)` (4 bytes at `0x80000004`), a silent stretch (94
 nodes) to the data load node.  Both fetches answer the boot image at timestamp 0 (the pin) and
 lie in W3's pristine window `[bcRoLo, bcRoHi)` (the fetch clause).
 
@@ -57,7 +57,8 @@ about W13's bundle.  `srvwmoXv6M1PfRun` checks the premise set FEEDS W5b′'s re
 ## Measurements (kernel, `decide +kernel`)
 
 Footprint `SrvwmoXv6Witness.dEntry`: 22 registers (the deduplicated collector readback of the
-four stretches).  Node counts 106 / 16 / 106 / 96.  Image words: `0x0000a117` (`auipc`),
+four stretches).  Node counts 106 / 14 / 106 / 94 (16 / 96 before 2026-11-04: the 32-bit decode no longer reads
+`cur_privilege` and `mseccfg` for the Zicfilp/Zicfiss guards).  Image words: `0x0000a117` (`auipc`),
 `0x3e813103` (`ld`); GOT bytes `20 a4 00 80 00 00 00 00`.
 
 **Name map.**  None (Lean-only).  Main declarations: `esilAdmRun`, `execProgOk'SSnoc`,
@@ -357,14 +358,14 @@ theorem SrvwmoXv6Witness.len1 : ecount 600 SrvwmoXv6Witness.dEntry SrvwmoXv6Witn
   decide +kernel
 theorem SrvwmoXv6Witness.len2 :
     ecount 600 SrvwmoXv6Witness.dEntry
-      (ecurRead SrvwmoXv6Witness.wf1.toNat SrvwmoXv6Witness.x1) = 16 := by
+      (ecurRead SrvwmoXv6Witness.wf1.toNat SrvwmoXv6Witness.x1) = 14 := by
   decide +kernel
 theorem SrvwmoXv6Witness.len3 :
     ecount 600 SrvwmoXv6Witness.dEntry (ecurLoop false SrvwmoXv6Witness.x2) = 106 := by
   decide +kernel
 theorem SrvwmoXv6Witness.len4 :
     ecount 600 SrvwmoXv6Witness.dEntry
-      (ecurRead SrvwmoXv6Witness.wf2.toNat SrvwmoXv6Witness.x3) = 96 := by
+      (ecurRead SrvwmoXv6Witness.wf2.toNat SrvwmoXv6Witness.x3) = 94 := by
   decide +kernel
 
 theorem SrvwmoXv6Witness.noSf1 :

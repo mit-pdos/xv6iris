@@ -9,12 +9,14 @@ default class and the counter class, and the check at User for every number
   `CSR_Illegal` for every other number except the three of `uxrExc`.  The
   table does not pin the counter enables, so these walks provably never read
   them.
-* `0x001`–`0x003` (`fflags`/`frm`/`fcsr`): the F gate reads `mstatus.FS`,
-  symbolic; `uxr_ccr_fs` composes the check (`false` under `FS = 0`, Rocq
-  `exec_currentlyEnabled_F_off`) with the closed rest.
+* `0x001`–`0x003` (`fflags`/`frm`/`fcsr`): `uxr_ccr_fs` composes the check
+  (the F gate `false`, Rocq `exec_currentlyEnabled_F_off`) with the closed
+  rest.  (Since 2026-11-04 the hart has no F, so the gate is `false` by
+  `hartSupports` without reading `mstatus.FS`.)
 * `0x747`/`0x757` (`mseccfg`/`mseccfgh`) are refused at the privilege gate
-  like every machine-level number (Sail's `&` short-circuits, so the missing
-  `currentlyEnabled Ext_Zkr` clause behind it is never reached).
+  like every machine-level number (Sail's `&` short-circuits).  (Since
+  2026-11-04 the Zkr module is compiled, so `currentlyEnabled Ext_Zkr` has a
+  clause; before, it was an `assert false` behind that gate.)
 
 `uxr_ccr_spec`: for every non-default number outside `uxrExc`, the check
 `check_CSR_result c User acc` walks, at the table, to `CSR_Illegal`.
@@ -32,7 +34,7 @@ open LeanRV64D LeanRV64D.Functions
 -- per-quarter evaluations `uxr_tab_*` in `UExecCsrTabR`/`W`/`RW`.
 
 /-- **The table**, one kernel evaluation per access type and quarter at a
-SYMBOLIC file (the default numbers skipped by `||`; 339 walks in all per
+SYMBOLIC file (the default numbers skipped by `||`; 340 walks in all per
 access type): every number is default, excepted, or `CSR_Illegal`. -/
 theorem uxr_tab (f : RegFile) (acc : CSRAccessType) (n : Nat) (hn : n < 4096) :
     uxrChk f acc n = true := by

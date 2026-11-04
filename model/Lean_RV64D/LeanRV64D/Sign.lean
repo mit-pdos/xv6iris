@@ -58,6 +58,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -202,11 +203,11 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex672019_ : Nat, k_ex672019_ ∈ {16, 32, 64, 128} -/
-def float_is_positive (op : (BitVec k_ex672019_)) : Bool :=
+/-- Type quantifiers: k_ex672060_ : Nat, k_ex672060_ ∈ {16, 32, 64, 128} -/
+def float_is_positive (op : (BitVec k_ex672060_)) : Bool :=
   (is_highest_zero op)
 
-/-- Type quantifiers: k_ex672021_ : Nat, k_ex672021_ ∈ {16, 32, 64, 128} -/
-def float_is_negative (op : (BitVec k_ex672021_)) : Bool :=
+/-- Type quantifiers: k_ex672062_ : Nat, k_ex672062_ ∈ {16, 32, 64, 128} -/
+def float_is_negative (op : (BitVec k_ex672062_)) : Bool :=
   (is_highest_one op)
 

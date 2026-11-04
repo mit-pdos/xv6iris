@@ -94,9 +94,11 @@ theorem execEffCEZicfilpFalse (s : ExecSt) (hcp : s.regs .cur_privilege = .Machi
     (hm : bool_bit_backwards (_get_Seccfg_MLPE (s.regs .mseccfg)) = false) :
     execEff (currentlyEnabled .Ext_Zicfilp) s = some (false, s, []) := by
   rw [currentlyEnabled]
-  simp only [execEffBindEq, execEffRecCEZicsrAny, execEffHartSupportsZicfilp, ↓reduceIte]
-  unfold get_xLPE
-  exec_eff_steps [hcp, hm]
+  -- (since 2026-11-04 the gate is `false` without reads; `hcp`/`hm` no longer needed)
+  simp only [execEffBindEq, execEffRecCEZicsrAny, execEffHartSupportsZicfilp, ↓reduceIte,
+    Bool.false_eq_true]
+  try unfold get_xLPE
+  try exec_eff_steps [hcp, hm]
 
 /-- Rocq `exec_eff_jump_to_zca`: `jump_to` under the C extension (a 2-aligned
 target jumps). -/

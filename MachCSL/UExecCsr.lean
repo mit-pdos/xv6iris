@@ -57,8 +57,9 @@ theorem uxr_ccr_dflt (f : RegFile) (c : BitVec 12) (acc : CSRAccessType) (h : ux
 section
 variable {D : UFoot} {s : UWSt}
 
-/-- `F` is off under `FS = 0` (Rocq `exec_currentlyEnabled_F_off`): the
-`mstatus.FS` gate reads the symbolic `mstatus`. -/
+/-- `F` is off (Rocq `exec_currentlyEnabled_F_off`, there under `FS = 0`).
+Since 2026-11-04 the hart has no F: the gate is `false` by `hartSupports`,
+before any `misa`/`mstatus.FS` read; `hc.fs` is no longer needed. -/
 theorem uxr_cE_F_off (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) :
     runRW D orc s (currentlyEnabled .Ext_F) = some (false, s, orc) := by
   have hDm : D.Dr .misa = true := hD _ (by decide)

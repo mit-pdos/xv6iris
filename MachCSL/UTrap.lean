@@ -54,12 +54,14 @@ open LeanRV64D LeanRV64D.Functions
 /-! ## §1 The delivered `mstatus` and its bit facts (Rocq `UserTrap.v` §1) -/
 
 /-- **Rocq `utrap_ms`**: `mstatus` after a trap from User to Supervisor
-(`SPELP := elp`, `SPIE := SIE`, `SIE := 0`, `SPP := 0`, in the model's
-order). -/
-def utrapMs (elp : BitVec 1) (ms : BitVec 64) : BitVec 64 :=
+(`SPIE := SIE`, `SIE := 0`, `SPP := 0`, in the model's order).
+Since 2026-11-04 the hart has no Zicfilp, so the trap no longer writes
+`SPELP := elp`; the `elp` argument is kept (unused) so that the many
+statements over `utrapMs e ms` are unchanged. -/
+def utrapMs (_elp : BitVec 1) (ms : BitVec 64) : BitVec 64 :=
   Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
-    (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange ms 23 23 elp) 5 5
-      (_get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 elp))) 1 1 0#1) 8 8 0#1
+    (Sail.BitVec.updateSubrange ms 5 5
+      (_get_Mstatus_SIE ms)) 1 1 0#1) 8 8 0#1
 
 /-- **Rocq `utrap_scause`**: `scause` after a trap with cause `c` (both
 halves written, so the old value is irrelevant: `utrapScause_eq`). -/
@@ -189,19 +191,11 @@ theorem swp_trap_handler_U (cpu : CPU) (c : TrapCause) (pc0 : BitVec 64) (info :
   iintro ⟨#Hhw, Hpriv, Hsatp, Hgprs, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, HΦ⟩
   have hbase := stvecDirect_base h hdir
   have hmode : BitVec.extractLsb' 0 2 h = 0#2 := hdir
-  unfold trap_handler zicfilp_preserve_elp_on_trap
-  generalize hR : reset_elp () = R
-  swp_run 40
-  -- the `reset_elp` node: a write of the value already there
-  subst hR
-  unfold reset_elp
-  iapply (swp_writeReg_hw_bind (r := Register.elp) (v := landing_pad_bits_backwards .NO_LP_EXPECTED)
-    (h := by rfl))
-  iframe Hhw
-  inext
-  have hms : Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
-      (Sail.BitVec.updateSubrange ms 23 23 0#1) 5 5
-      (_get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 0#1)))
+  unfold trap_handler
+  -- (no Zicfilp since 2026-11-04: the trap neither banks `elp` into `SPELP`
+  -- nor resets `elp`)
+  have hms : Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
+      (Sail.BitVec.updateSubrange ms 5 5 (_get_Mstatus_SIE ms))
       1 1 0#1) 8 8 0#1 = utrapMs 0#1 ms := rfl
   have hsc : Sail.BitVec.updateSubrange
       (Sail.BitVec.updateSubrange sc 63 63 (bool_to_bit (trapCause_is_interrupt c))) 62 0

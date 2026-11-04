@@ -71,11 +71,11 @@ theorem AxSpinTailW.rfFDec9c : rfF (ext_decode AxSpinTail2.wJal) := by
 
 /-- Decode walk of `wJal`, machine reference map (confirms the AST). -/
 theorem AxSpinTailW.walk9cM :
-    runRead drefM (ext_decode AxSpinTail2.wJal) = some (AxSpinTailW.ap9c, true) := by kernel_rfl
+    runRead drefM (ext_decode AxSpinTail2.wJal) = some (AxSpinTailW.ap9c, false) := by kernel_rfl
 
 /-- Decode walk of `wJal`, supervisor reference map. -/
 theorem AxSpinTailW.walk9cS :
-    runRead WkEntryNew.drefS0 (ext_decode AxSpinTail2.wJal) = some (AxSpinTailW.ap9c, true) := by
+    runRead WkEntryNew.drefS0 (ext_decode AxSpinTail2.wJal) = some (AxSpinTailW.ap9c, false) := by
   kernel_rfl
 
 /-- The decode of `wJal`. -/

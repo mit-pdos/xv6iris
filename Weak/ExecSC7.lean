@@ -251,7 +251,7 @@ def menvcfgLegalized (o v : BitVec 64) : BitVec 64 :=
   _update_MEnvcfg_PBMTE (_update_MEnvcfg_ADUE (_update_MEnvcfg_PMM (_update_MEnvcfg_STCE (_update_MEnvcfg_CBIE
     (_update_MEnvcfg_CBCFE (_update_MEnvcfg_CBZE (_update_MEnvcfg_SSE (_update_MEnvcfg_LPE (_update_MEnvcfg_FIOM o
       (if sys_enable_writable_fiom then _get_MEnvcfg_FIOM v' else 0#1))
-      (_get_MEnvcfg_LPE v')) (_get_MEnvcfg_SSE v')) (_get_MEnvcfg_CBZE v')) (_get_MEnvcfg_CBCFE v'))
+      0#1) 0#1) (_get_MEnvcfg_CBZE v')) (_get_MEnvcfg_CBCFE v'))  -- LPE/SSE: 0 (no Zicfilp/Zicfiss, 2026-11-04)
       (menvcfgCbie v)) (_get_MEnvcfg_STCE v'))
       (if (true && is_supported_pmm .PM_SMNPM (pmm_mode_backwards (_get_MEnvcfg_PMM v'))) = true
        then _get_MEnvcfg_PMM v' else _get_MEnvcfg_PMM o))
@@ -278,8 +278,8 @@ theorem execWriteCSRMenvcfg (v : BitVec 64) (s : ExecSt) (hS : (_get_Misa_S (s.r
     simp only [this, ↓reduceIte, execCurrentlyEnabledSv39 s hS]
   rw [write_CSR_menvcfg]
   unfold legalize_menvcfg legalize_xenvcfg_cbie menvcfgLegalized menvcfgCbie
-  have hzl : hartSupports .Ext_Zicfilp = true := by decide +kernel
-  have hzs : hartSupports .Ext_Zicfiss = true := by decide +kernel
+  have hzl : hartSupports .Ext_Zicfilp = false := by decide +kernel  -- no Zicfilp/Zicfiss since 2026-11-04
+  have hzs : hartSupports .Ext_Zicfiss = false := by decide +kernel
   cases h1 : (_get_MEnvcfg_CBIE (Mk_MEnvcfg v) != 2#2) <;>
   cases h2 : is_supported_pmm .PM_SMNPM (pmm_mode_backwards (_get_MEnvcfg_PMM (Mk_MEnvcfg v))) <;>
   exec_run [hzl, hzs, hZb, hZm, hSm, hPb, execCurrentlyEnabledSstc, execCurrentlyEnabledSvadu, h1, h2,
@@ -613,8 +613,10 @@ def stvecBase (v : BitVec 64) : BitVec 64 := _get_Mtvec_Base v ++ 0b00#2
 /-- Rocq's `s9` of section `TrapReduce`: the model's exact write order of an S-mode
 interrupt trap. -/
 def trapSupS9 (s : ExecSt) (i : InterruptType) (pc0 ms_v sc_old : BitVec 64) (elp_v : BitVec 1) : ExecSt :=
-  let ms_e := Sail.BitVec.updateSubrange ms_v 23 23 elp_v
-  let s1e := (s.setReg .mstatus ms_e).setReg .elp (landing_pad_bits_backwards .NO_LP_EXPECTED)
+  -- since 2026-11-04 (no Zicfilp) the trap neither banks `elp` into `SPELP` nor resets `elp`;
+  -- `elp_v` is kept (unused) so that the statements over this state are unchanged
+  let ms_e := ms_v
+  let s1e := s
   let c1 := Sail.BitVec.updateSubrange sc_old (64 - 1) (64 - 1) (bool_to_bit (trapCause_is_interrupt (.Interrupt i)))
   let c2 := Sail.BitVec.updateSubrange c1 (64 - 2) 0
     (zero_extend (m := 64 - 1) (trapCause_bits_forwards (.Interrupt i)))
@@ -633,7 +635,7 @@ theorem execHandleInterruptS (s : ExecSt) (i : InterruptType) (pc0 ms_v sc_old s
     exec (handle_interrupt i .Supervisor) s =
       some ((), (trapSupS9 s i pc0 ms_v sc_old elp_v).setReg .nextPC (stvecBase stvec_v)) := by
   subst hms hsc hstvec help hpc
-  unfold handle_interrupt trap_handler zicfilp_preserve_elp_on_trap reset_elp get_config_print_exception
+  unfold handle_interrupt trap_handler get_config_print_exception
     get_config_print_interrupt prepare_trap_vector tval
   exec_run [hartSupportsZicfilp, execTrackTrapS]
   simp (config := { decide := true }) only [ExecSt.setReg_regs, RegFile.set_other, RegFile.set_same,

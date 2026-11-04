@@ -125,14 +125,14 @@ def p22 : instruction :=
 
 /-! Lean-only checks (deviation 1): the eight 4-byte words decode to the instructions above. -/
 
-theorem AxSpinPO.walk0aM : runRead drefM (ext_decode Wq0a) = some (q0a, true) := by kernel_rfl
-theorem AxSpinPO.walk10M : runRead drefM (ext_decode Wq10) = some (q10, true) := by kernel_rfl
-theorem AxSpinPO.walk18M : runRead drefM (ext_decode Wq18) = some (q18, true) := by kernel_rfl
-theorem AxSpinPO.walk2cM : runRead drefM (ext_decode Wq2c) = some (q2c, true) := by kernel_rfl
-theorem AxSpinPO.walk30M : runRead drefM (ext_decode Wq30) = some (q30, true) := by kernel_rfl
-theorem AxSpinPO.walkP08M : runRead drefM (ext_decode Wp08) = some (p08, true) := by kernel_rfl
-theorem AxSpinPO.walkP0cM : runRead drefM (ext_decode Wp0c) = some (p0c, true) := by kernel_rfl
-theorem AxSpinPO.walkP16M : runRead drefM (ext_decode Wp16) = some (p16, true) := by kernel_rfl
+theorem AxSpinPO.walk0aM : runRead drefM (ext_decode Wq0a) = some (q0a, false) := by kernel_rfl
+theorem AxSpinPO.walk10M : runRead drefM (ext_decode Wq10) = some (q10, false) := by kernel_rfl
+theorem AxSpinPO.walk18M : runRead drefM (ext_decode Wq18) = some (q18, false) := by kernel_rfl
+theorem AxSpinPO.walk2cM : runRead drefM (ext_decode Wq2c) = some (q2c, false) := by kernel_rfl
+theorem AxSpinPO.walk30M : runRead drefM (ext_decode Wq30) = some (q30, false) := by kernel_rfl
+theorem AxSpinPO.walkP08M : runRead drefM (ext_decode Wp08) = some (p08, false) := by kernel_rfl
+theorem AxSpinPO.walkP0cM : runRead drefM (ext_decode Wp0c) = some (p0c, false) := by kernel_rfl
+theorem AxSpinPO.walkP16M : runRead drefM (ext_decode Wp16) = some (p16, false) := by kernel_rfl
 
 /-! # 2. The text -/
 

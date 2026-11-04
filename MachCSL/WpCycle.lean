@@ -147,7 +147,7 @@ theorem wpLoop_m_base (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege)
   iapply swp_bind
   iapply (hdec _)
   iframe
-  inext
+  -- (no `inext`: `decodes32P` carries no later since 2026-11-04)
   iintro HmConf
   mconf_cases HmConf
   swp_run 40

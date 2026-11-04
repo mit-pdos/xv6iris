@@ -18,6 +18,7 @@ import LeanRV64D.SysControl
 import LeanRV64D.Platform
 import LeanRV64D.Vmem
 import LeanRV64D.InstsBegin
+import LeanRV64D.ZkrControl
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -77,6 +78,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -244,7 +246,7 @@ def encdec_csrop_backwards_matches (arg_ : (BitVec 2)) : Bool :=
   | 0b11 => true
   | _ => false
 
-/-- Type quantifiers: k_ex673695_ : Bool, k_ex673694_ : Bool -/
+/-- Type quantifiers: k_ex673735_ : Bool, k_ex673734_ : Bool -/
 def csr_access_type (op : csrop) (rd_is_x0 : Bool) (rs1_imm_is_zero : Bool) : CSRAccessType :=
   match (op, rd_is_x0, rs1_imm_is_zero) with
   | (.CSRRW, true, _) => CSRWrite
@@ -2430,6 +2432,7 @@ def read_CSR (merge_var : (BitVec 12)) : SailM (BitVec 64) := do
                                   (pure (zero_extend (m := 64)
                                       ((← readReg sstateen3) &&& (Sail.BitVec.extractLsb mask 31 0)))))
                               | 0x180 => readReg satp
+                              | 0x015 => (read_seed_csr ())
                               | v__1416 =>
                                 (do
                                   if ((((Sail.BitVec.extractLsb v__1416 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -4711,6 +4714,7 @@ def read_CSR (merge_var : (BitVec 12)) : SailM (BitVec 64) := do
                                   (pure (zero_extend (m := 64)
                                       ((← readReg sstateen3) &&& (Sail.BitVec.extractLsb mask 31 0)))))
                               | 0x180 => readReg satp
+                              | 0x015 => (read_seed_csr ())
                               | v__1416 =>
                                 (do
                                   if ((((Sail.BitVec.extractLsb v__1416 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -6992,6 +6996,7 @@ def read_CSR (merge_var : (BitVec 12)) : SailM (BitVec 64) := do
                                   (pure (zero_extend (m := 64)
                                       ((← readReg sstateen3) &&& (Sail.BitVec.extractLsb mask 31 0)))))
                               | 0x180 => readReg satp
+                              | 0x015 => (read_seed_csr ())
                               | v__1416 =>
                                 (do
                                   if ((((Sail.BitVec.extractLsb v__1416 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -9292,6 +9297,7 @@ def read_CSR (merge_var : (BitVec 12)) : SailM (BitVec 64) := do
                                   (pure (zero_extend (m := 64)
                                       ((← readReg sstateen3) &&& (Sail.BitVec.extractLsb mask 31 0)))))
                               | 0x180 => readReg satp
+                              | 0x015 => (read_seed_csr ())
                               | v__1416 =>
                                 (do
                                   if ((((Sail.BitVec.extractLsb v__1416 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -11418,6 +11424,7 @@ def read_CSR (merge_var : (BitVec 12)) : SailM (BitVec 64) := do
                               (pure (zero_extend (m := 64)
                                   ((← readReg sstateen3) &&& (Sail.BitVec.extractLsb mask 31 0)))))
                           | 0x180 => readReg satp
+                          | 0x015 => (read_seed_csr ())
                           | v__1416 =>
                             (do
                               if ((((Sail.BitVec.extractLsb v__1416 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -13696,6 +13703,7 @@ def write_CSR (arg0 : (BitVec 12)) (arg1 : (BitVec 64)) : SailM (Result (BitVec 
                                       writeReg satp (← (legalize_satp
                                           (← (architecture Supervisor)) (← readReg satp) value))
                                       (pure (Ok (← readReg satp))))
+                                  | (0x015, value) => (pure (Ok (write_seed_csr ())))
                                   | (v__1438, value) =>
                                     (do
                                       if ((((Sail.BitVec.extractLsb v__1438 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -15823,6 +15831,7 @@ def write_CSR (arg0 : (BitVec 12)) (arg1 : (BitVec 64)) : SailM (Result (BitVec 
                                       writeReg satp (← (legalize_satp
                                           (← (architecture Supervisor)) (← readReg satp) value))
                                       (pure (Ok (← readReg satp))))
+                                  | (0x015, value) => (pure (Ok (write_seed_csr ())))
                                   | (v__1438, value) =>
                                     (do
                                       if ((((Sail.BitVec.extractLsb v__1438 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -17950,6 +17959,7 @@ def write_CSR (arg0 : (BitVec 12)) (arg1 : (BitVec 64)) : SailM (Result (BitVec 
                                       writeReg satp (← (legalize_satp
                                           (← (architecture Supervisor)) (← readReg satp) value))
                                       (pure (Ok (← readReg satp))))
+                                  | (0x015, value) => (pure (Ok (write_seed_csr ())))
                                   | (v__1438, value) =>
                                     (do
                                       if ((((Sail.BitVec.extractLsb v__1438 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -20133,6 +20143,7 @@ def write_CSR (arg0 : (BitVec 12)) (arg1 : (BitVec 64)) : SailM (Result (BitVec 
                                       writeReg satp (← (legalize_satp
                                           (← (architecture Supervisor)) (← readReg satp) value))
                                       (pure (Ok (← readReg satp))))
+                                  | (0x015, value) => (pure (Ok (write_seed_csr ())))
                                   | (v__1438, value) =>
                                     (do
                                       if ((((Sail.BitVec.extractLsb v__1438 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=
@@ -22087,6 +22098,7 @@ def write_CSR (arg0 : (BitVec 12)) (arg1 : (BitVec 64)) : SailM (Result (BitVec 
                               writeReg satp (← (legalize_satp (← (architecture Supervisor))
                                   (← readReg satp) value))
                               (pure (Ok (← readReg satp))))
+                          | (0x015, value) => (pure (Ok (write_seed_csr ())))
                           | (v__1438, value) =>
                             (do
                               if ((((Sail.BitVec.extractLsb v__1438 11 5) == (0b0011001#7 : (BitVec 7))) && (let index : (BitVec 5) :=

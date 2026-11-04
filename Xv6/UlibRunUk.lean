@@ -103,8 +103,6 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
       | none => rw [hr] at h; cases h
       | some p =>
         obtain ⟨i', b⟩ := p
-        cases b
-        · rw [hr] at h; cases h
         rw [hr] at h
         simp only at h ⊢
         by_cases hc : isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 k.enc)) = false ∧ instrWf i'

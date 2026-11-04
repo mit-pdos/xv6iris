@@ -77,7 +77,7 @@ theorem nvSTlbCold (T : PTree) : tlbExact T (nvSRs .tlb) := by
 /-- Rocq `nvS_ctrl_ok`. -/
 theorem nvSCtrlOk (T : PTree) : ctrlOkS T nvSSatp nvSRs := by
   unfold ctrlOkS AxSpineOk6.pmpOk AxSpineOk6.sconfMsFacts
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_,
     nvSTlbCold T, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first | decide +kernel | rfl
 

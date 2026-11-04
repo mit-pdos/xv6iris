@@ -88,25 +88,18 @@ theorem amTrapHandler {Y : Type} (Q : Y → AmSt → Prop) (del : Privilege) (c 
   unfold trap_handler
   simp only [get_config_print_exception, get_config_print_interrupt, Bool.or_false,
     Bool.false_eq_true, ↓reduceIte, bind_assoc, pure_bind]
-  have hz : hartSupports extension.Ext_Zicfilp = true := by
+  -- since 2026-11-04 no Zicfilp: the trap neither banks nor resets `elp`
+  have hz : hartSupports extension.Ext_Zicfilp = false := by
     simp [hartSupports]
-  rw [if_pos hz]
-  unfold zicfilp_preserve_elp_on_trap reset_elp
+  rw [if_neg (by simp [hz])]
+  try simp only [pure_bind]
   cases del with
   | Machine =>
     simp only [bind_assoc]
-    refine amReadBind _ _ _ _ (fun v1 _ _ => ?_)
-    refine amReadBind _ _ _ _ (fun v2 _ _ => ?_)
-    refine amWriteBind _ _ _ _ _ trivial rfl ?_
-    refine amWriteBind _ _ _ _ _ trivial rfl ?_
     refine amReadBind _ _ _ _ (fun v3 _ _ => ?_)
     exact amStopBind _ _ _ _ _ (by decide)
   | Supervisor =>
     simp only [bind_assoc]
-    refine amReadBind _ _ _ _ (fun v1 _ _ => ?_)
-    refine amReadBind _ _ _ _ (fun v2 _ _ => ?_)
-    refine amWriteBind _ _ _ _ _ trivial rfl ?_
-    refine amWriteBind _ _ _ _ _ trivial rfl ?_
     refine amBind (fun _ st' => st'.amo = false) _ _ _ _ ?_ (fun b st1 h1 => ?_)
     · exact amOfZf _ _ _ _ (zfCurrentlyEnabled _) ha (fun _ _ _ _ h _ => h)
     · refine amAssertBind _ _ _ _ _ (fun _ => ?_)

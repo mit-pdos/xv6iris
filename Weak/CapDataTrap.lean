@@ -69,17 +69,14 @@ theorem trapHandlerP {Y : Type} (Q : Y → CySt → Prop) (del : Privilege) (c :
   unfold trap_handler
   simp only [get_config_print_exception, get_config_print_interrupt, Bool.or_false,
     Bool.false_eq_true, ↓reduceIte, pure_bind]
-  have hz : hartSupports extension.Ext_Zicfilp = true := by
+  -- since 2026-11-04 no Zicfilp: the trap neither banks nor resets `elp`
+  have hz : hartSupports extension.Ext_Zicfilp = false := by
     simp [hartSupports]
-  rw [if_pos hz]
-  unfold zicfilp_preserve_elp_on_trap reset_elp
+  rw [if_neg (by simp [hz])]
+  try simp only [pure_bind]
   cases del with
   | Machine =>
     simp only [bind_assoc]
-    refine cyReadBind _ _ _ _ (fun v1 _ => ?_)
-    refine cyReadBind _ _ _ _ (fun v2 _ => ?_)
-    refine cyWriteBind _ _ _ _ _ (by decide) trivial ?_
-    refine cyWriteBind _ _ _ _ _ (by decide) trivial ?_
     refine cyReadBind _ _ _ _ (fun v3 _ => ?_)
     refine cyStopBind A Aa T _ _ _ _ _ (by decide) ?_
     refine hT _ _ _ ?_ (by decide) ?_
@@ -87,10 +84,6 @@ theorem trapHandlerP {Y : Type} (Q : Y → CySt → Prop) (del : Privilege) (c :
     · exact PinCycRun.causeBitUpd _ _
   | Supervisor =>
     simp only [bind_assoc]
-    refine cyReadBind _ _ _ _ (fun v1 _ => ?_)
-    refine cyReadBind _ _ _ _ (fun v2 _ => ?_)
-    refine cyWriteBind _ _ _ _ _ (by decide) trivial ?_
-    refine cyWriteBind _ _ _ _ _ (by decide) trivial ?_
     refine cyBBind (fun b st' => st'.rv .cur_privilege = st.rv .cur_privilege) _ _ _ _ ?_
       (fun b st1 hpr => ?_)
     · refine cyOfPf A Aa cyS T ?_ _ _ _ _ (pfCurrentlyEnabled _) ?_
@@ -98,7 +91,7 @@ theorem trapHandlerP {Y : Type} (Q : Y → CySt → Prop) (del : Privilege) (c :
       · intro r hr
         simp only [cyS, Bool.or_eq_true, decide_eq_true_eq] at hr
         rcases hr with rfl | rfl <;> rfl
-      · exact rbootAllSet _ _ _ (rbootAllSet _ _ _ hrb trivial) trivial
+      · exact hrb
       · simp (disch := decide) only [cyRd, cyWr, RegFile.set_other]
     · refine cyAssertBind A Aa T _ _ _ _ _ (fun _ => ?_)
       refine cyReadBind _ _ _ _ (fun v3 _ => ?_)

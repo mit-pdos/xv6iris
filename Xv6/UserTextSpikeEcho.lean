@@ -44,7 +44,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 the registers the decoder reads, at the values the user tier holds them. -/
 def spikeDrefU : (r : Register) → Option (RegisterType r)
   | .cur_privilege => some Privilege.User
-  | .misa => some 0x800000000014112D#64
+  | .misa => some 0x8000000000141105#64
   | .menvcfg => some menvcfgS
   | .mseccfg => some 0#64
   | .senvcfg => some 0#64
@@ -55,7 +55,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- The cells `spikeDrefU` names, at fraction `dq`. -/
 def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%
   Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.User ∗
-  Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
+  Register.misa ↦ᵣ[cpu]{dq} 0x8000000000141105#64 ∗
   Register.menvcfg ↦ᵣ[cpu]{dq} menvcfgS ∗
   Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
   Register.senvcfg ↦ᵣ[cpu]{dq} 0#64
@@ -84,7 +84,7 @@ a5, BGE)`). -/
 theorem echo_main_16 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac)
     (Φ : instruction → IProp GF) :
     utextImg T Echo.code.byte ∗ spikeUCells cpu dq ∗
-      ▷ (spikeUCells cpu dq -∗ Φ (.BTYPE (0x60#13, .Regidx 10#5, .Regidx 15#5, .BGE))) ⊢
+      (spikeUCells cpu dq -∗ Φ (.BTYPE (0x60#13, .Regidx 10#5, .Regidx 15#5, .BGE))) ⊢
     utextWin T 0x16 4 0x06a7d063 ∗ swp cpu (ext_decode (BitVec.ofNat 32 0x06a7d063)) Φ :=
   utext_step_base spikeDrefU Echo.textOk T 0x16 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
@@ -117,26 +117,29 @@ DU4's load-offset relocation is about). -/
 theorem echo_main_44 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac)
     (Φ : instruction → IProp GF) :
     utextImg T Echo.code.byte ∗ spikeUCells cpu dq ∗
-      ▷ (spikeUCells cpu dq -∗ Φ (.JAL (0x30e#21, .Regidx 1#5))) ⊢
+      (spikeUCells cpu dq -∗ Φ (.JAL (0x30e#21, .Regidx 1#5))) ⊢
     utextWin T 0x44 4 0x30e000ef ∗ swp cpu (ext_decode (BitVec.ofNat 32 0x30e000ef)) Φ :=
   utext_step_base spikeDrefU Echo.textOk T 0x44 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
 /-! ## The walk is honest
 
-The walk reads the privilege: the same word does NOT evaluate under a map
-that omits a register the decoder reads (so `rfl` above really ran the U-mode
-decode, and an `rfl` on a wrong AST fails). -/
+The walk reads `misa` on a compressed half (the Zca gate): the same half
+does NOT evaluate under a map that omits it (so `rfl` above really ran the
+U-mode decode, and an `rfl` on a wrong AST fails).  (Until 2026-11-04 the
+32-bit word at 0x16 was the witness, under a map without `cur_privilege`:
+the Zicfilp/Zicfiss decode guards read it.  The hart has neither since, and
+a 32-bit decode of these words reads no register.) -/
 
-/-- A reference map without `cur_privilege`. -/
-def spikeDrefNoPriv : (r : Register) → Option (RegisterType r)
-  | .misa => some 0x800000000014112D#64
+/-- A reference map without `misa`. -/
+def spikeDrefNoMisa : (r : Register) → Option (RegisterType r)
+  | .cur_privilege => some Privilege.User
   | .menvcfg => some menvcfgS
   | .mseccfg => some 0#64
   | .senvcfg => some 0#64
   | _ => none
 
-theorem echo_main_16_needs_priv :
-    utextDecodeWith spikeDrefNoPriv Echo.tree Echo.code.byte 0x16 = none := by rfl
+theorem echo_main_2_needs_misa :
+    utextDecodeWith spikeDrefNoMisa Echo.tree Echo.code.byte 0x2 = none := by rfl
 
 /-- No instruction starts mid-word. -/
 theorem echo_main_18_none :

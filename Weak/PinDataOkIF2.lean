@@ -22,7 +22,7 @@ namespace PinDataOk
 open SailCycleOrderK PinCycRun
 
 /-- The kernel's `misa` (`kCfg`). -/
-def kMisa : BitVec 64 := 0x800000000014112D#64
+def kMisa : BitVec 64 := 0x8000000000141105#64
 
 /-- The two configurations' register filter, with `PC = pc` and the kernel's `misa`. -/
 def dG2 (c1 c2 : DCfg) (pc : Int) (r : Register) (v : RegisterType r) : Prop :=

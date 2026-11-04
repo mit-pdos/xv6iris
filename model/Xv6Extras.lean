@@ -46,9 +46,24 @@
 -- functions: the theorem would then describe one platform (e.g. one whose
 -- SC always fails) instead of every platform.
 --
--- NOT OVERRIDDEN (as in Rocq): `plat_term_read`, `get_16_random_bits` and the
--- softfloat `riscv_f*` family.  Their results are CONSUMED, so any
--- realisation would fabricate data; a hart that reaches one stays stuck.
+-- WHAT IS NONDETERMINISTIC (2026-11-04, owner rulings [OWN.P7] SA-2 and
+-- [OWN.P9] "Include Zkr").  `get_16_random_bits`, the entropy source behind
+-- the Zkr `seed` CSR (extensions/K/zkr_control.sail `read_seed_csr`, reached
+-- by `csrrw`/`csrrs`/`csrrc` with a write on CSR 0x015 when the privilege
+-- check passes).  Its result is consumed, so it is realised as the model's
+-- own nondeterminism: one `choose (.bitvector 16)` event, answered by ANY
+-- 16-bit value -- the SC semantics (`MachCSL.evStep`) and the weak instance
+-- (`Weak.Prom.hnodeStep`'s `.choose` arm, ∃ ch) both let the environment pick
+-- it, exactly as for Sail's `undefined_bitvector`.  This is the honest
+-- reading of an entropy source (the ISA fixes no value), and it fabricates
+-- nothing.  Before 2026-11-04 the Zkr module was not compiled and this hook
+-- was unreachable.
+--
+-- NOT OVERRIDDEN (as in Rocq): `plat_term_read` and the softfloat `riscv_f*`
+-- family.  Their results are CONSUMED, so any realisation would fabricate
+-- data; a hart that reaches one stays stuck.  (Neither is reachable: no
+-- compiled module calls `plat_term_read`, and FD_instructions, the only
+-- caller of `riscv_f*`, is not compiled.)
 -- ======================================================================
 
 import Sail.Sail
@@ -84,6 +99,13 @@ def valid_reservation (_ : Unit) : Bool := xv6_resv_is_valid
 
 def plat_term_write (_ : BitVec 8) : SailM Unit :=
   pure ()
+
+-- ---- Zkr entropy source: nondeterministic (SA-2) ---------------------
+-- Any 16-bit value: one `choose (.bitvector 16)` event (lean-sail's
+-- `PreSail.undefined_bitvector`, what Sail's `undefined` bits compile to).
+
+def get_16_random_bits (_ : Unit) : SailM (BitVec 16) :=
+  PreSail.undefined_bitvector 16
 
 -- ---- Experimental extensions: off ------------------------------------
 

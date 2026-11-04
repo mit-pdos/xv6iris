@@ -58,6 +58,7 @@ open uop
 open stateen_bit
 open sopw
 open sop
+open seed_opst
 open rounding_mode
 open ropw
 open rop
@@ -202,13 +203,13 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex672025_ : Nat, k_ex672025_ ∈ {16, 32, 64, 128} -/
-def float_is_normal (op : (BitVec k_ex672025_)) : Bool :=
+/-- Type quantifiers: k_ex672066_ : Nat, k_ex672066_ ∈ {16, 32, 64, 128} -/
+def float_is_normal (op : (BitVec k_ex672066_)) : Bool :=
   let { exp := exp, sign := _, mantissa := _ } := (float_decompose op)
   ((! (is_all_ones exp)) && (! (is_all_zeros exp)))
 
-/-- Type quantifiers: k_ex672027_ : Nat, k_ex672027_ ∈ {16, 32, 64, 128} -/
-def float_is_subnormal (op : (BitVec k_ex672027_)) : Bool :=
+/-- Type quantifiers: k_ex672068_ : Nat, k_ex672068_ ∈ {16, 32, 64, 128} -/
+def float_is_subnormal (op : (BitVec k_ex672068_)) : Bool :=
   let { exp := exp, mantissa := mantissa, sign := _ } := (float_decompose op)
   ((is_all_zeros exp) && (! (is_all_zeros mantissa)))
 

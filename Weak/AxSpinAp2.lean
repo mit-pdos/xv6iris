@@ -87,54 +87,54 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports
   LeanRV64D.Functions.currentlyEnabled
 
 /-- (Lean-only, deviation 2) decode walk of `WA68`, machine reference map. -/
-theorem AxSpinAp2.walkA68M : runRead drefM (ext_decode WA68) = some (ap68, true) := by kernel_rfl
+theorem AxSpinAp2.walkA68M : runRead drefM (ext_decode WA68) = some (ap68, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA68`, supervisor reference map. -/
-theorem AxSpinAp2.walkA68S : runRead WkEntryNew.drefS0 (ext_decode WA68) = some (ap68, true) := by
+theorem AxSpinAp2.walkA68S : runRead WkEntryNew.drefS0 (ext_decode WA68) = some (ap68, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA6c`, machine reference map. -/
-theorem AxSpinAp2.walkA6cM : runRead drefM (ext_decode WA6c) = some (ap6c, true) := by kernel_rfl
+theorem AxSpinAp2.walkA6cM : runRead drefM (ext_decode WA6c) = some (ap6c, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA6c`, supervisor reference map. -/
-theorem AxSpinAp2.walkA6cS : runRead WkEntryNew.drefS0 (ext_decode WA6c) = some (ap6c, true) := by
+theorem AxSpinAp2.walkA6cS : runRead WkEntryNew.drefS0 (ext_decode WA6c) = some (ap6c, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA70`, machine reference map. -/
-theorem AxSpinAp2.walkA70M : runRead drefM (ext_decode WA70) = some (ap70, true) := by kernel_rfl
+theorem AxSpinAp2.walkA70M : runRead drefM (ext_decode WA70) = some (ap70, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA70`, supervisor reference map. -/
-theorem AxSpinAp2.walkA70S : runRead WkEntryNew.drefS0 (ext_decode WA70) = some (ap70, true) := by
+theorem AxSpinAp2.walkA70S : runRead WkEntryNew.drefS0 (ext_decode WA70) = some (ap70, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA76`, machine reference map. -/
-theorem AxSpinAp2.walkA76M : runRead drefM (ext_decode WA76) = some (ap76, true) := by kernel_rfl
+theorem AxSpinAp2.walkA76M : runRead drefM (ext_decode WA76) = some (ap76, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA76`, supervisor reference map. -/
-theorem AxSpinAp2.walkA76S : runRead WkEntryNew.drefS0 (ext_decode WA76) = some (ap76, true) := by
+theorem AxSpinAp2.walkA76S : runRead WkEntryNew.drefS0 (ext_decode WA76) = some (ap76, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA7a`, machine reference map. -/
-theorem AxSpinAp2.walkA7aM : runRead drefM (ext_decode WA7a) = some (ap7a, true) := by kernel_rfl
+theorem AxSpinAp2.walkA7aM : runRead drefM (ext_decode WA7a) = some (ap7a, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA7a`, supervisor reference map. -/
-theorem AxSpinAp2.walkA7aS : runRead WkEntryNew.drefS0 (ext_decode WA7a) = some (ap7a, true) := by
+theorem AxSpinAp2.walkA7aS : runRead WkEntryNew.drefS0 (ext_decode WA7a) = some (ap7a, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA7e`, machine reference map. -/
-theorem AxSpinAp2.walkA7eM : runRead drefM (ext_decode WA7e) = some (ap7e, true) := by kernel_rfl
+theorem AxSpinAp2.walkA7eM : runRead drefM (ext_decode WA7e) = some (ap7e, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA7e`, supervisor reference map. -/
-theorem AxSpinAp2.walkA7eS : runRead WkEntryNew.drefS0 (ext_decode WA7e) = some (ap7e, true) := by
+theorem AxSpinAp2.walkA7eS : runRead WkEntryNew.drefS0 (ext_decode WA7e) = some (ap7e, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA82`, machine reference map. -/
-theorem AxSpinAp2.walkA82M : runRead drefM (ext_decode WA82) = some (ap82, true) := by kernel_rfl
+theorem AxSpinAp2.walkA82M : runRead drefM (ext_decode WA82) = some (ap82, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA82`, supervisor reference map. -/
-theorem AxSpinAp2.walkA82S : runRead WkEntryNew.drefS0 (ext_decode WA82) = some (ap82, true) := by
+theorem AxSpinAp2.walkA82S : runRead WkEntryNew.drefS0 (ext_decode WA82) = some (ap82, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA86`, machine reference map. -/
-theorem AxSpinAp2.walkA86M : runRead drefM (ext_decode WA86) = some (ap86, true) := by kernel_rfl
+theorem AxSpinAp2.walkA86M : runRead drefM (ext_decode WA86) = some (ap86, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA86`, supervisor reference map. -/
-theorem AxSpinAp2.walkA86S : runRead WkEntryNew.drefS0 (ext_decode WA86) = some (ap86, true) := by
+theorem AxSpinAp2.walkA86S : runRead WkEntryNew.drefS0 (ext_decode WA86) = some (ap86, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA90`, machine reference map. -/
-theorem AxSpinAp2.walkA90M : runRead drefM (ext_decode WA90) = some (ap90, true) := by kernel_rfl
+theorem AxSpinAp2.walkA90M : runRead drefM (ext_decode WA90) = some (ap90, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA90`, supervisor reference map. -/
-theorem AxSpinAp2.walkA90S : runRead WkEntryNew.drefS0 (ext_decode WA90) = some (ap90, true) := by
+theorem AxSpinAp2.walkA90S : runRead WkEntryNew.drefS0 (ext_decode WA90) = some (ap90, false) := by
   kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA94`, machine reference map. -/
-theorem AxSpinAp2.walkA94M : runRead drefM (ext_decode WA94) = some (ap94, true) := by kernel_rfl
+theorem AxSpinAp2.walkA94M : runRead drefM (ext_decode WA94) = some (ap94, false) := by kernel_rfl
 /-- (Lean-only, deviation 2) decode walk of `WA94`, supervisor reference map. -/
-theorem AxSpinAp2.walkA94S : runRead WkEntryNew.drefS0 (ext_decode WA94) = some (ap94, true) := by
+theorem AxSpinAp2.walkA94S : runRead WkEntryNew.drefS0 (ext_decode WA94) = some (ap94, false) := by
   kernel_rfl
 
 end walks
