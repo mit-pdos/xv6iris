@@ -33,11 +33,19 @@ Marks: STRONGER = forbids executions the manual's prose allows; WEAKER = allows 
 Ambiguity (not counted as a bug): ppo rule 13's "instruction m" (`rvwmo.adoc:301-302`) vs the formal `r13 = [R];addr;[M];po;[W]`
 (a failed SC issues no memory operation). Owner ruling [OWN.P6]: memory-operation reading (= the formal model).
 
-## Sail RISC-V model (our generated Lean copy, `model/Lean_RV64D`)
+## Sail RISC-V model
 
-| # | Gap | Evidence | Mark | Tests affected | Upstream status |
+Upstream: riscv/sail-riscv main `02cc53657cf8` (2026-11-03). Our generated Lean copy (`model/Lean_RV64D`) comes from the
+fork zeldovich/sail-riscv `070832a1` (on upstream `61266bd`, 2026-08-03) via `tools/regen_sail_model.sh`, with the module
+list `model/sail-modules.txt` and the config `model/sail-config-rv64d.json`. Evidence: the SA-3 investigation
+(2026-11-03, `~/dev/weak-orch/promising/SA3_prompt.txt`). Owner rulings [OWN.P8], [OWN.P9].
+
+| # | Gap | Evidence | Where the gap is | Effect | Status / treatment |
 |---|---|---|---|---|---|
-| S1 | No Zalasr: load-acquire / store-release instructions (`l*.aq`, `s*.rl`) raise `internal_error` | `model/Lean_RV64D/.../Mem.lean:222-255` (found by the Sail-level litmus run, S0-P(2) m3, 2026-11-02) | missing feature (executions stuck) | 3801 corpus tests (2705 `s*.rl`, 1096 `l*.aq`) can only be checked at label level | not checked whether upstream sail-riscv has Zalasr |
+| S1 | **No Zalasr** (load-acquire `l*.aq`, store-release `s*.rl`, RCsc) | the instructions are not decoded: they trap as illegal. Mem.lean:222-255's `internal_error` for unreserved aq/rl is unreachable (every caller passes safe flags). Upstream mem.sail has the same behaviour | **upstream Sail gap**: Zalasr is ratified but not implemented; PR #328 open since 2023-10-27, stale (maintainer asked for an update 2026-08-20) | faithful for a hart without Zalasr; 3801 corpus tests can be checked only at label level / against the reference | [OWN.P9]: keep the trap; Zalasr covered by `rvwmoRef` + label level. (Earlier wording here said "raise internal_error"; corrected.) |
+| S2 | **Zkr module missing from our build** while the config says `Zkr.supported: true`: an M-mode `csrr`/`csrw` of `mseccfg` (0x747) or `mseccfgh` (0x757) ends in `assert false` (no step) | `currentlyEnabled` has no `Ext_Zkr` clause (PlatformConfig.lean:2976-2978), reached from `is_CSR_accessible` (SysControl.lean:319, :330; the `\|\|` at :330 is eager) | **our build config** (`model/sail-modules.txt`); upstream builds with `--all-modules` | the only Sail error site reachable in phase 1 (M-mode code touching mseccfg); no xv6 kernel path reaches it | [OWN.P9]: include the Zkr module, regenerate at the same pinned commit; `seed` answered nondeterministically (SA-2) |
+| S3 | **`misa` and the config advertise F and D (and Zicfilp, Zicfiss, Smmpm) but those instruction modules are not compiled**: FP instructions trap as illegal on a hart that claims them | `model/sail-config-rv64d.json` (F :552, D :565, Zicfilp :665, Zicfiss :668, Smmpm :919) vs `model/sail-modules.txt` | **our build config** (module list vs config mismatch); upstream builds all modules, so not an upstream bug | not a faithful RISC-V hart (advertises what it cannot execute); kernel image has no FP instructions | [OWN.P9]: clear F/D/Zicfilp/Zicfiss/Smmpm from misa and the config (rv64imac-style hart); regenerate |
+| S4 | **`internal_error` on a failed PTE conditional write** (translation on) | Vmem.lean:367 | upstream behaviour; reachable only if the instance answers a conditional PTE write with `.Err ()` | deferred with translation ([OWN.P3]) | Emit must never answer `.Err ()` there; otherwise global havoc ([OWN.P9]) |
 
 ## litmus-tests-riscv
 
