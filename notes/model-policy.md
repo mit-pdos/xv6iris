@@ -340,9 +340,9 @@ decision (19) deferred, presetting A and D in the kernel's `mappages`, becomes o
 conformance harness mirrors both arms; the content pin moves with the change (`evStep` included, its
 exclusive-read arm now passing the kind).
 
-**Decided by the owner (2026-11-05), on the liveness plan's finding that the harts-progress assumption
+**Decided by the owner (2026-11-04), on the liveness plan's finding that the harts-progress assumption
 had to exclude retries blocked by an LR reservation** (its `lr-tradeoffs.md` and `assumptions-audit.md`,
-outside the repository; lane `lr-nonblock`): (22) An LR's reservation blocks nobody (owner, 2026-11-05;
+outside the repository; lane `lr-nonblock`): (22) An LR's reservation blocks nobody (owner, 2026-11-04;
 lane `lr-nonblock`; the liveness plan's N-D4).  MachCSL keeps recording the reservation an LR takes, with
 kind `lr`, but the blocking predicates `othersReserve` and `anyReserve` consider only reservations that
 are not an LR's.  Why: on hardware an LR registers a watch that holds no other hart back (the manual:

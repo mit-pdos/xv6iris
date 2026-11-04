@@ -127,7 +127,7 @@ reservation is left exactly as before, until the hart's next store or
 exclusive read: the SC's outcome is the opaque predicate (`notes/model-diffs.md`
 §5, the platform hooks: the reservation predicates are opaque parameters).
 
-LR reservations (owner ruling, 2026-11-05; `notes/model-policy.md` decision
+LR reservations (owner ruling, 2026-11-04; `notes/model-policy.md` decision
 (22); the liveness plan's N-D4).  An LR's reservation is recorded as before
 (kind `lr`, until the hart's next store or exclusive read) but blocks nobody:
 the two predicates that decide blocking, `othersReserve` (`MachCSL.TsoMem`)
@@ -520,12 +520,13 @@ abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
   | .printMessage _ => fun _ σ' => σ' = σ
 
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
-reservation; the hart self-loops (the event is retried), a blocked exclusive
+blocking reservation (`othersReserve`); the hart self-loops (the event is retried), a blocked exclusive
 read dropping the hart's own reservation, a blocked plain store releasing it
 unless it is an LR's (`MState.dropWindow`); a blocked conditional write keeps
-it (an AMO's or the walker's write holds its own reservation on the footprint
-and is never blocked, by `resvInv`'s disjointness; an SC writing without one
-can be, and then keeps whatever it holds -- the owner's smaller change). -/
+it (an AMO's or the walker's write holds its own blocking reservation on the
+footprint and is never blocked, by `resvInv`'s disjointness; an SC can be,
+whether it holds its own LR record, which protects nothing since 2026-11-04,
+or none, and then keeps whatever it holds -- the owner's smaller change). -/
 abbrev blockedStep (cpu : CPU) (o : InstructionEffect) (σ σ' : MState) : Prop :=
   match o with
   | .memRead req =>

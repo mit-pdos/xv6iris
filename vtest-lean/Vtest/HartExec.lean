@@ -83,7 +83,7 @@ theorem blockingB_iff (r : Resv) : blockingB r = true ↔ r.blocking := by
 
 /-- Does hart `c` hold a blocking reservation (`Resv.blocking`: not an LR's)
 over a byte of the footprint?  An LR's reservation is recorded but blocks
-nobody (owner ruling 2026-11-05, policy decision (22)). -/
+nobody (owner ruling 2026-11-04, policy decision (22)). -/
 def hartBlocksB (x : XState) (c : CPU) (pa : PAddr) (n : Nat) : Bool :=
   match (x.hart c).resv with
   | some r => blockingB r && overlapsB r pa n

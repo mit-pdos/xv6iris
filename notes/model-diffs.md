@@ -222,7 +222,9 @@ Each is conditional and reports itself in the regeneration log.
   boundary and no plain store (the re-walk after a failed compare is plain reads) -- so every AMO and
   every A/D compare-and-store behaves exactly as before and the kernel-table rules that carry a
   reservation through the re-walk are unchanged; a conditional write that holds its own reservation
-  on the footprint is never blocked (`resvInv`'s disjointness), so for an AMO's or the walker's write
+  on the footprint is never blocked (`resvInv`'s disjointness; since 2026-11-04 the reservation must be a
+  blocking one, an LR's record protecting nothing, so an SC holding its own LR record can be blocked by
+  another hart's AMO window, next bullet), so for an AMO's or the walker's write
   the `if akExcl` guard on the blocked-write arm changes nothing, while an SC writing without one can
   be blocked and then keeps whatever it holds (the liveness plan's R2 section 4.3: a blocked user SC
   may hold a dangling user-PTE reservation from its own translation) -- the guard was kept as the
@@ -232,7 +234,8 @@ Each is conditional and reports itself in the regeneration log.
   pairs; the faithful semantics (the reservation as per-hart state the model reads, an LR excluding
   nobody, the SC's outcome coupled to interference) is the recorded target for when a theorem over
   arbitrary user code needs it; until then two harts can still deadlock on two LR reservations, each
-  storing into the other's (user level only: the kernel has no LR).  History: the Rocq prototype
+  storing into the other's (user level only: the kernel has no LR) (2026-11-04, next bullet: an LR's
+  reservation blocks nobody, and the deadlock is gone).  History: the Rocq prototype
   cleared the reservation at the boundary (`iris/RiscvLang.v:1860-1862` on `origin/rocq`; its design
   note calls it "the per-cycle garbage collection"), and its design note had rejected the
   blocked-store release (2026-08-18) because pairwise disjointness of reservations was not then an
@@ -253,7 +256,7 @@ Each is conditional and reports itself in the regeneration log.
   captures interleave at most whole instructions of their harts, none executes an SC, a blocked step
   would have shown as a stuck run, and a full `tools/ci/vtest.sh passes` run reproduced the green set
   exactly.
-- **An LR's reservation blocks nobody** (owner, 2026-11-05; `notes/model-policy.md` section 8, decision
+- **An LR's reservation blocks nobody** (owner, 2026-11-04; `notes/model-policy.md` section 8, decision
   (22); lane `lr-nonblock`, the liveness plan's N-D4): the two predicates that decide blocking,
   `othersReserve` (`MachCSL/TsoMem.lean`; a RAM store or an exclusive read by a hart) and `anyReserve`
   (`MachCSL/Lang.lean`; a DMA write), gain the conjunct `r.blocking`, where `Resv.blocking r` is
@@ -268,15 +271,25 @@ Each is conditional and reports itself in the regeneration log.
   read exclusively, possibly for ever, is a behaviour hardware does not have, and one the Progress Axiom
   excludes ("no memory operation may be preceded in the global memory order by an infinite sequence of
   other memory operations", `unpriv/rvwmo.adoc:347-351`).  The drop of 2026-10-24 removed that
-  behaviour for an AMO's and the walker's reservation and left the LR's, because releasing the record
-  would have lost the watch; this change keeps the record and removes only the blocking.  What the
+  behaviour for an AMO's and the walker's reservation and left the LR's, to keep the model's outcome of
+  a successful SC within hardware's for the plain LR;SC pattern (its bullet above: releasing it "would
+  trade a liveness artefact for a safety over-approximation of successful LR/SC pairs"); this change
+  accepts that over-approximation as its cost (below), keeps the record and removes only the blocking.  What the
   liveness plan needed: its harts-progress assumption ("a retry blocked by another hart's reservation
   that changed nothing is eventually served") had to exclude retries blocked by an LR reservation, since
   the model could never serve them, and the kernel proof would have carried an invariant on where LR
   reservations lie; both qualifiers are gone.  Cost, in the other direction: the SC's outcome is still
-  the opaque platform predicate (above), so a successful SC may now follow another hart's intervening
-  store, an outcome hardware forbids; this adds behaviours, so no safety theorem proved on the model is
-  invalidated, and no theorem speaks of user LR/SC (the kernel has none).  The remaining LR/SC gap and
+  the opaque platform predicate (above), so a successful SC may follow another hart's intervening store
+  into the reserved bytes, an outcome hardware forbids (before this change the same outcome needed the
+  LR's record to have died first: the holder's store elsewhere, a blocked exclusive read, or a
+  translation's A/D update replacing it).  Relative to hardware that is an over-approximation of the
+  SC's outcome, the sound direction for safety, within the recorded LR/SC limitation (the outcome is
+  fixed per address by the opaque predicate, so the model does not over-approximate hardware's SC in
+  general); relative to the previous model the change both adds this outcome and removes the
+  LR-blocked retries, and every theorem was re-proved on the changed model (the build and the assumption
+  audit).  No theorem assumes anything about an SC's outcome: the user tier's LR/SC arms
+  (`Xv6/UserMemLrsc.lean`, `ume_loadres` and `ume_storecon`) split on the opaque predicate and never
+  read the blocking predicates, and the kernel has no LR.  The remaining LR/SC gap and
   its repair, the watch model (the SC's outcome decided by the memory through the write's answer, which
   needs lean-sail's write event to answer an optional Boolean), are recorded in `notes/design-rulings.md`
   ("LR reservations do not block").  Proof structure: the two invariants carried in `memModelAt`
@@ -296,7 +309,12 @@ Each is conditional and reports itself in the regeneration log.
   LEFT; no module, axiom or `opaque` set changed; 2,599 constants under 2,253 declarations (was 2,598
   under 2,252).  The leaves and lemmas whose statements changed are theorems, which the pin does not
   cover, and the constants that merely name the predicates (`evStep`, `blockedStep`, `devOpStep`,
-  `devBlocked`, `memModelAt`) did not move, as the hash covers a constant's name, not its definition.  The
+  `devBlocked`, `memModelAt`) did not move, as the hash covers a constant's name, not its definition.
+  Theorems that depend on it (the pin's per-theorem tables): all fifteen pinned top theorems reach
+  `othersReserve`, `anyReserve` and `Resv.blocking`; `mmOk` is reached by `riscvPowerAdequacy`,
+  `xv6PowerAdequacy`, `xv6FsAdequacy_xv6GF`, `xv6FsAdequacy_closed` and `userProof`, and `resvInv` by
+  the same but `xv6FsAdequacy_closed`.  Their statements' text is unchanged; the moved hashes record
+  that their meaning changed, which is what the pin is for.  The
   conformance harness mirrors the kind test (`vtest-lean/Vtest/HartExec.lean`, `othersReserveB` and
   `anyReserveB`, each proved equal to its predicate) and no green result changed: no capture executes an
   LR or an SC, and a full `tools/ci/vtest.sh passes` run reproduced the green set exactly.
