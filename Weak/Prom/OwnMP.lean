@@ -100,6 +100,7 @@ theorem hstep_nil {M : List PMsg} {h : Nat} {σ σ' : OSt (List (BitVec 8))} {g 
   cases hs with
   | plain => rename_i _ _ hp _; exact tp_nil hp
   | rel => rename_i _ _ _ _ hp _; exact tp_nil hp
+  | fetch => rename_i _ hp; exact (tp_fetch hp).elim   -- [E-b]
 
 theorem tsx_pos {M : List PMsg} {t : Nat} (h : memByte mpImg M t X = some 1) : 1 ≤ t := by
   rcases Nat.eq_zero_or_pos t with e | e

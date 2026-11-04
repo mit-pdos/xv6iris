@@ -54,9 +54,11 @@ theorem relClass_none {ws : PState} {l : PLabel} (h : wrPre ws l = none) : ¬ re
 theorem wrPre_quiet {ws : PState} {l : PLabel} (hq : quietL l = true) : wrPre ws l = none := by
   cases l <;> simp_all [quietL, wrPre]
 
-/-- THE TWO CASES of an NF_R hart step (OwnLang.lean `hstepO`), as one disjunction. -/
+/-- THE TWO CASES of an NF_R hart step (OwnLang.lean `hstepO`) of a NON-FETCH label, as one disjunction.
+[E-b] premise `hnf`: the prophecy-fed fetch constructor `hstepO.fetch` only has fetch labels. -/
 theorem hstepO_cases {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : P} {ws ws' : PState}
-    {l : PLabel} {ots : Option Nat} (hs : hstepO w h σ s ws l ots s' ws' σ') :
+    {l : PLabel} {ots : Option Nat} (hs : hstepO w h σ s ws l ots s' ws' σ')
+    (hnf : ∀ b tvs, l ≠ LIFetch b tvs := by intro _ _ e; cases e) :
     w.pstep s () l s' () ∧
     ((∃ pr', memStep w.img (w.M.take σ.n) h (σ.pr h) ws l ots ws' pr' ∧ ¬ relClass ws l ∧
         σ' = { σ with pr := upd σ.pr h pr' }) ∨
@@ -66,15 +68,18 @@ theorem hstepO_cases {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' 
   cases hs
   · exact ⟨‹_›, .inl ⟨_, ‹_›, ‹_›, rfl⟩⟩
   · exact ⟨‹_›, .inr ⟨_, ‹_›, ‹_›, ‹_›, rfl, ‹_›, rfl⟩⟩
+  · exact (hnf _ _ rfl).elim   -- [E-b]
 
 theorem hstepO_pstep {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : P} {ws ws' : PState} {l : PLabel}
-    {ots : Option Nat} (hs : hstepO w h σ s ws l ots s' ws' σ') : w.pstep s () l s' () := (hstepO_cases hs).1
+    {ots : Option Nat} (hs : hstepO w h σ s ws l ots s' ws' σ') : w.pstep s () l s' () := by
+  cases hs <;> assumption   -- [E-b] (was `(hstepO_cases hs).1`)
 
 /-- A QUIET LABEL's NF_R step: no fulfil, the quiet post, no change of the language state. -/
 theorem hstepO_quiet {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : P} {ws ws' : PState}
     {l : PLabel} {ots : Option Nat} (hq : quietL l = true) (hs : hstepO w h σ s ws l ots s' ws' σ') :
     ots = none ∧ ws' = qPost ws l ∧ σ' = σ := by
-  rcases (hstepO_cases hs).2 with ⟨pr', hm, _, rfl⟩ | ⟨_, _, _, hrc, _⟩
+  -- [E-b] fetch labels are not quiet
+  rcases (hstepO_cases hs (fun _ _ e => by subst e; simp [quietL] at hq)).2 with ⟨pr', hm, _, rfl⟩ | ⟨_, _, _, hrc, _⟩
   · obtain ⟨h1, h2, h3⟩ := quiet_inv hq hm
     subst h1 h2 h3
     exact ⟨rfl, rfl, upd_pr_same σ h⟩

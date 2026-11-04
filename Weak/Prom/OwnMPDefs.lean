@@ -87,6 +87,13 @@ theorem tp_fence {pr pw sr sw : Bool} {c : List Tpl} {g : List (BitVec 8)} {l : 
 theorem tp_nil {g : List (BitVec 8)} {l : PLabel} {s' : TP} (h : tpNext ⟨[], g⟩ l = some s') : False := by
   unfold tpNext at h; cases l <;> simp at h
 
+/-- [E-b] The label-level program half never fetches (for `hstepO.fetch`). -/
+theorem tp_fetch {s s' : TP} {b : Int} {tvs : List (Nat × BitVec 8)} (h : tpNext s (LIFetch b tvs) = some s') :
+    False := by
+  rcases s with ⟨_ | ⟨x, c⟩, g⟩
+  · unfold tpNext at h; simp at h
+  · cases x <;> (unfold tpNext at h; simp at h)
+
 /-! ## 2. The test -/
 
 def X : Int := 1
@@ -311,6 +318,7 @@ theorem hstep_fence {w : OW TP (List (BitVec 8))} {h : Nat} {σ σ' : OSt (List 
     obtain ⟨rfl, rfl⟩ := tp_fence hp
     cases hm
     exact ⟨rfl, rfl, upd_pr_self σ h, rfl⟩
+  | fetch => rename_i _ hp; rw [hw] at hp; exact (tp_fetch hp).elim   -- [E-b]
   | rel =>
     rename_i pr' _ _ _ hp hm
     rw [hw] at hp
@@ -354,6 +362,7 @@ theorem hstep_ld {w : OW TP (List (BitVec 8))} {h : Nat} {σ σ' : OSt (List (Bi
           exact absurd ⟨m, k, len, take_get hm, hcl, hk, hle1, hle2⟩ (hinv ti a)
       · have := (loadRun_keep ws false false (srcsView ws []) a [(t, v)]).2.2.2.2
         exact this.1
+  | fetch => rename_i _ hp; rw [hw] at hp; exact (tp_fetch hp).elim   -- [E-b]
   | rel =>
     rename_i pr' _ _ _ hp hm
     rw [hw] at hp
@@ -388,6 +397,7 @@ theorem h0_st1 {M : List PMsg} {σ σ' : OSt (List (BitVec 8))} {D : Nat → Pro
     rename_i pr' hnr hp _
     obtain ⟨rfl, rfl⟩ := tp_st hp
     exact absurd (relClass_store0 rfl rfl _ _ _ _ _ _) hnr
+  | fetch => rename_i _ hp; exact (tp_fetch hp).elim   -- [E-b]
   | rel =>
     rename_i pr' hn _ _ hp hm
     obtain ⟨rfl, rfl⟩ := tp_st hp
@@ -427,6 +437,7 @@ theorem h0_st2 {M : List PMsg} {σ σ' : OSt (List (BitVec 8))} {D : Nat → Pro
     rename_i pr' hnr hp _
     obtain ⟨rfl, rfl⟩ := tp_st hp
     exact absurd (relClass_fenceW ws1 false F [1]) hnr
+  | fetch => rename_i _ hp; exact (tp_fetch hp).elim   -- [E-b]
   | rel =>
     rename_i pr' hn _ _ hp hm
     obtain ⟨rfl, rfl⟩ := tp_st hp
