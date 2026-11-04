@@ -963,6 +963,10 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.AdMachine
+import Weak.Prom.AdWitness
+import Weak.Prom.NfrAd
+import Weak.Prom.OwnAd
 import Weak.Prom.NfrFetch
 import Weak.Prom.OwnWpF
 import Weak.Prom.OwnG4F

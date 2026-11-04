@@ -18,3 +18,4 @@ Weak/Prom/AmoSplitCheck.lean   # audit printer: `#print axioms` only, no declara
 Weak/Prom/PfxAxioms.lean       # audit printer: `#print axioms` only, no declarations (S3d prefix lemma)
 Weak/Prom/AmoTightCex.lean     # executable counterexample to amoTightV2 (failed amocas, run with lake env lean --run); evidence only
 Weak/Prom/EbCheck.lean         # audit printer: `#print axioms` only, no declarations (G4 experiment E-b)
+Weak/Prom/EcCheck.lean         # audit printer: `#print axioms` only, no declarations (G4 experiment E-c)
