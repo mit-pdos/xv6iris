@@ -963,6 +963,17 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.NfrFetch
+import Weak.Prom.OwnWpF
+import Weak.Prom.OwnG4F
+import Weak.Prom.OwnAEBase
+import Weak.Prom.OwnAE1cDefs
+import Weak.Prom.OwnAE1cCS
+import Weak.Prom.OwnAE1c
+import Weak.Prom.OwnAEHold
+import Weak.Prom.OwnAEPipeDefs
+import Weak.Prom.OwnAEPipeCS
+import Weak.Prom.OwnAEPipe
 import Weak.Prom.PfxDefs
 import Weak.Prom.PfxSym
 import Weak.Prom.PfxRank
