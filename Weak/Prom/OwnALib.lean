@@ -3,9 +3,9 @@ Weak/Prom: **track (a), the resource library: dead messages, deposit slots, the 
 plan rev 7 §3 "Resource part, an invariant access, pre-allocated", "The deposit", "Opening", "Points-to, a
 hypothesis to validate", R-a1).
 
-* `deadInv g t` — a message the program protocol never fulfils: its `pend` sits in an invariant that may be
-  surrendered to the doom box (`dead_doom`: reading it dooms the branch) and that contradicts its `shot`
-  (`dead_shot`: seeing it fulfilled dooms the branch).
+* `deadInv g t` — a message the program protocol never fulfils (`g.dd t`): its `pend` sits in an invariant that may
+  be surrendered to the doom box as a DEAD witness (`dead_doom`: reading it puts the run in FREE MODE) and that
+  contradicts its `shot` (`dead_shot`: seeing it fulfilled gives free mode).
 * `slotInv g t R γc` — THE DEPOSIT SLOT of message `t` (plan §3, pre-allocated at adequacy start, one per `t`):
   `inv (slotN.@t) (pend t ∨ (shot t ∗ (R ∨ token γc)))`.  The author deposits `R` exactly at its fulfil
   (`slot_deposit`: it must take `pend t` out to shoot it, and the lifting lemma requires `shot t` at the fulfil).
@@ -49,8 +49,8 @@ section inv
 variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG GF]
   [InvGS_gen hlc GF]
 
-/-- A DEAD message: its `pend` (or doom) in an invariant. -/
-def deadInv (g : AGN) (t : Nat) : IProp GF := inv (ndot deadN t) iprop(pend g t ∨ dshot g)
+/-- A DEAD message (S4a part 2: `g.dd t`, no hart's text fulfils it): its `pend`, or free mode, in an invariant. -/
+def deadInv (g : AGN) (t : Nat) : IProp GF := inv (ndot deadN t) iprop(pend g t ∨ dfree g)
 
 /-- THE DEPOSIT SLOT of message `t` with content `R` and claim token `γc` (plan §3). -/
 def slotInv (g : AGN) (t : Nat) (R : IProp GF) (γc : GName) : IProp GF :=
@@ -74,34 +74,44 @@ theorem slot_alloc (g : AGN) (t : Nat) (R : IProp GF) (γc : GName) : pend (GF :
   iapply inv_alloc
   inext; ileft; iexact Hp
 
-/-- READING A DEAD MESSAGE dooms the branch (its `pend` goes to the doom box). -/
-theorem dead_doom (g : AGN) (M : List PMsg) (t : Nat) (ht : 1 ≤ t ∧ t ≤ M.length) :
-    doomInv (GF := GF) g M ∗ deadInv g t ⊢ |={⊤}=> dshot g := by
+/-- READING A DEAD MESSAGE: free mode (its `pend` goes to the doom box as a dead witness). -/
+theorem dead_doom (g : AGN) (M : List PMsg) (t : Nat) (ht : 1 ≤ t ∧ t ≤ M.length) (hd : g.dd t) :
+    doomInv (GF := GF) g M ∗ deadInv g t ⊢ |={⊤}=> dfree g ∗ dshot g := by
   iintro ⟨#Hdoom, #Hd⟩
   unfold deadInv
   imod inv_acc_timeless (E := ⊤) CoPset.subseteq_top $$ Hd with ⟨Hb, Hclose⟩
   icases Hb with (Hp | #Hs)
-  · imod doom (doomN_dead t) g M t ht $$ [Hp] with #Hs
+  · imod doomD (doomN_dead t) g M t ht hd $$ [Hp] with ⟨#Hf, #Hs⟩
     · iframe Hdoom Hp
     imod Hclose $$ [] with -
+    · iright; iexact Hf
+    imodintro; iframe Hf Hs
+  · imod dfree_dshot (doomN_dead t) g M $$ [] with #Hds
+    · iframe Hdoom Hs
+    imod Hclose $$ [] with -
     · iright; iexact Hs
-    imodintro; iexact Hs
-  · imod Hclose $$ [] with -
-    · iright; iexact Hs
-    imodintro; iexact Hs
+    imodintro; iframe Hs Hds
 
-/-- A FULFILLED DEAD MESSAGE dooms the branch. -/
-theorem dead_shot (g : AGN) (t : Nat) : deadInv (GF := GF) g t ∗ shot g t ⊢ |={⊤}=> dshot g := by
-  iintro ⟨#Hd, #Hsh⟩
-  unfold deadInv
-  imod inv_acc_timeless (E := ⊤) CoPset.subseteq_top $$ Hd with ⟨Hb, Hclose⟩
-  icases Hb with (Hp | #Hs)
-  · iexfalso
-    iapply pend_shot
-    iframe Hp Hsh
-  · imod Hclose $$ [] with -
-    · iright; iexact Hs
-    imodintro; iexact Hs
+/-- A FULFILLED DEAD MESSAGE: free mode. -/
+theorem dead_shot (g : AGN) (M : List PMsg) (t : Nat) :
+    doomInv (GF := GF) g M ∗ deadInv g t ∗ fulT g t ⊢ |={⊤}=> dfree g ∗ dshot g := by
+  iintro ⟨#Hdoom, #Hd, #Hft⟩
+  unfold fulT
+  icases Hft with (#Hsh | ⟨#Hf, _⟩)
+  · unfold deadInv
+    imod inv_acc_timeless (E := ⊤) CoPset.subseteq_top $$ Hd with ⟨Hb, Hclose⟩
+    icases Hb with (Hp | #Hs)
+    · iexfalso
+      iapply pend_shot
+      iframe Hp Hsh
+    · imod dfree_dshot (doomN_dead t) g M $$ [] with #Hds
+      · iframe Hdoom Hs
+      imod Hclose $$ [] with -
+      · iright; iexact Hs
+      imodintro; iframe Hs Hds
+  · imod dfree_dshot (E := ⊤) CoPset.subseteq_top g M $$ [] with #Hds
+    · iframe Hdoom Hf
+    imodintro; iframe Hf Hds
 
 end inv
 

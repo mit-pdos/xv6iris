@@ -98,7 +98,8 @@ theorem mp_h0 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
   imodintro
   isplitr
   · ileft; ipureintro; exact ⟨⟨0, grd_intro trivial⟩, grd_intro trivial⟩
-  iframe Hsh
+  isplitr
+  · unfold fulT; ileft; iexact Hsh
   iintro %s1 %hs1 _ _
   imodintro
   iintro Hl
@@ -151,7 +152,8 @@ theorem mp_h0 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
   imodintro
   isplitr
   · ileft; ipureintro; exact ⟨⟨0, grd_intro trivial⟩, grd_intro trivial⟩
-  iframe Hshf
+  isplitr
+  · unfold fulT; ileft; iexact Hshf
   iintro %s3 %hs3 _ _
   imodintro
   iintro Hl
@@ -191,7 +193,8 @@ theorem imgMP_Y : imgMP (Y : Int) = some 0 := by decide
 was not 1), doom, or x's points-to with its latest write below the load floor `vrNew`. -/
 theorem mp_h1_tail (g : AGN) (M : List PMsg) (γc : GName) (s2 : LP) (ws : PState) {pr : GSet Nat}
     (tvs0 : List (Nat × BitVec 8)) (hprog : s2.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW,
-      Weak.Prom.Ref.Lit.ld 7 8]) (hpc : s2.pc = 2) (hq : s2.q = []) (h8 : s2.rd 8 = X) :
+      Weak.Prom.Ref.Lit.ld 7 8]) (hpc : s2.pc = 2) (hq : s2.q = []) (h8 : s2.rd 8 = X)
+    (hdd : ∀ t, isD M t = true → g.dd t) :
     mpCtx (GF := GF) g M γc ∗
       (⌜obsOf tvs0 ≠ 1⌝ ∨ dshot g ∨ ∃ lw, ⌜1 ≤ lw ∧ lw ≤ ws.wVrNew⌝ ∗ xPts g M lw) ∗
       lhA g Proto.triv (wMP M 1) (qsMP 1) ws pr [(LLoad false false (Y : Int) tvs0 (srcR 6), none)] ⊢
@@ -246,7 +249,7 @@ theorem mp_h1_tail (g : AGN) (M : List PMsg) (γc : GName) (s2 : LP) (ws : PStat
           icases Hctx with ⟨Hdoom, -, Hdd⟩
           ihave #Hds := bsl_mem (F := fun t => deadInv g t)
             (List.mem_filter.2 ⟨mem_rng.2 (msgAt_le hm), hD⟩) $$ Hdd
-          imod dead_doom g M s (msgAt_le hm) $$ [Hdoom Hds] with #Hd
+          imod dead_doom g M s (msgAt_le hm) (hdd s hD) $$ [Hdoom Hds] with ⟨_, #Hd⟩
           · iframe Hdoom Hds
           imodintro; iright; iexact Hd
   imod Hr with Hr
@@ -265,7 +268,7 @@ theorem mp_h1_tail (g : AGN) (M : List PMsg) (γc : GName) (s2 : LP) (ws : PStat
 
 
 theorem frontA_shot {g : AGN} {π : Proto} {img : Image} {M : List PMsg} {ws : PState} (t : Nat) :
-    frontA (GF := GF) g π img M ws ⊢ ⌜1 ≤ t ∧ t ≤ M.length ∧ t ≤ wfr ws⌝ -∗ shot g t := by
+    frontA (GF := GF) g π img M ws ⊢ ⌜1 ≤ t ∧ t ≤ M.length ∧ t ≤ wfr ws⌝ -∗ fulT g t := by
   unfold frontA
   iintro ⟨#H, _⟩ %h
   iapply H
@@ -274,7 +277,8 @@ theorem frontA_shot {g : AGN} {π : Proto} {img : Image} {M : List PMsg} {ws : P
 /-- **H1, the reader**: claims x's points-to from the flag message's slot, then reads x. -/
 theorem mp_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
     (hprog : s0.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW, Weak.Prom.Ref.Lit.ld 7 8])
-    (hpc : s0.pc = 0) (hq : s0.q = []) (h6 : s0.rd 6 = Y) (h8 : s0.rd 8 = X) :
+    (hpc : s0.pc = 0) (hq : s0.q = []) (h6 : s0.rd 6 = Y) (h8 : s0.rd 8 = X)
+    (hdd : ∀ t, isD M t = true → g.dd t) :
     mpCtx (GF := GF) g M γc ∗ token γc ∗ lhA g Proto.triv (wMP M 1) (qsMP 1) psInit P0 [] ⊢
       wpKA g Proto.triv (wMP M 1) qsMP s0 (fun _ => iprop(⌜∃ V, grd Proto.triv imgMP M V True⌝ ∨ dshot g)) := by
   have hw := litW_lit imgMP M 1
@@ -327,9 +331,16 @@ theorem mp_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
           ((t0, v0) :: r0)) (regWL 5 [.DLdRes] ++ [LInstr])) true false true true)).wVrNew := by
         simp only [instrR_vrNew, fence_vrNew, ite_true]
         omega
-      ihave #Hsh := frontA_shot t0 $$ Hfr %⟨(msgAt_le hmt).1, (msgAt_le hmt).2, hfl⟩
+      ihave #Hfs := frontA_shot t0 $$ Hfr %⟨(msgAt_le hmt).1, (msgAt_le hmt).2, hfl⟩
       unfold mpCtx
-      icases Hctx with ⟨_, Hs, Hdd⟩
+      icases Hctx with ⟨Hdoom, Hs, Hdd⟩
+      unfold fulT
+      icases Hfs with (#Hsh | ⟨#Hfr, _⟩)
+      rotate_left
+      · imod dfree_dshot (E := ⊤) CoPset.subseteq_top g M $$ [] with #Hd
+        · iframe Hdoom Hfr
+        imodintro
+        iright; ileft; iexact Hd
       by_cases hf : m = fMsg
       · -- a flag message: claim the slot
         subst hf
@@ -349,8 +360,8 @@ theorem mp_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
         have hD : isD M t0 = true := by simp [isD, isX, isF, hmt, hmX, hf]
         ihave #Hds := bsl_mem (F := fun t => deadInv g t)
           (List.mem_filter.2 ⟨mem_rng.2 (msgAt_le hmt), hD⟩) $$ Hdd
-        imod dead_shot g t0 $$ [Hds Hsh] with #Hd
-        · iframe Hds Hsh
+        imod dead_shot g M t0 $$ [Hds Hsh] with ⟨_, #Hd⟩
+        · iframe Hdoom Hds; unfold fulT; ileft; iexact Hsh
         imodintro
         iright; ileft; iexact Hd
     · imodintro; ileft; ipureintro; exact hv
@@ -358,7 +369,7 @@ theorem mp_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
   imodintro
   dsimp only [List.nil_append]
   iintro Hl
-  iapply (mp_h1_tail g M γc s2 _ tvs0 hP2 hc2 hq2 e8)
+  iapply (mp_h1_tail g M γc s2 _ tvs0 hP2 hc2 hq2 e8 hdd)
   iframe Hctx HG
   iexact Hl
 
@@ -415,14 +426,15 @@ theorem mp_assemble [InvGS ownGF] (g : AGN) (M : List PMsg) (γc : GName) (p0 p1
     (hpc0 : p0.pc = 0) (hq0 : p0.q = []) (h5 : p0.rd 5 = 42) (h6 : p0.rd 6 = X) (h7 : p0.rd 7 = 1)
     (h8 : p0.rd 8 = Y)
     (hpr1 : p1.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW, Weak.Prom.Ref.Lit.ld 7 8])
-    (hpc1 : p1.pc = 0) (hq1 : p1.q = []) (h6' : p1.rd 6 = Y) (h8' : p1.rd 8 = X) :
+    (hpc1 : p1.pc = 0) (hq1 : p1.q = []) (h6' : p1.rd 6 = Y) (h8' : p1.rd 8 = X)
+    (hdd : ∀ t, isD M t = true → g.dd t) :
     mpCtx (GF := ownGF) g M γc ∗ xPts g M 0 ∗ token γc ∗ hartA g 0 psInit (P0 0) [] ∗
       hartA g (0 + 1) psInit (P0 (0 + 1)) [] ⊢
     [∗list] k ↦ p ∈ [p0, p1], wpA (hlc := .hasLC) g Proto.triv (hw litStep litDone imgMP M k)
       (fun h => ΨK M (qsMP h)) p
       (fun v => iprop(⌜∃ V, grd Proto.triv imgMP M V ((fun (_ : Nat) (_ : Unit) => True) k v)⌝ ∨ dshot g)) := by
   have k0 := mp_h0 (GF := ownGF) g M γc p0 (P0 := P0 0) hpr0 hpc0 hq0 h5 h6 h7 h8
-  have k1 := mp_h1 (GF := ownGF) g M γc p1 (P0 := P0 1) hpr1 hpc1 hq1 h6' h8'
+  have k1 := mp_h1 (GF := ownGF) g M γc p1 (P0 := P0 1) hpr1 hpc1 hq1 h6' h8' hdd
   have s0 := lhA_start (GF := ownGF) (g := g) (π := Proto.triv) (w := wMP M 0) (Qs := qsMP) (P0 := P0 0) (qsMP_nil 0)
   have s1 := lhA_start (GF := ownGF) (g := g) (π := Proto.triv) (w := wMP M 1) (Qs := qsMP) (P0 := P0 1) (qsMP_nil 1)
   have k0' : mpCtx (GF := ownGF) g M γc ∗ xPts g M 0 ∗ lhA g Proto.triv (wMP M 0) (qsMP 0) psInit (P0 0) [] ⊢
@@ -453,8 +465,8 @@ theorem mp_assemble [InvGS ownGF] (g : AGN) (M : List PMsg) (γc : GName) (p0 p1
 /-- THE ADEQUACY PREMISE for MP with ownership: the setup (OwnAMPDefs.lean `mp_setup`), H0's and H1's proofs. -/
 theorem mp_premise (M : List PMsg) :
     wpPremise .hasLC ownGF litStep litDone imgMP M (progs mpOwnT) Proto.triv (fun _ _ => True)
-      (fun h => ΨK M (qsMP h)) := by
-  intro Hinv g P0 hn hm hP0
+      (fun h => ΨK M (qsMP h)) (fun t => isD M t = true) := by
+  intro Hinv g P0 hn hm hdd hP0
   obtain ⟨p0, p1, hps⟩ := progs_mpOwn
   have hg0 : (progs mpOwnT)[0]? = some p0 := by rw [hps]; rfl
   have hg1 : (progs mpOwnT)[1]? = some p1 := by rw [hps]; rfl
@@ -475,7 +487,7 @@ theorem mp_premise (M : List PMsg) :
   iapply (mp_assemble g M γc p0 p1 (P0 := P0) hpr0 hpc0 hq0 (by rw [hrd0 5 (by decide) (by decide)]; rfl)
     (by rw [hrd0 6 (by decide) (by decide)]; rfl) (by rw [hrd0 7 (by decide) (by decide)]; rfl)
     (by rw [hrd0 8 (by decide) (by decide)]; rfl) hpr1 hpc1 hq1 (by rw [hrd1 6 (by decide) (by decide)]; rfl)
-    (by rw [hrd1 8 (by decide) (by decide)]; rfl))
+    (by rw [hrd1 8 (by decide) (by decide)]; rfl) (fun t ht => by rw [hdd]; exact ht))
   iframe Hctx Hx Htok H0 H1
 
 /-- **G4 TARGET (2) ON TRACK (a): MP WITH OWNERSHIP TRANSFER** (plan §4 G4 (2)).  Over every final memory and every
@@ -486,7 +498,8 @@ theorem own_mp (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun litStep imgMP () (progs mpOwnT) M run) :
     ∀ b, run.obsLoad 1 0 = some 1 → run.obsLoad 1 1 = some b → b = 42 := by
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
-    (fun h => ΨK M (qsMP h)) trivial (fun h => ⟨qsMP_nil h, wrOk_nil M⟩) (mp_premise M) hrun
+    (fun h => ΨK M (qsMP h)) (fun t => isD M t = true) trivial (fun h => ⟨qsMP_nil h, wrOk_nil M⟩)
+    (mp_premise M) hrun
   intro b h0 h1
   have hq := (hΨ 1 (run.trace 1).length).1
   rw [List.take_length] at hq

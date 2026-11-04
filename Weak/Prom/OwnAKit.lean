@@ -6,7 +6,7 @@ The same instruction-level rules as the core's kit (CoreKit.lean: memory entries
 the ONE lifting lemma `wpA_lift`, with what track (a) adds:
 * every label step's continuation runs under `|={⊤}=>` with `£ 1` and the FRONTIER RULE of its pre-state (`frontA`),
   so the client may open invariants at the step (deposit slots, points-to transfers);
-* a FULFIL must hand back `shot g ts` (the deposit is forced, OwnAWp.lean);
+* a FULFIL must hand back `fulT g ts` (`shot g ts`, or free mode; the deposit is forced, OwnAWp.lean);
 * every obligation may instead be discharged by doom (`dshot g`).
 The kit resource `lhA g π w Q ws P ev` is `hartA` with some trace whose memory entries are `ev`, `wrOk`, and the
 guarded `⟦V⟧⌜Q ev⌝` or doom.
@@ -56,7 +56,7 @@ theorem wpA_any {s : LP} {ws : PState} {pr : GSet Nat} {τ : Trace} {Ψ : Nat �
     hartA g w.h ws pr τ ∗
     ▷ (∀ l ots s' ws' pr', ⌜anyFab w.pstep s () l s' ()⌝ -∗ ⌜memStep w.img w.M w.h pr ws l ots ws' pr'⌝ -∗
           frontA g π w.img w.M ws -∗ £ 1 -∗
-          |={⊤}=> (⌜stepOk π w.img w.M (Ψ w.h) ws τ l ots⌝ ∨ dshot g) ∗ (∀ t, ⌜ots = some t⌝ → shot g t) ∗
+          |={⊤}=> (⌜stepOk π w.img w.M (Ψ w.h) ws τ l ots⌝ ∨ dshot g) ∗ (∀ t, ⌜ots = some t⌝ → fulT g t) ∗
             (hartA g w.h ws' pr' (τ ++ [(l, ots)]) -∗ wpA g π w Ψ s' Φ))
     ⊢ wpA g π w Ψ s Φ := by
   iintro ⟨Hst, Hk⟩
@@ -211,7 +211,7 @@ theorem wpKA_load1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : 
       iframe Hst Hr
       ipureintro; exact ⟨by rw [memEv_snoc _ _ rfl, he], wrOk_snoc_none hw⟩
 
-/-- ONE STORE LABEL (FULFIL): the client hands back `shot g ts`. -/
+/-- ONE STORE LABEL (FULFIL): the client hands back `fulT g ts`. -/
 theorem wpKA_store1 {s k : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bool} {base : Int}
     {data : List (BitVec 8)} {asrc vsrc : List Dsrc} (hd : w.pdone s = none)
     (hl : ∀ l s', anyFab w.pstep s () l s' () → l = LStore aq rl base data asrc vsrc ∧ s' = k) :
@@ -221,7 +221,7 @@ theorem wpKA_store1 {s k : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl
         ⌜stPreA ws aq rl (srcsView ws asrc) (srcsView ws vsrc) < ts⌝ -∗ frontA g π w.img w.M ws -∗ £ 1 -∗
         |={⊤}=> (⌜(∃ V, grd π w.img w.M V (Qs w.h (ev ++ [(LStore aq rl base data asrc vsrc, some ts)]))) ∧
               grd π w.img w.M (stPreA ws aq rl (srcsView ws asrc) (srcsView ws vsrc))
-                (π.okMsg ⟨base, data, some w.h, stClass rl⟩)⌝ ∨ dshot g) ∗ shot g ts ∗
+                (π.okMsg ⟨base, data, some w.h, stClass rl⟩)⌝ ∨ dshot g) ∗ fulT g ts ∗
           (lhA g π w (Qs w.h) (acqPost (storeRun ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc))
               base data.length ts) aq ts) (pr \ {ts}) (ev ++ [(LStore aq rl base data asrc vsrc, some ts)]) -∗
             wpKA g π w Qs k Φ))
@@ -302,7 +302,7 @@ theorem wpKA_ld (hw : LitW w) {s : LP} {sz rd rs1 off : Nat} {sgn : Bool} {base 
   iintro Hf Hc
   iapply Hk $$ %_ %(LPstep_wr s rd _ _) Hf Hc
 
-/-- **STORE instruction** `s{b,h,w,d} rs2, off(rs1)`: `LStore` (FULFIL; hand back `shot`), then `LInstr`. -/
+/-- **STORE instruction** `s{b,h,w,d} rs2, off(rs1)`: `LStore` (FULFIL; hand back `fulT`), then `LInstr`. -/
 theorem wpKA_sw (hw : LitW w) {s : LP} {sz rs2 rs1 off : Nat} {base : Int} {ws : PState} {pr : GSet Nat}
     {ev : Trace} (hag : LitAg w s) (hq : s.q = []) (hp : s.prog[s.pc]? = some (.store sz rs2 rs1 off))
     (ha : aligned ((s.rd rs1 + off) % two64) sz = true) (hb : (((s.rd rs1 + off) % two64 : Nat) : Int) = base) :
@@ -314,7 +314,7 @@ theorem wpKA_sw (hw : LitW w) {s : LP} {sz rs2 rs1 off : Nat} {base : Int} {ws :
         |={⊤}=> (⌜(∃ V, grd π w.img w.M V
             (Qs w.h (ev ++ [(LStore false false base (toBytes (s.rd rs2) sz) (srcR rs1) (srcR rs2), some ts)]))) ∧
           grd π w.img w.M (stPreA ws false false (srcsView ws (srcR rs1)) (srcsView ws (srcR rs2)))
-            (π.okMsg ⟨base, toBytes (s.rd rs2) sz, some w.h, .plain⟩)⌝ ∨ dshot g) ∗ shot g ts ∗
+            (π.okMsg ⟨base, toBytes (s.rd rs2) sz, some w.h, .plain⟩)⌝ ∨ dshot g) ∗ fulT g ts ∗
           (∀ s', ⌜LPstep s s' (s.pc + 1) 0 0⌝ -∗
             frontA g π w.img w.M (acqPost (storeRun ws false (srcsView ws (srcR rs1))
                 (max (srcsView ws (srcR rs1)) (srcsView ws (srcR rs2))) base (toBytes (s.rd rs2) sz).length ts) false ts) -∗

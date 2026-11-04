@@ -135,8 +135,9 @@ variable {pstep : P → D → PLabel → P → D → Prop} {pdone : P → Option
 /-- The client premise of the concurrent adequacy (see the header). -/
 def wpPremise (hlc : HasLC) (GF : BundledGFunctors) [InvGpreS GF] [GhostVarG GF HSt] [GhostVarG GF Bool]
     (pstep : P → D → PLabel → P → D → Prop) (pdone : P → Option V) (img : Image) (M : List PMsg) (ps : List P)
-    (π : Proto) (Φ : Nat → V → Prop) (Ψ : Nat → Trace → Prop) : Prop :=
+    (π : Proto) (Φ : Nat → V → Prop) (Ψ : Nat → Trace → Prop) (Dd : Nat → Prop) : Prop :=
   ∀ [InvGS_gen hlc GF] (g : AGN) (P0 : Nat → GSet Nat), g.hn.length = ps.length → g.mn.length = M.length →
+    g.dd = Dd →
     (∀ h, h < ps.length → ∀ t, t ∈ P0 h ↔ 0 < t ∧ ownTs M h t) →
     ⊢@{IProp GF} doomInv g M -∗ ([∗list] k ↦ _x ∈ g.hn, hartA g k psInit (P0 k) []) -∗
       ([∗list] k ↦ _x ∈ g.mn, pend g (k + 1)) ={⊤}=∗
@@ -153,8 +154,9 @@ def esInit [Inhabited P] (pstep : P → D → PLabel → P → D → Prop) (pdon
 
 /-- **THE ADEQUACY CORE**: after any execution of the concurrent language from the initial configuration that
 ends with every timestamp fulfilled, the facts hold and every value reached meets its (guarded) postcondition. -/
-theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat → Trace → Prop} (himg : PO_img π img)
-    (hΨ0 : ∀ h, Ψ h []) (hwp : wpPremise hlc GF pstep pdone img M ps π Φ Ψ) (P0 : Nat → GSet Nat)
+theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat → Trace → Prop} {Dd : Nat → Prop}
+    (himg : PO_img π img)
+    (hΨ0 : ∀ h, Ψ h []) (hwp : wpPremise hlc GF pstep pdone img M ps π Φ Ψ Dd) (P0 : Nat → GSet Nat)
     (hP0 : ∀ h, h < ps.length → ∀ t, t ∈ P0 h ↔ 0 < t ∧ ownTs M h t)
     {k : Nat} {es2 : List (CExpr P D V)} {σ2 : CSt}
     (hsteps : NSteps k (esInit pstep pdone img M ps, σInit ps.length P0) [] (es2, σ2))
@@ -168,12 +170,15 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
   imod harts_alloc (GF := GF) ps.length (σInit ps.length P0) with ⟨%hn, %hlen, H1, H2⟩
   imod pends_alloc (GF := GF) M.length with ⟨%mn, %hmlen, Hp⟩
   imod ghost_var_alloc (GF := GF) false with ⟨%dn, Hd⟩
-  imod inv_alloc doomN ⊤ iprop(dpend (GF := GF) ⟨hn, mn, dn⟩ ∨
-      (dshot ⟨hn, mn, dn⟩ ∗ ∃ s, ⌜1 ≤ s ∧ s ≤ M.length⌝ ∗ pend ⟨hn, mn, dn⟩ s)) $$ [Hd] with #Hdoom
-  · inext; ileft; unfold dpend; iexact Hd
-  ihave #Hdoom' : doomInv (GF := GF) ⟨hn, mn, dn⟩ M $$ []
+  imod ghost_var_alloc (GF := GF) false with ⟨%fn, Hfn⟩
+  imod inv_alloc doomN ⊤ iprop((dpend (GF := GF) ⟨hn, mn, dn, fn, Dd⟩ ∗ dfpend ⟨hn, mn, dn, fn, Dd⟩) ∨
+      (dshot ⟨hn, mn, dn, fn, Dd⟩ ∗ ∃ s, ⌜1 ≤ s ∧ s ≤ M.length⌝ ∗ pend ⟨hn, mn, dn, fn, Dd⟩ s ∗
+        (dfpend ⟨hn, mn, dn, fn, Dd⟩ ∨ (dfree ⟨hn, mn, dn, fn, Dd⟩ ∗ ⌜(⟨hn, mn, dn, fn, Dd⟩ : AGN).dd s⌝))))
+      $$ [Hd Hfn] with #Hdoom
+  · inext; ileft; unfold dpend dfpend; iframe Hd Hfn
+  ihave #Hdoom' : doomInv (GF := GF) ⟨hn, mn, dn, fn, Dd⟩ M $$ []
   · unfold doomInv; iexact Hdoom
-  have hwp' := @hwp Hinv ⟨hn, mn, dn⟩ P0 hlen hmlen hP0
+  have hwp' := @hwp Hinv ⟨hn, mn, dn, fn, Dd⟩ P0 hlen hmlen rfl hP0
   ihave Hw := hwp'
   imod Hw $$ Hdoom' [H2] [Hp] with Hwps
   · iapply BigSepL.bigSepL_mono (Φ := fun k γ => ghost_var (GF := GF) γ (.own (1 : Qp).half) (σInit ps.length P0 k))
@@ -193,8 +198,8 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
     simp only [Nat.add_sub_cancel]
     rw [getD_of_get? hj]
   imodintro
-  iexists (fun σ _ _ _ => stA (GF := GF) ⟨hn, mn, dn⟩ π img M Ψ σ),
-    (List.range ps.length).map (fun k => fun v => iprop(⌜∃ V, grd π img M V (Φ k v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn⟩)),
+  iexists (fun σ _ _ _ => stA (GF := GF) ⟨hn, mn, dn, fn, Dd⟩ π img M Ψ σ),
+    (List.range ps.length).map (fun k => fun v => iprop(⌜∃ V, grd π img M V (Φ k v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩)),
     (fun _ => iprop(True)), (fun _ _ _ _ => fupd_intro)
   dsimp only
   isplitl [H1]
@@ -233,9 +238,9 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
   · -- the thread pool's wps
     unfold esInit
     iapply bsl2_map (E := fun k => CExpr.run (hw pstep pdone img M k) (ps.getD k default))
-      (Q := fun k => fun v => iprop(⌜∃ V, grd π img M V (Φ k v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn⟩))
-    iapply BigSepL.bigSepL_mono (Φ := fun j _ => wpA (GF := GF) ⟨hn, mn, dn⟩ π (hw pstep pdone img M j) Ψ
-      (ps.getD j default) (fun v => iprop(⌜∃ V, grd π img M V (Φ j v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn⟩))) ?_
+      (Q := fun k => fun v => iprop(⌜∃ V, grd π img M V (Φ k v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩))
+    iapply BigSepL.bigSepL_mono (Φ := fun j _ => wpA (GF := GF) ⟨hn, mn, dn, fn, Dd⟩ π (hw pstep pdone img M j) Ψ
+      (ps.getD j default) (fun v => iprop(⌜∃ V, grd π img M V (Φ j v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩))) ?_
     · intro j i hj
       have : i = j := by
         have hjl := (List.getElem?_eq_some_iff.1 hj).1
@@ -246,8 +251,8 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
       dsimp only [wpA]
       exact .rfl
     iapply bsl_len ps (List.range ps.length) _ (by simp)
-    iapply BigSepL.bigSepL_mono (Φ := fun j p => wpA (GF := GF) ⟨hn, mn, dn⟩ π (hw pstep pdone img M j) Ψ p
-      (fun v => iprop(⌜∃ V, grd π img M V (Φ j v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn⟩))) ?_ $$ Hwps
+    iapply BigSepL.bigSepL_mono (Φ := fun j p => wpA (GF := GF) ⟨hn, mn, dn, fn, Dd⟩ π (hw pstep pdone img M j) Ψ p
+      (fun v => iprop(⌜∃ V, grd π img M V (Φ j v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩))) ?_ $$ Hwps
     intro j p hj
     rw [List.getD_eq_getElem?_getD, hj]
     exact .rfl
@@ -257,7 +262,7 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
   icases Hσ with ⟨_, %Hout, %Hok, #Hshots, #Hfacts⟩
   imod inv_acc_timeless (E := ⊤) CoPset.subseteq_top $$ Hdoom with ⟨Hb, -⟩
   iapply fupd_mask_intro_discard Std.LawfulSet.empty_subset
-  icases Hb with (Hd | ⟨Hds, %s, %hs, Hps⟩)
+  icases Hb with (⟨Hd, Hdf⟩ | ⟨Hds, %s, %hs, Hps, Hmode⟩)
   · icases Hfacts with (%Hf | #Hds)
     · -- not doomed: the facts, and the selected value's postcondition
       have Hf' : cFacts π img M Ψ ps.length σ2 := by have := Hf; simp only at this; rw [hlen] at this; exact this
@@ -271,8 +276,8 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
             have h1 : es'[hsel]? = some (CExpr.ret v) := by
               rw [Heq, List.getElem?_append_left (by rw [Hlen]; simp [esInit]; exact hs)] at hq; exact hq
             have h2 : ((List.range ps.length).map (fun k => fun v => iprop(⌜∃ V, grd π img M V (Φ k v)⌝ ∨
-                dshot (GF := GF) ⟨hn, mn, dn⟩)))[hsel]? =
-                some (fun v => iprop(⌜∃ V, grd π img M V (Φ hsel v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn⟩)) := by
+                dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩)))[hsel]? =
+                some (fun v => iprop(⌜∃ V, grd π img M V (Φ hsel v)⌝ ∨ dshot (GF := GF) ⟨hn, mn, dn, fn, Dd⟩)) := by
               rw [List.getElem?_map, List.getElem?_range hs]; rfl
             ihave Hp := BigSepL2.bigSepL2_lookup h1 h2 $$ Hpost
             dsimp only [ToVal.toVal, CExpr.toV, Option.elim]
@@ -287,11 +292,15 @@ theorem adeq_core [Inhabited P] {π : Proto} {Φ : Nat → V → Prop} {Ψ : Nat
       iapply dpend_dshot
       iframe Hd Hds
   · iexfalso
-    iapply pend_shot
-    iframe Hps
-    iapply Hshots
-    ipureintro
-    exact ⟨hs.1, hs.2, hall s hs.1 hs.2⟩
+    ihave #Hfs := Hshots $$ %s %⟨hs.1, hs.2, hall s hs.1 hs.2⟩
+    unfold fulT
+    icases Hfs with (#Hsh | ⟨#Hfr, %hnd⟩)
+    · iapply pend_shot
+      iframe Hps Hsh
+    · icases Hmode with (Hdf | ⟨_, %hdd⟩)
+      · iapply dfpend_dfree; iframe Hdf Hfr
+      · exact absurd hdd hnd
+
 
 end core
 
@@ -325,10 +334,10 @@ variable {GF : BundledGFunctors} [InvGpreS GF] [GhostVarG GF HSt] [GhostVarG GF 
 trace part at every prefix of every hart, (iii) the partition (both parts), (iv) `Valid`, (v) `traceWf`. -/
 theorem adequacyA [Inhabited P] {pstep : P → D → PLabel → P → D → Prop} {pdone : P → Option V} {img : Image}
     {d0 : D} {ps : List P} {M : List PMsg} {run : PFRun P D}
-    (π : Proto) (Φ : Nat → V → Prop) (Ψ : Nat → Trace → Prop) :
+    (π : Proto) (Φ : Nat → V → Prop) (Ψ : Nat → Trace → Prop) (Dd : Nat → Prop) :
     PO_img π img →
     (∀ h, Ψ h []) →
-    wpPremise hlc GF pstep pdone img M ps π Φ Ψ →
+    wpPremise hlc GF pstep pdone img M ps π Φ Ψ Dd →
     PF.validRun pstep img d0 ps M run →
       (∀ h v, run.done pdone h v → Φ h v)
     ∧ (∀ h k, Ψ h ((run.trace h).take k))

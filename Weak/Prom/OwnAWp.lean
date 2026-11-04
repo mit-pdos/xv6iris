@@ -16,6 +16,10 @@ per hart step along the chosen schedule, so the step index is the schedule's ste
   REQUIRES `shot g t` at the fulfil of `t`, so the only way to fulfil `t` is to have shot its `pend` — wherever the
   program proof put it (e.g. inside a deposit invariant `inv N (pend t ∨ (shot t ∗ R))`: the author must take
   `pend t` out, shoot it and deposit `R` in the same step; plan §3 "The deposit … happens at t's fulfil").
+* (S4a part 2) FREE MODE `dfree g`: the doom box's second mode, entered only by surrendering the `pend` of a DEAD
+  message (`g.dd`, the client's predicate: no hart's text can fulfil it, `doomD`); a fulfil of `t` hands back
+  `fulT g t = shot g t ∨ (dfree g ∗ ⌜¬ g.dd t⌝)`, so a doomed hart that lost the resources holding its later
+  writes' `pend`s can still run (sound: the dead witness's own fulfil cannot use free mode).
 * `dpend g` / `dshot g` and `doomInv g M` — THE DOOM BOX, the mechanism for R-a1 (plan §3: "The read rule must
   therefore return 'v, or ⟦·⟧-doomed until my release'").  A hart holding `pend s` for a message `s` may surrender
   it for good (`doom`): `s` can then never be fulfilled, so the run is not valid, and the persistent `dshot g`
@@ -58,6 +62,10 @@ structure AGN where
   mn : List GName
   /-- the doom one-shot -/
   dn : GName
+  /-- the FREE-MODE one-shot (S4a part 2: R-a1, doomed continuations) -/
+  fn : GName
+  /-- the client's DEAD predicate: timestamps no hart's text can fulfil (the free-mode witnesses) -/
+  dd : Nat → Prop
 
 /-- The doom box's namespace. -/
 def doomN : Namespace := ndot nroot "promDoom"
@@ -82,9 +90,21 @@ def dpend (g : AGN) : IProp GF := ghost_var g.dn (.own 1) false
 /-- The doom one-shot, shot: this branch is not part of any valid run. -/
 def dshot (g : AGN) : IProp GF := ghost_var g.dn .discard true
 
-/-- THE DOOM BOX (plan R-a1): an invariant holding `dpend`, or `dshot` with some surrendered `pend s`. -/
+/-- The free-mode one-shot, not yet shot. -/
+def dfpend (g : AGN) : IProp GF := ghost_var g.fn (.own 1) false
+
+/-- FREE MODE (S4a part 2): the run is doomed by a DEAD witness (`g.dd`), so every later fulfil of a non-dead
+message is free (`fulT`). -/
+def dfree (g : AGN) : IProp GF := ghost_var g.fn .discard true
+
+/-- What a fulfil of `t` must hand back (S4a part 2): `shot g t`, or free mode and `t` is not dead. -/
+def fulT (g : AGN) (t : Nat) : IProp GF := iprop(shot g t ∨ (dfree g ∗ ⌜¬ g.dd t⌝))
+
+/-- THE DOOM BOX (plan R-a1; S4a part 2: two modes): `dpend ∗ dfpend` (not doomed), or `dshot` with a surrendered
+witness `pend s`, and either `dfpend` (doomed, fulfils still need `shot`) or `dfree` with `s` DEAD (free mode). -/
 def doomInv [InvGS_gen hlc GF] (g : AGN) (M : List PMsg) : IProp GF :=
-  inv doomN iprop(dpend g ∨ (dshot g ∗ ∃ s, ⌜1 ≤ s ∧ s ≤ M.length⌝ ∗ pend g s))
+  inv doomN iprop((dpend g ∗ dfpend g) ∨
+    (dshot g ∗ ∃ s, ⌜1 ≤ s ∧ s ≤ M.length⌝ ∗ pend g s ∗ (dfpend g ∨ (dfree g ∗ ⌜g.dd s⌝))))
 
 instance [InvGS_gen hlc GF] (g : AGN) (M : List PMsg) : Persistent (doomInv (GF := GF) g M) := by
   unfold doomInv; infer_instance
@@ -94,6 +114,11 @@ instance (g : AGN) (t : Nat) : Timeless (shot (GF := GF) g t) := by unfold shot;
 instance (g : AGN) (t : Nat) : Timeless (pend (GF := GF) g t) := by unfold pend; infer_instance
 instance (g : AGN) : Timeless (dshot (GF := GF) g) := by unfold dshot; infer_instance
 instance (g : AGN) : Timeless (dpend (GF := GF) g) := by unfold dpend; infer_instance
+instance (g : AGN) : Persistent (dfree (GF := GF) g) := by unfold dfree; infer_instance
+instance (g : AGN) : Timeless (dfree (GF := GF) g) := by unfold dfree; infer_instance
+instance (g : AGN) : Timeless (dfpend (GF := GF) g) := by unfold dfpend; infer_instance
+instance (g : AGN) (t : Nat) : Persistent (fulT (GF := GF) g t) := by unfold fulT; infer_instance
+instance (g : AGN) (t : Nat) : Timeless (fulT (GF := GF) g t) := by unfold fulT; infer_instance
 
 /-- `pend ∗ shot ⊢ False`. -/
 theorem pend_shot (g : AGN) (t : Nat) : pend (GF := GF) g t ∗ shot g t ⊢ False := by
@@ -109,6 +134,13 @@ theorem dpend_dshot (g : AGN) : dpend (GF := GF) g ∗ dshot g ⊢ False := by
   ihave %h := ghost_var_valid_2 $$ H1 H2
   exact absurd h.2 (by decide)
 
+/-- `dfpend ∗ dfree ⊢ False`. -/
+theorem dfpend_dfree (g : AGN) : dfpend (GF := GF) g ∗ dfree g ⊢ False := by
+  unfold dfpend dfree
+  iintro ⟨H1, H2⟩
+  ihave %h := ghost_var_valid_2 $$ H1 H2
+  exact absurd h.2 (by decide)
+
 /-- SHOOT the one-shot of `t` (the fulfil's obligation). -/
 theorem shoot (g : AGN) (t : Nat) : pend (GF := GF) g t ⊢ |==> shot g t := by
   unfold pend shot
@@ -117,24 +149,83 @@ theorem shoot (g : AGN) (t : Nat) : pend (GF := GF) g t ⊢ |==> shot g t := by
   iapply ghost_var_persist $$ H
 
 /-- **DOOM** (plan R-a1): surrender `pend s` to the doom box; this branch's every later obligation is then
-discharged by the persistent `dshot g` (no valid run fulfils `s`). -/
+discharged by the persistent `dshot g` (no valid run fulfils `s`).  Fulfils still need `shot` (or free mode). -/
 theorem doom [InvGS_gen hlc GF] {E : CoPset} (hE : ↑doomN ⊆ E) (g : AGN) (M : List PMsg) (s : Nat)
     (hs : 1 ≤ s ∧ s ≤ M.length) : doomInv (GF := GF) g M ∗ pend g s ⊢ |={E}=> dshot g := by
   iintro ⟨#Hinv, Hp⟩
   unfold doomInv
   unfold dshot
   imod inv_acc_timeless hE $$ Hinv with ⟨Hb, Hclose⟩
-  icases Hb with (Hd | ⟨#Hs, Hrest⟩)
+  icases Hb with (⟨Hd, Hf⟩ | ⟨#Hs, Hrest⟩)
   · unfold dpend
     imod ghost_var_update true _ false $$ Hd with Hd
     imod ghost_var_persist $$ Hd with #Hd
+    imod Hclose $$ [Hp Hf] with -
+    · iright
+      isplitr [Hp Hf]
+      · iexact Hd
+      · iexists s; iframe Hp; isplitr [Hf]
+        · ipureintro; exact hs
+        · ileft; iexact Hf
+    imodintro
+    iexact Hd
+  · imod Hclose $$ [Hrest] with -
+    · iright; iframe Hs; iexact Hrest
+    imodintro
+    iexact Hs
+
+/-- **DOOM BY A DEAD WITNESS** (S4a part 2): surrender `pend d` of a DEAD `d` (`g.dd d`): FREE MODE (`dfree`) and
+`dshot`.  No hart's text can fulfil `d`, so after it every fulfil of a non-dead message is free (`fulT`). -/
+theorem doomD [InvGS_gen hlc GF] {E : CoPset} (hE : ↑doomN ⊆ E) (g : AGN) (M : List PMsg) (d : Nat)
+    (hs : 1 ≤ d ∧ d ≤ M.length) (hd : g.dd d) : doomInv (GF := GF) g M ∗ pend g d ⊢ |={E}=> dfree g ∗ dshot g := by
+  iintro ⟨#Hinv, Hp⟩
+  unfold doomInv
+  unfold dshot
+  imod inv_acc_timeless hE $$ Hinv with ⟨Hb, Hclose⟩
+  icases Hb with (⟨Hd, Hf⟩ | ⟨#Hs, %s, %hs', Hps, (Hf | ⟨#Hfr, %hds⟩)⟩)
+  · unfold dpend dfpend
+    imod ghost_var_update true _ false $$ Hd with Hd
+    imod ghost_var_persist $$ Hd with #Hd
+    imod ghost_var_update true _ false $$ Hf with Hf
+    imod ghost_var_persist $$ Hf with #Hf
     imod Hclose $$ [Hp] with -
     · iright
       isplitr [Hp]
       · iexact Hd
-      · iexists s; iframe Hp; ipureintro; exact hs
+      · iexists d; iframe Hp; isplitr
+        · ipureintro; exact hs
+        · iright; unfold dfree; iframe Hf; ipureintro; exact hd
     imodintro
-    iexact Hd
+    unfold dfree
+    iframe Hd Hf
+  · unfold dfpend
+    imod ghost_var_update true _ false $$ Hf with Hf
+    imod ghost_var_persist $$ Hf with #Hf
+    imod Hclose $$ [Hp] with -
+    · iright
+      isplitr [Hp]
+      · iexact Hs
+      · iexists d; iframe Hp; isplitr
+        · ipureintro; exact hs
+        · iright; unfold dfree; iframe Hf; ipureintro; exact hd
+    imodintro
+    unfold dfree
+    iframe Hs Hf
+  · imod Hclose $$ [Hps] with -
+    · iright; iframe Hs; iexists s; iframe Hps; isplitr
+      · ipureintro; exact hs'
+      · iright; iframe Hfr; ipureintro; exact hds
+    imodintro
+    iframe Hfr Hs
+
+/-- Free mode implies doom. -/
+theorem dfree_dshot [InvGS_gen hlc GF] {E : CoPset} (hE : ↑doomN ⊆ E) (g : AGN) (M : List PMsg) :
+    doomInv (GF := GF) g M ∗ dfree g ⊢ |={E}=> dshot g := by
+  iintro ⟨#Hinv, #Hfr⟩
+  unfold doomInv
+  imod inv_acc_timeless hE $$ Hinv with ⟨Hb, Hclose⟩
+  icases Hb with (⟨Hd, Hf⟩ | ⟨#Hs, Hrest⟩)
+  · iexfalso; iapply dfpend_dfree; iframe Hf Hfr
   · imod Hclose $$ [Hrest] with -
     · iright; iframe Hs; iexact Hrest
     imodintro
@@ -161,7 +252,7 @@ def stA (g : AGN) (π : Proto) (img : Image) (M : List PMsg) (Ψ : Nat → Trace
   iprop(([∗list] k ↦ γ ∈ g.hn, ghost_var γ (.own (1 : Qp).half) (σ k)) ∗
     ⌜∀ k, g.hn.length ≤ k → (σ k).2.2 = []⌝ ∗
     ⌜∀ k, fOk M σ k⌝ ∗
-    □ (∀ t, ⌜1 ≤ t ∧ t ≤ M.length ∧ fulAt σ t⌝ → shot g t) ∗
+    □ (∀ t, ⌜1 ≤ t ∧ t ≤ M.length ∧ fulAt σ t⌝ → fulT g t) ∗
     (⌜cFacts π img M Ψ g.hn.length σ⌝ ∨ dshot g))
 
 /-- The iris-lean `IrisGS` of the concurrent language: one `▷` and `£ 1` per step. -/
@@ -185,9 +276,10 @@ def wpA [InvGS_gen hlc GF] (g : AGN) (π : Proto) (w : HW P D V) (Ψ : Nat → T
   letI : IrisGS_gen hlc (CExpr P D V) GF := aIrisGS g π w.img w.M Ψ
   WP (CExpr.run w s) @ Stuckness.MaybeStuck; ⊤ {{ Φ }}
 
-/-- THE FRONTIER RULE at pre-state `ws` (plan §3): every `t ≤ WF(ws)` is shot, and `Valid(WF(ws))` (or doom). -/
+/-- THE FRONTIER RULE at pre-state `ws` (plan §3): every `t ≤ WF(ws)` is fulfilled (`fulT`: shot, or free mode),
+and `Valid(WF(ws))` (or doom). -/
 def frontA (g : AGN) (π : Proto) (img : Image) (M : List PMsg) (ws : PState) : IProp GF :=
-  iprop(□ (∀ t, ⌜1 ≤ t ∧ t ≤ M.length ∧ t ≤ wfr ws⌝ → shot g t) ∗ (⌜Valid π img M (wfr ws)⌝ ∨ dshot g))
+  iprop(□ (∀ t, ⌜1 ≤ t ∧ t ≤ M.length ∧ t ≤ wfr ws⌝ → fulT g t) ∗ (⌜Valid π img M (wfr ws)⌝ ∨ dshot g))
 
 instance (g : AGN) (π : Proto) (img : Image) (M : List PMsg) (ws : PState) :
     Persistent (frontA (GF := GF) g π img M ws) := by unfold frontA; infer_instance
@@ -316,7 +408,7 @@ theorem wpA_lift {g : AGN} {π : Proto} {w : HW P D V} {Ψ : Nat → Trace → P
     ▷ ((∀ v, ⌜w.pdone s = some v⌝ -∗ hartA g w.h ws pr τ -∗ |={⊤}=> Φ v) ∧
        (∀ l ots s' ws' pr', ⌜anyFab w.pstep s () l s' ()⌝ -∗ ⌜memStep w.img w.M w.h pr ws l ots ws' pr'⌝ -∗
           (⌜hartFacts π w.img w.M (Ψ w.h) (ws, pr, τ)⌝ ∨ dshot g) -∗ frontA g π w.img w.M ws -∗ £ 1 -∗
-          |={⊤}=> (⌜stepOk π w.img w.M (Ψ w.h) ws τ l ots⌝ ∨ dshot g) ∗ (∀ t, ⌜ots = some t⌝ → shot g t) ∗
+          |={⊤}=> (⌜stepOk π w.img w.M (Ψ w.h) ws τ l ots⌝ ∨ dshot g) ∗ (∀ t, ⌜ots = some t⌝ → fulT g t) ∗
             (hartA g w.h ws' pr' (τ ++ [(l, ots)]) -∗ wpA g π w Ψ s' Φ)))
     ⊢ wpA g π w Ψ s Φ := by
   letI : IrisGS_gen hlc (CExpr P D V) GF := aIrisGS g π w.img w.M Ψ

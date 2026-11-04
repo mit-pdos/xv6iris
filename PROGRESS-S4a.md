@@ -1,25 +1,88 @@
 # S4a progress — ownership track (a), promises-first, frontier-gated resources (plan rev 7 §3, §4 G4, §8 S4a)
 
-## Status (top): GREEN increment 3 (2026-11-03); no kill criterion fired
-- K4: no program-specific normal-form fact (the schedule lemma is program-agnostic); 2,862 new lines (bound 19k).
-- Build: `lake build Weak.Prom.OwnAMP Weak.Prom.OwnANeg` green (closure = all OwnA* files).
-  `#print axioms`: `adequacyA`, `own_mp` — propext, Classical.choice, Quot.sound.  No sorry/axiom/native_decide.
-- Workspace edits: NEW files only (`Weak/Prom/OwnA*.lean`); no existing file touched.
-- G4 on track (a): (2) PROVED `Weak.Prom.OA.own_mp` (x's points-to moves H0 → flag slot → H1; 0 named inputs;
-  finite runs, S3d separate [OWN.P4]); (5) PROVED `slot_two_readers` (+ `frontA_dup`).  NOT YET: (1a)/(1b)/(1c),
-  (2′), (3), (4).
-- Criteria: (ii) isLock shape — not attempted yet; (iii) ctxByte-shaped points-to — not yet (current `xPts` is a
-  word-level "latest write + bag of later x-messages' `pend`"); (iv) 2.9k lines so far.
+## Status (top): GREEN increment 6 (2026-11-03, end of part 2); no kill criterion fired
+- K4: no program-specific normal-form fact; 6,632 lines in Weak/Prom/OwnA*.lean (bound 19k; 2× = 38k).
+- Build: `lake build Weak.Prom.OwnALock1b Weak.Prom.OwnAMP2 Weak.Prom.OwnANeg` green (closure = every OwnA* file).
+  `#print axioms` of `adequacyA`, `own_mp`, `own_mp2`, `own_lock1a`, `own_lock1a_excl`, `own_lock1b`: propext,
+  Classical.choice, Quot.sound.  No sorry/axiom/native_decide/opaque/implemented_by.
+- Workspace edits: NEW files only, except my own part-1 files OwnAWp, OwnAAdeq, OwnAKit, OwnALib, OwnAMP (free mode,
+  below).  No shared file touched (the loop front end is a new program half, not an edit of RefProg/MachLitmus).
+- G4 on track (a), 0 named inputs each, finite runs (prefix lemma S3d separate, [OWN.P4]):
+  - (1a) PROVED `own_lock1a` (+ `own_lock1a_excl`): manual Example 1 (`amoswap.w.aq` / `amoswap.w.rl x0,x0`) with
+    the counter client `ld; addi; sd`: each hart's critical-section load read, in every byte, the LATEST counter
+    message below its own store (no counter write by anybody in between).
+  - (1b) PROVED `own_lock1b`: Example 2 (`amoswap.w; fence r,rw` / `fence rw,w; amoswap.w x0,x0`), same statement;
+    the claim happens at `fence r,rw`'s step, release-class through `fence rw,w`.
+  - (2) PROVED `own_mp`; (2′) PROVED `own_mp2` (receiver `sd 2,(x)` after the hand-off is coherence-after H0's
+    write); (5) PROVED `slot_two_readers`.
+  - NOT DONE: (1c) xv6 text, (3) holding(), (4) pipealloc/runtime γ.
+- Criteria: (i) 5 of 8 targets; (ii) PARTIAL; (iii) EXPRESSIBLE (not built); (iv) below.
+
+### Criteria (ii)–(iv), measured 2026-11-03
+- (ii) `isLock γ lk s R` (MachCSL/Lock.lean:3325, persistent `inv lockN (lockBodyM …)` + floors).  Track (a)'s handle
+  `lkCtx g M tk` IS persistent and the lock body is invariants only (image slot `iSlot`, one `rSlot r` per release
+  message, `deadInv`s) — no floors.  But (a) the slots are allocated at adequacy start for the M-indexed family, so
+  `R` is FIXED there (`Rs` = the counter's points-to); a generic `R` (and `R : CtxId → IProp`) needs the plan's
+  saved-proposition slots σ_t (G4 (4), not built); (b) `lk` is a constant of the classification (`Lk`); a runtime
+  lock needs the classes keyed by the lock address of the `initlock` that created it.  So the STATEMENT shape
+  `isLock γ lk s R` is reproducible only after (4): γ ↦ (tk, slot names), lk ↦ the classification key.
+- (iii) ctxByte-shaped points-to (`ctxByte ξ a dq v`: `a ↦ₕ (e :: H)` + `keyAt ξ e.t`).  Track (a)'s points-to is
+  `cPts lw` = "latest write `lw` (pure, M-indexed) ∗ the `pend` of every later message to the location"; per byte it
+  is `∃ lw, ⌜M[lw] holds v at a⌝ ∗ [∗ later a-messages] pend`, and `keyAt ξ e.t` becomes a HART-LOCAL view fact
+  `lw ≤ vrNew/ldPre` (in this kit a pure fact about the hart state carried by the proof, not a resource).
+  Expressible; `dq` fractions are not (the bag of `pend`s is exclusive; read sharing needs fractional bags).
+- (iv) Lines: OwnA*.lean 6,632 (part 1 2,862; part 2 3,770: free mode in part-1 files ~120, loop front end + kit
+  390, lock library shared by (1a)/(1b) 1,450 (Defs 382, Lib 292, Free 181, CS 446, Acq 149), (1a) 490, (1b) 825,
+  (2′) 495).  S5-delta projection for track (a), rough: lock body over
+  runtime-allocated saved-prop slots + address-keyed classes 2–3k; ctxByte-shaped per-byte bags and readAU/writeAU
+  leaves over the kit 4–6k; (1c)/xv6 acquire-release leaf lemmas 1.5k; the M-indexed setup for a kernel (every
+  address's messages to an owner's bag) 2–4k; proof-text edits (10 files unfolding `↦ₕ`, 21 calling
+  readAU/writeAU, 7 touching `lkFloor`) 3–5k; total ≈ 13–20k lines, not counting S3d/S3c.
+  RISK for S5: free mode needs DEAD messages (no text can fulfil them); with arbitrary user code almost no shape is
+  dead, so lock-word reads of unexpected messages must instead be refuted by the OWNER of that address's bag — every
+  byte of memory needs an owner of its messages' `pend`s (the classification): the big S5 item.
+
+### Design findings of part 2 (for G4)
+- R-a1 "doomed continuations": after a doom the hart must still fulfil its later writes (the lifting lemma needs
+  `shot t`), but the doomed branch may lack the resources holding their `pend`.  FIX (general, OwnAWp): a second
+  mode of the doom box — FREE MODE `dfree`, entered only with a DEAD witness (`g.dd d`: a message no hart's text can
+  fulfil; the client picks `dd`, adequacy takes it as a parameter `Dd`); a fulfil hands back
+  `fulT g t = shot g t ∨ (dfree g ∗ ⌜¬ g.dd t⌝)`.  Sound: at the end of a valid run the dead witness is fulfilled,
+  but its fulfil could not use free mode (`¬ dd`) and its `pend` is in the box.  Ordinary doom (R-a1 reads of the
+  next owner's future message) keeps the reader's resources: its own later store lies above `coh ≥ the read
+  message` (THE WRITE FLOOR, `loadBytes_coh`), so the surrendered `pend` is never needed again.
+- The lock (OwnALockDefs): no "stage"/"who reads s" ghost needed: the claim token of release `s`'s slot is the token
+  of `nxtL M s` (the first later write to the lock word, a pure function of M); an AMO at `ts` that read `s0` proves
+  `nxtL M s0 ts` per step from `exclOk` (other harts), its coherence floor (own writes at or below it) and its
+  own-message bag (own writes above it are unfulfilled, but the frontier `≥ ts` shows them fulfilled: absurd).
+- Release-class is used as plan §3 defines it: the `.rl` AMO's pre-view contains `vwOld ≥ ts_c`.
 
 ## Next (in order)
-1. Kit: `wpKA_amo`, `wpKA_br`, `wpKA_alu(i)` (port of CoreKit's, with frontier/`shot`).
-2. Points-to with a write FLOOR (hart-local view fact `fl ≤ vwNew ∨ ∃ j, fl ≤ coh(x+j)`) so a hart can WRITE after
-   a doomed read (needed by the CS `ld c; addi; sd c` of (1)); machine lemma `coh ≤ vrOld ⊔ vwOld`.
-3. Lock body over slots (one slot per lk message; uniqueness of the AMO reading a source from `exclOk`) → (1a),
-   (1b), (1c) (needs `sext.w` = `addiw` in the litmus front end, or the Sail front end), then (2′), (3), (4)
-   (saved-prop slot content for runtime γ).
+1. (1c) xv6's exact text: generalize the lock classes to plain release stores (`sw zero,0(s1)`) and add the
+   lock-protected `cpu` field (`Lk+16`, 8 bytes: a second bag in `Rs`); text `li a4,1; again: mv a5,a4;
+   amoswap.w.aq a5,a5,(s1); sext.w a5,a5; bnez a5,again; sd a0,16(s1); CS; sd zero,16(s1); fence rw,w;
+   sw zero,0(s1)` over the loop front end (`wpKA_addiw` exists).  Estimate 1.2k lines (the (1b) structure).
+2. (3) holding()-shaped racy read (pure frontier part: `ld lk; beqz` then `vcap ≥ s`).
+3. (4) saved-prop slots σ_t (iris-lean SavedProp, `SavedPropG` in the bundle) + deferred deposits `rOf_t`.
 
 ## Files (Weak/Prom/)
+16. `OwnALock1b.lean` — (1b): text `p1b`, free walker `lk_free1b`, `lk_cs1b`/`lk_cs2_1b`, `lk_rel1b` (fence) +
+   `lk_rel1b_amo`, `lk_loop1b` (claim at `fence r,rw`), THE VERDICT `own_lock1b`.
+17. `OwnAMP2.lean` — (2′): test `mpW`, classes (`isW`: H1's own message), `mw_setup`, `mw_h0`, `mw_h1`,
+   `mw_h1_tail`, THE VERDICT `own_mp2`.
+9. `OwnAFront.lean` — the LOOP FRONT END (new program half `xStep Xs` over `LP`: backward branches, `addiw`;
+   `litW_x`, `litAg_x`/`litAg_xn`) and kit rules `wpKA_alui`, `wpKA_rmw1`, `wpKA_amo`, `wpKA_brx`, `wpKA_addiw`.
+   Recorded decision: NOT an edit of RefProg/MachLitmus (`Instr` is matched exhaustively in 14 shared files);
+   `addiw` is an `XI` constructor whose `LP.prog` placeholder is `.nop`.
+10. `OwnALockDefs.lean` — (1a) text/test, message classes (`isA`, `isR`, `isC`, `isJ`, `isDd`), the chain `nxtL`,
+   `qLk` (the mutual-exclusion invariant), bags, `cPts`, `Rs`, `iSlot`, `rSlot`, `lkCtx`, `obag`.
+11. `OwnALockLib.lean` — `cld_cases` (owned counter read, R-a1 cases), `lk_src`, `lk_chain`, `lk_claim`.
+12. `OwnALockFree.lean` — `ddL` (dead predicate), `lk_free` (free mode walks the text, Löb).
+13. `OwnALockCS.lean` — `lk_cs` (ld: clean / R-a1 doom / free), `lk_cs2` (addi; sd moves the points-to),
+   `lk_rel` (release AMO deposits `Rs r`).
+14. `OwnALockAcq.lean` — `lk_acq` (the acquire step: value 1, or 0 with the claimed `Rs s0`, or free).
+15. `OwnALock.lean` — `lk_loop` (Löb over the spin loop), `lk_hart`, `lk_setup`, `lk_premise`, THE VERDICTS
+   `own_lock1a`, `own_lock1a_excl`.
 1. `OwnALang.lean` — the concurrent language: shared state `CSt` (every hart's exact `(ws, P, τ)`), the write
    frontier `wfr = stFloor = max vcap vwNew` (plan §3 WF(h)), `fulAt`, `stageGe` (plan "stage ≥ s"; v2 has no A/D
    class, so every timestamp counts), THE FRONTIER CLAIM `fOk` (`WF(h) ≥ s ⊢ stage ≥ s`), `cstep` (one hart's
@@ -60,7 +123,3 @@
   will carry the `pend` tokens of the later messages to its location.
 - Deposit slots: the lifting lemma requires `shot g t` at t's fulfil, so `inv N (pend t ∨ shot t ∗ R)` forces the
   author to deposit R exactly at its fulfil (plan §3 deposit); saved-prop slots (plan rev-4 design) layer on top.
-
-## Next
-- OwnALib: points-to `x ↦ v` (latest write + the `pend` tokens of later x-messages), read/write rules, deposit
-  slots (saved props), then G4 (2) MP with ownership transfer.
