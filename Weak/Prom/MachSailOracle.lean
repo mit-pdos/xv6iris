@@ -11,6 +11,8 @@ h=<#> | SM=<cmp> SR=<cmp> SH=<cmp> | vd s/m/r/h | <ms sail> <ms mach> <ms ref>` 
 `r` reference, `h` herd; `<cmp>` as MachOracle: `STRONGER` = the Sail level lacks an outcome of the other side,
 `WEAKER` = it has an extra one), then `only-…` lines on a disagreement.  `SCOPE-SAIL <why>` when the test cannot go
 through Sail (assembly) or a Sail run stopped (`oos=`); the label-level verdict is still printed then.
+MachFix-havoc: `HAVOC <file> …` with Sail-level verdict `HAVOC` when a valid run reaches a Sail `.error` node
+(MachHavoc.lean: every observation is possible; a forbidden verdict is blocked).
 The parsing, herd, reference and label-level code is MachOracle.lean's (copied: that file defines `main`).
 -/
 import Weak.Prom.MachSail
@@ -287,8 +289,11 @@ def main (args : List String) : IO UInt32 := do
           let flags := (if st.oos.isEmpty then "" else s!" oos={st.oos}") ++
             (if st.miss == 0 then "" else s!" MISS={st.miss}") ++ (if st.platDiff then " platDiff" else "") ++
             (if rok then "" else " ref-varsOk-FAIL") ++ (if mbud then " mach-budget" else "")
-          let tag := if st.oos.isEmpty then "S" else "SCOPE-SAIL oos"
-          IO.println s!"{tag} {f} {lt.name} | P={st.plats} M={st.cands} V={st.valid} it={st.iters} ev={st.events} nodes={st.nodes} | s={so.length} m={mo.length} r={ro.length} h={(ho.map List.length).getD 0} | SM={sm} SR={sr} SH={sh} | vd {vdOf obs T.cond so}/{vdOf obs T.cond mo}/{if noref then "na" else vdOf obs T.cond ro}/{hv} | {t2 - t1}ms {t1 - t0}ms {t3 - t2}ms{flags}"
+          -- MachFix-havoc: a havoc run (a valid run reaching a Sail `.error` node) makes every outcome possible: tag
+          -- `HAVOC`, Sail-level verdict `HAVOC` (never forbidden; MachHavoc.lean `allowedH`)
+          let tag := if st.havoc then "HAVOC" else if st.oos.isEmpty then "S" else "SCOPE-SAIL oos"
+          let vds := if st.havoc then "HAVOC" else vdOf obs T.cond so
+          IO.println s!"{tag} {f} {lt.name} | P={st.plats} M={st.cands} V={st.valid} it={st.iters} ev={st.events} nodes={st.nodes} | s={so.length} m={mo.length} r={ro.length} h={(ho.map List.length).getD 0} | SM={sm} SR={sr} SH={sh} | vd {vds}/{vdOf obs T.cond mo}/{if noref then "na" else vdOf obs T.cond ro}/{hv} | {t2 - t1}ms {t1 - t0}ms {t3 - t2}ms{flags}"
           if !onlySM.isEmpty then IO.println s!"  only-sail(vs mach): {onlySM.map (showOut obs)}"
           if !onlyMS.isEmpty then IO.println s!"  only-mach: {onlyMS.map (showOut obs)}"
           if !onlySR.isEmpty then IO.println s!"  only-sail(vs ref): {onlySR.map (showOut obs)}"

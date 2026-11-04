@@ -11,7 +11,7 @@ Weak/Prom: **track (b)'s weakest precondition, lifting lemmas and adequacy** (st
   as a promise of its author) preserves `X`, the agent thread is safe.
 * `ownAdequacy` — THE ADEQUACY: if the client allocates `X` with `X σ0`, proves the agent obligation, every hart's
   wp, and a final extraction `X σ ⊢ ⌜φ σ.done⌝` at the end of the run, then `φ` holds of the final value map of EVERY
-  valid, fetch-bounded, `invalFree` run of machine v2 (`D = Unit`), via the NF_R lemma (NfrRun.lean) and the
+  valid, fetch-bounded run (MachFix-R-b5: no `invalFree`) of machine v2 (`D = Unit`), via the NF_R lemma (NfrRun.lean) and the
   simulation (OwnLang.lean).
 No `sorry`, no axiom, no `native_decide`.
 -/
@@ -133,16 +133,17 @@ theorem bigSepL_hartsFrom_len (w : OW P V) (ps : List P) :
   simp [hartsFrom_length]
 
 /-- **THE ADEQUACY OF TRACK (b)'s LOGIC**: a client state interpretation `X`, the agent obligation, the hart wps and a
-final extraction give `φ` of the final value map of every valid, fetch-bounded, `invalFree` run. -/
+final extraction give `φ` of the final value map of every valid, fetch-bounded run (MachFix-R-b5: the former
+`invalFree` premise is gone). -/
 theorem ownAdequacy [InvGpreS GF] {w : OW P V} {ps : List P} (φ : (Nat → Option V) → Prop)
     (Hwp : ∀ [InvGS_gen hlc GF], ⊢@{IProp GF} |={⊤}=> ∃ X : OSt V → IProp GF,
       X σ0 ∗ □ (∀ σ σ', ⌜agentStep w σ σ'⌝ -∗ X σ -∗ |={⊤}=> X σ') ∗
       ([∗list] e ∈ hartsFrom w 0 ps, wpO X e (fun _ => iprop(True))) ∗
       (∀ σ, ⌜σ.n = w.M.length ∧ ∀ h, σ.pr h = ∅⌝ -∗ X σ -∗ |={⊤,∅}=> ⌜φ σ.done⌝))
     {evs : List PEvt} {cfg : PCfg P Unit} (hv : validRun w.pstep w.img () ps evs cfg) (hM : cfg.pcLog = w.M)
-    (hfb : fetchBounded w.pstep w.img ps cfg.pcLog evs) (hinv : invalFree cfg.pcLog) :
+    (hfb : fetchBounded w.pstep w.img ps cfg.pcLog evs) :   -- MachFix-R-b5: no `invalFree` premise
     φ (doneOf w ps.length cfg) := by
-  obtain ⟨evs', ⟨hnf, hno⟩, _⟩ := nfR hv hfb hinv
+  obtain ⟨evs', ⟨hnf, hno⟩, _⟩ := nfR hv hfb
   let N := ps.length
   have hs0 : Sim w N (pmInit w.img () ps) (hartsFrom w 0 ps ++ [OExpr.agent w]) σ0 := by
     refine ⟨rfl, by simp [pmInit, σ0], Nat.zero_le _, by simp [pmInit, N], by simp [hartsFrom_length, N], ?_,

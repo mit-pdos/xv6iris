@@ -305,7 +305,8 @@ theorem wpK_drain (hw : LitW w) {pr : GSet Nat} {ev : Trace} :
 /-- ONE LOAD LABEL. -/
 theorem wpK_load1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bool} {base : Int}
     {asrc : List Dsrc} {k : List (Nat × BitVec 8) → LP} {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Q (ev ++ [(LLoad aq rl base tvs asrc, none)]))⌝ ∗
@@ -376,7 +377,8 @@ theorem wpK_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bo
     {asrc vsrc : List Dsrc} {dat : List (Nat × BitVec 8) → List (BitVec 8)} {k : List (Nat × BitVec 8) → LP}
     {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
     (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LRmw aq rl base tvs (dat tvs) asrc vsrc ∧ s' = k tvs ∧
-      C tvs) :
+      C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs ts, ⌜C tvs⌝ -∗ ⌜tvs.length = (dat tvs).length⌝ -∗ ⌜ts ∈ pr⌝ -∗
         ⌜w.M[ts - 1]? = some ⟨base, dat tvs, some w.h, .excl⟩⌝ -∗
@@ -400,7 +402,9 @@ theorem wpK_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bo
   iintro %l %ots %s' %ws' %pr' %hp %hm Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext =>
+  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext vi hci _ =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero]
     imod Hk $$ %tvs %ts %hC %hlen %hts %hmsg %hlo %hex %hcoh %hext with ⟨%hQ, %hpv, Hk⟩
     obtain ⟨V', hg⟩ := hQ
     have hw' : wrOk w.M (τ ++ [(LRmw aq rl base tvs (dat tvs) asrc vsrc, some ts)]) :=
@@ -426,7 +430,8 @@ theorem wpK_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bo
 /-- ONE LR LABEL (M16). -/
 theorem wpK_lr1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bool} {base : Int}
     {asrc : List Dsrc} {k : List (Nat × BitVec 8) → LP} {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LExLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LExLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Q (ev ++ [(LExLoad aq rl base tvs asrc, none)]))⌝ ∗
@@ -591,7 +596,8 @@ theorem wpK_drainA (hw : LitW w) {pr : GSet Nat} {ev : Trace} (labs : List PLabe
 /-- **LOAD instruction** `l{b,h,w,d} rd, off(rs1)`: `LLoad`, then `LRegW rd [DLdRes]` (unless `rd = x0`), `LInstr`. -/
 theorem wpK_ld (hw : LitW w) {s : LP} {sz rd rs1 off : Nat} {sgn : Bool} {base : Int} {ws : PState}
     {pr : GSet Nat} {ev : Trace} (hag : LitAg w s) (hq : s.q = []) (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off))
-    (ha : aligned ((s.rd rs1 + off) % two64) sz = true) (hb : (((s.rd rs1 + off) % two64 : Nat) : Int) = base) :
+    (ha : aligned ((s.rd rs1 + off) % two64) sz = true) (hb : (((s.rd rs1 + off) % two64 : Nat) : Int) = base)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs, ⌜tvs.length = sz⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws false false (srcsView ws (srcR rs1))) base tvs⌝ -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Q (ev ++ [(LLoad false false base tvs (srcR rs1), none)]))⌝ ∗
@@ -754,7 +760,8 @@ theorem wpK_br (hw : LitW w) {s : LP} {c : Weak.Prom.Ref.BrC} {rs1 rs2 tgt : Nat
 theorem wpK_amo (hw : LitW w) {s : LP} {op : Weak.Prom.Ref.AmoOp} {sz : Nat} {aq rl : Bool} {rd rs2 rs1 : Nat}
     {base : Int} {ws : PState} {pr : GSet Nat} {ev : Trace} (hag : LitAg w s) (hq : s.q = [])
     (hp : s.prog[s.pc]? = some (.amo op sz aq rl rd rs2 rs1)) (ha : aligned (s.rd rs1) sz = true)
-    (hb : ((s.rd rs1 : Nat) : Int) = base) :
+    (hb : ((s.rd rs1 : Nat) : Int) = base)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs ts, ⌜tvs.length = sz⌝ -∗ ⌜ts ∈ pr⌝ -∗
         ⌜w.M[ts - 1]? = some ⟨base, amoD op sz (s.rd rs2) tvs, some w.h, .excl⟩⌝ -∗
@@ -803,7 +810,8 @@ theorem wpK_amo (hw : LitW w) {s : LP} {op : Weak.Prom.Ref.AmoOp} {sz : Nat} {aq
 /-- **LR instruction** `lr.<sz> rd, (rs1)` (no annotation): `LExLoad`, `LRegW rd [DLdRes]`, `LInstr`. -/
 theorem wpK_lr (hw : LitW w) {s : LP} {sz rd rs1 : Nat} {base : Int} {ws : PState} {pr : GSet Nat} {ev : Trace}
     (hag : LitAg w s) (hq : s.q = []) (hp : s.prog[s.pc]? = some (.lr sz false false rd rs1))
-    (ha : aligned (s.rd rs1) sz = true) (hb : ((s.rd rs1 : Nat) : Int) = base) :
+    (ha : aligned (s.rd rs1) sz = true) (hb : ((s.rd rs1 : Nat) : Int) = base)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lh γ π w Q ws pr ev ∗
     ▷ (∀ tvs, ⌜tvs.length = sz⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws false false (srcsView ws (srcR rs1))) base tvs⌝ -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Q (ev ++ [(LExLoad false false base tvs (srcR rs1), none)]))⌝ ∗

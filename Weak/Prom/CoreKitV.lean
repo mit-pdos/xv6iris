@@ -302,6 +302,7 @@ theorem kitAdeq {V : Type} {pdone : LP → Option V} {T : Test} {π : Proto} {M 
     (∀ h v, run.done pdone h v → Φ h v) ∧ (∀ h, Qs h (memEv (run.trace h))) ∧ noCmo M ∧
     (∀ t, 1 ≤ t → t ≤ M.length → exU (fun h => t ∈ run.fulfils h ∧ tidAt M t = some h)) ∧ run.traceWf M ∧
     run.cfg.pcImg = testImg T ∧ Valid π (testImg T) M M.length := by
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, hii, hpart, _, hval, hwf, _⟩ := adequacy (hlc := HasLC.hasLC) (GF := pfGF) (pdone := pdone)
     π Φ (fun h => ΨK M (Qs h)) himg (PO_ad_all _ _ _) (fun h => ⟨hQ0 h, wrOk_nil M⟩) (devFree_lit _) hwp hrun
   have hfin : ∀ h, ΨK M (Qs h) (run.trace h) := fun h => by simpa using hii h (run.trace h).length

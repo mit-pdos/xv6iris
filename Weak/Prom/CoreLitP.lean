@@ -233,7 +233,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [InvGS_gen hlc
 /-- **H0 in the logic, with its doomed branch**. -/
 theorem ptr0_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP)
     (hprog : s0.prog = [.load 8 true 10 8 0, .load 8 true 11 10 0]) (hpc : s0.pc = 0) (hq : s0.q = [])
-    (hlen : s0.regs.length = 32) (ha : s0.rd 8 = A) :
+    (hlen : s0.regs.length = 32) (ha : s0.rd 8 = A)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF πPtr ⟨litStepF accPtr, litDone, img, M, h⟩ (ΨK M qPtr0) s0
       (fun _ => iprop(⌜∃ V, grd πPtr img M V True⌝)) := by
   have hw := litWF accPtr img M h
@@ -370,12 +371,28 @@ def QsPtr : Nat → Trace → Prop
   | 1 => qPtr1
   | _ => q0
 
+/-- MachFix-R-b5: the faulting front end issues no cache-block operation either (LitNoCmo.lean). -/
+theorem litF_noInvalT {acc : Nat → Bool} {T : Test} {img : Image} {M : List PMsg} {run : PFRun LP Unit}
+    (hv : validRun (litStepF acc) img () (progs T) M run) : ∀ t a, ¬ cmoAt M isInvalK t a := by
+  rw [← hv.2]
+  refine Own.noInval_of_noCmoLab (fun s => qOk s.q) (fun p hp => by rw [Own.progs_q T p hp]; exact qOk_nil)
+    (fun s l s' hq hs => ?_) hv.1
+  unfold litStepF litNextF at hs
+  split at hs
+  · split at hs
+    · rename_i hl
+      cases hs; subst hl
+      exact ⟨qOk_nil, fun _ _ _ _ h => by cases h⟩
+    · cases hs
+  · exact ⟨Mach.litNext_q hq hs, (Own.litNext_nf hq hs).2⟩
+
 /-- **ROW 38, MP-ptr no-fault: proved IN THE LOGIC** (plan §5 row 38, §2 guarded Ψ, A0 (ii), (iv)): in every valid
 run of the faulting front end, no hart's trace contains a load-access fault. -/
 theorem lit_mpPtr : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun (litStepF accPtr) (testImg mpPtr) () (progs mpPtr) M run →
     ∀ h, ∀ e ∈ run.trace h, e.1 ≠ LSilent := by
   intro M run hrun
+  have hnoinv := litF_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hii, _, _, _, _, _⟩ := adequacy (hlc := HasLC.hasLC) (GF := pfGF) (pdone := litDone)
     πPtr (fun _ _ => True) (fun h => ΨK M (QsPtr h)) po_img_ptr (PO_ad_all _ _ _)
     (fun h => match h with | 0 => ⟨trivial, wrOk_nil M⟩ | 1 => ⟨trivial, wrOk_nil M⟩ | _ + 2 => ⟨rfl, wrOk_nil M⟩)

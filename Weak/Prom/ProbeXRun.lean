@@ -50,14 +50,14 @@ def main (args : List String) : IO UInt32 := do
       | .error e => (none, s!"asm:{e}")
       | .ok S =>
         match SailLitX.outsAtX S (fun _ => true) obs 200000 200000 with
-        | (some os, st) => (some os.eraseDups, s!"cands={st.cands} valid={st.valid}{if st.oos.isEmpty then "" else s!" oos={st.oos}"}{if st.miss > 0 then s!" MISS={st.miss}" else ""}")
+        | (some os, st) => (some os.eraseDups, s!"cands={st.cands} valid={st.valid}{if st.oos.isEmpty then "" else s!" oos={st.oos}"}{if st.miss > 0 then s!" MISS={st.miss}" else ""}{if st.havoc then " HAVOC" else ""}")   -- MachFix-havoc
         | (none, st) => (none, s!"budget oos={st.oos}")
     let t2 ← IO.monoMsNow
     let (sr, onlyS, onlyRS) := match so with
       | some s => cmpSets s ro
       | none => ("na", [], [])
     let vstr := match p.verdict with
-      | some (c, al) => s!"text={if al then "A" else "F"} r={vd obs c ro} s={(so.map (vd obs c)).getD "-"}"
+      | some (c, al) => s!"text={if al then "A" else "F"} r={vd obs c ro} s={if sst.endsWith " HAVOC" then "HAVOC" else (so.map (vd obs c)).getD "-"}"
       | none => "text=- (compare only)"
     IO.println s!"P G5x {p.name} | r={ro.length} (consistent {nref}) s={(so.map List.length).getD 0} | SR={sr} | V {vstr} | {t1 - t0}/{t2 - t1}ms | {sst}"
     IO.println s!"  quote: {p.quote}"

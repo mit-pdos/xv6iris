@@ -166,14 +166,17 @@ theorem post_floor_le {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat
     split
     · rw [h5]; omega
     · rw [h5]; omega
-  | rmw aq rl base tvs data asrc vsrc =>
-    obtain ⟨_, _, _, _, h5, h6, _⟩ := storeRun_mono (loadRun ws aq false (srcsView ws asrc) base tvs) rl
+  | rmw aq rl base tvs data asrc vsrc _ _ _ _ _ _ _ _ vi _ hvt =>   -- MachFix-R-b5: `loadRunV`, `vi < t`
+    obtain ⟨_, _, _, _, h5, h6, _⟩ := storeRun_mono (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
       (srcsView ws asrc) t base data.length t
     have h2 := (PF.stPre_ge (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
       (srcsView ws vsrc))
     have h3 : (loadRun ws aq false (srcsView ws asrc) base tvs).wVwNew ≤
         stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) (srcsView ws vsrc) := by
       unfold stPre; split <;> omega
+    have hR := loadRunV_vRaise ws aq false (srcsView ws asrc) vi base tvs
+    have hR1 := hR.vwNew
+    have hR2 := hR.vcap
     simp only [fulPv] at hpv
     unfold stFloor
     unfold amoPost; simp only

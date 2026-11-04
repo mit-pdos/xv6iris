@@ -21,6 +21,7 @@ No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.CoreLitBase
 import Weak.Prom.MachCerts
+import Weak.Prom.LitNoCmo   -- MachFix-R-b5: `lit_noInvalT`
 
 namespace Weak.Prom.PF
 
@@ -66,7 +67,8 @@ at every step (V = 0) and `True` at its end. -/
 theorem lbdd_hart (s0 : LP) (x y : Nat) (img : Image) (M : List PMsg) (h : Nat)
     (hprog : s0.prog = [.load 4 true 5 6 0, .store 4 5 8 0]) (hpc : s0.pc = 0) (hq : s0.q = [])
     (hx : s0.rd 6 = x) (hy : s0.rd 8 = y) (hxa : x % 4 = 0) (hya : y % 4 = 0) (hxl : x < two64)
-    (hyl : y < two64) :
+    (hyl : y < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨLB x y 4) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   unfold wpPF
@@ -203,7 +205,8 @@ although `t` is always 1: the view is syntactic. -/
 theorem lbfd_hart (s0 : LP) (x y : Nat) (img : Image) (M : List PMsg) (h : Nat)
     (hprog : s0.prog = [.load 4 true 5 6 0, .alu .xor 7 5 5, .alui .or 7 7 1, .store 4 7 8 0]) (hpc : s0.pc = 0)
     (hq : s0.q = []) (hx : s0.rd 6 = x) (hy : s0.rd 8 = y) (hxa : x % 4 = 0) (hya : y % 4 = 0) (hxl : x < two64)
-    (hyl : y < two64) :
+    (hyl : y < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨLB x y 4) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   unfold wpPF
@@ -392,7 +395,8 @@ Both branch outcomes reach the same store (the target is the next instruction). 
 theorem lbctrl_hart (s0 : LP) (x y : Nat) (img : Image) (M : List PMsg) (h : Nat)
     (hprog : s0.prog = [.load 4 true 5 6 0, .br .ne 5 0 2, .store 4 7 8 0]) (hpc : s0.pc = 0)
     (hq : s0.q = []) (hx : s0.rd 6 = x) (hy : s0.rd 8 = y) (hxa : x % 4 = 0) (hya : y % 4 = 0) (hxl : x < two64)
-    (hyl : y < two64) :
+    (hyl : y < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨLB x y 4) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   unfold wpPF
@@ -566,6 +570,7 @@ theorem lb_verdict {T : Test} {M : List PMsg} {run : PFRun LP Unit}
       ⊢@{IProp pfGF} wpPF Proto.triv ⟨litStep, litDone, testImg T, M, h⟩ (ΨLB2 X Y h) p
         (fun v => iprop(⌜∃ V, grd Proto.triv (testImg T) M V ((fun (_ : Nat) (_ : Unit) => True) h v)⌝))) :
     ¬ (run.obsLoad 0 0 = some 1 ∧ run.obsLoad 1 0 = some 1) := by
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hii, hpart, _, _, hwf, _⟩ := adequacy (hlc := HasLC.hasLC) (GF := pfGF) (pdone := litDone)
     Proto.triv (fun _ _ => True) (ΨLB2 X Y) trivial (PO_ad_all _ _ _) (ΨLB2_nil _ _) (devFree_lit _) hwp hrun
   have himg : run.cfg.pcImg = testImg T := validRun_img hrun.1
@@ -581,6 +586,7 @@ theorem lit_lbdd : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.lbdd) () (progs Weak.Prom.Ref.Lit.lbdd) M run →
     ¬ (run.obsLoad 0 0 = some 1 ∧ run.obsLoad 1 0 = some 1) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   refine lb_verdict hrun rfl rfl (fun h p hp _ => ?_)
   have hlen : (progs Weak.Prom.Ref.Lit.lbdd).length = 2 := rfl
   match h, hp with
@@ -603,6 +609,7 @@ theorem lit_lbfd : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.lbDatas) () (progs Weak.Prom.Ref.Lit.lbDatas) M run →
     ¬ (run.obsLoad 0 0 = some 1 ∧ run.obsLoad 1 0 = some 1) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   refine lb_verdict hrun rfl rfl (fun h p hp _ => ?_)
   have hlen : (progs Weak.Prom.Ref.Lit.lbDatas).length = 2 := rfl
   match h, hp with
@@ -623,6 +630,7 @@ theorem lit_lbctrl : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.lbCtrls) () (progs Weak.Prom.Ref.Lit.lbCtrls) M run →
     ¬ (run.obsLoad 0 0 = some 1 ∧ run.obsLoad 1 0 = some 1) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   refine lb_verdict hrun rfl rfl (fun h p hp _ => ?_)
   have hlen : (progs Weak.Prom.Ref.Lit.lbCtrls).length = 2 := rfl
   match h, hp with

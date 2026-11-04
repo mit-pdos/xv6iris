@@ -43,7 +43,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [InvGS_gen hlc
 theorem hPI_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a r rd p : Nat)
     (hprog : s0.prog = [.alui .add r 0 1, .amo .add 4 false false rd r p]) (hpc : s0.pc = 0) (hq : s0.q = [])
     (hnz : r ≠ 0 ∧ p ≠ 0 ∧ p ≠ r) (hlen : r < s0.regs.length) (ha : s0.rd p = a) (hal : a < two64)
-    (hA : aligned a 4 = true) :
+    (hA : aligned a 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qPI M h a p r)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V (piDone M h a)⌝)) := by
   have hw := litW_lit img M h
@@ -204,6 +205,7 @@ theorem lit_parInc : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.parInc) () (progs Weak.Prom.Ref.Lit.parInc) M run →
     run.done litDone 0 () → run.done litDone 1 () → finalMem (testImg Weak.Prom.Ref.Lit.parInc) M X 4 ≠ 1 := by
   intro M run hrun hd0 hd1 hf
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, hQ, _, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with | 0 => qPI M 0 (X : Int) 6 5 | 1 => qPI M 1 (X : Int) 6 5 | _ => q0)
     (fun h _ => match h with | 0 => piDone M 0 (X : Int) | 1 => piDone M 1 (X : Int) | _ => True) trivial

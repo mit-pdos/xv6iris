@@ -116,11 +116,11 @@ def main (args : List String) : IO UInt32 := do
         | some b =>
           let P : BitVec 64 → Bool := fun _ => b
           match SailLit.outsAt S P obs budget mcap {} with
-          | (some os, st) => (some os.eraseDups, if st.oos.isEmpty then "" else s!"oos={st.oos}")
+          | (some os, st) => (some os.eraseDups, (if st.oos.isEmpty then "" else s!"oos={st.oos}") ++ (if st.havoc then " HAVOC" else ""))   -- MachFix-havoc
           | (none, _) => (none, "budget")
         | none =>
           match SailLit.sailOutcomes S obs budget mcap with
-          | (some os, st) => (some os.eraseDups, if st.oos.isEmpty then "" else s!"oos={st.oos}")
+          | (some os, st) => (some os.eraseDups, (if st.oos.isEmpty then "" else s!"oos={st.oos}") ++ (if st.havoc then " HAVOC" else ""))   -- MachFix-havoc
           | (none, _) => (none, "budget")
     let t3 ← IO.monoMsNow
     let (to, tst) := if notoday then ([], ({} : Today.TStat)) else Today.todayOutcomes T obs budget mcap p.plat
@@ -133,7 +133,7 @@ def main (args : List String) : IO UInt32 := do
     let (tr, onlyT, onlyRT) := if notoday || noref || tst.budget then ("na", [], []) else cmpSets to ro
     let vstr := match p.verdict with
       | some (c, al) =>
-        s!"text={if al then "A" else "F"} r={if noref then "-" else vd obs c ro} m={vd obs c mos} s={(so.1.map (vd obs c)).getD "-"} t={if notoday then "-" else vd obs c to}"
+        s!"text={if al then "A" else "F"} r={if noref then "-" else vd obs c ro} m={vd obs c mos} s={if so.2.endsWith " HAVOC" then "HAVOC" else (so.1.map (vd obs c)).getD "-"} t={if notoday then "-" else vd obs c to}"
       | none => "-"
     let flags := (if rok then "" else " ref-varsOk-FAIL") ++ (if moos.isEmpty then "" else s!" moos={moos}") ++
       (if so.2.isEmpty then "" else s!" s:{so.2}") ++ (if tst.oos.isEmpty then "" else s!" toos={tst.oos}") ++

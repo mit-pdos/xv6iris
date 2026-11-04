@@ -63,6 +63,7 @@ theorem lit_sbFF : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.sbFF) () (progs Weak.Prom.Ref.Lit.sbFF) M run →
     ¬ (run.obsLoad 0 0 = some 0 ∧ run.obsLoad 1 0 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsSB M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
     (fun h p hp _ => by
@@ -121,6 +122,7 @@ theorem lit_isa2F : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.isa2F) () (progs Weak.Prom.Ref.Lit.isa2F) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 2 0 = some 1 ∧ run.obsLoad 2 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsISA2 M)
     (fun h _ => match h with | 0 => wwDone M 0 (X : Int) (Y : Int) (toBytes 1 4) (toBytes 1 4) | _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | 2 => trivial | _ + 3 => rfl)
@@ -204,6 +206,7 @@ theorem lit_wrcF : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.wrcF) () (progs Weak.Prom.Ref.Lit.wrcF) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 2 0 = some 1 ∧ run.obsLoad 2 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsWRC M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | 2 => trivial | _ + 3 => rfl)
     (fun h p hp _ => by
@@ -281,6 +284,7 @@ theorem lit_iriwF : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.iriwF) () (progs Weak.Prom.Ref.Lit.iriwF) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0 ∧ run.obsLoad 3 0 = some 1 ∧ run.obsLoad 3 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsIRIW M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | 2 => trivial | 3 => trivial | _ + 4 => rfl)
     (fun h p hp _ => by
@@ -391,6 +395,7 @@ theorem lit_w22F : ∀ (M : List PMsg) (run : PFRun LP Unit),
     run.done litDone 0 () → run.done litDone 1 () →
     ¬ (finalMem (testImg Weak.Prom.Ref.Lit.w22F) M X 4 = 2 ∧ finalMem (testImg Weak.Prom.Ref.Lit.w22F) M Y 4 = 2) := by
   intro M run hrun hd0 hd1
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, hQ, _, hpart, hwf, _, _⟩ := kitAdeq (π := Proto.triv) QsW22
     (fun h _ => match h with
       | 0 => wwDone M 0 (X : Int) (Y : Int) (toBytes 2 4) (toBytes 1 4)

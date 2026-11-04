@@ -6,10 +6,11 @@ three step facts that make that possible, for every arm of machine v2 (`memStep`
 
 * `memStep_restrict` — RESTRICTION, the converse of `memStep_extend` (MachFactor.lean): a state step against `M`
   whose read timestamps and fulfil timestamp lie in the prefix `L` is a state step against `L`, with the same label,
-  timestamp and post-state, from the promise set cut at `|L|`.  Premise `invalFree M` (no invalidate-class CMO in
-  `M`): the invalidate clause `invalRead` (Machine.lean) lets a load cite an invalidate ABOVE every view (its post-view
-  does not absorb it, D-v2-5), a fourth escape the plan's list (§4: fetches, `lat` loads, sink-free walks, A/D) does
-  not name.  It is a premise of NF_R here and is reported (PROGRESS-S4b.md, R-b5).
+  timestamp and post-state, from the promise set cut at `|L|`.  MachFix-R-b5 (2026-11-04): the former premise
+  `invalFree M` is GONE — machine v2's load arms now absorb the cited invalidate's view `vi` (Machine.lean
+  `invalCite`/`loadRunV`), so a cited invalidate is below the post-state's `vrOld` (`loadRunV_vi_le`), hence inside
+  the prefix (premise `hvr`); for the fused AMO `vi < ts` (its arm).  (Was R-b5: the invalidate clause let a load
+  cite an invalidate ABOVE every view, D-v2-5.)
 * `memStep_self` — THE SELF BOUND: with `bnd ws := vrOld ⊔ vwOld ⊔ wIfr`, every timestamp a step reads or fulfils
   is at most `bnd` of its post-state, `bnd` only grows, and `psBounded ws (bnd ws)` is kept.  So every view of a hart
   is bounded by its loads (`vrOld`), its fulfils (`vwOld`) and its fetches (`wIfr`), the plan's "Why the segment
@@ -87,32 +88,35 @@ theorem exclOk_pre {L M : List PMsg} (hpre : L <+: M) {i ts : Nat} :
   | _, [], _ => trivial
   | a, _ :: r, ⟨h1, h2⟩ => ⟨fun h => h1 (writesInBy_pre hpre h), exclOk_pre hpre (a + 1) r h2⟩
 
-theorem loadOk_restrict {img : Image} {L M : List PMsg} (hpre : L <+: M) (hinv : invalFree M) {ws : PState}
-    {vpre : Nat} : ∀ {base : Int} {tvs : List (Nat × BitVec 8)}, loadOk img M ws vpre base tvs →
+theorem loadOk_restrict {img : Image} {L M : List PMsg} (hpre : L <+: M) {ws : PState}
+    {vpre vi : Nat} : ∀ {base : Int} {tvs : List (Nat × BitVec 8)}, loadOk img M ws vpre base tvs →
+      invalCite M ws vpre vi base tvs → vi ≤ L.length →   -- MachFix-R-b5 (was: `invalFree M`)
       bytesAll (fun _ t _ => t ≤ L.length) base tvs → loadOk img L ws vpre base tvs := by
-  intro base tvs hok hts
+  intro base tvs hok hci hvi hts
   unfold loadOk at hok ⊢
   -- the floor expressions mention `base`/`tvs` globally; generalise the run while keeping them
   have key : ∀ (a : Int) (r : List (Nat × BitVec 8)),
       bytesAll (fun a t v => memByte img M t a = some v ∧
         (¬ writesIn M a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
           invalRead M a t (max vpre (coh ws a)))) a r →
+      bytesAll (fun a t _ =>
+        ¬ writesIn M a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
+        ∃ ti, ti ≤ vi ∧ invalReadAt M a t (max vpre (coh ws a)) ti) a r →
       bytesAll (fun _ t _ => t ≤ L.length) a r →
       bytesAll (fun a t v => memByte img L t a = some v ∧
         (¬ writesIn L a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
           invalRead L a t (max vpre (coh ws a)))) a r := by
     intro a r
     induction r generalizing a with
-    | nil => intro _ _; trivial
+    | nil => intro _ _ _; trivial
     | cons tv r ih =>
       obtain ⟨t, v⟩ := tv
-      rintro ⟨⟨hm, hw⟩, h2⟩ ⟨ht, h3⟩
-      refine ⟨⟨by rw [← memByte_ext hpre ht]; exact hm, ?_⟩, ih (a + 1) h2 h3⟩
-      rcases hw with hw | hw
+      rintro ⟨⟨hm, _⟩, h2⟩ ⟨hc, hc2⟩ ⟨ht, h3⟩
+      refine ⟨⟨by rw [← memByte_ext hpre ht]; exact hm, ?_⟩, ih (a + 1) h2 hc2 h3⟩
+      rcases hc with hw | ⟨ti, hti, hr⟩
       · exact .inl (fun h => hw (writesIn_pre hpre h))
-      · obtain ⟨ti, hc, _⟩ := hw
-        exact absurd hc (hinv ti a)
-  exact key base tvs hok hts
+      · exact .inr ⟨ti, invalReadAt_restrict hpre hr (by omega)⟩
+  exact key base tvs hok hci.1 hts
 
 /-! ## 3. Restriction -/
 
@@ -126,7 +130,8 @@ theorem promCut_diff {prom Q : GSet Nat} {n ts : Nat} (hQ : ∀ t, t ∈ Q ↔ t
 a state step against `L` with the same label, timestamp and post-state, from the promise set cut at `|L|`. -/
 theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState} {l : PLabel}
     {ots : Option Nat} {ws' : PState} {prom' : GSet Nat} (Q : GSet Nat)
-    (h : memStep img M i prom ws l ots ws' prom') (hpre : L <+: M) (hinv : invalFree M)
+    (h : memStep img M i prom ws l ots ws' prom') (hpre : L <+: M)
+    (hvr : ots = none → ws'.wVrOld ≤ L.length ∨ M.length ≤ L.length)   -- MachFix-R-b5 (was: `invalFree M`)
     (hr : readsLe l L.length) (hts : ∀ ts, ots = some ts → ts ≤ L.length)
     (hQ : ∀ t, t ∈ Q ↔ t ∈ prom ∧ t ≤ L.length) :
     ∃ Q', memStep img L i Q ws l ots ws' Q' ∧ ∀ t, t ∈ Q' ↔ t ∈ prom' ∧ t ≤ L.length := by
@@ -137,18 +142,25 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
   have hin : ∀ ts, ts ∈ prom → ts ≤ L.length → ts ∈ Q := fun ts h1 h2 => (hQ ts).2 ⟨h1, h2⟩
   cases h with
   | silent => exact ⟨Q, .silent _ _, hQ⟩
-  | load aq rl base tvs asrc hok =>
-    exact ⟨Q, .load _ _ _ _ _ _ _ (loadOk_restrict hpre hinv hok (hr _ _ rfl)), hQ⟩
+  | load aq rl base tvs asrc hok vi hci =>
+    have hvi : vi ≤ L.length := (hvr rfl).elim (fun h => Nat.le_trans (loadRunV_vi_le hci) h)
+      (fun h => Nat.le_trans (invalCite_le hci) h)
+    exact ⟨Q, .load _ _ _ _ _ _ _ (loadOk_restrict hpre hok hci hvi (hr _ _ rfl)) vi
+      (invalCite_restrict hpre hci hvi), hQ⟩
   | store aq rl base data asrc vsrc ts hts' hm hc hpv =>
     have h1 := hts ts rfl
     exact ⟨Q \ {ts}, .store _ _ _ _ _ _ _ _ _ (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm) hc hpv,
       promCut_diff hQ⟩
-  | rmw aq rl base tvs data asrc vsrc ts hlen hts' hm hok hx hc hpv =>
+  | rmw aq rl base tvs data asrc vsrc ts hlen hts' hm hok hx hc hpv vi hci hvt =>
     have h1 := hts ts rfl
     exact ⟨Q \ {ts}, .rmw _ _ _ _ _ _ _ _ _ _ hlen (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm)
-      (loadOk_restrict hpre hinv hok (hr _ _ rfl)) (exclOk_pre hpre _ _ hx) hc hpv, promCut_diff hQ⟩
-  | amoLd aq base tvs asrc hok =>
-    exact ⟨Q, .amoLd _ _ _ _ _ _ (loadOk_restrict hpre hinv hok (hr _ _ rfl)), hQ⟩
+      (loadOk_restrict hpre hok hci (by omega) (hr _ _ rfl)) (exclOk_pre hpre _ _ hx) hc hpv vi
+      (invalCite_restrict hpre hci (by omega)) hvt, promCut_diff hQ⟩
+  | amoLd aq base tvs asrc hok vi hci =>
+    have hvi : vi ≤ L.length := (hvr rfl).elim (fun h => Nat.le_trans (loadRunV_vi_le hci) h)
+      (fun h => Nat.le_trans (invalCite_le hci) h)
+    exact ⟨Q, .amoLd _ _ _ _ _ _ (loadOk_restrict hpre hok hci hvi (hr _ _ rfl)) vi
+      (invalCite_restrict hpre hci hvi), hQ⟩
   | amoSt rl base data asrc vsrc ts R hR hb' hlen hts' hm hx hc hpv =>
     have h1 := hts ts rfl
     exact ⟨Q \ {ts}, .amoSt _ _ _ _ _ _ _ _ R hR hb' hlen (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm)
@@ -159,8 +171,11 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
   | regW rd srcs => exact ⟨Q, .regW _ _ _ _, hQ⟩
   | ctrl srcs => exact ⟨Q, .ctrl _ _ _, hQ⟩
   | instr => exact ⟨Q, .instr _ _, hQ⟩
-  | lr aq rl base tvs asrc hok =>
-    exact ⟨Q, .lr _ _ _ _ _ _ _ (loadOk_restrict hpre hinv hok (hr _ _ rfl)), hQ⟩
+  | lr aq rl base tvs asrc hok vi hci =>
+    have hvi : vi ≤ L.length := (hvr rfl).elim (fun h => Nat.le_trans (loadRunV_vi_le hci) h)
+      (fun h => Nat.le_trans (invalCite_le hci) h)
+    exact ⟨Q, .lr _ _ _ _ _ _ _ (loadOk_restrict hpre hok hci hvi (hr _ _ rfl)) vi
+      (invalCite_restrict hpre hci hvi), hQ⟩
   | sc aq rl base data asrc vsrc ts R hR hts' hm hx hlt hc hpv =>
     have h1 := hts ts rfl
     exact ⟨Q \ {ts}, .sc _ _ _ _ _ _ _ _ _ R hR (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm)
@@ -197,20 +212,24 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
 
 theorem memStep_bndN {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState} {l : PLabel}
     {ots : Option Nat} {ws' : PState} {prom' : GSet Nat} {n : Nat} (h : memStep img log i prom ws l ots ws' prom')
-    (hb : psBounded ws n) (hr : readsLe l n) (hts : ∀ ts, ots = some ts → ts ≤ n) : psBounded ws' n := by
+    (hb : psBounded ws n) (hr : readsLe l n) (hts : ∀ ts, ots = some ts → ts ≤ n)
+    (hvr : ws'.wVrOld ≤ n) :   -- MachFix-R-b5: the absorbed view is in range
+    psBounded ws' n := by
   have hsv : ∀ s, srcsView ws s ≤ n := srcsView_le hb.2.2.2.2.2.2.2.1 hb.2.2.2.2.2.2.2.2.2.1
   cases h with
   | silent => exact hb
-  | load aq rl base tvs asrc hok => exact loadRun_bnd hb (hsv _) (hr _ _ rfl)
+  | load aq rl base tvs asrc hok vi hci =>
+    exact loadRunV_bnd hb (hsv _) (Nat.le_trans (loadRunV_vi_le hci) hvr) (hr _ _ rfl)
   | store aq rl base data asrc vsrc ts _ _ _ _ =>
     have hts' := hts ts rfl
     refine acqPost_bnd (storeRun_bnd hb (hsv _) ?_ hts') hts'
     have := hsv asrc; have := hsv vsrc; omega
-  | rmw aq rl base tvs data asrc vsrc ts _ _ _ hok _ _ _ =>
+  | rmw aq rl base tvs data asrc vsrc ts _ _ _ hok _ _ _ vi _ hvt =>
     have hts' := hts ts rfl
-    exact amoPost_bnd (storeRun_bnd (loadRun_bnd hb (hsv _) (hr _ _ rfl)) (hsv _) hts' hts') hts'
-  | amoLd aq base tvs asrc hok =>
-    have h1 := loadRun_bnd (aq := aq) (rl := false) hb (hsv asrc) (hr _ _ rfl)
+    exact amoPost_bnd (storeRun_bnd (loadRunV_bnd hb (hsv _) (by omega) (hr _ _ rfl)) (hsv _) hts' hts') hts'
+  | amoLd aq base tvs asrc hok vi hci =>
+    have h1 := loadRunV_bnd (aq := aq) (rl := false) hb (hsv asrc)
+      (Nat.le_trans (loadRunV_vi_le (aq := aq) (rl := false) hci) hvr) (hr _ _ rfl)
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, hR, _, h8, h9, h10⟩ := h1
     refine psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 h7 hR (fun R hR' => ?_) h8 h9 h10
     simp only [Option.some.injEq] at hR'
@@ -241,9 +260,10 @@ theorem memStep_bndN {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat}
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 (Nat.zero_le _) hR (fun R hR' => by cases hR') h8 h9
       (Nat.zero_le _)
-  | lr aq rl base tvs asrc hok =>
-    have hrv := readView_le (aq := aq) (rl := rl) hb (hsv asrc) (hr _ _ rfl)
-    have h1 := loadRun_bnd (aq := aq) (rl := rl) hb (hsv asrc) (hr _ _ rfl)
+  | lr aq rl base tvs asrc hok vi hci =>
+    have hvi : vi ≤ n := Nat.le_trans (loadRunV_vi_le (aq := aq) (rl := rl) hci) hvr
+    have hrv := readViewV_le (aq := aq) (rl := rl) hb (hsv asrc) hvi (hr _ _ rfl)
+    have h1 := loadRunV_bnd (aq := aq) (rl := rl) hb (hsv asrc) hvi (hr _ _ rfl)
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, _, hM, h8, h9, h10⟩ := h1
     refine psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 h7 (fun R hR' => ?_) hM h8 h9 h10
     simp only [Option.some.injEq] at hR'
@@ -316,6 +336,14 @@ theorem loadRun_keep (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs :
   obtain ⟨i1, i2, i3, i4, i5⟩ := loadBytes_keep aq (ldPre ws aq rl va) ws base tvs
   exact ⟨i1, i2, i3, i4, i5⟩
 
+/-- MachFix-R-b5: `loadRun_keep` for the absorbing post-state. -/
+theorem loadRunV_keep (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    (loadRunV ws aq rl va vi base tvs).wFwd = ws.wFwd ∧ (loadRunV ws aq rl va vi base tvs).wVwOld = ws.wVwOld ∧
+    (loadRunV ws aq rl va vi base tvs).wIfr = ws.wIfr ∧ ws.wVrOld ≤ (loadRunV ws aq rl va vi base tvs).wVrOld ∧
+    bytesAll (fun a t _ => fwdView ws aq a t ≤ (loadRunV ws aq rl va vi base tvs).wVrOld) base tvs := by
+  obtain ⟨i1, i2, i3, i4, i5⟩ := loadBytes_keep aq (max (ldPre ws aq rl va) vi) ws base tvs
+  exact ⟨i1, i2, i3, i4, i5⟩
+
 theorem storeBytes_keep : ∀ (ws : PState) (a : Int) (n ts fv : Nat),
     (storeBytes ws a n ts fv).wVrOld = ws.wVrOld ∧ (storeBytes ws a n ts fv).wVwOld = ws.wVwOld ∧
     (storeBytes ws a n ts fv).wIfr = ws.wIfr
@@ -358,36 +386,37 @@ theorem memStep_self {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {
     (hb : psBounded ws (bnd ws)) :
     bnd ws ≤ bnd ws' ∧ readsLe l (bnd ws') ∧ (∀ ts, ots = some ts → ts ≤ bnd ws') ∧ psBounded ws' (bnd ws') := by
   suffices H : bnd ws ≤ bnd ws' ∧ readsLe l (bnd ws') ∧ (∀ ts, ots = some ts → ts ≤ bnd ws') by
-    exact ⟨H.1, H.2.1, H.2.2, memStep_bndN h (psBounded_mono hb H.1) H.2.1 H.2.2⟩
+    exact ⟨H.1, H.2.1, H.2.2, memStep_bndN h (psBounded_mono hb H.1) H.2.1 H.2.2
+      (by unfold bnd; omega)⟩
   have nor : ∀ n, readsLe l n → readsLe l n := fun _ h => h
   cases h with
   | silent => exact ⟨Nat.le_refl _, fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
-  | load aq rl base tvs asrc hok =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRun_keep ws aq rl (srcsView ws asrc) base tvs
-    have e2 : (loadRun ws aq rl (srcsView ws asrc) base tvs).wVwOld = ws.wVwOld := i2
+  | load aq rl base tvs asrc hok vi _ =>
+    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    have e2 : (loadRunV ws aq rl (srcsView ws asrc) vi base tvs).wVwOld = ws.wVwOld := i2
     refine ⟨by unfold bnd; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; rw [i2, i3]; omega
-  | lr aq rl base tvs asrc hok =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRun_keep ws aq rl (srcsView ws asrc) base tvs
+  | lr aq rl base tvs asrc hok vi _ =>
+    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
     refine ⟨by unfold bnd; simp only; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; simp only; rw [i2, i3]; omega
-  | amoLd aq base tvs asrc hok =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRun_keep ws aq false (srcsView ws asrc) base tvs
+  | amoLd aq base tvs asrc hok vi _ =>
+    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
     refine ⟨by unfold bnd; simp only; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; simp only; rw [i2, i3]; omega
-  | rmw aq rl base tvs data asrc vsrc ts _ _ _ hok _ _ _ =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRun_keep ws aq false (srcsView ws asrc) base tvs
-    obtain ⟨j1, j2, j3⟩ := storeRun_keep (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
-      ts base data.length ts
+  | rmw aq rl base tvs data asrc vsrc ts _ _ _ hok _ _ _ vi _ _ =>
+    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
+    obtain ⟨j1, j2, j3⟩ := storeRun_keep (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
+      (srcsView ws asrc) ts base data.length ts
     refine ⟨?_, ?_, ?_⟩
     · simp only [bnd, amoPost, j1, j2, j3, i2, i3]; omega
     · intro b t hl
@@ -490,20 +519,20 @@ theorem memStep_vw {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {ws
     {ots : Option Nat} {ws' : PState} {prom' : GSet Nat} (h : memStep img M i prom ws l ots ws' prom') :
     ws.wVwOld ≤ ws'.wVwOld ∧ ∀ ts, ots = some ts → ts ≤ ws'.wVwOld := by
   cases h with
-  | load aq rl base tvs asrc =>
-    obtain ⟨_, i2, _⟩ := loadRun_keep ws aq rl (srcsView ws asrc) base tvs
-    exact ⟨by rw [show (loadRun ws aq rl (srcsView ws asrc) base tvs).wVwOld = ws.wVwOld from i2]; exact
+  | load aq rl base tvs asrc _ vi _ =>
+    obtain ⟨_, i2, _⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    exact ⟨by rw [show (loadRunV ws aq rl (srcsView ws asrc) vi base tvs).wVwOld = ws.wVwOld from i2]; exact
       Nat.le_refl _, fun _ h => (by cases h)⟩
-  | lr aq rl base tvs asrc =>
-    obtain ⟨_, i2, _⟩ := loadRun_keep ws aq rl (srcsView ws asrc) base tvs
+  | lr aq rl base tvs asrc _ vi _ =>
+    obtain ⟨_, i2, _⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
     exact ⟨by simp only; rw [i2]; exact Nat.le_refl _, fun _ h => (by cases h)⟩
-  | amoLd aq base tvs asrc =>
-    obtain ⟨_, i2, _⟩ := loadRun_keep ws aq false (srcsView ws asrc) base tvs
+  | amoLd aq base tvs asrc _ vi _ =>
+    obtain ⟨_, i2, _⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
     exact ⟨by simp only; rw [i2]; exact Nat.le_refl _, fun _ h => (by cases h)⟩
-  | rmw aq rl base tvs data asrc vsrc ts =>
-    obtain ⟨_, i2, _⟩ := loadRun_keep ws aq false (srcsView ws asrc) base tvs
-    obtain ⟨_, j2, _⟩ := storeRun_keep (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
-      ts base data.length ts
+  | rmw aq rl base tvs data asrc vsrc ts _ _ _ _ _ _ _ vi _ _ =>
+    obtain ⟨_, i2, _⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
+    obtain ⟨_, j2, _⟩ := storeRun_keep (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
+      (srcsView ws asrc) ts base data.length ts
     refine ⟨?_, fun t h => ?_⟩
     · simp only [amoPost]; rw [j2, i2]; omega
     · cases h; simp only [amoPost]; rw [j2]; omega

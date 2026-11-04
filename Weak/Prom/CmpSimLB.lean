@@ -82,7 +82,7 @@ theorem sim_loadAq (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws
           tvs := by
       rw [← loadRun_wRes ws true rl0 (srcsView ws (srcR rs1)) _ tvs]
     rw [e]
-    exact .load _ _ _ _ _ _ _ hl
+    exact memStep.load0 (memOf_noInval X) hl   -- MachFix-R-b5
   · refine resOk_mono hx.res (by omega) (fun j h1 h2 => ?_)
     have : j = s.evs.length := by omega
     subst this; rw [c.sk hm]; rfl
@@ -108,7 +108,8 @@ theorem sim_lr (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws pro
     rfl hwf' hfut (fun tvs => LExLoad aq0 (aq0 && rl0) ((X.ev (h, s.evs.length)).pa : Int) tvs (srcR rs1))
     (fun tvs => some ⟨((X.ev (h, s.evs.length)).pa : Int), tvs.map Prod.fst, readView ws aq0 (aq0 && rl0)
       (srcsView ws (srcR rs1)) ((X.ev (h, s.evs.length)).pa : Int) tvs⟩)
-    ?_ (fun tvs hl => .lr _ _ _ _ _ _ _ hl) (fun tvs tl => machRow_exLoad _ _ _ _ _ _ _) ?_
+    ?_ (fun tvs hl => memStep.lr0 (memOf_noInval X) hl)   -- MachFix-R-b5
+    (fun tvs tl => machRow_exLoad _ _ _ _ _ _ _) ?_
   · intro tvs htl
     simp only [litNext, hinv.q, lpi_of hinv hi, instrNext]
     rw [halign]

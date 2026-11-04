@@ -78,6 +78,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.silent.prom", "INERT", "reason:no memory or view effect (the silent arm)"),
   ("C-A.silent.ots", "INERT", "reason:no memory or view effect (the silent arm)"),
   ("C-A.load.p1", "FAITHFUL", "cmp:G1,G1w,G3 + cmp:COV"),
+  ("C-A.load.p2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
   ("C-A.load.w.wCoh", "FAITHFUL", "cmp:G1,G1w,G3"),
   ("C-A.load.w.wVrOld", "FAITHFUL", "cmp:G1,G1w,G3"),
   ("C-A.load.w.wVrNew", "FAITHFUL", "cmp:G1,G1w,G3"),
@@ -109,6 +110,8 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.rmw.p5", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.rmw.p6", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.rmw.p7", "FAITHFUL", "cmp:G1,ROW"),
+  ("C-A.rmw.p8", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
+  ("C-A.rmw.p9", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
   ("C-A.rmw.w.wCoh", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.rmw.w.wVrOld", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.rmw.w.wVwOld", "FAITHFUL", "cmp:G1,ROW"),
@@ -122,6 +125,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.rmw.prom", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.rmw.ots", "FAITHFUL", "cmp:G1,ROW"),
   ("C-A.amoLd.p1", "FAITHFUL", "cmp:G1,G1b"),
+  ("C-A.amoLd.p2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
   ("C-A.amoLd.w.wCoh", "FAITHFUL", "cmp:G1,G1b"),
   ("C-A.amoLd.w.wVrOld", "FAITHFUL", "cmp:G1,G1b"),
   ("C-A.amoLd.w.wVrNew", "FAITHFUL", "cmp:G1,G1b"),
@@ -181,6 +185,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.instr.prom", "FAITHFUL", "cmp:G1b"),
   ("C-A.instr.ots", "FAITHFUL", "cmp:G1b"),
   ("C-A.lr.p1", "FAITHFUL", "cmp:G1,G1lxs + cmp:COV"),
+  ("C-A.lr.p2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
   ("C-A.lr.w.wCoh", "FAITHFUL", "cmp:G1,G1lxs"),
   ("C-A.lr.w.wVrOld", "FAITHFUL", "cmp:G1,G1lxs"),
   ("C-A.lr.w.wVrNew", "FAITHFUL", "cmp:G1,G1lxs"),
@@ -249,7 +254,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.br.memByte.m1.succ", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.byteAt.if1", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.loadOk.or1.1", "FAITHFUL", "cmp:COV,G1,G3"),
-  ("C-A.br.loadOk.or1.2", "WEAKER", "text:G5x/CMO-INV"),
+  ("C-A.br.loadOk.or1.2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5: was WEAKER (D-v2-5; `ti` now absorbed, `invalCite`)
   ("C-A.br.loadOk.if2", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.fwdHit.m1.some(mk)", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.fwdHit.m1.none", "FAITHFUL", "cmp:COV,G1,G3"),
@@ -264,6 +269,14 @@ def tableCv2 : List (String × String × String) := [
   ("C-A.br.loadByte.if1", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.loadByte.if2", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.loadRun.if1", "FAITHFUL", "cmp:COV,G1,G3"),
+  ("C-A.br.loadRunV.if1", "FAITHFUL", "cmp:G1,G1w,G3"),   -- MachFix-R-b5
+  ("C-A.br.invalCite.or1.1", "FAITHFUL", "cmp:G1,G1w,G3"),   -- MachFix-R-b5
+  ("C-A.br.invalCite.or1.2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
+  ("C-A.br.invalCite.if2", "FAITHFUL", "cmp:G1,G1w,G3"),   -- MachFix-R-b5
+  ("C-A.br.invalCite.or3.1", "FAITHFUL", "cmp:G1,G1w,G3"),   -- MachFix-R-b5
+  ("C-A.br.invalCite.or3.2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
+  ("C-A.br.bytesAny.or1.1", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
+  ("C-A.br.bytesAny.or1.2", "FAITHFUL", "text:G5x/CMO-INV"),   -- MachFix-R-b5
   ("C-A.br.stClass.if1", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.stPre.if1", "FAITHFUL", "cmp:COV,G1,G3"),
   ("C-A.br.stPreA.if1", "FAITHFUL", "cmp:COV,G1,G3"),
@@ -282,7 +295,7 @@ def tableCv2 : List (String × String × String) := [
   ("C-E.hstep.m1.some(mk(mk(mk)))", "FAITHFUL", "cmp:G1"),
   ("C-E.hstep.m1.none", "FAITHFUL", "cmp:G1"),
   ("C-E.hnodeStep.m1.pure", "FAITHFUL", "cmp:ROW"),
-  ("C-E.hnodeStep.m1.impure(error)", "SCOPE:the .error arm has no successor (FC-3; PROGRESS-S1Mdef STOP-AND-ASK)", "reason:Sail internal_error / sailThrow paths; no decoded instruction of the decoder check reaches one"),
+  ("C-E.hnodeStep.m1.impure(error)", "SCOPE:HAVOC ([OWN.P8]/[OWN.P9], MachFix-havoc): no successor; a valid run reaching it makes every outcome possible (MachHavoc.allowedH)", "reason:Sail internal_error / sailThrow paths; no decoded instruction of the decoder check reaches one; the Sail-level explorer reports HAVOC (MachSail.lean)"),   -- MachFix-havoc
   ("C-E.hnodeStep.m1.impure(ok)", "FAITHFUL", "cmp:ROW"),
   ("C-E.bndStep.or1.1", "FAITHFUL", "text:G5/FAIL-then-OK,TS/T-LR2"),
   ("C-E.bndStep.or1.2", "FAITHFUL", "text:G5x/ZC-WB"),

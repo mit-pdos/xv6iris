@@ -41,6 +41,7 @@ theorem lit_coWW : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coWW) () (progs Weak.Prom.Ref.Lit.coWW) M run →
     run.done litDone 0 () → finalMem (testImg Weak.Prom.Ref.Lit.coWW) M X 4 = 2 := by
   intro M run hrun hd0
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, hQ, _, hpart, hwf, _, _⟩ := kitAdeq (π := Proto.triv) QsCoWW
     (fun h _ => match h with | 0 => wwDone M 0 (X : Int) (X : Int) (toBytes 1 4) (toBytes 2 4) | _ => True) trivial
     (fun h => match h with | 0 => trivial | _ + 1 => rfl)
@@ -101,6 +102,7 @@ theorem lit_coWR0 : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coWR0) () (progs Weak.Prom.Ref.Lit.coWR0) M run →
     ¬ run.obsLoad 0 0 = some 0 := by
   intro M run hrun ho
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsCoWR0 M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | _ + 1 => rfl)
     (fun h p hp _ => by
@@ -139,6 +141,7 @@ theorem lit_coWR : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coWR) () (progs Weak.Prom.Ref.Lit.coWR) M run →
     ¬ (finalMem (testImg Weak.Prom.Ref.Lit.coWR) M X 8 = 1 ∧ run.obsLoad 0 0 = some 2) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsCoWR M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
     (fun h p hp _ => by
@@ -203,6 +206,7 @@ theorem lit_coRW1 : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coRW1) () (progs Weak.Prom.Ref.Lit.coRW1) M run →
     ¬ run.obsLoad 0 0 = some 1 := by
   intro M run hrun ho
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, _, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) QsCoRW1
     (fun h _ => match h with | 0 => wDone M 0 (X : Int) (toBytes 1 4) | _ => True) trivial
     (fun h => match h with | 0 => trivial | _ + 1 => rfl)
@@ -242,6 +246,7 @@ theorem lit_coRW2 : ∀ (M : List PMsg) (run : PFRun LP Unit),
     run.done litDone 1 () →
     ¬ (run.obsLoad 1 0 = some 1 ∧ finalMem (testImg Weak.Prom.Ref.Lit.coRW2) M X 4 = 1) := by
   intro M run hrun hd1
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, hQ, _, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) QsCoRW2
     (fun h _ => match h with | 1 => wDone M 1 (X : Int) (toBytes 2 4) | _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
@@ -313,6 +318,7 @@ theorem lit_coRR : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coRR) () (progs Weak.Prom.Ref.Lit.coRR) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsCoRR M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
     (fun h p hp _ => by
@@ -359,6 +365,7 @@ theorem lit_coRR2 : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.coRR2) () (progs Weak.Prom.Ref.Lit.coRR2) M run →
     ¬ (run.obsLoad 2 0 = some 1 ∧ run.obsLoad 2 1 = some 2 ∧ run.obsLoad 3 0 = some 2 ∧ run.obsLoad 3 1 = some 1) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsCoRR2 M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | 2 => trivial | 3 => trivial | _ + 4 => rfl)
     (fun h p hp _ => by

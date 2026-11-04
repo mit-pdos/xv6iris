@@ -13,7 +13,7 @@ The proof is part 1's (OwnMP.lean header), instruction by instruction through th
   post-view `vrOld`; `fence r,rw` lifts it to the load floor `vrNew`; `ld x7,(x8)`: every byte is x's latest
   message's byte (`x7 = 42`) or a later, pending x-message (`bad`, `mpOk_markX`).
 `g4_mpOwnL`: in EVERY valid machine-v2 run of `mpT`, if H1 finished with registers `g` then `g[5] = 1 → g[7] = 42`
-(`g4_mpOwnL_regs`: stated on the final configuration).  Through `ownAdequacy` (NF_R) with PO-fetch and `invalFree`
+(`g4_mpOwnL_regs`: stated on the final configuration).  Through `ownAdequacy` (NF_R) with PO-fetch (MachFix-R-b5: no `invalFree` premise)
 discharged for every litmus test (OwnLitSide.lean).  0 named inputs; finite runs (prefix lemma S3d separate).
 Also G4 (5) for this state interpretation (`g4_noDoubleClaimL`).
 No `sorry`, no axiom, no `native_decide`.
@@ -555,7 +555,7 @@ theorem g4_mpOwnL {evs : List PEvt} {cfg : PCfg LP Unit} (hvr : validRun litStep
           · unfold hv; iframe Hb2 Htok
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply mp_final) hvr rfl (lit_fetchBounded hvr hps) hinv
+      · iapply mp_final) hvr rfl (lit_fetchBounded hvr hps)   -- MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key g hg
 
 /-- **G4 (2), on the final configuration**: in every valid run of `mpT`, if H1 ran its whole program, its final

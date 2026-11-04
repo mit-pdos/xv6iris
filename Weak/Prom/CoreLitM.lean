@@ -49,7 +49,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [InvGS_gen hlc
 fails: at the end `a3 = 1`. -/
 theorem lrScSc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a : Nat)
     (hprog : s0.prog = [.lr 4 false false 10 8, .sc 4 false false 11 12 8, .sc 4 false false 13 14 8])
-    (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (ha : s0.rd 8 = a) (hA : aligned a 4 = true) :
+    (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (ha : s0.rd 8 = a) (hA : aligned a 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litFin, img, M, h⟩ (ΨK M (fun _ => True)) s0
       (fun v => iprop(⌜∃ V, grd Proto.triv img M V (¬ (v.rd 11 = 1 ∧ v.rd 13 = 0))⌝)) := by
   have hw := litW_fin img M h
@@ -123,6 +124,7 @@ theorem lit_lrScSc : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.lrScSc) () (progs Weak.Prom.Ref.Lit.lrScSc) M run →
     ∀ s, run.done litFin 0 s → ¬ (s.rd 11 = 1 ∧ s.rd 13 = 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨hi, _⟩ := kitAdeq (π := Proto.triv) (pdone := litFin)
     (fun h => match h with | 0 => fun _ => True | _ => q0)
     (fun h v => match h with | 0 => ¬ (v.rd 11 = 1 ∧ v.rd 13 = 0) | _ => True) trivial
@@ -153,7 +155,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [InvGS_gen hlc
 /-- **Row 32's reader in the logic**: `lh d,(p)` proves `qL2` (M9: the single read point of non-forwarded bytes). -/
 theorem hL2_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a d p : Nat) (sg : Bool)
     (hprog : s0.prog = [.load 2 sg d p 0]) (hpc : s0.pc = 0) (hq : s0.q = []) (hp0 : p ≠ 0)
-    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a 2 = true) :
+    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a 2 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qL2 M a p)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -191,6 +194,7 @@ theorem lit_mixSca : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mixSca) () (progs Weak.Prom.Ref.Lit.mixSca) M run →
     ¬ (run.obsLoad 2 0 = some 0x0201 ∧ finalMem (testImg Weak.Prom.Ref.Lit.mixSca) M X 1 = 2) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsSca M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | 2 => trivial | _ + 3 => rfl)
     (fun h p hp _ => by

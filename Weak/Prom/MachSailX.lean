@@ -260,7 +260,7 @@ end
 
 partial def msgListsX (i : Nat) : TX → List (List PMsg)
   | .done _ => [[]]
-  | .stop _ => []
+  | .stop why => if why == "sail-error" then [[]] else []   -- MachFix-havoc
   | .lab _ t => msgListsX i t
   | .rd _ _ _ kids => (kids.flatMap (fun p => msgListsX i p.2)).eraseDups
   | .wr k base data ok ko =>
@@ -302,7 +302,8 @@ def succCmo (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (k : Cmo
 partial def runTX (img : Image) (log : List PMsg) (i : Nat) (t : TX) (ws : PState) (prom : GSet Nat) : MR :=
   match t with
   | .done regs => if promDone log prom then { fin := [regs], nodes := 1 } else { nodes := 1 }
-  | .stop why => { oos := [why], nodes := 1 }
+  -- MachFix-havoc (as MachSail.lean `runT`)
+  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" && promDone log prom }
   | .lab l t' =>
     match fixPost ws l with
     | some ws' => let r := runTX img log i t' ws' prom; { r with nodes := r.nodes + 1 }
@@ -384,8 +385,9 @@ def outcomesSX (S : STestX) (ts : List TX) (obs : List Key) (M : List PMsg) : Op
     | k + 1, st =>
       let i := ts.length - (k + 1)
       let r := runTX S.img M i ((ts[i]?).getD default) psInit (promsOf M i)
-      let st := { st with oos := (st.oos ++ r.oos).eraseDups, miss := st.miss + r.miss, nodes := st.nodes + r.nodes }
-      if r.fin.isEmpty then (none, st) else
+      let st := { st with oos := (st.oos ++ r.oos).eraseDups, miss := st.miss + r.miss, nodes := st.nodes + r.nodes,
+                          herr := st.herr || r.herr }
+      if r.fin.isEmpty && !r.herr then (none, st) else   -- MachFix-havoc
       let proj := (r.fin.map (fun regs => (regsOf obs i).map (fun rr =>
         (i, rr, unreloc S.locs ((regs[rr]?).getD 0))))).eraseDups
       match harts k st with
@@ -423,7 +425,7 @@ def outsAtX (S : STestX) (P : BitVec 64 → Bool) (obs : List Key) (budget mcap 
         match r with
         | none => pure ()
         | some os =>
-          st := { st with valid := st.valid + 1 }
+          st := { st with valid := st.valid + 1, havoc := st.havoc || mr.herr }   -- MachFix-havoc
           for o in os do outs := outs.insert o
     return (some outs.toList, st)
 

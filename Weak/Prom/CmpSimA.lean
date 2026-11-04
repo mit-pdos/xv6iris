@@ -264,7 +264,7 @@ theorem sim_amo (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws pr
   have hstp : stPre { ws1 with wVcap := max (srcsView ws (srcR rs1)) ws1.wVcap } rl0 (srcsView ws (srcR rs1))
       (srcsView ws (srcR rs2)) < ts :=
     stPre_post_lt aq0 rl0 hwpre (by omega) i8 i5 i3 j1 j4
-  have hmem := memStep.rmw (img := testImg T) (log := memOf X) (i := h) prom ws aq0 rl0
+  have hmem := memStep.rmw0 (img := testImg T) (log := memOf X) (i := h) (memOf_noInval X) prom ws aq0 rl0   -- MachFix-R-b5
     ((X.ev (h, s.evs.length)).pa : Int) (uniTvs t ((ν (h, s.evs.length)).map bv8))
     ((X.ev (h, s.evs.length)).wdat.map bv8) (srcR rs1) (srcR rs2) ts htl hpr hlog hlok hexcl
     (by rw [hlr]; exact hcohb) (by rw [hlr]; exact hstp)

@@ -130,10 +130,20 @@ precedes i" (the fourth bullet, non-coherent agents, has no instance: every agen
 Rendering: some invalidate-class `ti` covering `a` is the latest one at or below the read point `max(fl, ti)`, no
 byte write to `a` lies in `(ti, fl]` (no store between `i` and `r`; an own po-intervening store raised `coh`, hence
 `fl`), `t < ti`, and no byte write to `a` lies in `(t, c)` for any clean-class `c < ti` (bullets 2–3: `t` is the
-latest store before the latest clean, or later; `t = 0`, the initial value, only if no store precedes it).  The
-load's post-view does NOT absorb `ti` ("i precedes r" would order `r` after `i`): WEAKER, sound. -/
+latest store before the latest clean, or later; `t = 0`, the initial value, only if no store precedes it).
+FIX MachFix-R-b5 (2026-11-04): "i precedes r" in the global memory order, so `r` is ordered after `i`: the load's
+post-view ABSORBS the cited `ti` — the load-like arms carry the absorbed view `vi` (`invalCite`, `loadRunV`).  Was
+WEAKER (D-v2-5: `ti` existential and never absorbed).  Mark after the fix: FAITHFUL for the post-view; the per-byte
+floor of a cited byte stays `max(fl, ti)` (not the load's common point): the M9 exemption, WEAKER-or-FAITHFUL. -/
 def invalRead (log : List PMsg) (a : Int) (t fl : Nat) : Prop :=
   ∃ ti, cmoAt log isInvalK ti a ∧ t < ti ∧
+    ¬ writesIn log a ti fl ∧
+    (¬ ∃ ti', ti < ti' ∧ ti' ≤ max fl ti ∧ cmoAt log isInvalK ti' a) ∧
+    ∀ c, c < ti → cmoAt log isCleanK c a → ¬ writesIn log a t (c - 1)
+
+/-- MachFix-R-b5: the invalidate clause at a FIXED cited invalidate `ti` (`invalRead` is `∃ ti, invalReadAt …`). -/
+def invalReadAt (log : List PMsg) (a : Int) (t fl ti : Nat) : Prop :=
+  cmoAt log isInvalK ti a ∧ t < ti ∧
     ¬ writesIn log a ti fl ∧
     (¬ ∃ ti', ti < ti' ∧ ti' ≤ max fl ti ∧ cmoAt log isInvalK ti' a) ∧
     ∀ c, c < ti → cmoAt log isCleanK c a → ¬ writesIn log a t (c - 1)
@@ -144,6 +154,11 @@ def invalRead (log : List PMsg) (a : Int) (t fl : Nat) : Prop :=
 def bytesAll (P : Int → Nat → BitVec 8 → Prop) : Int → List (Nat × BitVec 8) → Prop
   | _, [] => True
   | a, (t, v) :: r => P a t v ∧ bytesAll P (a + 1) r
+
+/-- MachFix-R-b5: SOME answered byte of the run satisfies `P`. -/
+def bytesAny (P : Int → Nat → BitVec 8 → Prop) : Int → List (Nat × BitVec 8) → Prop
+  | _, [] => False
+  | a, (t, v) :: r => P a t v ∨ bytesAny P (a + 1) r
 
 /-- The maximum of `f a t` over a run. -/
 def bytesMax (f : Int → Nat → Nat) : Int → List (Nat × BitVec 8) → Nat
@@ -351,6 +366,33 @@ def loadRun (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs : List (Na
     wVcap := max va ws1.wVcap
     wVRel := if rl then max ws1.wVRel (readView ws aq rl va base tvs) else ws1.wVRel }
 
+/-! ### MachFix-R-b5: the absorbed invalidate view -/
+
+/-- THE CITATION of the invalidate clause by a load-like access (FIX MachFix-R-b5, 2026-11-04): `vi` is the view the
+load absorbs for the invalidates it cites.  Every byte either is read normally (`loadOk`'s first disjunct) or cites
+an invalidate `ti ≤ vi` (`invalReadAt`); and `vi` is `0` (no citation) or is cited by some byte — so `vi` is exactly
+the maximum of the cited `ti` for some choice of citations.  cmo.adoc:259–274 "If an invalidate operation i precedes
+a load r …": `i` precedes `r` in the global memory order, so `r`'s post-view is at least `ti` (`loadRunV`).
+Mark: FAITHFUL (post-view). -/
+def invalCite (log : List PMsg) (ws : PState) (vpre vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Prop :=
+  bytesAll (fun a t _ =>
+      ¬ writesIn log a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
+      ∃ ti, ti ≤ vi ∧ invalReadAt log a t (max vpre (coh ws a)) ti) base tvs ∧
+  (vi = 0 ∨ bytesAny (fun a t _ => invalReadAt log a t (max vpre (coh ws a)) vi) base tvs)
+
+/-- The read's post-view with the absorbed invalidate view (MachFix-R-b5): an LR's rule-8 view. -/
+def readViewV (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
+  max (readView ws aq rl va base tvs) vi
+
+/-- THE RUN-LEVEL READ WITH THE ABSORBED INVALIDATE VIEW (FIX MachFix-R-b5): `loadRun` whose read point is raised to
+`vi` — every per-byte post-view (coherence, `vrOld`, `wLdv`, the acquire floors) and the release view absorb it.
+`loadRunV … 0 … = loadRun …` (`loadRunV_zero`, MachInval.lean).  Mark: FAITHFUL. -/
+def loadRunV (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : PState :=
+  let ws1 := loadBytes aq (max (ldPre ws aq rl va) vi) ws base tvs
+  { ws1 with
+    wVcap := max va ws1.wVcap
+    wVRel := if rl then max ws1.wVRel (readViewV ws aq rl va vi base tvs) else ws1.wVRel }
+
 /-! ## 5. Writes -/
 
 /-- COH (PARM `writable`'s coherence conjunct): every written byte's coherence floor is below `ts`. -/
@@ -522,11 +564,12 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   | silent (prom : GSet Nat) (ws : PState) :
       memStep prom ws LSilent none ws prom
   /-- PLAIN/ACQUIRE LOAD: admissible at `ldPre` (rules 4, 5, 6 for a release load, 7, 9; PA-1f), single read
-  point (M9). -/
+  point (M9).  MachFix-R-b5: the cited invalidates' view `vi` (`invalCite`) is absorbed (`loadRunV`). -/
   | load (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
       loadOk img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs →
-      memStep prom ws (LLoad aq rl base tvs asrc) none (loadRun ws aq rl (srcsView ws asrc) base tvs) prom
+      ∀ vi : Nat, invalCite log ws (ldPre ws aq rl (srcsView ws asrc)) vi base tvs →   -- MachFix-R-b5
+      memStep prom ws (LLoad aq rl base tvs asrc) none (loadRunV ws aq rl (srcsView ws asrc) vi base tvs) prom
   /-- PLAIN/RELEASE STORE: fulfils its promise `ts` (COH + EXT); forward view = address ⊔ data view (M2).  An
   acquire store (FIX S0P2-D3) has the pre-view `stPreA` and the post `acqPost`. -/
   | store (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (data : List (BitVec 8))
@@ -540,7 +583,11 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
           data.length ts) aq ts)
         (prom \ {ts})
   /-- FUSED AMO (M0): the read at `ldPre` with the address view (rule 9 on the single op), the atomicity window
-  (`exclOk`), the write at the post-read state's `stPre`; post: exclusive forward view `ts` (M1), `amoPost`. -/
+  (`exclOk`), the write at the post-read state's `stPre`; post: exclusive forward view `ts` (M1), `amoPost`.
+  MachFix-R-b5: the read half absorbs its cited invalidates' view `vi` (`loadRunV`); COH and EXT are stated on the
+  `vi = 0` post-read state together with `vi < ts` — equivalent to COH and EXT on the absorbing post-read state
+  (`loadRunV` raises each view to at most its `vi = 0` value ⊔ `vi`, and the AMO writes the bytes it reads), and the
+  single op at `ts` is after every cited invalidate. -/
   | rmw (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (data : List (BitVec 8)) (asrc vsrc : List Dsrc) (ts : Nat) :
       tvs.length = data.length →
@@ -550,16 +597,18 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
       exclOk log i base (tvs.map Prod.fst) ts →
       cohBelow (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts →
       stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) (srcsView ws vsrc) < ts →
+      ∀ vi : Nat, invalCite log ws (ldPre ws aq false (srcsView ws asrc)) vi base tvs → vi < ts →  -- MachFix-R-b5
       memStep prom ws (LRmw aq rl base tvs data asrc vsrc) (some ts)
-        (amoPost (storeRun (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
+        (amoPost (storeRun (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl (srcsView ws asrc) ts base
           data.length ts) aq ts)
         (prom \ {ts})
   /-- SPLIT AMO, read half (M10): a load-like read; records the AMO slot (never `wRes`). -/
   | amoLd (prom : GSet Nat) (ws : PState) (aq : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
       loadOk img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs →
+      ∀ vi : Nat, invalCite log ws (ldPre ws aq false (srcsView ws asrc)) vi base tvs →   -- MachFix-R-b5
       memStep prom ws (LAmoLd aq base tvs asrc) none
-        { loadRun ws aq false (srcsView ws asrc) base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }
+        { loadRunV ws aq false (srcsView ws asrc) vi base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }
         prom
   /-- SPLIT AMO, write half (M10 (2), (3)): needs the slot at the same base and width, the atomicity window, COH
   and EXT; post as the fused AMO with the READ half's aq; the slot is consumed. -/
@@ -601,9 +650,10 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   | lr (prom : GSet Nat) (ws : PState) (aq rl : Bool) (base : Int) (tvs : List (Nat × BitVec 8))
       (asrc : List Dsrc) :
       loadOk img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs →
+      ∀ vi : Nat, invalCite log ws (ldPre ws aq rl (srcsView ws asrc)) vi base tvs →   -- MachFix-R-b5
       memStep prom ws (LExLoad aq rl base tvs asrc) none
-        { loadRun ws aq rl (srcsView ws asrc) base tvs with
-          wRes := some ⟨base, tvs.map Prod.fst, readView ws aq rl (srcsView ws asrc) base tvs⟩ }
+        { loadRunV ws aq rl (srcsView ws asrc) vi base tvs with
+          wRes := some ⟨base, tvs.map Prod.fst, readViewV ws aq rl (srcsView ws asrc) vi base tvs⟩ }
         prom
   /-- SUCCESSFUL SC (M16): needs a reservation; the SC's base and width are FREE (§rvwmo: "The Atomicity Axiom
   theoretically supports LR/SC pairs of different widths and to mismatched addresses"; the reservation set is the

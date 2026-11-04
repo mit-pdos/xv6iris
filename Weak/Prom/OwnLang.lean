@@ -14,7 +14,7 @@ finished.  A hart thread carries its own exact machine state (`PState`, trace) i
 * the agent step appends `M[n]` as a promise of its author (`ostep.ag`);
 * a hart that reached a value and has no outstanding promise may stop (`ostep.fin`), recording its value.
 
-`validRun_lang`: every valid, fetch-bounded, `invalFree` run of machine v2 (`D = Unit`) is an execution of this
+`validRun_lang`: every valid, fetch-bounded run (MachFix-R-b5: no `invalFree`) of machine v2 (`D = Unit`) is an execution of this
 language from the initial pool, ending with log `M`, no promise, and every finished hart's value recorded — through
 the NF_R lemma `nfR` (NfrRun.lean) and the simulation `nf_sim`.
 No `sorry`, no axiom, no `native_decide`.

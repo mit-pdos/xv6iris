@@ -586,7 +586,7 @@ theorem g4_mpOwn {evs : List PEvt} {cfg : PCfg TP Unit} (hvr : validRun tpStep m
           unfold hv
           iframe Hb2 Htok
         exact BigSepL.bigSepL_nil_intro
-      · iapply mp_final) hvr rfl (mp_fetch hvr) (mp_invalFree hvr)
+      · iapply mp_final) hvr rfl (mp_fetch hvr)   -- MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key g hg
 
 

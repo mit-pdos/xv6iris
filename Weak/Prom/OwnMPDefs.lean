@@ -332,7 +332,9 @@ theorem hstep_ld {w : OW TP (List (BitVec 8))} {h : Nat} {σ σ' : OSt (List (Bi
     rw [hw] at hp
     obtain ⟨t, v, rfl, rfl⟩ := tp_ld hp
     cases hm with
-    | load _ _ _ _ _ hok =>
+    | load _ _ _ _ _ hok vi hci =>   -- MachFix-R-b5: `vi = 0` (`invalFree`)
+      obtain rfl := invalCite_vi0 (noInval_take hinv _) hci
+      rw [loadRunV_zero]
       obtain ⟨⟨hmb, hw'⟩, _⟩ := hok
       obtain ⟨hmb', htn⟩ := memByte_take hmb
       refine ⟨t, v, rfl, rfl, upd_pr_self σ h, rfl, hmb', htn, fun t0 h1 h2 h3 hwr => ?_, ?_⟩

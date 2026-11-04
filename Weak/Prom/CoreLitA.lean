@@ -57,7 +57,8 @@ theorem hSAmoRl_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v r 
     (hprog : s0.prog = [.alui .add r 0 v, .store 4 r pa 0, .amo .swap 4 false true 0 r pb])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : r ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ pa ≠ r ∧ pb ≠ r) (hlen : r < s0.regs.length)
     (hv : v < two64) (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qSA a b v true pa r pb)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -113,7 +114,8 @@ theorem hSFAmo_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v r p
       .amo .swap 4 false false 0 r pb])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : r ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ pa ≠ r ∧ pb ≠ r) (hlen : r < s0.regs.length)
     (hv : v < two64) (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qSA a b v false pa r pb)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -174,7 +176,8 @@ theorem hAqR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b rd pa p
     (hprog : s0.prog = [.amo .swap 4 true false rd 0 pa, .load 4 true d pb 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : rd ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ pb ≠ rd)
     (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qAR M a b true (amoD .swap 4 0) pa [] pb)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -235,7 +238,8 @@ theorem hLAFR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v r rd
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : r ≠ 0 ∧ rd ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ pa ≠ r ∧ pb ≠ r ∧ pb ≠ rd)
     (hlen : r < s0.regs.length) (hv : v < two64)
     (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qAR M a b false (amoD .swap 4 v) pa [.DReg r] pb)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -312,7 +316,8 @@ theorem hLAFW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v v' r
     (hnz : r ≠ 0 ∧ rd ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ r' ≠ 0 ∧ pa ≠ r ∧ pb ≠ r ∧ pb ≠ rd ∧ pb ≠ r')
     (hlen : r < s0.regs.length ∧ r' < s0.regs.length) (hv : v < two64)
     (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qAW a b v pa r pb r')) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -381,7 +386,8 @@ theorem hLADW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v k r 
     (hnz : r ≠ 0 ∧ rd ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ r' ≠ 0 ∧ pa ≠ r ∧ pb ≠ r ∧ pb ≠ rd ∧ pb ≠ r')
     (hlen : r < s0.regs.length) (hv : v < two64)
     (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qAW a b v pa r pb r')) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -444,7 +450,8 @@ theorem hLACW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a b v v' r
     (hnz : r ≠ 0 ∧ rd ≠ 0 ∧ pa ≠ 0 ∧ pb ≠ 0 ∧ r' ≠ 0 ∧ pa ≠ r ∧ pb ≠ r ∧ pb ≠ rd ∧ pb ≠ r')
     (hlen : r < s0.regs.length) (hv : v < two64)
     (ha : s0.rd pa = a) (hb : s0.rd pb = b) (hal : a < two64) (hbl : b < two64)
-    (hA : aligned a 4 = true) (hB : aligned b 4 = true) :
+    (hA : aligned a 4 = true) (hB : aligned b 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qAW a b v pa r pb r')) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -683,6 +690,7 @@ theorem lit_mpAmoRlAq : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mpAmoRlAq) () (progs Weak.Prom.Ref.Lit.mpAmoRlAq) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with
       | 0 => qSA (X : Int) (Y : Int) 1 true 8 6 9
@@ -713,6 +721,7 @@ theorem lit_mpFAmo : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mpFAmo) () (progs Weak.Prom.Ref.Lit.mpFAmo) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with
       | 0 => qSA (X : Int) (Y : Int) 1 false 8 5 9
@@ -762,6 +771,7 @@ theorem lit_amoStorePart : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.amoStorePart) () (progs Weak.Prom.Ref.Lit.amoStorePart) M run →
     ¬ (run.obsLoad 1 0 = some 2 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with
       | 0 => qAW (Y : Int) (Z : Int) 1 9 5 18 28
@@ -794,6 +804,7 @@ theorem lit_mpAmoData : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mpAmoData) () (progs Weak.Prom.Ref.Lit.mpAmoData) M run →
     ¬ (run.obsLoad 1 0 = some 5 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with
       | 0 => qAW (X : Int) (Y : Int) 2 8 7 9 5
@@ -825,6 +836,7 @@ theorem lit_mpAmoCtrl : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mpAmoCtrl) () (progs Weak.Prom.Ref.Lit.mpAmoCtrl) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv)
     (fun h => match h with
       | 0 => qAW (X : Int) (Y : Int) 2 8 5 9 6

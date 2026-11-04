@@ -121,7 +121,8 @@ variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG 
 theorem lk_rel (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw : Nat)
     (hs : s.prog = b1a ∧ s.q = [] ∧ s.pc = 6 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwOld) :
+    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwOld)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗ (⌜qLk M ev⌝ ∨ dshot g) ∗
       lhA g Proto.triv (wL M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL M h) (qsLk M) s (ΦL g M) := by
@@ -199,7 +200,8 @@ the bag (`0`: none, the read was clean). -/
 theorem lk_cs2 (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev0 : Trace) (tvs1 : List (Nat × BitVec 8)) (lo lw ex : Nat)
     (hs : s.prog = b1a ∧ s.q = [] ∧ s.pc = 4 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hnoC : noC ev0) (hlw : lw = 0 ∨ isC M lw = true) :
+    (hlo : lo ≤ coh ws Lk) (hnoC : noC ev0) (hlw : lw = 0 ∨ isC M lw = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ ([∗list] t ∈ cBagX M lw ex, pend g t) ∗
       (⌜ex = 0 ∧ (∀ p ∈ tvs1, p.1 = lw) ∧ lw ≤ coh ws Ct⌝ ∨
         (dshot g ∗ ⌜lw < ex ∧ ∃ j : Nat, j < 8 ∧ ex ≤ coh ws (Ct + j)⌝)) ∗
@@ -339,7 +341,8 @@ theorem lk_cs2 (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h 
 theorem lk_cs (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw : Nat)
     (hs : s.prog = b1a ∧ s.q = [] ∧ s.pc = 3 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev) :
+    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗
       lhA g Proto.triv (wL M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL M h) (qsLk M) s (ΦL g M) := by

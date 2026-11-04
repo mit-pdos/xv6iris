@@ -94,7 +94,8 @@ theorem oota_hart (s0 : LP) (x y : Nat) (img : Image) (M : List PMsg) (h : Nat)
     (hprog : s0.prog = [.load 4 true 5 6 0, .store 4 5 8 0]) (hpc : s0.pc = 0) (hq : s0.q = [])
     (hlen : 5 < s0.regs.length)
     (hx : s0.rd 6 = x) (hy : s0.rd 8 = y) (hxa : x % 4 = 0) (hya : y % 4 = 0) (hxl : x < two64)
-    (hyl : y < two64) :
+    (hyl : y < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF πZero ⟨litStep, litDone, img, M, h⟩ (fun _ => True) s0
       (fun _ => iprop(⌜∃ V, grd πZero img M V True⌝)) := by
   unfold wpPF
@@ -216,6 +217,7 @@ theorem lit_oota42 : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.oota42) () (progs Weak.Prom.Ref.Lit.oota42) M run →
     ¬ (run.obsLoad 0 0 = some 42 ∧ run.obsLoad 1 0 = some 42) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   have hlen : (progs Weak.Prom.Ref.Lit.oota42).length = 2 := rfl
   obtain ⟨_, _, _, _, hValid, hwf, _⟩ := adequacy (hlc := HasLC.hasLC) (GF := pfGF) (pdone := litDone)
     πZero (fun _ _ => True) (fun _ _ => True) (fun _ => rfl) (PO_ad_all _ _ _) (fun _ => trivial) (devFree_lit _)

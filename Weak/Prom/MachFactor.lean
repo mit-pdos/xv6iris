@@ -107,6 +107,47 @@ theorem loadOk_ext {img : Image} {L M : List PMsg} {ws : PState} {vpre : Nat} {b
   · right
     exact invalRead_ext h (by omega) hr
 
+/-- MachFix-R-b5: a cited invalidate is append-stable (as `invalRead_ext`). -/
+theorem invalReadAt_ext {L M : List PMsg} {a : Int} {t fl ti : Nat} (h : L <+: M) (hfl : fl ≤ L.length)
+    (hr : invalReadAt L a t fl ti) : invalReadAt M a t fl ti := by
+  obtain ⟨hc, hlt, hnw, hno, hall⟩ := hr
+  have hti := cmoAt_lt hc
+  refine ⟨(cmoAt_ext h hti).2 hc, hlt, ?_, ?_, ?_⟩
+  · rw [writesIn_ext h hfl]; exact hnw
+  · rintro ⟨ti', h1, h2, hc'⟩
+    exact hno ⟨ti', h1, h2, (cmoAt_ext h (by omega)).1 hc'⟩
+  · intro c hc1 hc2
+    rw [writesIn_ext h (by omega)]
+    exact hall c hc1 ((cmoAt_ext h (by omega)).1 hc2)
+
+/-- MachFix-R-b5: A CITATION IS APPEND-STABLE (as `loadOk_ext`). -/
+theorem invalCite_ext {L M : List PMsg} {ws : PState} {vpre vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : L <+: M) (hv : vpre ≤ L.length) (hc : ∀ a, coh ws a ≤ L.length)
+    (hts : bytesAll (fun _ t _ => t ≤ L.length) base tvs)
+    (hok : invalCite L ws vpre vi base tvs) : invalCite M ws vpre vi base tvs := by
+  have hN : nonFwdMax ws base tvs ≤ L.length := nonFwdMax_le hts
+  obtain ⟨h1, h2⟩ := hok
+  refine ⟨?_, h2.elim .inl (fun h3 => .inr (bytesAny_mono (fun a t _ hp => invalReadAt_ext h
+    (by have := hc a; omega) hp) base tvs h3))⟩
+  have key : ∀ (a : Int) (r : List (Nat × BitVec 8)), bytesAll (fun _ t _ => t ≤ L.length) a r →
+      bytesAll (fun a t _ =>
+      ¬ writesIn L a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
+      ∃ ti, ti ≤ vi ∧ invalReadAt L a t (max vpre (coh ws a)) ti) a r →
+      bytesAll (fun a t _ =>
+      ¬ writesIn M a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ∨
+      ∃ ti, ti ≤ vi ∧ invalReadAt M a t (max vpre (coh ws a)) ti) a r := by
+    intro a r
+    induction r generalizing a with
+    | nil => intro _ _; trivial
+    | cons tv r ih =>
+      obtain ⟨t, v⟩ := tv
+      rintro ⟨_, h3⟩ ⟨hw | ⟨ti, hti, hr⟩, h4⟩
+      · have hca := hc a
+        exact ⟨.inl (by rw [writesIn_ext h (by split <;> omega)]; exact hw), ih (a + 1) h3 h4⟩
+      · have hca := hc a
+        exact ⟨.inr ⟨ti, hti, invalReadAt_ext h (by omega) hr⟩, ih (a + 1) h3 h4⟩
+  exact key base tvs hts h1
+
 theorem ownDone_ext {L M : List PMsg} {i : Nat} {P prom : GSet Nat} {t : Nat} (h : L <+: M)
     (ht : t ≤ L.length) (hP : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom)) :
     ownDone M i P t = ownDone L i prom t := by
@@ -160,18 +201,21 @@ theorem memStep_extend {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet Na
     exact hm
   cases h with
   | silent => exact ⟨P, .silent _ _, hP⟩
-  | load aq rl base tvs asrc hok =>
-    exact ⟨P, .load _ _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok), hP⟩
+  | load aq rl base tvs asrc hok vi hvi =>
+    exact ⟨P, .load _ _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok) vi
+      (invalCite_ext hpre (ldPre_le hb (hsv _)) hcoh (loadOk_ts hok) hvi), hP⟩
   | store aq rl base data asrc vsrc ts hts hm hc hpv =>
     exact ⟨P \ {ts}, .store _ _ _ _ _ _ _ _ _ (hPin ts hts) (hmsg ts _ hts hm) hc hpv,
       hPdiff ts (hw ts hts).2.1⟩
-  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hc hpv =>
+  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hc hpv vi hvi hvt =>
     have hts' := (hw ts hts).2.1
     exact ⟨P \ {ts}, .rmw _ _ _ _ _ _ _ _ _ _ hlen (hPin ts hts) (hmsg ts _ hts hm)
-      (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok) ((exclOk_ext hpre hts' _ _).2 hx) hc hpv,
+      (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok) ((exclOk_ext hpre hts' _ _).2 hx) hc hpv vi
+      (invalCite_ext hpre (ldPre_le hb (hsv _)) hcoh (loadOk_ts hok) hvi) hvt,
       hPdiff ts hts'⟩
-  | amoLd aq base tvs asrc hok =>
-    exact ⟨P, .amoLd _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok), hP⟩
+  | amoLd aq base tvs asrc hok vi hvi =>
+    exact ⟨P, .amoLd _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok) vi
+      (invalCite_ext hpre (ldPre_le hb (hsv _)) hcoh (loadOk_ts hok) hvi), hP⟩
   | amoSt rl base data asrc vsrc ts R hR hb' hlen hts hm hx hc hpv =>
     have hts' := (hw ts hts).2.1
     exact ⟨P \ {ts}, .amoSt _ _ _ _ _ _ _ _ R hR hb' hlen (hPin ts hts) (hmsg ts _ hts hm)
@@ -182,8 +226,9 @@ theorem memStep_extend {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet Na
   | regW rd srcs => exact ⟨P, .regW _ _ _ _, hP⟩
   | ctrl srcs => exact ⟨P, .ctrl _ _ _, hP⟩
   | instr => exact ⟨P, .instr _ _, hP⟩
-  | lr aq rl base tvs asrc hok =>
-    exact ⟨P, .lr _ _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok), hP⟩
+  | lr aq rl base tvs asrc hok vi hvi =>
+    exact ⟨P, .lr _ _ _ _ _ _ _ (loadOk_ext hpre (ldPre_le hb (hsv _)) hcoh hok) vi
+      (invalCite_ext hpre (ldPre_le hb (hsv _)) hcoh (loadOk_ts hok) hvi), hP⟩
   | sc aq rl base data asrc vsrc ts R hR hts hm hx hlt hc hpv =>
     have hts' := (hw ts hts).2.1
     exact ⟨P \ {ts}, .sc _ _ _ _ _ _ _ _ _ R hR (hPin ts hts) (hmsg ts _ hts hm)

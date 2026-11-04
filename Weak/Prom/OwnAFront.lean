@@ -211,7 +211,8 @@ theorem wpKA_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : B
     {asrc vsrc : List Dsrc} {dat : List (Nat × BitVec 8) → List (BitVec 8)} {k : List (Nat × BitVec 8) → LP}
     {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
     (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LRmw aq rl base tvs (dat tvs) asrc vsrc ∧ s' = k tvs ∧
-      C tvs) :
+      C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lhA g π w (Qs w.h) ws pr ev ∗
     ▷ (∀ tvs ts, ⌜C tvs⌝ -∗ ⌜tvs.length = (dat tvs).length⌝ -∗ ⌜ts ∈ pr⌝ -∗
         ⌜w.M[ts - 1]? = some ⟨base, dat tvs, some w.h, .excl⟩⌝ -∗
@@ -236,7 +237,9 @@ theorem wpKA_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : B
   iintro %l %ots %s' %ws' %pr'' %hp %hm Hf Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext =>
+  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext vi hci _ =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero]
     imod Hk $$ %tvs %ts %hC %hlen %hts %hmsg %hlo %hex %hcoh %hext Hf Hc with ⟨#Hr, #Hsh, Hk⟩
     have hw' : wrOk w.M (τ ++ [(LRmw aq rl base tvs (dat tvs) asrc vsrc, some ts)]) :=
       wrOk_snoc_some hw hmsg (by omega) rfl
@@ -271,7 +274,8 @@ theorem wpKA_rmw1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : B
 theorem wpKA_amo (hw : LitW w) {s : LP} {op : Weak.Prom.Ref.AmoOp} {sz : Nat} {aq rl : Bool} {rd rs2 rs1 : Nat}
     {base : Int} {ws : PState} {pr : GSet Nat} {ev : Trace} (hag : LitAg w s) (hq : s.q = [])
     (hp : s.prog[s.pc]? = some (.amo op sz aq rl rd rs2 rs1)) (ha : aligned (s.rd rs1) sz = true)
-    (hb : ((s.rd rs1 : Nat) : Int) = base) :
+    (hb : ((s.rd rs1 : Nat) : Int) = base)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lhA g π w (Qs w.h) ws pr ev ∗
     ▷ (∀ tvs ts, ⌜tvs.length = sz⌝ -∗ ⌜ts ∈ pr⌝ -∗
         ⌜w.M[ts - 1]? = some ⟨base, amoD op sz (s.rd rs2) tvs, some w.h, .excl⟩⌝ -∗
@@ -386,5 +390,50 @@ theorem wpKA_addiw {Xs : List (List XI)} (hw : LitW w) {s : LP} {X : List XI} {r
   iapply Hk $$ %_ %(LPstep_wr s rd _ _) Hf Hc
 
 end kit
+
+/-! ## MachFix-R-b5: the loop front end issues no cache-block operation -/
+
+theorem go1_qnc {s s' : LP} {regs : List Nat} {pc : Nat} {labs : List PLabel} {l : PLabel}
+    (h : go1 s regs pc labs l = some s') (hq : qOk labs.tail)
+    (hnc : ∀ x ∈ labs, ∀ k b len asrc, x ≠ LCmo k b len asrc) :
+    qOk s'.q ∧ ∀ k b len asrc, l ≠ LCmo k b len asrc := by
+  obtain ⟨rest, rfl, rfl⟩ := go1_eq h
+  exact ⟨hq, hnc _ (List.mem_cons_self ..)⟩
+
+theorem qOk_noCmo {q : List PLabel} (h : qOk q) : ∀ x ∈ q, ∀ k b len asrc, x ≠ LCmo k b len asrc := by
+  intro x hx k b len asrc he
+  subst he
+  have := h.1 _ hx
+  simp [qLab] at this
+
+theorem qOk_tl {q : List PLabel} (h : qOk q) : qOk q.tail := by
+  cases q with
+  | nil => exact qOk_nil
+  | cons l r => exact qOk_tail h
+
+/-- Every valid run of the loop front end has no invalidate-class message (its labels are `litNext`'s or
+answer-free; LitNoCmo.lean `noInval_of_noCmoLab`), so machine v2's load-like arms take `vi = 0` there. -/
+theorem x_noInvalT {Xs : List (List XI)} {T : Test} {img : Image} {M : List PMsg} {run : PFRun LP Unit}
+    (hv : PF.validRun (xStep Xs) img () (progs T) M run) : ∀ t a, ¬ cmoAt M isInvalK t a := by
+  rw [← hv.2]
+  refine Own.noInval_of_noCmoLab (fun s => qOk s.q) (fun p hp => by rw [Own.progs_q T p hp]; exact qOk_nil)
+    (fun s l s' hq hs => ?_) hv.1
+  have hs' : xNext Xs s l = some s' := hs
+  unfold xNext at hs'
+  split at hs'
+  · exact ⟨Mach.litNext_q hq hs', (Own.litNext_nf hq hs').2⟩
+  · split at hs'
+    · exact go1_qnc hs' (qOk_tl (qOk_regWL1 _ _)) (qOk_noCmo (qOk_regWL1 _ _))
+    · split at hs'
+      · cases hs'
+      · refine go1_qnc hs' (by simp [qOk, qLab, isRegW]) (fun x hx => ?_)
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
+        rcases hx with rfl | rfl <;> intro _ _ _ _ h <;> cases h
+    · split at hs'
+      · cases hs'
+      · refine go1_qnc hs' (by simp [qOk, qLab, isRegW]) (fun x hx => ?_)
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hx
+        subst hx; intro _ _ _ _ h; cases h
+    · exact ⟨Mach.litNext_q hq hs', (Own.litNext_nf hq hs').2⟩
 
 end Weak.Prom.OA

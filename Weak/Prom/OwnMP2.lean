@@ -509,7 +509,7 @@ theorem g4_mp2 {evs : List PEvt} {cfg : PCfg LP Unit} (hvr : validRun litStep mp
           · unfold hv; iframe Hb2 Htok
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply mp2_final) hvr rfl (lit_fetchBounded hvr hps) hinv
+      · iapply mp2_final) hvr rfl (lit_fetchBounded hvr hps)   -- MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key g hg h5
 
 end Weak.Prom.Own.MP2

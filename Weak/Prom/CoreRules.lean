@@ -219,7 +219,8 @@ theorem wpH_done {v : V} (hdv : w.pdone s = some v) (hns : ∀ l s', ¬ anyFab w
 continuation `k tvs` with side condition `C tvs` (e.g. the width) from the program half. -/
 theorem wpH_load {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
     {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     hartSt γ ws pr τ ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗ £ 1 -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LLoad aq rl base tvs asrc, none)]))⌝ ∗
@@ -233,8 +234,35 @@ theorem wpH_load {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat �
   iintro %l %ots %s' %ws' %pr' %hp %hm Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | load _ _ _ _ _ hlo =>
+  | load _ _ _ _ _ hlo vi hci =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero]
     imod Hk $$ %tvs %hC %hlo Hc with ⟨%Hψ, Hk⟩
+    imodintro
+    isplitr
+    · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩
+    · iexact Hk
+/-- MachFix-R-b5: the general rule (every absorbed invalidate view `vi`, `invalCite`).  **LOAD** (plan §2): every admissible answer `tvs` (`loadOk` at `ldPre`, v2's single read point); the
+continuation `k tvs` with side condition `C tvs` (e.g. the width) from the program half. -/
+theorem wpH_loadV {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
+    {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    hartSt γ ws pr τ ∗
+    ▷ (∀ tvs vi, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
+        ⌜invalCite w.M ws (ldPre ws aq rl (srcsView ws asrc)) vi base tvs⌝ -∗ £ 1 -∗
+        |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LLoad aq rl base tvs asrc, none)]))⌝ ∗
+          (hartSt γ (loadRunV ws aq rl (srcsView ws asrc) vi base tvs) pr (τ ++ [(LLoad aq rl base tvs asrc, none)]) -∗
+            wpH γ π w Ψ (k tvs) Φ))
+    ⊢ wpH γ π w Ψ s Φ := by
+  iintro ⟨Hst, Hk⟩
+  iapply wpH_any hd
+  iframe Hst
+  inext
+  iintro %l %ots %s' %ws' %pr' %hp %hm Hc
+  obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
+  cases hm with
+  | load _ _ _ _ _ hlo vi hci =>
+    imod Hk $$ %tvs %vi %hC %hlo %hci Hc with ⟨%Hψ, Hk⟩
     imodintro
     isplitr
     · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩
@@ -245,7 +273,8 @@ the forward-bank knowledge (FK) of the pre-state, so every forwarded byte comes 
 (`fwdRead`). -/
 theorem wpH_load_fwd {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
     {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     hartSt γ ws pr τ ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
         ⌜fwdKnow π w.img w.M ws τ⌝ -∗ £ 1 -∗
@@ -263,8 +292,40 @@ theorem wpH_load_fwd {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (N
   iintro %l %ots %s' %ws' %pr' %hp %hm %hf Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | load _ _ _ _ _ hlo =>
+  | load _ _ _ _ _ hlo vi hci =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero]
     imod Hk $$ %tvs %hC %hlo %hf.2.2.2 Hc with ⟨%Hψ, Hk⟩
+    imodintro
+    isplitr
+    · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩
+    · iexact Hk
+/-- MachFix-R-b5: the general rule (every absorbed invalidate view `vi`, `invalCite`).  **LOAD with the forwarded-read rule** (plan §2 "Forwarded reads"): as `wpH_load`, and the client is also handed
+the forward-bank knowledge (FK) of the pre-state, so every forwarded byte comes with `⟦pv_f⟧ proto(M[t_f])`
+(`fwdRead`). -/
+theorem wpH_load_fwdV {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
+    {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    hartSt γ ws pr τ ∗
+    ▷ (∀ tvs vi, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
+        ⌜invalCite w.M ws (ldPre ws aq rl (srcsView ws asrc)) vi base tvs⌝ -∗
+        ⌜fwdKnow π w.img w.M ws τ⌝ -∗ £ 1 -∗
+        |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LLoad aq rl base tvs asrc, none)]))⌝ ∗
+          (hartSt γ (loadRunV ws aq rl (srcsView ws asrc) vi base tvs) pr (τ ++ [(LLoad aq rl base tvs asrc, none)]) -∗
+            wpH γ π w Ψ (k tvs) Φ))
+    ⊢ wpH γ π w Ψ s Φ := by
+  iintro ⟨Hst, Hk⟩
+  iapply wpH_liftF
+  iframe Hst
+  inext
+  isplit
+  · iintro %v %hv
+    rw [hd] at hv; cases hv
+  iintro %l %ots %s' %ws' %pr' %hp %hm %hf Hc
+  obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
+  cases hm with
+  | load _ _ _ _ _ hlo vi hci =>
+    imod Hk $$ %tvs %vi %hC %hlo %hci %hf.2.2.2 Hc with ⟨%Hψ, Hk⟩
     imodintro
     isplitr
     · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩
@@ -399,7 +460,8 @@ theorem wpH_store {aq rl : Bool} {base : Int} {data : List (BitVec 8)} {asrc vsr
 reservation records the LR's bytes and its post-view. -/
 theorem wpH_lr {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
     {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LExLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LExLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     hartSt γ ws pr τ ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗ £ 1 -∗
         |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LExLoad aq rl base tvs asrc, none)]))⌝ ∗
@@ -414,8 +476,36 @@ theorem wpH_lr {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × 
   iintro %l %ots %s' %ws' %pr' %hp %hm Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | lr _ _ _ _ _ hlo =>
+  | lr _ _ _ _ _ hlo vi hci =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero, readViewV_zero]
     imod Hk $$ %tvs %hC %hlo Hc with ⟨%Hψ, Hk⟩
+    imodintro
+    isplitr
+    · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩
+    · iexact Hk
+/-- MachFix-R-b5: the general rule (every absorbed invalidate view `vi`, `invalCite`).  **LR** (plan §2 "RMW / LR / SC …: the same pattern over the v2 arms"; M16): every admissible answer; the
+reservation records the LR's bytes and its post-view. -/
+theorem wpH_lrV {aq rl : Bool} {base : Int} {asrc : List Dsrc} {k : List (Nat × BitVec 8) → P}
+    {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LExLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    hartSt γ ws pr τ ∗
+    ▷ (∀ tvs vi, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
+        ⌜invalCite w.M ws (ldPre ws aq rl (srcsView ws asrc)) vi base tvs⌝ -∗ £ 1 -∗
+        |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LExLoad aq rl base tvs asrc, none)]))⌝ ∗
+          (hartSt γ { loadRunV ws aq rl (srcsView ws asrc) vi base tvs with
+              wRes := some ⟨base, tvs.map Prod.fst, readViewV ws aq rl (srcsView ws asrc) vi base tvs⟩ }
+            pr (τ ++ [(LExLoad aq rl base tvs asrc, none)]) -∗ wpH γ π w Ψ (k tvs) Φ))
+    ⊢ wpH γ π w Ψ s Φ := by
+  iintro ⟨Hst, Hk⟩
+  iapply wpH_any hd
+  iframe Hst
+  inext
+  iintro %l %ots %s' %ws' %pr' %hp %hm Hc
+  obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
+  cases hm with
+  | lr _ _ _ _ _ hlo vi hci =>
+    imod Hk $$ %tvs %vi %hC %hlo %hci Hc with ⟨%Hψ, Hk⟩
     imodintro
     isplitr
     · ipureintro; exact ⟨Hψ, fun t ht => by cases ht⟩

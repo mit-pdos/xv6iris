@@ -194,7 +194,8 @@ was not 1), doom, or x's points-to with its latest write below the load floor `v
 theorem mp_h1_tail (g : AGN) (M : List PMsg) (γc : GName) (s2 : LP) (ws : PState) {pr : GSet Nat}
     (tvs0 : List (Nat × BitVec 8)) (hprog : s2.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW,
       Weak.Prom.Ref.Lit.ld 7 8]) (hpc : s2.pc = 2) (hq : s2.q = []) (h8 : s2.rd 8 = X)
-    (hdd : ∀ t, isD M t = true → g.dd t) :
+    (hdd : ∀ t, isD M t = true → g.dd t)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     mpCtx (GF := GF) g M γc ∗
       (⌜obsOf tvs0 ≠ 1⌝ ∨ dshot g ∨ ∃ lw, ⌜1 ≤ lw ∧ lw ≤ ws.wVrNew⌝ ∗ xPts g M lw) ∗
       lhA g Proto.triv (wMP M 1) (qsMP 1) ws pr [(LLoad false false (Y : Int) tvs0 (srcR 6), none)] ⊢
@@ -278,7 +279,8 @@ theorem frontA_shot {g : AGN} {π : Proto} {img : Image} {M : List PMsg} {ws : P
 theorem mp_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
     (hprog : s0.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW, Weak.Prom.Ref.Lit.ld 7 8])
     (hpc : s0.pc = 0) (hq : s0.q = []) (h6 : s0.rd 6 = Y) (h8 : s0.rd 8 = X)
-    (hdd : ∀ t, isD M t = true → g.dd t) :
+    (hdd : ∀ t, isD M t = true → g.dd t)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     mpCtx (GF := GF) g M γc ∗ token γc ∗ lhA g Proto.triv (wMP M 1) (qsMP 1) psInit P0 [] ⊢
       wpKA g Proto.triv (wMP M 1) qsMP s0 (fun _ => iprop(⌜∃ V, grd Proto.triv imgMP M V True⌝ ∨ dshot g)) := by
   have hw := litW_lit imgMP M 1
@@ -427,7 +429,8 @@ theorem mp_assemble [InvGS ownGF] (g : AGN) (M : List PMsg) (γc : GName) (p0 p1
     (h8 : p0.rd 8 = Y)
     (hpr1 : p1.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW, Weak.Prom.Ref.Lit.ld 7 8])
     (hpc1 : p1.pc = 0) (hq1 : p1.q = []) (h6' : p1.rd 6 = Y) (h8' : p1.rd 8 = X)
-    (hdd : ∀ t, isD M t = true → g.dd t) :
+    (hdd : ∀ t, isD M t = true → g.dd t)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     mpCtx (GF := ownGF) g M γc ∗ xPts g M 0 ∗ token γc ∗ hartA g 0 psInit (P0 0) [] ∗
       hartA g (0 + 1) psInit (P0 (0 + 1)) [] ⊢
     [∗list] k ↦ p ∈ [p0, p1], wpA (hlc := .hasLC) g Proto.triv (hw litStep litDone imgMP M k)
@@ -463,7 +466,8 @@ theorem mp_assemble [InvGS ownGF] (g : AGN) (M : List PMsg) (γc : GName) (p0 p1
   itrivial
 
 /-- THE ADEQUACY PREMISE for MP with ownership: the setup (OwnAMPDefs.lean `mp_setup`), H0's and H1's proofs. -/
-theorem mp_premise (M : List PMsg) :
+theorem mp_premise (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF litStep litDone imgMP M (progs mpOwnT) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qsMP h)) (fun t => isD M t = true) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -497,6 +501,7 @@ message's deposit slot (see the header); 0 named inputs; finite runs (the prefix
 theorem own_mp (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun litStep imgMP () (progs mpOwnT) M run) :
     ∀ b, run.obsLoad 1 0 = some 1 → run.obsLoad 1 1 = some b → b = 42 := by
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5: litmus programs issue no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qsMP h)) (fun t => isD M t = true) trivial (fun h => ⟨qsMP_nil h, wrOk_nil M⟩)
     (mp_premise M) hrun

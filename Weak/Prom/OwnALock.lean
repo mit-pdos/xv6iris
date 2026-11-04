@@ -44,7 +44,8 @@ def lhS (s : LP) : Prop :=
   s.prog = b1a ∧ s.q = [] ∧ s.pc = 1 ∧ s.rd 5 = 1 ∧ s.rd 10 = X ∧ s.rd 11 = Y ∧ s.regs.length = 32
 
 /-- **THE SPIN LOOP** (Löb induction at the loop head `again:`). -/
-theorem lk_loop (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M) :
+theorem lk_loop (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo : Nat), ⌜lhS s⌝ -∗
       ⌜lo ≤ coh ws Lk ∧ noC ev⌝ -∗ lkCtx (GF := GF) g M tk -∗ obag g M tk h lo 0 -∗
       lhA g Proto.triv (wL M h) (qsLk M h) ws pr ev -∗ wpKA g Proto.triv (wL M h) (qsLk M) s (ΦL g M) := by
@@ -208,7 +209,8 @@ variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG 
 /-- **A HART** of (1a): `li t0, 1`, then the spin loop. -/
 theorem lk_hart (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b1a) (hpc : s0.pc = 0) (hq : s0.q = [])
-    (hlen : s0.regs.length = 32) (h10 : s0.rd 10 = X) (h11 : s0.rd 11 = Y) :
+    (hlen : s0.regs.length = 32) (h10 : s0.rd 10 = X) (h11 : s0.rd 11 = Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h 0 0 ∗ lhA g Proto.triv (wL M h) (qsLk M h) psInit P0 [] ⊢
       wpKA g Proto.triv (wL M h) (qsLk M) s0 (ΦL g M) := by
   have hw := litW_x xs1a imgL M h
@@ -391,7 +393,8 @@ end hart
 theorem progs_1a : ∃ p0 p1 : LP, progs t1a = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (1a). -/
-theorem lk_premise (M : List PMsg) :
+theorem lk_premise (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF (xStep xs1a) litDone imgL M (progs t1a) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qsLk M h)) (ddL M) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -463,6 +466,7 @@ and the image's slot, claimed by the unique AMO reading each release.  0 named i
 anywhere in its spin loop; the prefix lemma S3d is separate, [OWN.P4]). -/
 theorem own_lock1a (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun (xStep xs1a) imgL () (progs t1a) M run) : ∀ h, qLk M (run.trace h) := by
+  have hnoinv := x_noInvalT hrun   -- MachFix-R-b5: the front end issues no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qsLk M h)) (ddL M) trivial (fun h => ⟨qLk_noC noC_nil, wrOk_nil M⟩) (lk_premise M) hrun
   intro h

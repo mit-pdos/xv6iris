@@ -113,6 +113,7 @@ theorem mp_verdict {T : Test} {M : List PMsg} {run : PFRun LP Unit} (pw sw : Boo
     (hx : testImg T (X : Int) = some 0) (hy : testImg T (Y : Int) = some 0)
     (hrun : validRun litStep (testImg T) () (progs T) M run) :
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (T := T) (QsMP M rb)
     (fun h _ => match h with | 0 => wwDone M 0 (X : Int) (Y : Int) (toBytes 1 4) (toBytes 1 4) | _ => True) trivial
     (QsMP_nil M rb)
@@ -162,7 +163,8 @@ theorem hRaddr_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 p
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p0 ≠ 0 ∧ d0 ≠ 0 ∧ t ≠ 0 ∧ q ≠ 0 ∧ pb ≠ d0 ∧ pb ≠ t ∧ t ≠ d0)
     (hlen : s0.regs.length = 32) (hr : t < 32 ∧ q < 32) (hn : 0 < n) (hpb : pb ≠ 0)
     (ha0 : s0.rd p0 = a0) (ha1 : s0.rd pb = a1) (hal0 : a0 < two64) (hal1 : a1 < two64)
-    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true) :
+    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qRR M a0 a1 n [.DReg p0] [.DReg q])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -235,6 +237,7 @@ theorem lit_mpFAddr : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.mpFAddr) () (progs Weak.Prom.Ref.Lit.mpFAddr) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 1 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsMP M 10)
     (fun h _ => match h with | 0 => wwDone M 0 (X : Int) (Y : Int) (toBytes 1 4) (toBytes 1 4) | _ => True) trivial
     (QsMP_nil M 10)

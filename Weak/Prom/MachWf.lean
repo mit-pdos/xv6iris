@@ -10,7 +10,7 @@ These bounds are what makes every arm APPEND-STABLE (Machine.lean header): a pre
 windows whose upper end is a view or a fulfilled timestamp, and `psBounded` puts every such end below `|log|`.
 No `sorry`, no axiom, no `native_decide`.
 -/
-import Weak.Prom.Machine
+import Weak.Prom.MachInval   -- MachFix-R-b5 (was: Weak.Prom.Machine)
 
 namespace Weak.Prom
 
@@ -165,6 +165,24 @@ theorem loadRun_bnd {ws : PState} {n : Nat} {aq rl : Bool} {va : Nat} {base : In
   · simp only [loadRun]; split <;> omega
   · simp only [loadRun]; omega
 
+/-- MachFix-R-b5: `loadRunV` keeps the bounds when the absorbed view is in range. -/
+theorem loadRunV_bnd {ws : PState} {n : Nat} {aq rl : Bool} {va vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : psBounded ws n) (hva : va ≤ n) (hvi : vi ≤ n)
+    (hts : bytesAll (fun _ t _ => t ≤ n) base tvs) : psBounded (loadRunV ws aq rl va vi base tvs) n := by
+  have hp := ldPre_le (aq := aq) (rl := rl) h hva
+  have h1 := loadBytes_bnd (aq := aq) (vpre := max (ldPre ws aq rl va) vi) (by omega) ws base tvs h hts
+  have hrv := readView_le (aq := aq) (rl := rl) h hva hts
+  obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := h1
+  refine psB_intro hc h1 h2 h3 h4 ?_ hf hr ?_ h7 hR hM h8 h9 h10
+  · simp only [loadRunV, readViewV]; split <;> omega
+  · simp only [loadRunV]; omega
+
+theorem readViewV_le {ws : PState} {n : Nat} {aq rl : Bool} {va vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : psBounded ws n) (hva : va ≤ n) (hvi : vi ≤ n)
+    (hts : bytesAll (fun _ t _ => t ≤ n) base tvs) : readViewV ws aq rl va vi base tvs ≤ n := by
+  have := readView_le (aq := aq) (rl := rl) h hva hts
+  simp only [readViewV]; omega
+
 theorem cohRaise_bnd {n ts : Nat} (hts : ts ≤ n) :
     ∀ (ws : PState) (a : Int) (len : Nat), psBounded ws n → psBounded (cohRaise ws a len ts) n
   | _, _, 0, h => h
@@ -256,19 +274,20 @@ theorem memStep_bnd {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
   have hsv : ∀ s, srcsView ws s ≤ log.length := srcsView_le hb.2.2.2.2.2.2.2.1 hb.2.2.2.2.2.2.2.2.2.1
   cases h with
   | silent => exact ⟨hb, hw⟩
-  | load aq rl base tvs asrc hok =>
-    exact ⟨loadRun_bnd hb (hsv _) (loadOk_ts hok), hw⟩
+  | load aq rl base tvs asrc hok vi hvi =>
+    exact ⟨loadRunV_bnd hb (hsv _) (invalCite_le hvi) (loadOk_ts hok), hw⟩
   | store aq rl base data asrc vsrc ts hts hm hcoh hpre =>
     have hts' := (hw ts hts).2.1
     refine ⟨acqPost_bnd (storeRun_bnd hb (hsv _) ?_ hts') hts', promWf_diff ts hw⟩
     have := hsv asrc; have := hsv vsrc; omega
-  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hcoh hpre =>
+  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hcoh hpre vi hvi _ =>
     have hts' := (hw ts hts).2.1
-    exact ⟨amoPost_bnd (storeRun_bnd (loadRun_bnd hb (hsv _) (loadOk_ts hok)) (hsv _) hts' hts') hts',
+    exact ⟨amoPost_bnd (storeRun_bnd (loadRunV_bnd hb (hsv _) (invalCite_le hvi) (loadOk_ts hok)) (hsv _) hts'
+      hts') hts',
       promWf_diff ts hw⟩
-  | amoLd aq base tvs asrc hok =>
+  | amoLd aq base tvs asrc hok vi hvi =>
     refine ⟨?_, hw⟩
-    have h1 := loadRun_bnd (aq := aq) (rl := false) hb (hsv asrc) (loadOk_ts hok)
+    have h1 := loadRunV_bnd (aq := aq) (rl := false) hb (hsv asrc) (invalCite_le hvi) (loadOk_ts hok)
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, _, h8, h9, h10⟩ := h1
     refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 hR (fun R hR' => ?_) h8 h9 h10
     simp only [Option.some.injEq] at hR'
@@ -303,10 +322,10 @@ theorem memStep_bnd {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr h6 (Nat.zero_le _) hR (fun R hR' => by cases hR') h8 h9
       (Nat.zero_le _)
-  | lr aq rl base tvs asrc hok =>
+  | lr aq rl base tvs asrc hok vi hvi =>
     refine ⟨?_, hw⟩
-    have hrv := readView_le (aq := aq) (rl := rl) hb (hsv asrc) (loadOk_ts hok)
-    have h1 := loadRun_bnd (aq := aq) (rl := rl) hb (hsv asrc) (loadOk_ts hok)
+    have hrv := readViewV_le (aq := aq) (rl := rl) hb (hsv asrc) (invalCite_le hvi) (loadOk_ts hok)
+    have h1 := loadRunV_bnd (aq := aq) (rl := rl) hb (hsv asrc) (invalCite_le hvi) (loadOk_ts hok)
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, _, hM, h8, h9, h10⟩ := h1
     refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 (fun R hR' => ?_) hM h8 h9 h10
     simp only [Option.some.injEq] at hR'

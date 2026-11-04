@@ -101,7 +101,8 @@ theorem hWW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v0 v
     (hprog : s0.prog = [.store n r0 p0 0, .fence ⟨pr, true, false, false, sr, true, false, false⟩, .store n r1 p1 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p0 ≠ 0 ∧ p1 ≠ 0 ∧ r0 ≠ 0 ∧ r1 ≠ 0)
     (hv0 : s0.rd r0 = v0) (hv1 : s0.rd r1 = v1) (ha0 : s0.rd p0 = a0) (ha1 : s0.rd p1 = a1)
-    (hal0 : a0 < two64) (hal1 : a1 < two64) (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true) :
+    (hal0 : a0 < two64) (hal1 : a1 < two64) (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qWW a0 a1 (toBytes v0 n) (toBytes v1 n) [.DReg p0] [.DReg r0] [.DReg p1] [.DReg r1])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V (wwDone M h a0 a1 (toBytes v0 n) (toBytes v1 n))⌝)) := by
@@ -152,7 +153,8 @@ theorem hWW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v0 v
 theorem hWWc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v0 v1 p r0 r1 : Nat)
     (hprog : s0.prog = [.store n r0 p 0, .store n r1 p 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p ≠ 0 ∧ r0 ≠ 0 ∧ r1 ≠ 0) (hn : 0 < n)
-    (hv0 : s0.rd r0 = v0) (hv1 : s0.rd r1 = v1) (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true) :
+    (hv0 : s0.rd r0 = v0) (hv1 : s0.rd r1 = v1) (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qWW a a (toBytes v0 n) (toBytes v1 n) [.DReg p] [.DReg r0] [.DReg p] [.DReg r1])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V (wwDone M h a a (toBytes v0 n) (toBytes v1 n))⌝)) := by
@@ -202,7 +204,8 @@ theorem hRR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 p0 p
       .load n sg d1 p1 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p0 ≠ 0 ∧ p1 ≠ 0 ∧ p1 ≠ d0) (hd0 : d0 ≠ 0) (hn : 0 < n)
     (ha0 : s0.rd p0 = a0) (ha1 : s0.rd p1 = a1) (hal0 : a0 < two64) (hal1 : a1 < two64)
-    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true) :
+    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qRR M a0 a1 n [.DReg p0] [.DReg p1])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -257,7 +260,8 @@ theorem hRR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 p0 p
 theorem hRRc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a p d0 d1 : Nat) (sg : Bool)
     (hprog : s0.prog = [.load n sg d0 p 0, .load n sg d1 p 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p ≠ 0 ∧ p ≠ d0) (hd0 : d0 ≠ 0) (hn : 0 < n)
-    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true) :
+    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qRR M a a n [.DReg p] [.DReg p])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -307,7 +311,8 @@ theorem hRW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v p0
     (hprog : s0.prog = [.load n sg d p0 0, .fence ⟨true, pw, false, false, sr, true, false, false⟩, .store n r p1 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p0 ≠ 0 ∧ p1 ≠ 0 ∧ r ≠ 0 ∧ p1 ≠ d ∧ r ≠ d) (hd0 : d ≠ 0) (hn : 0 < n)
     (ha0 : s0.rd p0 = a0) (ha1 : s0.rd p1 = a1) (hv : s0.rd r = v) (hal0 : a0 < two64) (hal1 : a1 < two64)
-    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true) :
+    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qLW a0 a1 n (toBytes v n) [.DReg p0] [.DReg p1] [.DReg r])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -360,7 +365,8 @@ theorem hRW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v p0
 theorem hRWc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p d r : Nat) (sg : Bool)
     (hprog : s0.prog = [.load n sg d p 0, .store n r p 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p ≠ 0 ∧ r ≠ 0 ∧ p ≠ d ∧ r ≠ d) (hd0 : d ≠ 0) (hn : 0 < n)
-    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true) :
+    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qLW a a n (toBytes v n) [.DReg p] [.DReg p] [.DReg r])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V (wDone M h a (toBytes v n))⌝)) := by
@@ -409,7 +415,8 @@ theorem hWR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v p0
     (hprog : s0.prog = [.store n r p0 0, .fence ⟨pr, true, false, false, true, sw, false, false⟩, .load n sg d p1 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p0 ≠ 0 ∧ p1 ≠ 0 ∧ r ≠ 0) (hn : 0 < n)
     (ha0 : s0.rd p0 = a0) (ha1 : s0.rd p1 = a1) (hv : s0.rd r = v) (hal0 : a0 < two64) (hal1 : a1 < two64)
-    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true) :
+    (hA0 : aligned a0 n = true) (hA1 : aligned a1 n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qWR M a0 a1 n (toBytes v n) [.DReg p0] [.DReg r] [.DReg p1])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -465,7 +472,8 @@ theorem hWR_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a0 a1 v p0
 theorem hWRc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p d r : Nat) (sg : Bool)
     (hprog : s0.prog = [.store n r p 0, .load n sg d p 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p ≠ 0 ∧ r ≠ 0) (hn : 0 < n)
-    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true) :
+    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qWR M a a n (toBytes v n) [.DReg p] [.DReg r] [.DReg p])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -517,7 +525,8 @@ theorem hWRc_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p d r
 /-- **One store** `st r,(p)` proves `qS`. -/
 theorem hW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p r : Nat)
     (hprog : s0.prog = [.store n r p 0]) (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : p ≠ 0 ∧ r ≠ 0)
-    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true) :
+    (ha : s0.rd p = a) (hv : s0.rd r = v) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qS a (toBytes v n) [.DReg p] [.DReg r])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -543,7 +552,8 @@ theorem hW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p r : N
 theorem hLW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (n a v p r : Nat)
     (hprog : s0.prog = [.alui .add r 0 v, .store n r p 0]) (hpc : s0.pc = 0) (hq : s0.q = [])
     (hnz : p ≠ 0 ∧ r ≠ 0 ∧ p ≠ r) (hlen : r < s0.regs.length) (hvl : v < two64)
-    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true) :
+    (ha : s0.rd p = a) (hal : a < two64) (hA : aligned a n = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qS a (toBytes v n) [.DReg p] [.DReg r])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h

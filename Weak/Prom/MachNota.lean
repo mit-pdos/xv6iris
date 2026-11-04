@@ -585,6 +585,21 @@ theorem loadRun_vcap (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs :
   have := (loadBytes_fields aq (ldPre ws aq rl va) ws base tvs).2.2
   simp only [loadRun]; rw [this]
 
+/-- MachFix-R-b5: the `loadRunV` twins. -/
+theorem loadRunV_regv (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8))
+    (r : Nat) : regv (loadRunV ws aq rl va vi base tvs) r = regv ws r := by
+  have := (loadBytes_fields aq (max (ldPre ws aq rl va) vi) ws base tvs).2.1
+  unfold regv; simp only [loadRunV]; rw [this]
+
+theorem loadRunV_fwd (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    (loadRunV ws aq rl va vi base tvs).wFwd = ws.wFwd :=
+  (loadBytes_fields aq (max (ldPre ws aq rl va) vi) ws base tvs).1
+
+theorem loadRunV_vcap (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    (loadRunV ws aq rl va vi base tvs).wVcap = max va ws.wVcap := by
+  have := (loadBytes_fields aq (max (ldPre ws aq rl va) vi) ws base tvs).2.2
+  simp only [loadRunV]; rw [this]
+
 theorem storeRun_regv (ws : PState) (rl : Bool) (va fv : Nat) (base : Int) (n ts r : Nat) :
     regv (storeRun ws rl va fv base n ts) r = regv ws r := by
   have := (storeBytes_fields ws base n ts fv).1
@@ -619,7 +634,7 @@ theorem memStep_vcap {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat}
     {ots : Option Nat} {ws' : PState} {prom' : GSet Nat} (h : memStep img log i prom ws l ots ws' prom') :
     ws.wVcap ≤ ws'.wVcap := by
   cases h <;> (try simp only [acqPost, amoPost, cmoPost, fencePost, fenceIPost, loadRun_vcap, storeRun_vcap,
-    cohRaise_vcap]) <;> omega
+    cohRaise_vcap, loadRunV_vcap]) <;> omega   -- MachFix-R-b5: `loadRunV_vcap`
 
 theorem solo_vcap {img : Image} {M : List PMsg} {i : Nat} :
     ∀ {x y : LP × PState × GSet Nat} {tr : List (PLabel × Option Nat)},
@@ -742,6 +757,20 @@ theorem lowLoad {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {θ 
     bytesAll (fun a _ v => v ∈ D a ∨ lastByte w a = some v) base tvs := by
   have h1 := (loadBytes_ldv aq (ldPre ws aq rl va) ws base tvs).2
   have e : (loadRun ws aq rl va base tvs).wLdv = (loadBytes aq (ldPre ws aq rl va) ws base tvs).wLdv := rfl
+  refine vals_inD (aq := aq) hlow hf base tvs (bytesAll_and base tvs
+    (bytesAll_mono (fun _ _ _ hp => hp.1) base tvs hok) (bytesAll_mono (fun x u _ h => ?_) base tvs h1))
+  omega
+
+/-- MachFix-R-b5: `lowLoad` for the absorbing post-state. -/
+theorem lowLoadV {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {θ : Nat} {ws : PState} {aq rl : Bool}
+    {va vi : Nat} {base : Int} {tvs : List (Nat × BitVec 8)} {w : List PMsg} (hlow : lowM img M D θ)
+    (hf : fwdInv img M D θ ws w)
+    (hok : loadOk img M ws (ldPre ws aq rl va) base tvs) {W : Nat}
+    (hW : (loadRunV ws aq rl va vi base tvs).wLdv ≤ W) (hWθ : W < θ) :
+    bytesAll (fun a _ v => v ∈ D a ∨ lastByte w a = some v) base tvs := by
+  have h1 := (loadBytes_ldv aq (max (ldPre ws aq rl va) vi) ws base tvs).2
+  have e : (loadRunV ws aq rl va vi base tvs).wLdv =
+      (loadBytes aq (max (ldPre ws aq rl va) vi) ws base tvs).wLdv := rfl
   refine vals_inD (aq := aq) hlow hf base tvs (bytesAll_and base tvs
     (bytesAll_mono (fun _ _ _ hp => hp.1) base tvs hok) (bytesAll_mono (fun x u _ h => ?_) base tvs h1))
   omega

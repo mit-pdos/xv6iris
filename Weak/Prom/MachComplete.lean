@@ -2,8 +2,9 @@
 Weak/Prom: **completeness of the per-hart explorer of machine v2** (S0-P part (2), milestone 2b, statements 3–4,
 for the checker of `Weak/Prom/MachForbid.lean`).
 
-* `memStepF_complete` — `memStep … l ots ws' prom' → memStepF … l ots = some (ws', prom')`: the memory half as a
-  function (MachSound.lean) is EXACT (with `memStepF_sound`).  Rests on the Bool completeness of every transcribed
+* `memStepL_complete` (MachFix-R-b5; was `memStepF_complete`) — `memStep … l ots ws' prom' → (ws', prom') ∈
+  memStepL … l ots`: the list of every step (MachSound.lean) is EXACT (with `memStepL_sound`); `memStepF` is no longer
+  complete (it takes the absorbed invalidate view `vi = 0` only).  Rests on the Bool completeness of every transcribed
   premise (`invalReadB_complete`, `loadOkB_complete`, …).
 * `labCands` — every label a litmus hart (`litNext`, MachCert.lean) can emit next, with every answer run the memory
   could give (`ansRuns`: per byte every timestamp `0 … |M|` holding it); `labCands_complete`.
@@ -70,44 +71,118 @@ theorem loadOkB_complete {img : Image} {log : List PMsg} {ws : PState} {vpre : N
   · exact .inl (notB_of_not (writesInB_iff ..) h2)
   · exact .inr (invalReadB_complete h2)
 
-/-- `memStepF` IS COMPLETE: it computes every `memStep`. -/
-theorem memStepF_complete {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState}
+/-- MachFix-R-b5. -/
+theorem invalReadAtB_complete {log : List PMsg} {a : Int} {t fl ti : Nat} (h : invalReadAt log a t fl ti) :
+    invalReadAtB log a t fl ti = true := by
+  obtain ⟨hc, hlt, hnw, hno, hall⟩ := h
+  unfold invalReadAtB
+  simp only [Bool.and_eq_true, decide_eq_true_eq]
+  refine ⟨⟨⟨⟨(cmoAtB_iff ..).2 hc, hlt⟩, notB_of_not (writesInB_iff ..) hnw⟩, ?_⟩, ?_⟩
+  · apply notB_of_not List.any_eq_true
+    rintro ⟨ti', hm, hb⟩
+    rw [List.mem_range'_1] at hm
+    exact hno ⟨ti', by omega, by omega, (cmoAtB_iff ..).1 hb⟩
+  · refine List.all_eq_true.2 (fun c hc' => ?_)
+    rw [List.mem_range] at hc'
+    simp only [Bool.or_eq_true]
+    cases hb : cmoAtB log isCleanK c a
+    · left; rfl
+    · right; exact notB_of_not (writesInB_iff ..) (hall c hc' ((cmoAtB_iff ..).1 hb))
+
+/-- MachFix-R-b5. -/
+theorem bytesAnyB_complete {P : Int → Nat → BitVec 8 → Bool} {Q : Int → Nat → BitVec 8 → Prop}
+    (hQP : ∀ a t v, Q a t v → P a t v = true) :
+    ∀ (a : Int) (l : List (Nat × BitVec 8)), bytesAny Q a l → bytesAnyB P a l = true
+  | _, [], h => h.elim
+  | a, (t, v) :: r, h => by
+    simp only [bytesAnyB, Bool.or_eq_true]
+    exact h.elim (fun h => .inl (hQP a t v h)) (fun h => .inr (bytesAnyB_complete hQP (a + 1) r h))
+
+/-- MachFix-R-b5. -/
+theorem invalCiteB_complete {log : List PMsg} {ws : PState} {vpre vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : invalCite log ws vpre vi base tvs) :
+    invalCiteB log ws vpre vi base tvs = true := by
+  unfold invalCiteB
+  simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq]
+  refine ⟨bytesAllB_complete (fun a t v hp => ?_) base tvs h.1, ?_⟩
+  · simp only [Bool.or_eq_true]
+    rcases hp with hp | ⟨ti, hti, hr⟩
+    · exact .inl (notB_of_not (writesInB_iff ..) hp)
+    · exact .inr (List.any_eq_true.2 ⟨ti, List.mem_range.2 (by omega), invalReadAtB_complete hr⟩)
+  · rcases h.2 with h2 | h2
+    · exact .inl h2
+    · exact .inr (bytesAnyB_complete (fun a t v hp => invalReadAtB_complete hp) base tvs h2)
+
+theorem logHasCmo_of {log : List PMsg} {p : CmoKind → Bool} {t : Nat} {a : Int} (h : cmoAt log p t a) :
+    logHasCmo log = true := by
+  obtain ⟨m, k, len, hm, hc, _⟩ := h
+  unfold logHasCmo
+  refine List.any_eq_true.2 ⟨m, List.mem_of_getElem? hm, ?_⟩
+  rw [hc]
+
+/-- MachFix-R-b5: every admissible absorbed view is enumerated. -/
+theorem viOpts_complete {log : List PMsg} {ws : PState} {vpre vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : invalCite log ws vpre vi base tvs) : vi ∈ viOpts log ws vpre base tvs := by
+  refine List.mem_filter.2 ⟨?_, invalCiteB_complete h⟩
+  unfold viCands
+  cases hc : logHasCmo log
+  · have : vi = 0 := invalCite_vi0 (fun t a ha => by rw [logHasCmo_of ha] at hc; cases hc) h
+    subst this; exact List.mem_singleton_self _
+  · exact List.mem_range.2 (by have := invalCite_le h; omega)
+
+/-- MachFix-R-b5: `memStepL` IS COMPLETE: it lists every `memStep`. -/
+theorem memStepL_complete {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState}
     {l : PLabel} {ots : Option Nat} {ws' : PState} {prom' : GSet Nat}
-    (h : memStep img log i prom ws l ots ws' prom') : memStepF img log i prom ws l ots = some (ws', prom') := by
+    (h : memStep img log i prom ws l ots ws' prom') : (ws', prom') ∈ memStepL img log i prom ws l ots := by
   cases h with
-  | silent => rfl
-  | load aq rl base tvs asrc hok => simp [memStepF, okIf, loadOkB_complete hok]
+  | silent => simp [memStepL, memStepF]
+  | load aq rl base tvs asrc hok vi hvi =>
+    simp only [memStepL, loadOkB_complete hok, if_true]
+    exact List.mem_map.2 ⟨vi, viOpts_complete hvi, rfl⟩
   | store aq rl base data asrc vsrc ts hts hm hc hpv =>
-    simp [memStepF, okIf, (promHas_iff ..).2 hts, hm, (cohBelowB_iff ..).2 hc, hpv]
-  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hc hpv =>
-    simp [memStepF, okIf, hlen, (promHas_iff ..).2 hts, hm, loadOkB_complete hok, (exclOkB_iff ..).2 hx,
-      (cohBelowB_iff ..).2 hc, hpv]
-  | amoLd aq base tvs asrc hok => simp [memStepF, okIf, loadOkB_complete hok]
+    simp [memStepL, memStepF, okIf, (promHas_iff ..).2 hts, hm, (cohBelowB_iff ..).2 hc, hpv]
+  | rmw aq rl base tvs data asrc vsrc ts hlen hts hm hok hx hc hpv vi hvi hvt =>
+    have hcond : (decide (tvs.length = data.length) && promHas prom ts &&
+        log[ts - 1]? == some ⟨base, data, some i, .excl⟩ &&
+        loadOkB img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs &&
+        exclOkB log i base (tvs.map Prod.fst) ts &&
+        cohBelowB (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts &&
+        decide (stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
+          (srcsView ws vsrc) < ts)) = true := by
+      simp [hlen, (promHas_iff ..).2 hts, hm, loadOkB_complete hok, (exclOkB_iff ..).2 hx,
+        (cohBelowB_iff ..).2 hc, hpv]
+    simp only [memStepL, hcond, if_true]
+    exact List.mem_map.2 ⟨vi, List.mem_filter.2 ⟨viOpts_complete hvi, decide_eq_true hvt⟩, rfl⟩
+  | amoLd aq base tvs asrc hok vi hvi =>
+    simp only [memStepL, loadOkB_complete hok, if_true]
+    exact List.mem_map.2 ⟨vi, viOpts_complete hvi, rfl⟩
   | amoSt rl base data asrc vsrc ts R hR hb hlen hts hm hx hc hpv =>
-    simp [memStepF, okIf, hR, hb, hlen, (promHas_iff ..).2 hts, hm, (exclOkB_iff ..).2 hx,
+    simp [memStepL, memStepF, okIf, hR, hb, hlen, (promHas_iff ..).2 hts, hm, (exclOkB_iff ..).2 hx,
       (cohBelowB_iff ..).2 hc, hpv]
-  | fence => rfl
-  | fenceI => rfl
-  | dev => rfl
-  | regW => rfl
-  | ctrl => rfl
-  | instr => rfl
-  | lr aq rl base tvs asrc hok => simp [memStepF, okIf, loadOkB_complete hok]
+  | fence => simp [memStepL, memStepF]
+  | fenceI => simp [memStepL, memStepF]
+  | dev => simp [memStepL, memStepF]
+  | regW => simp [memStepL, memStepF]
+  | ctrl => simp [memStepL, memStepF]
+  | instr => simp [memStepL, memStepF]
+  | lr aq rl base tvs asrc hok vi hvi =>
+    simp only [memStepL, loadOkB_complete hok, if_true]
+    exact List.mem_map.2 ⟨vi, viOpts_complete hvi, rfl⟩
   | sc aq rl base data asrc vsrc ts R hR hts hm hx hlt hc hpv =>
     have hall : R.rvTs.all (fun t => decide (t < ts)) = true :=
       List.all_eq_true.2 (fun t ht => decide_eq_true (hlt t ht))
-    simp [memStepF, okIf, hR, (promHas_iff ..).2 hts, hm, (exclOkB_iff ..).2 hx, hall,
+    simp [memStepL, memStepF, okIf, hR, (promHas_iff ..).2 hts, hm, (exclOkB_iff ..).2 hx, hall,
       (cohBelowB_iff ..).2 hc, hpv]
-  | scFail => rfl
+  | scFail => simp [memStepL, memStepF]
   | fetch base tvs hok =>
     have hb : bytesAllB (fun a t v => memByte img log t a == some v && !writesInB log a t ws.wIfl) base tvs =
         true := by
       refine bytesAllB_complete (fun a t v hp => ?_) base tvs hok
       simp only [Bool.and_eq_true, beq_iff_eq]
       exact ⟨hp.1, notB_of_not (writesInB_iff ..) hp.2⟩
-    simp [memStepF, okIf, hb]
+    simp [memStepL, memStepF, okIf, hb]
   | cmo k base len asrc ts hts hm hc hpv =>
-    simp [memStepF, okIf, (promHas_iff ..).2 hts, hm, (cohBelowB_iff ..).2 hc, hpv]
+    simp [memStepL, memStepF, okIf, (promHas_iff ..).2 hts, hm, (cohBelowB_iff ..).2 hc, hpv]
 
 /-! ## 2. Facts about a state step's label -/
 
@@ -353,10 +428,10 @@ theorem labCands_complete {img : Image} {M : List PMsg} {s s' : LP} {l : PLabel}
 /-- Every successor of a solo state against `M`. -/
 def soloKids (img : Image) (M : List PMsg) (i : Nat) (x : LP × PState × GSet Nat) :
     List (LP × PState × GSet Nat) :=
-  (labCands img M x.1).flatMap (fun l => (tsOpts M).filterMap (fun o =>
-    match litNext x.1 l, memStepF img M i x.2.2 x.2.1 l o with
-    | some s', some (ws', p') => some (s', ws', p')
-    | _, _ => none))
+  (labCands img M x.1).flatMap (fun l => ((tsOpts M).filterMap (fun o =>
+    match litNext x.1 l with   -- MachFix-R-b5: every step (`memStepL`), not only `memStepF`'s
+    | some s' => some ((memStepL img M i x.2.2 x.2.1 l o).map (fun p => (s', p.1, p.2)))
+    | none => none)).flatten)
 
 /-- The DFS of hart `i`'s solo runs against `M`: every reachable state, and whether the fuel ran out. -/
 def soloDFS (img : Image) (M : List PMsg) (i : Nat) : Nat → LP × PState × GSet Nat →
@@ -370,10 +445,9 @@ theorem soloKids_complete {img : Image} {M : List PMsg} {i : Nat} {x : LP × PSt
     {ots : Option Nat} {p' : LP} {ws' : PState} {prom' : GSet Nat} (hp : litStep x.1 () l p' ())
     (hm : memStep img M i x.2.2 x.2.1 l ots ws' prom') : (p', ws', prom') ∈ soloKids img M i x := by
   unfold soloKids
-  refine List.mem_flatMap.2 ⟨l, labCands_complete hp (memStep_reads hm),
-    List.mem_filterMap.2 ⟨ots, tsOpts_complete hm, ?_⟩⟩
   have hp' : litNext x.1 l = some p' := hp
-  rw [hp', memStepF_complete hm]
+  refine List.mem_flatMap.2 ⟨l, labCands_complete hp (memStep_reads hm), List.mem_flatten.2 ⟨_,
+    List.mem_filterMap.2 ⟨ots, tsOpts_complete hm, by rw [hp']⟩, List.mem_map.2 ⟨_, memStepL_complete hm, rfl⟩⟩⟩
 
 /-- THE SOLO DFS IS COMPLETE: with enough fuel, every solo run's final state is reached. -/
 theorem soloDFS_complete {img : Image} {M : List PMsg} {i : Nat} :

@@ -135,6 +135,17 @@ def memG (X : Exec) (g : List EvId) : List PMsg := (g.filter (isSt X)).map (msgO
 /-- The final memory of execution `X` (`memOf G` of plan §0). -/
 def memOf (X : Exec) : List PMsg := memG X X.gmo
 
+/-- MachFix-R-b5: the final memory of an execution has no invalidate-class message (`skCls` is never `.cmo`), so
+machine v2's load-like arms there take the absorbed view `vi = 0` (MachInval.lean `memStep.load0` …). -/
+theorem memOf_noInval (X : Exec) : ∀ t a, ¬ cmoAt (memOf X) isInvalK t a := by
+  rintro t a ⟨m, k, len, hm, hc, _⟩
+  have hmem := List.mem_of_getElem? hm
+  simp only [memOf, memG, List.mem_map] at hmem
+  obtain ⟨e, _, rfl⟩ := hmem
+  simp only [msgOf] at hc
+  unfold skCls at hc
+  split at hc <;> first | cases hc | (split at hc <;> cases hc)
+
 /-- The view of event `e` in `X`'s global memory order. -/
 def vo (X : Exec) (e : EvId) : Nat := voG X X.gmo e
 

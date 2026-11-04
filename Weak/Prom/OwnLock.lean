@@ -223,7 +223,8 @@ variable [InvGS_gen hlc GF] (M : List PMsg) (γc γm γo : GName) (k ko : Nat) (
 /-- **THE RELEASE** `amoswap.w.rl x0,x0,(x10)` (always release-class: in place): THE DEPOSIT. -/
 theorem hF (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k)
     (s : LP) (ws : PState) (hprog : s.prog = lkProg) (hpc : s.pc = 5) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     KF (GF := GF) γc γm k (s.rd 7) ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_amo (op := .swap) (sz := 4) (aq := false) (rl := true) (rd := 0) (rs2 := 0) (rs1 := 10) hq
@@ -312,7 +313,8 @@ theorem hF (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm �
 /-- **THE COUNTER STORE** `sd x7,(x11)`: the holder's message becomes the counter's latest (`lk_sdc`). -/
 theorem hE (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k) (hk2 : k < 2)
     (s : LP) (ws : PState) (ts : Nat) (hprog : s.prog = lkProg) (hpc : s.pc = 4) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     KE (GF := GF) γc γm k (s.rd 7) ts ws ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_sd (sz := 8) (rs2 := 7) (rs1 := 11) (off := 0) hq (by rw [hprog, hpc]; rfl) (by rw [h11]; decide))
@@ -476,7 +478,8 @@ theorem KB_congr {γc γm : GName} {k ts : Nat} {ws ws' : PState} (h1 : ws'.wVrN
 /-- `addi x7,x7,1`. -/
 theorem hD (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k) (hk2 : k < 2)
     (s : LP) (ws : PState) (ts : Nat) (hprog : s.prog = lkProg) (hpc : s.pc = 3) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) (hlen : s.regs.length = 32) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) (hlen : s.regs.length = 32)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     KC (GF := GF) γc γm k (s.rd 7) ts ws ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_alui (op := .add) (rd := 7) (rs1 := 7) (imm := 1) hq (by rw [hprog, hpc]; rfl) (by decide))
@@ -914,7 +917,7 @@ theorem g4_lock {evs : List PEvt} {cfg : PCfg LP Unit} (hvr : validRun litStep l
           · unfold hv; iexact H12
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply lk_finalI) hvr rfl (lit_fetchBounded hvr hps) hinv
+      · iapply lk_finalI) hvr rfl (lit_fetchBounded hvr hps)   -- MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key r0 r1 h0 h1
 
 /-- **G4 (1a), on the final configuration**: if both harts ran their whole program and both acquired the lock, their

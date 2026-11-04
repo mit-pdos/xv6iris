@@ -82,11 +82,14 @@ theorem hstepO_quiet {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' 
 
 theorem memStep_load_inv {img : Image} {log : List PMsg} {i : Nat} {pr pr' : GSet Nat} {ws ws' : PState}
     {aq rl : Bool} {base : Int} {tvs : List (Nat × BitVec 8)} {asrc : List Dsrc} {ots : Option Nat}
-    (hm : memStep img log i pr ws (LLoad aq rl base tvs asrc) ots ws' pr') :
+    (hm : memStep img log i pr ws (LLoad aq rl base tvs asrc) ots ws' pr')
+    (hnoinv : ∀ t a, ¬ cmoAt log isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     loadOk img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs ∧ ots = none ∧
       ws' = loadRun ws aq rl (srcsView ws asrc) base tvs ∧ pr' = pr := by
   cases hm with
-  | load _ _ _ _ _ hlo => exact ⟨hlo, rfl, rfl, rfl⟩
+  | load _ _ _ _ _ hlo vi hci =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    exact ⟨hlo, rfl, loadRunV_zero .., rfl⟩
 
 theorem memStep_store_inv {img : Image} {log : List PMsg} {i : Nat} {pr pr' : GSet Nat} {ws ws' : PState}
     {aq rl : Bool} {base : Int} {data : List (BitVec 8)} {asrc vsrc : List Dsrc} {ots : Option Nat}
@@ -108,13 +111,15 @@ def rmwOk (img : Image) (L : List PMsg) (h : Nat) (ws : PState) (aq rl : Bool) (
 
 theorem memStep_rmw_inv {img : Image} {log : List PMsg} {i : Nat} {pr pr' : GSet Nat} {ws ws' : PState}
     {aq rl : Bool} {base : Int} {tvs : List (Nat × BitVec 8)} {data : List (BitVec 8)} {asrc vsrc : List Dsrc}
-    {ots : Option Nat} (hm : memStep img log i pr ws (LRmw aq rl base tvs data asrc vsrc) ots ws' pr') :
+    {ots : Option Nat} (hm : memStep img log i pr ws (LRmw aq rl base tvs data asrc vsrc) ots ws' pr')
+    (hnoinv : ∀ t a, ¬ cmoAt log isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ∃ ts, ots = some ts ∧ ts ∈ pr ∧ rmwOk img log i ws aq rl base tvs data (srcsView ws asrc) (srcsView ws vsrc) ts ∧
       ws' = amoPost (storeRun (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
         data.length ts) aq ts ∧ pr' = pr \ {ts} := by
   cases hm with
-  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext =>
-    exact ⟨ts, rfl, hts, ⟨hlen, hmsg, hlo, hex, hcoh, hext⟩, rfl, rfl⟩
+  | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hlo hex hcoh hext vi hci _ =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    exact ⟨ts, rfl, hts, ⟨hlen, hmsg, hlo, hex, hcoh, hext⟩, by rw [loadRunV_zero], rfl⟩
 
 /-- THE FULFIL FACT of a write step of hart `h` (plan §4 NF_R): a non-release-class write (`¬ rc`) fulfils its own
 promise `ts` of the prefix; a release-class write appends `M[n]` (authored by `h`) and fulfils it IN PLACE. -/
@@ -142,11 +147,14 @@ theorem hstepO_store {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' 
 /-- A FUSED AMO's NF_R step. -/
 theorem hstepO_rmw {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : P} {ws ws' : PState}
     {aq rl : Bool} {base : Int} {tvs : List (Nat × BitVec 8)} {data : List (BitVec 8)} {asrc vsrc : List Dsrc}
-    {ots : Option Nat} (hs : hstepO w h σ s ws (LRmw aq rl base tvs data asrc vsrc) ots s' ws' σ') :
+    {ots : Option Nat} (hs : hstepO w h σ s ws (LRmw aq rl base tvs data asrc vsrc) ots s' ws' σ')
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ∃ ts, ots = some ts ∧ fulO w.M h σ (relClass ws (LRmw aq rl base tvs data asrc vsrc)) ts σ' ∧
       rmwOk w.img (w.M.take σ'.n) h ws aq rl base tvs data (srcsView ws asrc) (srcsView ws vsrc) ts ∧
       ws' = amoPost (storeRun (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
         data.length ts) aq ts := by
+  have hn1 := noInval_take hnoinv σ.n
+  have hn2 := noInval_take hnoinv (σ.n + 1)
   rcases (hstepO_cases hs).2 with ⟨pr', hm, hnr, rfl⟩ | ⟨pr', hn, hau, hrc, rfl, hm, rfl⟩
   · obtain ⟨ts, rfl, hts, hok, rfl, rfl⟩ := memStep_rmw_inv hm
     exact ⟨ts, rfl, .inl ⟨hnr, hts, rfl⟩, hok, rfl⟩
@@ -157,9 +165,11 @@ theorem hstepO_rmw {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : 
 /-- A LOAD's NF_R step (loads are never release-class): against the current prefix, no state change. -/
 theorem hstepO_load {V P : Type} {w : OW P V} {h : Nat} {σ σ' : OSt V} {s s' : P} {ws ws' : PState}
     {aq rl : Bool} {base : Int} {tvs : List (Nat × BitVec 8)} {asrc : List Dsrc} {ots : Option Nat}
-    (hs : hstepO w h σ s ws (LLoad aq rl base tvs asrc) ots s' ws' σ') :
+    (hs : hstepO w h σ s ws (LLoad aq rl base tvs asrc) ots s' ws' σ')
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     loadOk w.img (w.M.take σ.n) ws (ldPre ws aq rl (srcsView ws asrc)) base tvs ∧ ots = none ∧
       ws' = loadRun ws aq rl (srcsView ws asrc) base tvs ∧ σ' = σ := by
+  have hn1 := noInval_take hnoinv σ.n
   rcases (hstepO_cases hs).2 with ⟨pr', hm, _, rfl⟩ | ⟨_, _, _, hrc, _⟩
   · obtain ⟨hlo, rfl, rfl, rfl⟩ := memStep_load_inv hm
     exact ⟨hlo, rfl, rfl, upd_pr_same σ h⟩
@@ -244,7 +254,8 @@ theorem wpT_quietI {s k : LP} {ws wsf : PState} {l0 : PLabel} {rest : List PLabe
 
 /-- **LOAD instruction** `l{b,h,w,d} rd, off(rs1)` against the current prefix. -/
 theorem wpT_ld {s : LP} {sz rd rs1 off : Nat} {sgn : Bool} {ws : PState} (hq : s.q = [])
-    (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off)) (ha : aligned ((s.rd rs1 + off) % two64) sz = true) :
+    (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off)) (ha : aligned ((s.rd rs1 + off) % two64) sz = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ▷ (∀ σ tvs, ⌜tvs.length = sz⌝ -∗
         ⌜loadOk img (M.take σ.n) ws (ldPre ws false false (srcsView ws (srcR rs1)))
           (((s.rd rs1 + off) % two64 : Nat) : Int) tvs⌝ -∗ X σ -∗ £ 1 -∗
@@ -299,7 +310,8 @@ theorem wpT_sd {s : LP} {sz rs2 rs1 off : Nat} {ws : PState} (hq : s.q = [])
 /-- **FUSED AMO instruction** `amo<op>.{w,d}[.aq][.rl] rd, rs2, (rs1)`: the fulfil fact and the AMO's admissibility
 `rmwOk`, against the prefix after the step. -/
 theorem wpT_amo {s : LP} {op : Weak.Prom.Ref.AmoOp} {sz : Nat} {aq rl : Bool} {rd rs2 rs1 : Nat} {ws : PState}
-    (hq : s.q = []) (hp : s.prog[s.pc]? = some (.amo op sz aq rl rd rs2 rs1)) (ha : aligned (s.rd rs1) sz = true) :
+    (hq : s.q = []) (hp : s.prog[s.pc]? = some (.amo op sz aq rl rd rs2 rs1)) (ha : aligned (s.rd rs1) sz = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ▷ (∀ σ tvs ts σ', ⌜tvs.length = sz⌝ -∗
         ⌜fulO M h σ (relClass ws (LRmw aq rl ((s.rd rs1 : Nat) : Int) tvs (amoD op sz (s.rd rs2) tvs) (srcR rs1)
           (srcR rs2))) ts σ'⌝ -∗

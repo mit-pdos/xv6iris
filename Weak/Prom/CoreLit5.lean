@@ -49,7 +49,8 @@ theorem lb8_hart (s0 : LP) (rd ra rb x y : Nat) (img : Image) (M : List PMsg) (h
     (hprog : s0.prog = [.load 8 true rd ra 0, .store 8 rd rb 0]) (hpc : s0.pc = 0) (hq : s0.q = [])
     (hrd : rd ≠ 0) (hrb : rb ≠ rd) (hra0 : ra ≠ 0) (hrb0 : rb ≠ 0)
     (hx : s0.rd ra = x) (hy : s0.rd rb = y) (hxa : x % 8 = 0) (hya : y % 8 = 0) (hxl : x < two64)
-    (hyl : y < two64) :
+    (hyl : y < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨLB x y 8) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   unfold wpPF
@@ -278,7 +279,8 @@ On the SC's success branch (Q3) comes from EXT and M4; on its failure branch the
 theorem lrsc_hart (s0 : LP) (x y z : Nat) (img : Image) (M : List PMsg) (h : Nat)
     (hprog : s0.prog = lsProg) (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : 12 < s0.regs.length)
     (hx : s0.rd 8 = x) (hy : s0.rd 9 = y) (hz : s0.rd 18 = z) (hxa : x % 8 = 0) (hya : y % 8 = 0)
-    (hza : z % 8 = 0) (hxl : x < two64) (hzl : z < two64) :
+    (hza : z % 8 = 0) (hxl : x < two64) (hzl : z < two64)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨLS x y z) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   unfold wpPF
@@ -564,6 +566,7 @@ theorem lit_lbLrsc : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.lbLrsc) () (progs Weak.Prom.Ref.Lit.lbLrsc) M run →
     ¬ (run.obsLoad 0 0 = some 0 ∧ run.obsLoad 1 0 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   have hlen : (progs Weak.Prom.Ref.Lit.lbLrsc).length = 2 := rfl
   obtain ⟨_, hii, hpart, _, _, hwf, _⟩ := adequacy (hlc := HasLC.hasLC) (GF := pfGF) (pdone := litDone)
     Proto.triv (fun _ _ => True) ΨR5 trivial (PO_ad_all _ _ _) ΨR5_nil (devFree_lit _) (fun h p hp _ => by

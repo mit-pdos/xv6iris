@@ -311,7 +311,8 @@ theorem mw_h1_tail (g : AGN) (M : List PMsg) (γc : GName) (s2 : LP) (ws : PStat
 theorem mw_h1 (g : AGN) (M : List PMsg) (γc : GName) (s0 : LP) {P0 : GSet Nat}
     (hprog : s0.prog = [Weak.Prom.Ref.Lit.ld 5 6, Weak.Prom.Ref.Lit.fRRW, Weak.Prom.Ref.Lit.sd 7 8])
     (hpc : s0.pc = 0) (hq : s0.q = []) (h6 : s0.rd 6 = Y) (h7 : s0.rd 7 = 2) (h8 : s0.rd 8 = X)
-    (hdd : ∀ t, isD2 M t = true → g.dd t) :
+    (hdd : ∀ t, isD2 M t = true → g.dd t)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     mwCtx (GF := GF) g M γc ∗ token γc ∗ ([∗list] t ∈ (rng M).filter (isW M), pend g t) ∗
       lhA g Proto.triv (wMW M 1) (qsMW M 1) psInit P0 [] ⊢
       wpKA g Proto.triv (wMW M 1) (qsMW M) s0 (fun _ => iprop(⌜∃ V, grd Proto.triv imgMW M V True⌝ ∨ dshot g)) := by
@@ -416,7 +417,8 @@ end harts
 theorem progs_mpW : ∃ p0 p1 : LP, progs mpW = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (2′). -/
-theorem mw_premise (M : List PMsg) :
+theorem mw_premise (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF litStep litDone imgMW M (progs mpW) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qsMW M h)) (fun t => isD2 M t = true) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -479,6 +481,7 @@ theorem own_mp2 (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun litStep imgMW () (progs mpW) M run) :
     run.obsLoad 1 0 = some 1 → ∀ e ∈ run.trace 1, ∀ ts, e.2 = some ts →
       ∀ t, msgAt M t = some xMsg → t < ts := by
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5: litmus programs issue no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qsMW M h)) (fun t => isD2 M t = true) trivial (fun h => ⟨qsMW_nil M h, wrOk_nil M⟩)
     (mw_premise M) hrun

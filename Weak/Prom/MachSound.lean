@@ -5,7 +5,8 @@ Weak/Prom: **soundness of the label-level explorer of machine v2** (S0-P part (2
   successor's label, fulfil timestamp, post-state and promise set.
 * `memStepF` — the memory half of a state step as a FUNCTION of the full label and fulfil timestamp (the run
   certificate checker's step, `Weak/Prom/MachCert.lean`), and `memStepF_sound`: `memStepF … = some (ws', prom')`
-  implies `memStep … ws' prom'`.
+  implies `memStep … ws' prom'`.  MachFix-R-b5: a load-like step takes the absorbed invalidate view `vi = 0`;
+  `memStepL` (every `vi`, `viOpts`) is the list of every step, `memStepL_sound`.
 
 Both rest on the Bool ↔ Prop lemmas of §1 (one per transcribed premise of MachExplore.lean §1, plus
 `ExtTreeSet.contains ↔ ∈`); post-states are Machine.lean's own functions, so they agree by definition.  Nothing here
@@ -138,6 +139,63 @@ theorem loadOkB_sound {img : Image} {log : List PMsg} {ws : PState} {vpre : Nat}
   · exact .inl (not_writesIn_of_B h2)
   · exact .inr (invalReadB_sound h2)
 
+/-- MachFix-R-b5. -/
+theorem invalReadAtB_sound {log : List PMsg} {a : Int} {t fl ti : Nat} (h : invalReadAtB log a t fl ti = true) :
+    invalReadAt log a t fl ti := by
+  unfold invalReadAtB at h
+  simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+  obtain ⟨⟨⟨⟨hc, hlt⟩, hw⟩, hn⟩, hall⟩ := h
+  refine ⟨(cmoAtB_iff ..).1 hc, hlt, not_writesIn_of_B hw, ?_, ?_⟩
+  · rintro ⟨ti', h3, h4, hc'⟩
+    have hb := (cmoAtB_iff ..).2 hc'
+    have hany : (List.range' (ti + 1) (max fl ti - ti)).any (fun ti' => cmoAtB log isInvalK ti' a) = true :=
+      List.any_eq_true.2 ⟨ti', List.mem_range'_1.2 ⟨by omega, by omega⟩, hb⟩
+    rw [hany] at hn; cases hn
+  · intro c hc1 hc2
+    have := List.all_eq_true.1 hall c (List.mem_range.2 hc1)
+    simp only [Bool.or_eq_true] at this
+    rcases this with h5 | h5
+    · have hb := (cmoAtB_iff ..).2 hc2
+      rw [hb] at h5; cases h5
+    · exact not_writesIn_of_B h5
+
+/-- MachFix-R-b5. -/
+theorem bytesAnyB_sound {P : Int → Nat → BitVec 8 → Bool} {Q : Int → Nat → BitVec 8 → Prop}
+    (hPQ : ∀ a t v, P a t v = true → Q a t v) :
+    ∀ (a : Int) (l : List (Nat × BitVec 8)), bytesAnyB P a l = true → bytesAny Q a l := by
+  intro a l
+  induction l generalizing a with
+  | nil => intro h; cases h
+  | cons tv r ih =>
+    obtain ⟨t, v⟩ := tv
+    intro h
+    simp only [bytesAnyB, Bool.or_eq_true] at h
+    rcases h with h | h
+    · exact .inl (hPQ a t v h)
+    · exact .inr (ih (a + 1) h)
+
+/-- MachFix-R-b5. -/
+theorem invalCiteB_sound {log : List PMsg} {ws : PState} {vpre vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : invalCiteB log ws vpre vi base tvs = true) :
+    invalCite log ws vpre vi base tvs := by
+  unfold invalCiteB at h
+  simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq] at h
+  obtain ⟨h1, h2⟩ := h
+  refine ⟨bytesAllB_sound (fun a t v hp => ?_) base tvs h1, ?_⟩
+  · simp only [Bool.or_eq_true] at hp
+    rcases hp with hp | hp
+    · exact .inl (not_writesIn_of_B hp)
+    · obtain ⟨ti, hti, hr⟩ := List.any_eq_true.1 hp
+      exact .inr ⟨ti, by have := List.mem_range.1 hti; omega, invalReadAtB_sound hr⟩
+  · rcases h2 with h2 | h2
+    · exact .inl h2
+    · exact .inr (bytesAnyB_sound (fun a t v hp => invalReadAtB_sound hp) base tvs h2)
+
+/-- MachFix-R-b5. -/
+theorem viOpts_sound {log : List PMsg} {ws : PState} {vpre vi : Nat} {base : Int}
+    {tvs : List (Nat × BitVec 8)} (h : vi ∈ viOpts log ws vpre base tvs) : invalCite log ws vpre vi base tvs :=
+  invalCiteB_sound (List.mem_filter.1 h).2
+
 theorem cohBelowB_iff (ws : PState) (ts : Nat) :
     ∀ (a : Int) (n : Nat), cohBelowB ws a n ts = true ↔ cohBelow ws a n ts := by
   intro a n
@@ -185,20 +243,20 @@ theorem explorerStep_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSe
       · exact .instr _ _
       · exact .scFail _ _
   | ld aq rl base sz asrc =>
-    simp only [succ, List.mem_filterMap] at h
+    simp only [succ, List.mem_flatMap] at h
     obtain ⟨tvs, _, hs⟩ := h
     split at hs
     · rename_i hok
-      cases hs
-      exact .load _ _ _ _ _ _ _ (loadOkB_sound hok)
+      obtain ⟨vi, hvi, rfl⟩ := List.mem_map.1 hs
+      exact .load _ _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
     · cases hs
   | lr aq rl base sz asrc =>
-    simp only [succ, List.mem_filterMap] at h
+    simp only [succ, List.mem_flatMap] at h
     obtain ⟨tvs, _, hs⟩ := h
     split at hs
     · rename_i hok
-      cases hs
-      exact .lr _ _ _ _ _ _ _ (loadOkB_sound hok)
+      obtain ⟨vi, hvi, rfl⟩ := List.mem_map.1 hs
+      exact .lr _ _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
     · cases hs
   | st aq rl base data asrc vsrc =>
     simp only [succ, List.mem_map] at h
@@ -230,11 +288,13 @@ theorem explorerStep_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSe
       · cases hs
       · rename_i hlen
         simp only [bne_iff_ne, ne_eq, Decidable.not_not] at hlen
-        simp only [List.mem_map, List.mem_filter] at hs
-        obtain ⟨ts, ⟨hts, hx⟩, hs⟩ := hs
-        subst hs
+        obtain ⟨ts, hts', hs⟩ := List.mem_flatMap.1 hs
+        obtain ⟨hts, hx⟩ := List.mem_filter.1 hts'
+        obtain ⟨vi, hvi', rfl⟩ := List.mem_map.1 hs
+        obtain ⟨hvi, hvt⟩ := List.mem_filter.1 hvi'
         obtain ⟨h1, h2, h3, h4⟩ := writeTs_mem hts
-        exact .rmw _ _ _ _ _ _ _ _ _ _ hlen h1 h2 (loadOkB_sound hok) ((exclOkB_iff ..).1 hx) h3 h4
+        exact .rmw _ _ _ _ _ _ _ _ _ _ hlen h1 h2 (loadOkB_sound hok) ((exclOkB_iff ..).1 hx) h3 h4 vi
+          (viOpts_sound hvi) (of_decide_eq_true hvt)
 
 /-! ## 3. The memory half as a function of the full label (the certificate checker's step) -/
 
@@ -269,8 +329,9 @@ matching `memStep` arm checked by its Bool transcription, the post-state by Mach
 def memStepF (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) :
     PLabel → Option Nat → Option (PState × GSet Nat)
   | LSilent, none => some (ws, prom)
-  | LLoad aq rl base tvs asrc, none =>
-    okIf (loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs)
+  | LLoad aq rl base tvs asrc, none =>   -- MachFix-R-b5: the `vi = 0` step (`memStepL`: every `vi`)
+    okIf (loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs &&
+        invalCiteB log ws (ldPre ws aq rl (srcsView ws asrc)) 0 base tvs)
       (loadRun ws aq rl (srcsView ws asrc) base tvs, prom)
   | LStore aq rl base data asrc vsrc, some ts =>
     okIf (promHas prom ts && log[ts - 1]? == some ⟨base, data, some i, stClass rl⟩ &&
@@ -284,11 +345,13 @@ def memStepF (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : P
         exclOkB log i base (tvs.map Prod.fst) ts &&
         cohBelowB (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts &&
         decide (stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
-          (srcsView ws vsrc) < ts))
+          (srcsView ws vsrc) < ts) &&
+        invalCiteB log ws (ldPre ws aq false (srcsView ws asrc)) 0 base tvs)   -- MachFix-R-b5
       (amoPost (storeRun (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc) ts base
           data.length ts) aq ts, prom \ {ts})
-  | LAmoLd aq base tvs asrc, none =>
-    okIf (loadOkB img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs)
+  | LAmoLd aq base tvs asrc, none =>   -- MachFix-R-b5: `vi = 0`
+    okIf (loadOkB img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs &&
+        invalCiteB log ws (ldPre ws aq false (srcsView ws asrc)) 0 base tvs)
       ({ loadRun ws aq false (srcsView ws asrc) base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }, prom)
   | LAmoSt rl base data asrc vsrc, some ts =>
     match ws.wRmw with
@@ -306,8 +369,9 @@ def memStepF (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : P
   | LRegW rd srcs, none => some ({ ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }, prom)
   | LCtrl srcs, none => some ({ ws with wVcap := max (srcsView ws srcs) ws.wVcap }, prom)
   | LInstr, none => some ({ ws with wLdv := 0, wRmw := none, wIfv := 0 }, prom)
-  | LExLoad aq rl base tvs asrc, none =>
-    okIf (loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs)
+  | LExLoad aq rl base tvs asrc, none =>   -- MachFix-R-b5: `vi = 0`
+    okIf (loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs &&
+        invalCiteB log ws (ldPre ws aq rl (srcsView ws asrc)) 0 base tvs)
       ({ loadRun ws aq rl (srcsView ws asrc) base tvs with
           wRes := some ⟨base, tvs.map Prod.fst, readView ws aq rl (srcsView ws asrc) base tvs⟩ }, prom)
   | LExStore aq rl base data asrc vsrc, some ts =>
@@ -342,7 +406,10 @@ theorem memStepF_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
   case LLoad.none aq rl base tvs asrc =>
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
-    exact .load _ _ _ _ _ _ _ (loadOkB_sound hc)
+    simp only [Bool.and_eq_true] at hc
+    have := memStep.load (img := img) (log := log) (i := i) prom ws aq rl base tvs asrc (loadOkB_sound hc.1) 0
+      (invalCiteB_sound hc.2)
+    rwa [loadRunV_zero] at this
   case LStore.some aq rl base data asrc vsrc ts =>
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
@@ -353,13 +420,18 @@ theorem memStepF_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
     simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
-    obtain ⟨⟨⟨⟨⟨⟨h0, h1⟩, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩ := hc
-    exact .rmw _ _ _ _ _ _ _ _ _ _ h0 ((promHas_iff ..).1 h1) (msgEq_of_beq h2) (loadOkB_sound h3)
-      ((exclOkB_iff ..).1 h4) ((cohBelowB_iff ..).1 h5) h6
+    obtain ⟨⟨⟨⟨⟨⟨⟨h0, h1⟩, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩, h7⟩ := hc
+    have := memStep.rmw (img := img) (log := log) (i := i) prom ws aq rl base tvs data asrc vsrc ts h0
+      ((promHas_iff ..).1 h1) (msgEq_of_beq h2) (loadOkB_sound h3) ((exclOkB_iff ..).1 h4)
+      ((cohBelowB_iff ..).1 h5) h6 0 (invalCiteB_sound h7) (by omega)
+    rwa [loadRunV_zero] at this
   case LAmoLd.none aq base tvs asrc =>
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
-    exact .amoLd _ _ _ _ _ _ (loadOkB_sound hc)
+    simp only [Bool.and_eq_true] at hc
+    have := memStep.amoLd (img := img) (log := log) (i := i) prom ws aq base tvs asrc (loadOkB_sound hc.1) 0
+      (invalCiteB_sound hc.2)
+    rwa [loadRunV_zero] at this
   case LAmoSt.some rl base data asrc vsrc ts =>
     cases hR : ws.wRmw with
     | none => rw [hR] at h; cases h
@@ -380,7 +452,10 @@ theorem memStepF_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
   case LExLoad.none aq rl base tvs asrc =>
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
-    exact .lr _ _ _ _ _ _ _ (loadOkB_sound hc)
+    simp only [Bool.and_eq_true] at hc
+    have := memStep.lr (img := img) (log := log) (i := i) prom ws aq rl base tvs asrc (loadOkB_sound hc.1) 0
+      (invalCiteB_sound hc.2)
+    rwa [loadRunV_zero, readViewV_zero] at this
   case LExStore.some aq rl base data asrc vsrc ts =>
     cases hR : ws.wRes with
     | none => rw [hR] at h; cases h
@@ -407,5 +482,82 @@ theorem memStepF_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
     simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
     obtain ⟨⟨⟨h1, h2⟩, h3⟩, h4⟩ := hc
     exact .cmo _ _ _ _ _ _ _ ((promHas_iff ..).1 h1) (msgEq_of_beq h2) ((cohBelowB_iff ..).1 h3) h4
+
+/-! ## 4. MachFix-R-b5: every step of a full label (`memStepL`, the absorbed views enumerated) -/
+
+/-- THE MEMORY HALF OF A STATE STEP, every successor: as `memStepF`, with every admissible absorbed invalidate view
+`vi` of a load-like label (`viOpts`; `memStepF` takes `vi = 0` only). -/
+def memStepL (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) :
+    PLabel → Option Nat → List (PState × GSet Nat)
+  | LLoad aq rl base tvs asrc, none =>
+    if loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs then
+      (viOpts log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs).map (fun vi =>
+        (loadRunV ws aq rl (srcsView ws asrc) vi base tvs, prom))
+    else []
+  | LRmw aq rl base tvs data asrc vsrc, some ts =>
+    if decide (tvs.length = data.length) && promHas prom ts &&
+        log[ts - 1]? == some ⟨base, data, some i, .excl⟩ &&
+        loadOkB img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs &&
+        exclOkB log i base (tvs.map Prod.fst) ts &&
+        cohBelowB (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts &&
+        decide (stPre (loadRun ws aq false (srcsView ws asrc) base tvs) rl (srcsView ws asrc)
+          (srcsView ws vsrc) < ts) then
+      ((viOpts log ws (ldPre ws aq false (srcsView ws asrc)) base tvs).filter (fun vi => decide (vi < ts))).map
+        (fun vi => (amoPost (storeRun (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl (srcsView ws asrc) ts
+          base data.length ts) aq ts, prom \ {ts}))
+    else []
+  | LAmoLd aq base tvs asrc, none =>
+    if loadOkB img log ws (ldPre ws aq false (srcsView ws asrc)) base tvs then
+      (viOpts log ws (ldPre ws aq false (srcsView ws asrc)) base tvs).map (fun vi =>
+        ({ loadRunV ws aq false (srcsView ws asrc) vi base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ },
+          prom))
+    else []
+  | LExLoad aq rl base tvs asrc, none =>
+    if loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs then
+      (viOpts log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs).map (fun vi =>
+        ({ loadRunV ws aq rl (srcsView ws asrc) vi base tvs with
+            wRes := some ⟨base, tvs.map Prod.fst, readViewV ws aq rl (srcsView ws asrc) vi base tvs⟩ }, prom))
+    else []
+  | l, o => (memStepF img log i prom ws l o).toList
+
+/-- `memStepL` IS SOUND. -/
+theorem memStepL_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState}
+    {l : PLabel} {ots : Option Nat} {ws' : PState} {prom' : GSet Nat}
+    (h : (ws', prom') ∈ memStepL img log i prom ws l ots) : memStep img log i prom ws l ots ws' prom' := by
+  have fb : ∀ {l o}, (ws', prom') ∈ (memStepF img log i prom ws l o).toList →
+      memStep img log i prom ws l o ws' prom' := fun h => memStepF_sound (by simpa using h)
+  cases l <;> cases ots <;> simp only [memStepL] at h <;> try exact fb h
+  case LLoad.none aq rl base tvs asrc =>
+    split at h
+    · rename_i hok
+      obtain ⟨vi, hvi, he⟩ := List.mem_map.1 h
+      cases he
+      exact .load _ _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
+    · cases h
+  case LRmw.some aq rl base tvs data asrc vsrc ts =>
+    split at h
+    · rename_i hc
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
+      obtain ⟨⟨⟨⟨⟨⟨h0, h1⟩, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩ := hc
+      obtain ⟨vi, hvi', he⟩ := List.mem_map.1 h
+      cases he
+      obtain ⟨hvi, hvt⟩ := List.mem_filter.1 hvi'
+      exact .rmw _ _ _ _ _ _ _ _ _ _ h0 ((promHas_iff ..).1 h1) (msgEq_of_beq h2) (loadOkB_sound h3)
+        ((exclOkB_iff ..).1 h4) ((cohBelowB_iff ..).1 h5) h6 vi (viOpts_sound hvi) (of_decide_eq_true hvt)
+    · cases h
+  case LAmoLd.none aq base tvs asrc =>
+    split at h
+    · rename_i hok
+      obtain ⟨vi, hvi, he⟩ := List.mem_map.1 h
+      cases he
+      exact .amoLd _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
+    · cases h
+  case LExLoad.none aq rl base tvs asrc =>
+    split at h
+    · rename_i hok
+      obtain ⟨vi, hvi, he⟩ := List.mem_map.1 h
+      cases he
+      exact .lr _ _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
+    · cases h
 
 end Weak.Prom.Mach

@@ -176,7 +176,8 @@ theorem wpKA_drainA (hw : LitW w) {pr : GSet Nat} {ev : Trace} (labs : List PLab
 /-- ONE LOAD LABEL. -/
 theorem wpKA_load1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : Bool} {base : Int}
     {asrc : List Dsrc} {k : List (Nat × BitVec 8) → LP} {C : List (Nat × BitVec 8) → Prop} (hd : w.pdone s = none)
-    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs) :
+    (hl : ∀ l s', anyFab w.pstep s () l s' () → ∃ tvs, l = LLoad aq rl base tvs asrc ∧ s' = k tvs ∧ C tvs)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lhA g π w (Qs w.h) ws pr ev ∗
     ▷ (∀ tvs, ⌜C tvs⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws aq rl (srcsView ws asrc)) base tvs⌝ -∗
         frontA g π w.img w.M ws -∗ £ 1 -∗
@@ -192,7 +193,9 @@ theorem wpKA_load1 {s : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl : 
   iintro %l %ots %s' %ws' %pr' %hp %hm Hf Hc
   obtain ⟨tvs, rfl, rfl, hC⟩ := hl l s' hp
   cases hm with
-  | load _ _ _ _ _ hlo =>
+  | load _ _ _ _ _ hlo vi hci =>
+    obtain rfl := invalCite_vi0 hnoinv hci
+    rw [loadRunV_zero]
     imod Hk $$ %tvs %hC %hlo Hf Hc with ⟨#Hr, Hk⟩
     imodintro
     isplitr
@@ -268,7 +271,8 @@ theorem wpKA_store1 {s k : LP} {ws : PState} {pr : GSet Nat} {ev : Trace} {aq rl
 `LInstr` (the last with a fupd at its pre-state's frontier). -/
 theorem wpKA_ld (hw : LitW w) {s : LP} {sz rd rs1 off : Nat} {sgn : Bool} {base : Int} {ws : PState}
     {pr : GSet Nat} {ev : Trace} (hag : LitAg w s) (hq : s.q = []) (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off))
-    (ha : aligned ((s.rd rs1 + off) % two64) sz = true) (hb : (((s.rd rs1 + off) % two64 : Nat) : Int) = base) :
+    (ha : aligned ((s.rd rs1 + off) % two64) sz = true) (hb : (((s.rd rs1 + off) % two64 : Nat) : Int) = base)
+    (hnoinv : ∀ t a, ¬ cmoAt w.M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lhA g π w (Qs w.h) ws pr ev ∗
     ▷ (∀ tvs, ⌜tvs.length = sz⌝ -∗ ⌜loadOk w.img w.M ws (ldPre ws false false (srcsView ws (srcR rs1))) base tvs⌝ -∗
         frontA g π w.img w.M ws -∗ £ 1 -∗

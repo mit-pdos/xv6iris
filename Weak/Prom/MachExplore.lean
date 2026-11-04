@@ -30,7 +30,7 @@ the only infinite-looking case: `readCands` lists answer runs, and the list is c
 Every candidate is then FILTERED by `loadOkB` (the transcription of `loadOk`), so the generator is only trusted for
 completeness, never for soundness.
 -/
-import Weak.Prom.Machine
+import Weak.Prom.MachInval   -- MachFix-R-b5 (was: Weak.Prom.Machine)
 
 namespace Weak.Prom.Mach
 
@@ -92,6 +92,25 @@ def loadOkB (img : Image) (log : List PMsg) (ws : PState) (vpre : Nat) (base : I
         invalReadB log a t (max vpre (coh ws a))))
     base tvs
 
+/-- MachFix-R-b5: `invalReadAt` as a Bool (`ti'` over `(ti, max fl ti]`, `c` over `[0, ti)`). -/
+def invalReadAtB (log : List PMsg) (a : Int) (t fl ti : Nat) : Bool :=
+  cmoAtB log isInvalK ti a && decide (t < ti) && !writesInB log a ti fl &&
+    !(List.range' (ti + 1) (max fl ti - ti)).any (fun ti' => cmoAtB log isInvalK ti' a) &&
+    (List.range ti).all (fun c => !cmoAtB log isCleanK c a || !writesInB log a t (c - 1))
+
+/-- MachFix-R-b5: `bytesAny` as a Bool. -/
+def bytesAnyB (P : Int → Nat → BitVec 8 → Bool) : Int → List (Nat × BitVec 8) → Bool
+  | _, [] => false
+  | a, (t, v) :: r => P a t v || bytesAnyB P (a + 1) r
+
+/-- MachFix-R-b5: `invalCite` as a Bool (`ti` over `[0, vi]`). -/
+def invalCiteB (log : List PMsg) (ws : PState) (vpre vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    Bool :=
+  bytesAllB (fun a t _ =>
+      !writesInB log a t (max (if fwdHit ws a t then vpre else max vpre (nonFwdMax ws base tvs)) (coh ws a)) ||
+      (List.range (vi + 1)).any (fun ti => invalReadAtB log a t (max vpre (coh ws a)) ti)) base tvs &&
+  (vi == 0 || bytesAnyB (fun a t _ => invalReadAtB log a t (max vpre (coh ws a)) vi) base tvs)
+
 /-- `cohBelow` as a Bool. -/
 def cohBelowB (ws : PState) : Int → Nat → Nat → Bool
   | _, 0, _ => true
@@ -105,6 +124,15 @@ def promHas (prom : GSet Nat) (ts : Nat) : Bool := prom.contains ts
 /-- Does the log hold a cache-block message? -/
 def logHasCmo (log : List PMsg) : Bool :=
   log.any (fun m => match m.cls with | .cmo _ _ => true | _ => false)
+
+/-- MachFix-R-b5: THE ABSORBED-VIEW CANDIDATES of a read: `0`, and with a cache-block message every timestamp
+`1 … |log|` (`invalCite_le`); each candidate is filtered by `invalCiteB`. -/
+def viCands (log : List PMsg) : List Nat :=
+  if logHasCmo log then List.range (log.length + 1) else [0]
+
+/-- MachFix-R-b5: the admissible absorbed views of an admissible read. -/
+def viOpts (log : List PMsg) (ws : PState) (vpre : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : List Nat :=
+  (viCands log).filter (fun vi => invalCiteB log ws vpre vi base tvs)
 
 /-- The latest timestamp `≤ p` at which byte `a` is held (the image at `0`, or a log entry writing `a`). -/
 def latestAt (img : Image) (log : List PMsg) (a : Int) (p : Nat) : Option Nat :=
@@ -205,20 +233,22 @@ def succ (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PStat
   | .ld aq rl base sz asrc =>
     let va := srcsView ws asrc
     let vpre := ldPre ws aq rl va
-    (readCands img log ws vpre base sz).filterMap (fun tvs =>
+    (readCands img log ws vpre base sz).flatMap (fun tvs =>
       if loadOkB img log ws vpre base tvs then
-        some ⟨LLoad aq rl base tvs asrc, none, loadRun ws aq rl va base tvs, prom⟩
-      else none)
+        (viOpts log ws vpre base tvs).map (fun vi =>   -- MachFix-R-b5
+          ⟨LLoad aq rl base tvs asrc, none, loadRunV ws aq rl va vi base tvs, prom⟩)
+      else [])
   | .lr aq rl base sz asrc =>
     let va := srcsView ws asrc
     let vpre := ldPre ws aq rl va
-    (readCands img log ws vpre base sz).filterMap (fun tvs =>
+    (readCands img log ws vpre base sz).flatMap (fun tvs =>
       if loadOkB img log ws vpre base tvs then
-        some ⟨LExLoad aq rl base tvs asrc, none,
-          { loadRun ws aq rl va base tvs with
-            wRes := some ⟨base, tvs.map Prod.fst, readView ws aq rl va base tvs⟩ },
-          prom⟩
-      else none)
+        (viOpts log ws vpre base tvs).map (fun vi =>   -- MachFix-R-b5
+          ⟨LExLoad aq rl base tvs asrc, none,
+            { loadRunV ws aq rl va vi base tvs with
+              wRes := some ⟨base, tvs.map Prod.fst, readViewV ws aq rl va vi base tvs⟩ },
+            prom⟩)
+      else [])
   | .st aq rl base data asrc vsrc =>
     let va := srcsView ws asrc
     let vd := srcsView ws vsrc
@@ -246,9 +276,11 @@ def succ (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PStat
       let ws1 := loadRun ws aq false va base tvs
       if tvs.length != data.length then [] else
       ((writeTs log i prom ws1 base data .excl (stPre ws1 rl va vd)).filter (fun ts =>
-          exclOkB log i base (tvs.map Prod.fst) ts)).map (fun ts =>
-        ⟨LRmw aq rl base tvs data asrc vsrc, some ts,
-          amoPost (storeRun ws1 rl va ts base data.length ts) aq ts, prom \ {ts}⟩))
+          exclOkB log i base (tvs.map Prod.fst) ts)).flatMap (fun ts =>
+        ((viOpts log ws vpre base tvs).filter (fun vi => decide (vi < ts))).map (fun vi =>   -- MachFix-R-b5
+          ⟨LRmw aq rl base tvs data asrc vsrc, some ts,
+            amoPost (storeRun (loadRunV ws aq false va vi base tvs) rl va ts base data.length ts) aq ts,
+            prom \ {ts}⟩)))
 
 /-! ## 4. Promise sets of the promises-first normal form -/
 

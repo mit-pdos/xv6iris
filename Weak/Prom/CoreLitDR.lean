@@ -42,7 +42,8 @@ theorem hLWW_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP) (a0 a1 v r p
       .store 4 r p1 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hnz : r ≠ 0 ∧ p0 ≠ 0 ∧ p1 ≠ 0 ∧ p0 ≠ r ∧ p1 ≠ r)
     (hlen : r < s0.regs.length) (hv : v < two64) (ha0 : s0.rd p0 = a0) (ha1 : s0.rd p1 = a1)
-    (hal0 : a0 < two64) (hal1 : a1 < two64) (hA0 : aligned a0 4 = true) (hA1 : aligned a1 4 = true) :
+    (hal0 : a0 < two64) (hal1 : a1 < two64) (hA0 : aligned a0 4 = true) (hA1 : aligned a1 4 = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩
       (ΨK M (qWW a0 a1 (toBytes v 4) (toBytes v 4) [.DReg p0] [.DReg r] [.DReg p1] [.DReg r])) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
@@ -103,7 +104,8 @@ theorem datarfi1_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP)
     (hprog : s0.prog = [.load 4 true 10 9 0, .store 4 10 18 0, .load 4 true 11 18 0, .alu .xor 12 11 11,
       .alu .add 8 8 12, .load 4 true 13 8 0])
     (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (h8 : s0.rd 8 = X) (h9 : s0.rd 9 = Y)
-    (h18 : s0.rd 18 = Z) :
+    (h18 : s0.rd 18 = Z)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M (qDR1 M)) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -222,6 +224,7 @@ theorem lit_datarfi : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.datarfi) () (progs Weak.Prom.Ref.Lit.datarfi) M run →
     ¬ (run.obsLoad 1 0 = some 1 ∧ run.obsLoad 1 2 = some 0) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsDR M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
     (fun h p hp _ => by

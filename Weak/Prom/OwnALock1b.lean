@@ -60,7 +60,8 @@ section free
 variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG GF] [InvGS GF]
 
 /-- FREE MODE runs the rest of (1b)'s text (as `lk_free`). -/
-theorem lk_free1b (g : AGN) (M : List PMsg) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M) :
+theorem lk_free1b (g : AGN) (M : List PMsg) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace), ⌜frS1b s⌝ -∗ dfree (GF := GF) g -∗ dshot g -∗
       lhA g Proto.triv (wL1b M h) (qsLk M h) ws pr ev -∗ wpKA g Proto.triv (wL1b M h) (qsLk M) s (ΦL g M) := by
   have hw := litW_x xs1b imgL M h
@@ -189,7 +190,8 @@ variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG 
 theorem lk_rel1b_amo (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw : Nat)
     (hs : s.prog = b1b ∧ s.q = [] ∧ s.pc = 8 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwNew) :
+    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwNew)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗ (⌜qLk M ev⌝ ∨ dshot g) ∗
       lhA g Proto.triv (wL1b M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL1b M h) (qsLk M) s (ΦL g M) := by
@@ -265,7 +267,8 @@ the AMO's write release-class (`fencePost` raises `vwNew` to `vrOld ⊔ vwOld �
 theorem lk_rel1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw : Nat)
     (hs : s.prog = b1b ∧ s.q = [] ∧ s.pc = 7 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwOld) :
+    (hlo : lo ≤ coh ws Lk) (hvw : lw ≤ ws.wVwOld)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗ (⌜qLk M ev⌝ ∨ dshot g) ∗
       lhA g Proto.triv (wL1b M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL1b M h) (qsLk M) s (ΦL g M) := by
@@ -294,7 +297,8 @@ the bag (`0`: none, the read was clean). -/
 theorem lk_cs2_1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev0 : Trace) (tvs1 : List (Nat × BitVec 8)) (lo lw ex : Nat)
     (hs : s.prog = b1b ∧ s.q = [] ∧ s.pc = 5 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hnoC : noC ev0) (hlw : lw = 0 ∨ isC M lw = true) :
+    (hlo : lo ≤ coh ws Lk) (hnoC : noC ev0) (hlw : lw = 0 ∨ isC M lw = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ ([∗list] t ∈ cBagX M lw ex, pend g t) ∗
       (⌜ex = 0 ∧ (∀ p ∈ tvs1, p.1 = lw) ∧ lw ≤ coh ws Ct⌝ ∨
         (dshot g ∗ ⌜lw < ex ∧ ∃ j : Nat, j < 8 ∧ ex ≤ coh ws (Ct + j)⌝)) ∗
@@ -434,7 +438,8 @@ theorem lk_cs2_1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh :
 theorem lk_cs1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw : Nat)
     (hs : s.prog = b1b ∧ s.q = [] ∧ s.pc = 4 ∧ s.rd 10 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev) :
+    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗
       lhA g Proto.triv (wL1b M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL1b M h) (qsLk M) s (ΦL g M) := by
@@ -548,7 +553,8 @@ def lhS1b (s : LP) : Prop :=
   s.prog = b1b ∧ s.q = [] ∧ s.pc = 1 ∧ s.rd 5 = 1 ∧ s.rd 10 = X ∧ s.rd 11 = Y ∧ s.regs.length = 32
 
 /-- **THE SPIN LOOP** of (1b) (Löb induction at the loop head `again:`); the claim at `fence r,rw`. -/
-theorem lk_loop1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M) :
+theorem lk_loop1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo : Nat), ⌜lhS1b s⌝ -∗
       ⌜lo ≤ coh ws Lk ∧ noC ev⌝ -∗ lkCtx (GF := GF) g M tk -∗ obag g M tk h lo 0 -∗
       lhA g Proto.triv (wL1b M h) (qsLk M h) ws pr ev -∗ wpKA g Proto.triv (wL1b M h) (qsLk M) s (ΦL g M) := by
@@ -710,7 +716,8 @@ theorem lk_loop1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh :
 /-- **A HART** of (1b): `li t0, 1`, then the spin loop. -/
 theorem lk_hart1b (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b1b) (hpc : s0.pc = 0) (hq : s0.q = [])
-    (hlen : s0.regs.length = 32) (h10 : s0.rd 10 = X) (h11 : s0.rd 11 = Y) :
+    (hlen : s0.regs.length = 32) (h10 : s0.rd 10 = X) (h11 : s0.rd 11 = Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h 0 0 ∗ lhA g Proto.triv (wL1b M h) (qsLk M h) psInit P0 [] ⊢
       wpKA g Proto.triv (wL1b M h) (qsLk M) s0 (ΦL g M) := by
   have hw := litW_x xs1b imgL M h
@@ -736,7 +743,8 @@ end loop
 theorem progs_1b : ∃ p0 p1 : LP, progs t1b = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (1b). -/
-theorem lk_premise1b (M : List PMsg) :
+theorem lk_premise1b (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF (xStep xs1b) litDone imgL M (progs t1b) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qsLk M h)) (ddL M) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -799,6 +807,7 @@ and the image's slot, claimed by the unique AMO reading each release.  0 named i
 anywhere in its spin loop; the prefix lemma S3d is separate, [OWN.P4]). -/
 theorem own_lock1b (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun (xStep xs1b) imgL () (progs t1b) M run) : ∀ h, qLk M (run.trace h) := by
+  have hnoinv := x_noInvalT hrun   -- MachFix-R-b5: the front end issues no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qsLk M h)) (ddL M) trivial (fun h => ⟨qLk_noC noC_nil, wrOk_nil M⟩) (lk_premise1b M) hrun
   intro h

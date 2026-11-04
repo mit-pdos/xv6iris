@@ -167,7 +167,7 @@ theorem sim_load (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
   have hmem : memStep (testImg T) (memOf X) h prom ws
       (LLoad false false ((X.ev (h, s.evs.length)).pa : Int) (uniTvs t ((ν (h, s.evs.length)).map bv8)) (srcR rs1))
       none (loadRun ws false false (srcsView ws (srcR rs1)) ((X.ev (h, s.evs.length)).pa : Int)
-        (uniTvs t ((ν (h, s.evs.length)).map bv8))) prom := .load _ _ _ _ _ _ _ hlok
+        (uniTvs t ((ν (h, s.evs.length)).map bv8))) prom := memStep.load0 (memOf_noInval X) hlok   -- MachFix-R-b5
   have htail := solo_af (testImg T) (memOf X) h (regWL rd [.DLdRes] ++ [LInstr]) { lp with
       regs := lp.wr rd (if sgn then sext sz (ofBytes ((ν (h, s.evs.length)).map bv8))
         else ofBytes ((ν (h, s.evs.length)).map bv8)), pc := lp.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }

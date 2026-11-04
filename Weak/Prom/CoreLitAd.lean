@@ -67,7 +67,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [GhostVarG GF HSt] [InvGS_gen hlc
 /-- **Row 18's H1 in the logic** (rule 13). -/
 theorem addrpo1_hart (img : Image) (M : List PMsg) (h : Nat) (s0 : LP)
     (hprog : s0.prog = [.alui .add 6 0 1, .load 4 true 11 9 0, .load 4 true 12 11 0, .store 4 6 8 0])
-    (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (h8 : s0.rd 8 = X) (h9 : s0.rd 9 = Y) :
+    (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (h8 : s0.rd 8 = X) (h9 : s0.rd 9 = Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- MachFix-R-b5
     ⊢@{IProp GF} wpPF Proto.triv ⟨litStep, litDone, img, M, h⟩ (ΨK M qAd1) s0
       (fun _ => iprop(⌜∃ V, grd Proto.triv img M V True⌝)) := by
   have hw := litW_lit img M h
@@ -169,6 +170,7 @@ theorem lit_addrpo : ∀ (M : List PMsg) (run : PFRun LP Unit),
     validRun litStep (testImg Weak.Prom.Ref.Lit.addrpo) () (progs Weak.Prom.Ref.Lit.addrpo) M run →
     ¬ (run.obsLoad 0 0 = some 1 ∧ run.obsLoad 1 0 = some Z) := by
   intro M run hrun
+  have hnoinv := Own.lit_noInvalT hrun   -- MachFix-R-b5
   obtain ⟨_, hQ, hnc, hpart, hwf, himg, _⟩ := kitAdeq (π := Proto.triv) (QsAd M) (fun _ _ => True) trivial
     (fun h => match h with | 0 => trivial | 1 => trivial | _ + 2 => rfl)
     (fun h p hp _ => by

@@ -42,6 +42,10 @@ theorem storeRun_wRegv (ws : PState) (rl : Bool) (va fv : Nat) (base : Int) (n t
 theorem loadRun_wRegv (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
     (loadRun ws aq rl va base tvs).wRegv = ws.wRegv := (loadBytes_fields aq (ldPre ws aq rl va) ws base tvs).2.1
 
+theorem loadRunV_wRegv (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    (loadRunV ws aq rl va vi base tvs).wRegv = ws.wRegv :=
+  (loadBytes_fields aq (max (ldPre ws aq rl va) vi) ws base tvs).2.1   -- MachFix-R-b5
+
 theorem fwdInv_storeRun {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {θ : Nat} {ws ws0 : PState}
     {w : List PMsg} (hf : fwdInv img M D θ ws w) (hw : ws0.wFwd = ws.wFwd) {rl : Bool} {va fv : Nat} {base : Int}
     {n ts : Nat} {m : PMsg} (hpa : m.pa = base) (hlen : m.data.length = n)
@@ -228,14 +232,14 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
         obtain ⟨⟨h1, h2, h3, h4, h5⟩, rfl⟩ := ite_some_none hl
         subst h1 h2 h3 h5
         cases hm with
-        | load _ _ _ _ _ hok =>
+        | load _ _ _ _ _ hok vi _ =>   -- MachFix-R-b5
           have hv' := hv
-          rw [loadRun_vcap] at hv'
+          rw [loadRunV_vcap] at hv'
           have hrs1 : s'.rd rs1 = s.rd rs1 := agree_src ha hqs (by omega)
           have hfw : fwdInv img M D θ
-              (loadRun ws false false (srcsView ws (srcR rs1)) (↑((s.rd rs1 + off) % two64)) tvs) w' := by
-            intro a' tf vf hg; rw [loadRun_fwd] at hg; exact hf a' tf vf hg
-          by_cases hc : (loadRun ws false false (srcsView ws (srcR rs1)) (↑((s.rd rs1 + off) % two64)) tvs).wLdv < θ
+              (loadRunV ws false false (srcsView ws (srcR rs1)) vi (↑((s.rd rs1 + off) % two64)) tvs) w' := by
+            intro a' tf vf hg; rw [loadRunV_fwd] at hg; exact hf a' tf vf hg
+          by_cases hc : (loadRunV ws false false (srcsView ws (srcR rs1)) vi (↑((s.rd rs1 + off) % two64)) tvs).wLdv < θ
           · refine ⟨LLoad false false (↑((s.rd rs1 + off) % two64)) tvs (srcR rs1),
               { s' with regs := s'.wr rd (if sgn then sext sz (ofBytes (tvs.map Prod.snd)) else ofBytes (tvs.map Prod.snd)), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] },
               ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
@@ -243,8 +247,8 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
             · intro base tvs' hr
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
-              exact lowLoad hlow hf hok (Nat.le_refl _) hc
-            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRun_regv _ _ _ _ _ _ r) (fun _ _ => rfl)
+              exact lowLoadV hlow hf hok (Nat.le_refl _) hc
+            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRunV_regv _ _ _ _ _ _ _ r) (fun _ _ => rfl)
           · refine ⟨LLoad false false (↑((s.rd rs1 + off) % two64))
                 (canonRun D (↑((s.rd rs1 + off) % two64)) sz) (srcR rs1),
               { s' with regs := s'.wr rd (if sgn then sext sz (ofBytes ((canonRun D (↑((s.rd rs1 + off) % two64)) sz).map Prod.snd)) else ofBytes ((canonRun D (↑((s.rd rs1 + off) % two64)) sz).map Prod.snd)), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }, ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
@@ -253,7 +257,7 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
               exact canonRun_inD hD _ _
-            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRun_regv _ _ _ _ _ _ r)
+            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRunV_regv _ _ _ _ _ _ _ r)
                 (fun _ hlt => absurd (by rw [srcsView_ld] at hlt; exact hlt) hc)
       | loadAq sz rl0 rd rs1 =>
         replace hl := ite_none_some' hl
@@ -264,21 +268,21 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
         obtain ⟨⟨h1, h2, h3, h4, h5⟩, rfl⟩ := ite_some_none hl
         subst h1 h2 h3 h5
         cases hm with
-        | load _ _ _ _ _ hok =>
+        | load _ _ _ _ _ hok vi _ =>   -- MachFix-R-b5
           have hv' := hv
-          rw [loadRun_vcap] at hv'
+          rw [loadRunV_vcap] at hv'
           have hrs1 : s'.rd rs1 = s.rd rs1 := agree_src ha hqs (by omega)
-          have hfw : fwdInv img M D θ (loadRun ws true rl (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs) w' := by
-            intro a' tf vf hg; rw [loadRun_fwd] at hg; exact hf a' tf vf hg
-          by_cases hc : (loadRun ws true rl (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs).wLdv < θ
+          have hfw : fwdInv img M D θ (loadRunV ws true rl (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs) w' := by
+            intro a' tf vf hg; rw [loadRunV_fwd] at hg; exact hf a' tf vf hg
+          by_cases hc : (loadRunV ws true rl (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs).wLdv < θ
           · refine ⟨LLoad true rl (↑(s.rd rs1)) tvs (srcR rs1),
               { s' with regs := s'.wr rd (sext sz (ofBytes (tvs.map Prod.snd))), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }, ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
             · rw [hst]; simp only [insNextF, instrNext]; rw [hrs1]; simp [hal, h4]
             · intro base tvs' hr
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
-              exact lowLoad hlow hf hok (Nat.le_refl _) hc
-            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRun_regv _ _ _ _ _ _ r) (fun _ _ => rfl)
+              exact lowLoadV hlow hf hok (Nat.le_refl _) hc
+            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRunV_regv _ _ _ _ _ _ _ r) (fun _ _ => rfl)
           · refine ⟨LLoad true rl (↑(s.rd rs1)) (canonRun D (↑(s.rd rs1)) sz) (srcR rs1),
               { s' with regs := s'.wr rd (sext sz (ofBytes ((canonRun D (↑(s.rd rs1)) sz).map Prod.snd))), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }, ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
             · rw [hst]; simp only [insNextF, instrNext]; rw [hrs1]; simp [hal, canonRun_len]
@@ -286,7 +290,7 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
               exact canonRun_inD hD _ _
-            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRun_regv _ _ _ _ _ _ r)
+            · exact agree_wrq ha hqs noRegW_LInstr hpc1 (fun r => loadRunV_regv _ _ _ _ _ _ _ r)
                 (fun _ hlt => absurd (by rw [srcsView_ld] at hlt; exact hlt) hc)
       | lr sz aq0 rl0 rd rs1 =>
         replace hl := ite_none_some' hl
@@ -297,25 +301,25 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
         obtain ⟨⟨h1, h2, h3, h4, h5⟩, rfl⟩ := ite_some_none hl
         subst h1 h2 h3 h5
         cases hm with
-        | lr _ _ _ _ _ hok =>
-          have hv' : (loadRun ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs).wVcap < θ := hv
-          rw [loadRun_vcap] at hv'
+        | lr _ _ _ _ _ hok vi _ =>   -- MachFix-R-b5
+          have hv' : (loadRunV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs).wVcap < θ := hv
+          rw [loadRunV_vcap] at hv'
           have hrs1 : s'.rd rs1 = s.rd rs1 := agree_src ha hqs (by omega)
-          have hfw : fwdInv img M D θ { loadRun ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs with wRes := some ⟨↑(s.rd rs1), tvs.map Prod.fst, readView ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs⟩ } w' := by
+          have hfw : fwdInv img M D θ { loadRunV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs with wRes := some ⟨↑(s.rd rs1), tvs.map Prod.fst, readViewV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs⟩ } w' := by
             intro a' tf vf hg
-            have hg' : get? (loadRun ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs).wFwd a' =
+            have hg' : get? (loadRunV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs).wFwd a' =
               some (tf, vf) := hg
-            rw [loadRun_fwd] at hg'; exact hf a' tf vf hg'
-          have hreg : ∀ r, regv { loadRun ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs with wRes := some ⟨↑(s.rd rs1), tvs.map Prod.fst, readView ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs⟩ } r = regv ws r :=
-            fun r => loadRun_regv _ _ _ _ _ _ r
-          by_cases hc : (loadRun ws aq (aq && rl0) (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs).wLdv < θ
+            rw [loadRunV_fwd] at hg'; exact hf a' tf vf hg'
+          have hreg : ∀ r, regv { loadRunV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs with wRes := some ⟨↑(s.rd rs1), tvs.map Prod.fst, readViewV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs⟩ } r = regv ws r :=
+            fun r => loadRunV_regv _ _ _ _ _ _ _ r
+          by_cases hc : (loadRunV ws aq (aq && rl0) (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs).wLdv < θ
           · refine ⟨LExLoad aq (aq && rl0) (↑(s.rd rs1)) tvs (srcR rs1),
               { s' with regs := s'.wr rd (sext sz (ofBytes (tvs.map Prod.snd))), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }, ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
             · rw [hst]; simp only [insNextF, instrNext]; rw [hrs1]; simp [hal, h4]
             · intro base tvs' hr
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
-              exact lowLoad hlow hf hok (Nat.le_refl _) hc
+              exact lowLoadV hlow hf hok (Nat.le_refl _) hc
             · exact agree_wrq ha hqs noRegW_LInstr hpc1 hreg (fun _ _ => rfl)
           · refine ⟨LExLoad aq (aq && rl0) (↑(s.rd rs1)) (canonRun D (↑(s.rd rs1)) sz) (srcR rs1),
               { s' with regs := s'.wr rd (sext sz (ofBytes ((canonRun D (↑(s.rd rs1)) sz).map Prod.snd))), pc := s'.pc + 1, q := regWL rd [.DLdRes] ++ [LInstr] }, ?_, ?_, ?_, fwdInv_nomsg rfl hfw⟩
@@ -412,30 +416,29 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
         obtain ⟨⟨h1, h2, h3, h4, h5, h6, h7⟩, rfl⟩ := ite_some_none hl
         subst h1 h2 h3 h5 h6 h7
         cases hm with
-        | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hok hx hcoh hpv =>
-          have hv' : (storeRun (loadRun ws aq false (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs) rl
+        | rmw _ _ _ _ _ _ _ ts hlen hts hmsg hok hx hcoh hpv vi _ _ =>   -- MachFix-R-b5
+          have hv' : (storeRun (loadRunV ws aq false (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs) rl
               (srcsView ws (srcR rs1)) ts (↑(s.rd rs1)) (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd))
                 (s.rd rs2 % 2 ^ (8 * sz))) sz).length ts).wVcap < θ := hv
-          rw [storeRun_vcap, loadRun_vcap] at hv'
+          rw [storeRun_vcap, loadRunV_vcap] at hv'
           have hrs1 : s'.rd rs1 = s.rd rs1 := agree_src ha hqs (by omega)
-          have hreg : ∀ r, regv (amoPost (storeRun (loadRun ws aq false (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs)
+          have hreg : ∀ r, regv (amoPost (storeRun (loadRunV ws aq false (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs)
               rl (srcsView ws (srcR rs1)) ts (↑(s.rd rs1)) (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd))
                 (s.rd rs2 % 2 ^ (8 * sz))) sz).length ts) aq ts) r = regv ws r := by
             intro r
-            unfold regv; simp only [amoPost_wRegv, storeRun_wRegv, loadRun_wRegv]
+            unfold regv; simp only [amoPost_wRegv, storeRun_wRegv, loadRunV_wRegv]
           have hfw : ∀ m : PMsg, m.pa = ↑(s.rd rs1) →
               m.data.length = (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd)) (s.rd rs2 % 2 ^ (8 * sz))) sz).length →
-              fwdInv img M D θ (amoPost (storeRun (loadRun ws aq false (srcsView ws (srcR rs1))
-              (↑(s.rd rs1)) tvs) rl (srcsView ws (srcR rs1)) ts (↑(s.rd rs1))
+              fwdInv img M D θ (amoPost (storeRun (loadRunV ws aq false (srcsView ws (srcR rs1)) vi               (↑(s.rd rs1)) tvs) rl (srcsView ws (srcR rs1)) ts (↑(s.rd rs1))
               (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd)) (s.rd rs2 % 2 ^ (8 * sz))) sz).length ts)
               aq ts) (w' ++ [m]) := fun m hpa hlen =>
-            fwdInv_storeRun (rl := rl) (va := srcsView ws (srcR rs1)) hf (loadRun_fwd _ _ _ _ _ _) hpa hlen (fun hvf b x hx => .inl (hlow _ hvf b x hx))
-          have hld : (loadRun ws aq false (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs).wLdv ≤
-              (amoPost (storeRun (loadRun ws aq false (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs) rl
+            fwdInv_storeRun (rl := rl) (va := srcsView ws (srcR rs1)) hf (loadRunV_fwd _ _ _ _ _ _ _) hpa hlen (fun hvf b x hx => .inl (hlow _ hvf b x hx))
+          have hld : (loadRunV ws aq false (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs).wLdv ≤
+              (amoPost (storeRun (loadRunV ws aq false (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs) rl
                 (srcsView ws (srcR rs1)) ts (↑(s.rd rs1)) (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd))
                   (s.rd rs2 % 2 ^ (8 * sz))) sz).length ts) aq ts).wLdv := by
             simp only [amoPost, storeRun_ldv]; omega
-          by_cases hc : (amoPost (storeRun (loadRun ws aq false (srcsView ws (srcR rs1)) (↑(s.rd rs1)) tvs) rl
+          by_cases hc : (amoPost (storeRun (loadRunV ws aq false (srcsView ws (srcR rs1)) vi (↑(s.rd rs1)) tvs) rl
                 (srcsView ws (srcR rs1)) ts (↑(s.rd rs1)) (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd))
                   (s.rd rs2 % 2 ^ (8 * sz))) sz).length ts) aq ts).wLdv < θ
           · refine ⟨LRmw aq rl (↑(s.rd rs1)) tvs (toBytes (amoOp op sz (ofBytes (tvs.map Prod.snd))
@@ -445,7 +448,7 @@ theorem ni_step {img : Image} {M : List PMsg} {D : Int → List (BitVec 8)} {i �
             · intro base tvs' hr
               simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hr
               obtain ⟨rfl, rfl⟩ := hr
-              exact lowLoad hlow hf hok hld hc
+              exact lowLoadV hlow hf hok hld hc
             · exact agree_wrq ha hqs noRegW_LInstr hpc1 hreg (fun _ _ => rfl)
           · refine ⟨LRmw aq rl (↑(s.rd rs1)) (canonRun D (↑(s.rd rs1)) sz)
                 (toBytes (amoOp op sz (ofBytes ((canonRun D (↑(s.rd rs1)) sz).map Prod.snd))

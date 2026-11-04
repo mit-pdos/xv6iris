@@ -55,7 +55,8 @@ Mark after the fix: FAITHFUL (rd depends on the CSR's previous writer, not on rs
   `cbo.zero` write, may be decomposed into any contiguous chunks (`splittable`); an I/O address with no device
   answers any value and accepts any write; `getCycleCount` answers any value; a failed `amocas` may write back the
   old value (zacas.adoc:159–161).  Items that cannot be realised in the instance are STOP-AND-ASK items in
-  PROGRESS-S1Mdef.md (misaligned-exception choice, unrealised hooks, the `.error` arm, `cbo.inval`).
+  PROGRESS-S1Mdef.md (misaligned-exception choice, unrealised hooks, the `.error` arm, `cbo.inval`).  The `.error`
+  arm is HAVOC ([OWN.P8]/[OWN.P9], MachFix-havoc): stuck here, run-level "every outcome" in MachHavoc.lean.
 * [OWN.P2] — `FENCE.I` (`Barrier_RISCV_i`) emits `LFenceI`; a fetch emits `LIFetch`; the announce no longer resets
   anything (it banks the bits only), so the fetch view `wIfv` survives into the instruction.
 -/
@@ -389,7 +390,9 @@ def regWriteStep (h : HState) (r : Register) (v : RegisterType r) (k : PUnit →
 def hnodeStep (h : HState) (d : DevStates) (l : PLabel) (h' : HState) (d' : DevStates) : Prop :=
   match h.m with
   | .pure _ => d' = d ∧ bndStep h l h'
-  | .impure (.error _) _ => False      -- STOP-AND-ASK (PROGRESS-S1Mdef.md): the `.error` arm
+  -- MachFix-havoc ([OWN.P8]/[OWN.P9]): a remaining Sail error site is HAVOC — no step here; a valid run reaching it
+  -- makes every observation possible (MachHavoc.lean `allowedH`, EmitHavoc.lean `sailErr`)
+  | .impure (.error _) _ => False
   | .impure (.ok o) k =>
     match o, k with
     | .regRead r, k =>

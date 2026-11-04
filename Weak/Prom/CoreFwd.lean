@@ -54,6 +54,12 @@ theorem loadRun_floor (ws : PState) (aq rl : Bool) (va : Nat) (base : Int) (tvs 
   have := loadBytes_floor aq (ldPre ws aq rl va) ws base tvs
   unfold stFloor loadRun; simp only; omega
 
+/-- MachFix-R-b5. -/
+theorem loadRunV_floor (ws : PState) (aq rl : Bool) (va vi : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    stFloor ws ≤ stFloor (loadRunV ws aq rl va vi base tvs) := by
+  have := loadBytes_floor aq (max (ldPre ws aq rl va) vi) ws base tvs
+  unfold stFloor loadRunV; simp only; omega
+
 theorem storeRun_floor (ws : PState) (rl : Bool) (va fv : Nat) (base : Int) (n ts : Nat) :
     stFloor ws ≤ stFloor (storeRun ws rl va fv base n ts) := by
   have := storeBytes_floor ws base n ts fv
@@ -72,11 +78,12 @@ theorem floors_mono {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
     stFloor ws ≤ stFloor ws' := by
   cases h with
   | silent => exact Nat.le_refl _
-  | load => exact loadRun_floor _ _ _ _ _ _
+  | load => exact loadRunV_floor _ _ _ _ _ _ _   -- MachFix-R-b5
   | store => exact Nat.le_trans (storeRun_floor _ _ _ _ _ _ _) (acqPost_floor _ _ _)
   | rmw =>
-    exact Nat.le_trans (loadRun_floor _ _ _ _ _ _) (Nat.le_trans (storeRun_floor _ _ _ _ _ _ _) (amoPost_floor _ _ _))
-  | amoLd => exact loadRun_floor _ _ _ _ _ _
+    exact Nat.le_trans (loadRunV_floor _ _ _ _ _ _ _) (Nat.le_trans (storeRun_floor _ _ _ _ _ _ _)
+      (amoPost_floor _ _ _))
+  | amoLd => exact loadRunV_floor _ _ _ _ _ _ _
   | amoSt => exact Nat.le_trans (storeRun_floor _ _ _ _ _ _ _) (amoPost_floor _ _ _)
   | fence => unfold stFloor fencePost; simp only; split <;> omega
   | fenceI => exact Nat.le_refl _
@@ -84,7 +91,7 @@ theorem floors_mono {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
   | regW => exact Nat.le_refl _
   | ctrl => unfold stFloor; simp only; omega
   | instr => exact Nat.le_refl _
-  | lr => exact loadRun_floor _ _ _ _ _ _
+  | lr => exact loadRunV_floor _ _ _ _ _ _ _
   | sc => exact Nat.le_trans (storeRun_floor _ _ _ _ _ _ _) (acqPost_floor _ _ _)
   | scFail => exact Nat.le_refl _
   | fetch => exact Nat.le_refl _
@@ -220,12 +227,12 @@ theorem fwd_step {π : Proto} {img : Image} {M : List PMsg} {i : Nat} {prom : GS
   unfold fetchInv at hfi ⊢
   cases h with
   | silent => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (Nat.le_refl _) hfk⟩
-  | load aq rl base tvs asrc _ =>
-    have hl := loadBytes_keep aq (ldPre ws aq rl (srcsView ws asrc)) ws base tvs
+  | load aq rl base tvs asrc _ vi _ =>   -- MachFix-R-b5: `loadRunV`
+    have hl := loadBytes_keep aq (max (ldPre ws aq rl (srcsView ws asrc)) vi) ws base tvs
     refine ⟨?_, fwdKnow_keep (ws := ws) ?_ (plainFloor_of hfm ?_) hfk⟩
-    · simp only [loadRun, hl]; omega
-    · simp only [loadRun, hl]
-    · simp only [loadRun, hl]; omega
+    · simp only [loadRunV, hl]; omega
+    · simp only [loadRunV, hl]
+    · simp only [loadRunV, hl]; omega
   | store aq rl base data asrc vsrc ts _ _ _ hext =>
     have hk' := hk ts rfl
     have hsb := storeBytes_keep ws base data.length ts (max (srcsView ws asrc) (srcsView ws vsrc))
@@ -243,23 +250,23 @@ theorem fwd_step {π : Proto} {img : Image} {M : List PMsg} {i : Nat} {prom : GS
         simp only [fulPv, stPreA, stPre, plainFloor, stFloor, acqPost, storeRun, hsb, Bool.false_eq_true,
           if_false] at hext ⊢
         omega
-  | rmw aq rl base tvs data asrc vsrc ts _ _ _ _ _ _ hext =>
+  | rmw aq rl base tvs data asrc vsrc ts _ _ _ _ _ _ hext vi _ _ =>   -- MachFix-R-b5: `loadRunV`
     have hk' := hk ts rfl
-    have hl := loadBytes_keep aq (ldPre ws aq false (srcsView ws asrc)) ws base tvs
-    have hsb := storeBytes_keep (loadRun ws aq false (srcsView ws asrc) base tvs) base data.length ts ts
-    have hlw : (loadRun ws aq false (srcsView ws asrc) base tvs).wIfr = ws.wIfr ∧
-        (loadRun ws aq false (srcsView ws asrc) base tvs).wIfv = ws.wIfv := by simp only [loadRun, hl]; simp
-    refine ⟨?_, fwdKnow_store (ws1 := loadRun ws aq false (srcsView ws asrc) base tvs) (base := base)
-      (n := data.length) (ts := ts) (fv := ts) rfl (by simp only [loadRun, hl])
+    have hl := loadBytes_keep aq (max (ldPre ws aq false (srcsView ws asrc)) vi) ws base tvs
+    have hsb := storeBytes_keep (loadRunV ws aq false (srcsView ws asrc) vi base tvs) base data.length ts ts
+    have hlw : (loadRunV ws aq false (srcsView ws asrc) vi base tvs).wIfr = ws.wIfr ∧
+        (loadRunV ws aq false (srcsView ws asrc) vi base tvs).wIfv = ws.wIfv := by simp only [loadRunV, hl]; simp
+    refine ⟨?_, fwdKnow_store (ws1 := loadRunV ws aq false (srcsView ws asrc) vi base tvs) (base := base)
+      (n := data.length) (ts := ts) (fv := ts) rfl (by simp only [loadRunV, hl])
       (plainFloor_of hfm ?_) hfk ⟨_, hext, hk', .inl (by omega)⟩⟩
     · simp only [amoPost, storeRun, hsb]; omega
     · simp only [amoPost, storeRun, hsb]; omega
-  | amoLd aq base tvs asrc _ =>
-    have hl := loadBytes_keep aq (ldPre ws aq false (srcsView ws asrc)) ws base tvs
+  | amoLd aq base tvs asrc _ vi _ =>
+    have hl := loadBytes_keep aq (max (ldPre ws aq false (srcsView ws asrc)) vi) ws base tvs
     refine ⟨?_, fwdKnow_keep (ws := ws) ?_ (plainFloor_of hfm ?_) hfk⟩
-    · simp only [loadRun, hl]; omega
-    · simp only [loadRun, hl]
-    · simp only [loadRun, hl]; omega
+    · simp only [loadRunV, hl]; omega
+    · simp only [loadRunV, hl]
+    · simp only [loadRunV, hl]; omega
   | amoSt rl base data asrc vsrc ts R _ _ _ _ _ _ _ hext =>
     have hk' := hk ts rfl
     have hsb := storeBytes_keep ws base data.length ts ts
@@ -273,12 +280,12 @@ theorem fwd_step {π : Proto} {img : Image} {M : List PMsg} {i : Nat} {prom : GS
   | regW => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
   | ctrl => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
   | instr => exact ⟨Nat.zero_le _, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
-  | lr aq rl base tvs asrc _ =>
-    have hl := loadBytes_keep aq (ldPre ws aq rl (srcsView ws asrc)) ws base tvs
+  | lr aq rl base tvs asrc _ vi _ =>
+    have hl := loadBytes_keep aq (max (ldPre ws aq rl (srcsView ws asrc)) vi) ws base tvs
     refine ⟨?_, fwdKnow_keep (ws := ws) ?_ (plainFloor_of hfm ?_) hfk⟩
-    · simp only [loadRun, hl]; omega
-    · simp only [loadRun, hl]
-    · simp only [loadRun, hl]; omega
+    · simp only [loadRunV, hl]; omega
+    · simp only [loadRunV, hl]
+    · simp only [loadRunV, hl]; omega
   | sc aq rl base data asrc vsrc ts R hR _ _ _ _ _ hext =>
     have hk' := hk ts rfl
     have hsb := storeBytes_keep ws base data.length ts ts

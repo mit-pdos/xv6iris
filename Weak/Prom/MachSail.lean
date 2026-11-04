@@ -401,10 +401,11 @@ def wrCls : WrK → PClass
   | .sc .. => .excl
   | .amo .. => .excl
 
-/-- The message lists of the tree's complete paths. -/
+/-- The message lists of the tree's complete paths (MachFix-havoc: a path ending at a Sail `.error` node is
+complete — a havoc run may end there). -/
 partial def msgLists (i : Nat) : STree → List (List PMsg)
   | .done _ => [[]]
-  | .stop _ => []
+  | .stop why => if why == "sail-error" then [[]] else []
   | .lab _ t => msgLists i t
   | .rd _ _ _ kids => (kids.flatMap (fun p => msgLists i p.2)).eraseDups
   | .wr k base data ok ko =>
@@ -430,16 +431,17 @@ partial def stops : STree → List String
 
 /-! ## 6. The machine arms the label level never needs -/
 
-/-- `memStep.amoLd`. -/
+/-- `memStep.amoLd` (MachFix-R-b5: with every admissible absorbed view `vi`, as `Mach.succ`). -/
 def succAmoLd (img : Image) (log : List PMsg) (prom : GSet Nat) (ws : PState) (aq : Bool) (base : Int) (sz : Nat)
     (asrc : List Dsrc) : List Succ :=
   let va := srcsView ws asrc
   let vpre := ldPre ws aq false va
-  (readCands img log ws vpre base sz).filterMap (fun tvs =>
+  (readCands img log ws vpre base sz).flatMap (fun tvs =>
     if loadOkB img log ws vpre base tvs then
-      some ⟨LAmoLd aq base tvs asrc, none,
-        { loadRun ws aq false va base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }, prom⟩
-    else none)
+      (viOpts log ws vpre base tvs).map (fun vi =>   -- MachFix-R-b5: every absorbed invalidate view
+        ⟨LAmoLd aq base tvs asrc, none,
+          { loadRunV ws aq false va vi base tvs with wRmw := some ⟨base, tvs.map Prod.fst, aq⟩ }, prom⟩)
+    else [])
 
 /-- `memStep.amoSt`. -/
 def succAmoSt (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (rl : Bool) (base : Int)
@@ -494,16 +496,20 @@ structure MR where
   oos : List String := []
   miss : Nat := 0
   nodes : Nat := 0
+  /-- MachFix-havoc: some path reached a Sail `.error` node with no own promise outstanding -/
+  herr : Bool := false
 
 instance : Inhabited MR := ⟨{}⟩
 
-def MR.add (a b : MR) : MR := ⟨a.fin ++ b.fin, (a.oos ++ b.oos).eraseDups, a.miss + b.miss, a.nodes + b.nodes⟩
+def MR.add (a b : MR) : MR :=
+  ⟨a.fin ++ b.fin, (a.oos ++ b.oos).eraseDups, a.miss + b.miss, a.nodes + b.nodes, a.herr || b.herr⟩
 
 /-- Walk the tree against `M` (every `succ`-successor at every node). -/
 partial def runT (img : Image) (log : List PMsg) (i : Nat) (t : STree) (ws : PState) (prom : GSet Nat) : MR :=
   match t with
   | .done regs => if promDone log prom then { fin := [regs], nodes := 1 } else { nodes := 1 }
-  | .stop why => { oos := [why], nodes := 1 }
+  -- MachFix-havoc: a Sail `.error` node with every own promise fulfilled ends a havoc path (MachHavoc.lean)
+  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" && promDone log prom }
   | .lab l t' =>
     match fixPost ws l with
     | some ws' => let r := runT img log i t' ws' prom; { r with nodes := r.nodes + 1 }
@@ -603,6 +609,9 @@ structure SStat where
   budget : Bool := false
   /-- the union differs from the all-true platform's set -/
   platDiff : Bool := false
+  /-- MachFix-havoc: some candidate memory has a HAVOC run (a valid run reaching a Sail `.error` node): every
+  observation is possible, no verdict is "forbidden" -/
+  havoc : Bool := false
 
 /-- The outcomes for one final memory `M` (as `outcomesM`), registers mapped back from the relocation. -/
 def outcomesS (S : STest) (ts : List STree) (obs : List Key) (M : List PMsg) : Option (List (List Nat)) × MR :=
@@ -611,8 +620,10 @@ def outcomesS (S : STest) (ts : List STree) (obs : List Key) (M : List PMsg) : O
     | k + 1, st =>
       let i := ts.length - (k + 1)
       let r := runT S.img M i ((ts[i]?).getD default) psInit (promsOf M i)
-      let st := { st with oos := (st.oos ++ r.oos).eraseDups, miss := st.miss + r.miss, nodes := st.nodes + r.nodes }
-      if r.fin.isEmpty then (none, st) else
+      let st := { st with oos := (st.oos ++ r.oos).eraseDups, miss := st.miss + r.miss, nodes := st.nodes + r.nodes,
+                          herr := st.herr || r.herr }
+      -- MachFix-havoc: a hart ends validly by finishing or by a havoc path
+      if r.fin.isEmpty && !r.herr then (none, st) else
       let proj := (r.fin.map (fun regs => (regsOf obs i).map (fun rr =>
         (i, rr, unreloc S.locs ((regs[rr]?).getD 0))))).eraseDups
       match harts k st with
@@ -650,7 +661,8 @@ def outsAt (S : STest) (P : BitVec 64 → Bool) (obs : List Key) (budget mcap : 
         match r with
         | none => pure ()
         | some os =>
-          st := { st with valid := st.valid + 1 }
+          -- MachFix-havoc: every hart ended validly and some by a havoc path: a HAVOC run
+          st := { st with valid := st.valid + 1, havoc := st.havoc || mr.herr }
           for o in os do outs := outs.insert o
     return (some outs.toList, st)
 
