@@ -963,6 +963,12 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.OwnAE2Defs
+import Weak.Prom.OwnAE2Lock
+import Weak.Prom.OwnAE2CS
+import Weak.Prom.OwnAE2H0
+import Weak.Prom.OwnAE2H1
+import Weak.Prom.OwnAE2
 import Weak.Prom.AdMachine
 import Weak.Prom.AdWitness
 import Weak.Prom.NfrAd
