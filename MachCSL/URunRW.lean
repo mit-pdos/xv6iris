@@ -25,8 +25,8 @@ byte it can reach (an owned byte map).  `runRW` walks a computation over
   The walker does not know about the reservation (Rocq `hmrun`, design §3a):
   an exclusive read (acquire or not) steps like a plain read, and an
   exclusive (conditional) write like a plain write, from ANY reservation
-  state -- the machine lets it through whenever no other hart reserves the
-  footprint, and whether an `SC` writes at all is the model's opaque
+  state -- the machine lets it through whenever no other hart holds a blocking
+  reservation over the footprint, and whether an `SC` writes at all is the model's opaque
   `match_reservation`, decided before the write event.  `s.rv` is only a
   bookkeeping bit (an exclusive read sets it, every write clears it); the
   hart's actual reservation rides `ctxTok` as Rocq's `resv_any`

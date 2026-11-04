@@ -827,7 +827,7 @@ load of them reads `h` at every view it may pick, and its exclusive re-read
 is never blocked and reads `h` again.  No accessor: nothing is learned about
 the histories but their heads, which the reservation already pins.  An LR's
 reservation pins nothing: it blocks nobody, so another hart may have stored
-into its bytes since (owner ruling 2026-11-05, policy decision (22)); these
+into its bytes since (owner ruling 2026-11-04, policy decision (22)); these
 leaves therefore take a blocking origin (`κ ≠ .lr`). -/
 
 /-- The hart's plain load of the bytes it reserves reads the snapshot, at

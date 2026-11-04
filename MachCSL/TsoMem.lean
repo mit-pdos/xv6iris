@@ -39,7 +39,7 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   self-loops).  A reservation of kind `lr` blocks nobody: on hardware an LR
   registers a watch that holds no other hart back, and a reservation that
   blocked until its holder's next store could block for ever, which hardware
-  cannot do (owner ruling 2026-11-05, policy decision (22)); the record is
+  cannot do (owner ruling 2026-11-04, policy decision (22)); the record is
   kept for the SC's future watch.  The paired write appends like any store
   and releases the reservation; an acquire pair (`.aq`) takes the floor past
   its own append.
@@ -50,7 +50,7 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   next store, possibly for ever (owner ruling 2026-10-24, policy decision
   (21)).  An LR's reservation lives, as before, until the hart's next store
   or exclusive read: its SC comes in a later instruction, so its window spans
-  instructions by design -- and, since 2026-11-05, it excludes nobody.
+  instructions by design -- and, since 2026-11-04, it excludes nobody.
 * **The non-coherent instruction cache.**  A fetch reads at a view at or
   above the hart's *instruction view* `itv`, as an agent that never authors
   a store (no forwarding: a hart's own store to code is not fetched until
@@ -231,7 +231,7 @@ A/D update (`pte`), or an LR (`lr`), whose SC comes in a later instruction so
 that its window spans instructions by design.  The cycle boundary and a
 blocked plain store release every reservation but an LR's (`MachCSL.Lang`,
 `MState.dropWindow`; owner ruling 2026-10-24, policy decision (21)), and an
-LR's blocks nobody (`Resv.blocking`; owner ruling 2026-11-05, policy
+LR's blocks nobody (`Resv.blocking`; owner ruling 2026-11-04, policy
 decision (22)). -/
 inductive ResvKind
   | rmw
@@ -286,7 +286,7 @@ def Resv.overlaps (r : Resv) (pa : PAddr) (n : Nat) : Prop :=
 
 /-- A reservation that excludes other harts: an AMO's window or the page
 walker's update.  An LR's reservation is recorded but excludes nobody: on
-hardware it is a watch, not a lock (owner ruling 2026-11-05, policy decision
+hardware it is a watch, not a lock (owner ruling 2026-11-04, policy decision
 (22)). -/
 def Resv.blocking (r : Resv) : Prop := r.kind ≠ .lr
 

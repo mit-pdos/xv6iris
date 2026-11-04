@@ -80,9 +80,9 @@ them into the structure); after the reservation drop (2026-10-24, `notes/model-d
 2,598 under 2,252 -- the 16 constants of `ResvKind`, `Resv`'s constructor and fields, `kindOf`, `akLR`,
 `akPteRe` and `MState.dropWindow` entered, 9 hashes moved (`Resv`, `snapOf`, `Resv.overlaps`,
 `MState.afterExcl`, `evStep`, `blockedStep`, `hartStep`, `mmOk`, `resvInv`), none left; after the LR
-reservations stopped blocking (2026-11-05, decision (22), the same section): 2,599 under 2,253 --
+reservations stopped blocking (2026-11-04, decision (22), the same section): 2,599 under 2,253 --
 `Resv.blocking` entered, 4 hashes moved (`othersReserve`, `anyReserve`, `mmOk`, `resvInv`), none left,
-no set moved.  Demonstrated on the case: with this baseline, the check run on the pre-C3
+no set moved.  Demonstrated on the case: with the baseline of `49b8aef37`'s tree, the check run on the pre-C3
 tree (`0a2b015d7`, rebuilt) fails with exactly four problems -- `HRead.afterExcl` changed in type and
 value, `MState.afterExcl` and `memModelAt` in value, `resvInv` left -- and a docstring-only, a
 body-comment and a proof-only edit made in the same rebuild moved nothing (`notes/design-rulings.md`,

@@ -1033,7 +1033,7 @@ the hart reserves needs (no other hart blocks it); the second, with the
 exclusive read stamping the floors at the top (`HRead.afterExcl`), is what
 makes the hart's plain loads of them read the head (its snapshot) at every
 view they may pick.  Both are restricted to blocking reservations
-(`Resv.blocking`, not an LR's; owner ruling 2026-11-05, policy decision
+(`Resv.blocking`, not an LR's; owner ruling 2026-11-04, policy decision
 (22)): an LR's record blocks nobody, so another hart's atomic window may
 overlap it and another hart may store into its bytes; the clauses are needed
 only for the atomic windows. -/
