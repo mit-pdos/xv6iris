@@ -302,8 +302,8 @@ def succCmo (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (k : Cmo
 partial def runTX (img : Image) (log : List PMsg) (i : Nat) (t : TX) (ws : PState) (prom : GSet Nat) : MR :=
   match t with
   | .done regs => if promDone log prom then { fin := [regs], nodes := 1 } else { nodes := 1 }
-  -- MachFix-havoc (as MachSail.lean `runT`)
-  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" && promDone log prom }
+  -- MachFix-havoc, HavocProm [OWN.P10] (as MachSail.lean `runT`)
+  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" }
   | .lab l t' =>
     match fixPost ws l with
     | some ws' => let r := runTX img log i t' ws' prom; { r with nodes := r.nodes + 1 }

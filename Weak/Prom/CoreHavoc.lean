@@ -13,12 +13,16 @@ by giving an error node NO RULE except "finish with the impossible value":
   `⟦V⟧ False`: it holds only if the protocol is already invalid at `V` (A0 (iv) removes that), i.e. the client must
   show the node is unreachable; MaybeStuck does not help (`wpH_stuck` needs `pdone = none`, false here).
 * `adequacyH` — A0 for that world: every conclusion of A0, and NO VALID RUN REACHES AN ERROR NODE
-  (`¬ errCfg perr run.cfg`).  With `noHavoc_of_adequacyH` this gives MachHavoc.lean's `¬ havocs`, the half of a
-  FORBIDDEN verdict that havoc adds (`forbiddenH_iff`).
+  (`¬ errCfg perr run.cfg`; `noValidHavoc_of_adequacyH`).  HavocProm ([OWN.P10]): MachHavoc.lean's `havocs` now
+  also counts runs in which a hart reaches an error with ITS OWN promise outstanding; those runs are not valid,
+  and these premises do NOT exclude them (a hart may refute its error branch by a guard `⟦V⟧` that covers its own
+  unfulfilled promise).  The half of a FORBIDDEN verdict that havoc adds (`¬ havocs`, `forbiddenH_iff`) is
+  CoreHavocP.lean `noHavoc_of_adequacyHP`, whose error obligation bounds `V` below the hart's outstanding
+  promises.
 How A0 itself reports a havoc run: it does not — `PF.adequacy` is stated over valid runs and says nothing about
 error nodes; a "forbidden" claim from A0 alone is a claim about valid runs only, and under havoc it stands only
-together with `¬ havocs` (from `adequacyH`, or `noErr_noHavoc` for program halves with no error node — every litmus
-front end, so every existing litmus theorem keeps its meaning).
+together with `¬ havocs` (from CoreHavocP.lean `noHavoc_of_adequacyHP`, or `noErr_noHavoc` for program halves
+with no error node — every litmus front end, so every existing litmus theorem keeps its meaning).
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.CoreAdeq
@@ -82,16 +86,17 @@ theorem adequacyH {hlc : HasLC} {GF : BundledGFunctors} [InvGpreS GF] [GhostVarG
   have hne : ¬ perr ag.paSt := fun he => hno ⟨h, ag, hag, he⟩
   exact hi h (some v) ⟨ag, hag, by simp [pdoneE_ok hne, hd]⟩
 
-/-- The havoc half of a FORBIDDEN verdict from the logic: if every valid run's final memory admits the per-hart
-wps (with error nodes), no valid run reaches an error node. -/
-theorem noHavoc_of_adequacyH {hlc : HasLC} {GF : BundledGFunctors} [InvGpreS GF] [GhostVarG GF HSt]
+/-- If every valid run's final memory admits the per-hart wps (with error nodes), no VALID run reaches an error
+node (HavocProm: renamed from `noHavoc_of_adequacyH`; `¬ havocs` over [OWN.P10]'s havoc runs is CoreHavocP.lean
+`noHavoc_of_adequacyHP`). -/
+theorem noValidHavoc_of_adequacyH {hlc : HasLC} {GF : BundledGFunctors} [InvGpreS GF] [GhostVarG GF HSt]
     {pstep : P → D → PLabel → P → D → Prop} {perr : P → Prop} {pdone : P → Option V} {img : Image} {d0 : D}
     {ps : List P} (π : Proto) (Φ : Nat → V → Prop) (Ψ : Nat → Trace → Prop)
     (himg : PO_img π img) (had : ∀ M, PO_ad π img M) (hΨ0 : ∀ h, Ψ h []) (hdf : devFreeProg pstep ps)
     (hwp : ∀ M, ∀ h p, ps[h]? = some p → ∀ [InvGS_gen hlc GF],
       ⊢@{IProp GF} wpPF π ⟨pstep, pdoneE perr pdone, img, M, h⟩ (Ψ h) p
         (fun v => iprop(⌜∃ V, grd π img M V (ΦE Φ h v)⌝))) :
-    ¬ havocs pstep perr img d0 ps := by
+    ¬ ∃ evs cfg, Weak.Prom.validRun pstep img d0 ps evs cfg ∧ errCfg perr cfg := by
   rintro ⟨evs, cfg, hv, he⟩
   exact (adequacyH (hlc := hlc) (GF := GF) (run := ⟨evs, cfg⟩) π Φ Ψ himg (had cfg.pcLog) hΨ0 hdf
     (hwp cfg.pcLog) ⟨hv, rfl⟩).1 he

@@ -390,8 +390,9 @@ def regWriteStep (h : HState) (r : Register) (v : RegisterType r) (k : PUnit →
 def hnodeStep (h : HState) (d : DevStates) (l : PLabel) (h' : HState) (d' : DevStates) : Prop :=
   match h.m with
   | .pure _ => d' = d ∧ bndStep h l h'
-  -- MachFix-havoc ([OWN.P8]/[OWN.P9]): a remaining Sail error site is HAVOC — no step here; a valid run reaching it
-  -- makes every observation possible (MachHavoc.lean `allowedH`, EmitHavoc.lean `sailErr`)
+  -- MachFix-havoc ([OWN.P8]/[OWN.P9]): a remaining Sail error site is HAVOC — no step here; a run reaching it
+  -- (HavocProm [OWN.P10]: own promises outstanding included) makes every observation possible (MachHavoc.lean
+  -- `allowedH`, EmitHavoc.lean `sailErr`)
   | .impure (.error _) _ => False
   | .impure (.ok o) k =>
     match o, k with

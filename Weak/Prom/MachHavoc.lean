@@ -2,7 +2,8 @@
 Weak/Prom: **HAVOC — the run-level semantics of a remaining Sail `.error` site** (FIX MachFix-havoc, 2026-11-04;
 owner rulings [OWN.P8] "fix every reachable Sail `.error` site faithfully; any site left afterwards is HAVOC: after
 `.error` the machine may do anything (WEAKER, sound)" and [OWN.P9] Havoc = "Global — once any hart reaches a
-remaining Sail error site, the run may produce any outcome"; context.md items 15–16).
+remaining Sail error site, the run may produce any outcome"; context.md items 15–16; HavocProm 2026-11-04:
+[OWN.P10], item 17, a run reaching an error with the erroring hart's own promise outstanding is havoc too).
 
 Machine v2 is parametric in the program half `pstep`; an ERROR NODE is a program state satisfying a predicate
 `perr` (for the Sail instance, `Emit.lean`'s residual computation `.impure (.error _) _`: `sailErr`,
@@ -10,21 +11,23 @@ EmitHavoc.lean).  The program half has no step out of an error node (Emit.lean's
 hart that reaches one stays there (`errCfg_persist`, given `errStable`): "a run reaches an error" is the same as
 "its final configuration has a hart at an error node".
 
-* `havocRun` — a VALID run (machine.lean `validRun`: from `pmInit`, no promise outstanding at its end) whose final
-  configuration has a hart at an error node; `havocs` — some havoc run exists.
+* `havocRun` — (HavocProm, [OWN.P10]) a run from `pmInit` whose final configuration has a hart at an error node
+  and whose OUTSTANDING PROMISES all belong to harts at error nodes (`promsAtErr`); `havocs` — some havoc run
+  exists.  Every valid run reaching an error is one (`havocRun_of_valid`, the MachFix-havoc notion); so is a run
+  in which a hart reaches an error while one of ITS OWN promises is still outstanding ([OWN.P10], context.md
+  item 17: "also counts as havoc (any outcome) — WEAKER, sound").  Promises of a hart NOT at an error node must
+  be fulfilled, as in a valid run: the ruling covers the erroring hart's own promises only, and the machine's
+  promise step is unconditional, so a run ending with a never-fulfilled promise of a live hart is not a run of
+  the program (it would make every program whose error branch depends on a read value havoc).
 * `allowedH O` — THE OBSERVATIONS UNDER HAVOC: an outcome predicate `O` on final configurations is allowed iff some
-  valid run's final configuration satisfies it, OR some valid run reaches an error (then EVERY observation is
-  possible: `allowedH_of_havocs`).  The "outcome constraints" of `validRun` are void after a havoc run.
-* `forbiddenH_iff` — `O` is FORBIDDEN under havoc iff no valid run satisfies it AND no valid run reaches an error:
-  a "forbidden" verdict needs both (the second is what the logic proves by showing every error node unreachable,
-  CoreHavoc.lean `adequacyH`; the Sail-level explorer reports `HAVOC` and never a forbidden verdict when it finds a
-  havoc run, MachSail.lean).
+  valid run's final configuration satisfies it, OR some havoc run exists (then EVERY observation is possible:
+  `allowedH_of_havocs`).  The "outcome constraints" of `validRun` are void after a havoc run.
+* `forbiddenH_iff` — `O` is FORBIDDEN under havoc iff no valid run satisfies it AND no havoc run exists (none of
+  the runs above, outstanding own promises included): a "forbidden" verdict needs both (the second is what the
+  logic proves by showing every error node unreachable, CoreHavocP.lean `noHavoc_of_adequacyHP`; the Sail-level
+  explorer reports `HAVOC` and never a forbidden verdict when it finds a havoc run, MachSail.lean).
 * `noErr_noHavoc` — a program half with no error node (every litmus front end: `perr := fun _ => False`) has no
   havoc run, so its outcome sets are unchanged.
-Fidelity note (HAVOC-PROM): the erroring hart is stuck, so a run in which a hart reaches an error while one of ITS
-OWN promises is still outstanding is not valid and is not counted (the brief's "a valid run reaching a Sail
-error"); under [OWN.P8]'s "may do anything" that hart could still fulfil it — recorded in PROGRESS-MachFix.md as an
-owner question.
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.MachFactor   -- `pmSteps_append`
@@ -41,16 +44,21 @@ variable {P D : Type} (pstep : P → D → PLabel → P → D → Prop) (perr : 
 /-- Some agent of the configuration is at an error node. -/
 def errCfg (cfg : PCfg P D) : Prop := ∃ (i : Nat) (ag : PAgent P), cfg.pcAgs[i]? = some ag ∧ perr ag.paSt
 
-/-- A HAVOC RUN: a valid run that reaches an error node (at its end; errors persist, `errCfg_persist`). -/
-def havocRun (img : Image) (d0 : D) (ps : List P) (evs : List PEvt) (cfg : PCfg P D) : Prop :=
-  validRun pstep img d0 ps evs cfg ∧ errCfg perr cfg
+/-- HavocProm: every outstanding promise belongs to an agent at an error node. -/
+def promsAtErr (cfg : PCfg P D) : Prop :=
+  ∀ (i : Nat) (ag : PAgent P) (t : Nat), cfg.pcAgs[i]? = some ag → t ∈ ag.paProm → perr ag.paSt
 
-/-- Some valid run reaches an error node. -/
+/-- A HAVOC RUN (HavocProm, [OWN.P10]): a run from the initial configuration that reaches an error node (at its
+end; errors persist, `errCfg_persist`), whose outstanding promises all belong to harts at error nodes. -/
+def havocRun (img : Image) (d0 : D) (ps : List P) (evs : List PEvt) (cfg : PCfg P D) : Prop :=
+  pmSteps pstep (pmInit img d0 ps) evs cfg ∧ promsAtErr perr cfg ∧ errCfg perr cfg
+
+/-- Some havoc run exists. -/
 def havocs (img : Image) (d0 : D) (ps : List P) : Prop :=
   ∃ evs cfg, havocRun pstep perr img d0 ps evs cfg
 
-/-- THE OBSERVATIONS UNDER HAVOC ([OWN.P9] "Global"): `O` is allowed iff a valid run satisfies it, or a valid run
-reaches an error (then every observation is possible). -/
+/-- THE OBSERVATIONS UNDER HAVOC ([OWN.P9] "Global", [OWN.P10]): `O` is allowed iff a valid run satisfies it, or
+a havoc run exists (then every observation is possible). -/
 def allowedH (img : Image) (d0 : D) (ps : List P) (O : PCfg P D → Prop) : Prop :=
   (∃ evs cfg, validRun pstep img d0 ps evs cfg ∧ O cfg) ∨ havocs pstep perr img d0 ps
 
@@ -63,7 +71,7 @@ variable {pstep perr}
 theorem allowedH_of_havocs {img : Image} {d0 : D} {ps : List P} (h : havocs pstep perr img d0 ps)
     (O : PCfg P D → Prop) : allowedH pstep perr img d0 ps O := .inr h
 
-/-- A FORBIDDEN verdict under havoc: no valid run satisfies `O`, and no valid run reaches an error. -/
+/-- A FORBIDDEN verdict under havoc: no valid run satisfies `O`, and no havoc run exists. -/
 theorem forbiddenH_iff {img : Image} {d0 : D} {ps : List P} {O : PCfg P D → Prop} :
     ¬ allowedH pstep perr img d0 ps O ↔
       (∀ evs cfg, validRun pstep img d0 ps evs cfg → ¬ O cfg) ∧ ¬ havocs pstep perr img d0 ps := by
@@ -78,10 +86,10 @@ theorem forbiddenH_iff {img : Image} {d0 : D} {ps : List P} {O : PCfg P D → Pr
 /-- No error node, no havoc: the outcome sets are those of the valid runs. -/
 theorem noErr_noHavoc {img : Image} {d0 : D} {ps : List P} (h : ∀ s, ¬ perr s) :
     ¬ havocs pstep perr img d0 ps := by
-  rintro ⟨_, _, _, _, ag, _, he⟩
+  rintro ⟨_, _, _, _, _, ag, _, he⟩
   exact h _ he
 
-/-- No valid run reaches an error ⇒ `allowedH` is plain reachability. -/
+/-- No havoc run ⇒ `allowedH` is plain reachability. -/
 theorem allowedH_iff_of_noHavoc {img : Image} {d0 : D} {ps : List P} (h : ¬ havocs pstep perr img d0 ps)
     {O : PCfg P D → Prop} :
     allowedH pstep perr img d0 ps O ↔ ∃ evs cfg, validRun pstep img d0 ps evs cfg ∧ O cfg :=
@@ -113,12 +121,30 @@ theorem errCfg_persist (hst : errStable pstep perr) {c c' : PCfg P D} {evs : Lis
   | refl => exact he
   | step c0 c1 c2 e es h1 _ ih => exact ih (errCfg_step hst h1 he)
 
+theorem promsAtErr_of_noPromises {cfg : PCfg P D} (h : noPromises cfg) : promsAtErr perr cfg := by
+  intro i ag t hag ht
+  rw [h i ag hag] at ht
+  exact absurd ht notElemOfEmpty
+
+/-- Every valid run reaching an error node is a havoc run (the MachFix-havoc notion). -/
+theorem havocRun_of_valid {img : Image} {d0 : D} {ps : List P} {evs : List PEvt} {cfg : PCfg P D}
+    (hv : validRun pstep img d0 ps evs cfg) (he : errCfg perr cfg) : havocRun pstep perr img d0 ps evs cfg :=
+  ⟨hv.1, promsAtErr_of_noPromises hv.2, he⟩
+
 /-- A valid run that passes through a configuration with a hart at an error node is a havoc run. -/
 theorem havocRun_of_prefix (hst : errStable pstep perr) {img : Image} {d0 : D} {ps : List P}
     {evs1 evs2 : List PEvt} {c cfg : PCfg P D} (h1 : pmSteps pstep (pmInit img d0 ps) evs1 c)
     (he : errCfg perr c) (h2 : pmSteps pstep c evs2 cfg) (hno : noPromises cfg) :
     havocRun pstep perr img d0 ps (evs1 ++ evs2) cfg :=
-  ⟨⟨pmSteps_append h1 h2, hno⟩, errCfg_persist hst h2 he⟩
+  ⟨pmSteps_append h1 h2, promsAtErr_of_noPromises hno, errCfg_persist hst h2 he⟩
+
+/-- HavocProm: a run that passes through an error node and ends with every outstanding promise at an error node
+(e.g. the erroring hart's own) is a havoc run. -/
+theorem havocRun_of_prefixE (hst : errStable pstep perr) {img : Image} {d0 : D} {ps : List P}
+    {evs1 evs2 : List PEvt} {c cfg : PCfg P D} (h1 : pmSteps pstep (pmInit img d0 ps) evs1 c)
+    (he : errCfg perr c) (h2 : pmSteps pstep c evs2 cfg) (hpa : promsAtErr perr cfg) :
+    havocRun pstep perr img d0 ps (evs1 ++ evs2) cfg :=
+  ⟨pmSteps_append h1 h2, hpa, errCfg_persist hst h2 he⟩
 
 end havoc
 

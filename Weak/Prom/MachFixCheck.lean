@@ -5,6 +5,7 @@ theorems after FIX MachFix-R-b5 (absorbed invalidate view) and FIX MachFix-havoc
 Expected for each: `[propext, Classical.choice, Quot.sound]` (or a subset).
 -/
 import Weak.Prom.CoreHavoc
+import Weak.Prom.CoreHavocP   -- HavocProm
 import Weak.Prom.EmitHavoc
 import Weak.Prom.MachForbid
 import Weak.Prom.MachComplete
@@ -35,7 +36,12 @@ import Weak.Prom.CmpMain
 #print axioms Weak.Prom.Own.lit_noInval
 #print axioms Weak.Prom.PF.adequacy
 #print axioms Weak.Prom.PF.adequacyH
-#print axioms Weak.Prom.PF.noHavoc_of_adequacyH
+#print axioms Weak.Prom.PF.noValidHavoc_of_adequacyH   -- HavocProm: renamed
+#print axioms Weak.Prom.PF.noHavoc_of_adequacyHP   -- HavocProm
+#print axioms Weak.Prom.PF.wpPF_of_wpPFH   -- HavocProm
+#print axioms Weak.Prom.PF.reach_soloD   -- HavocProm
+#print axioms Weak.Prom.havocRun_of_valid   -- HavocProm
+#print axioms Weak.Prom.havocRun_of_prefixE   -- HavocProm
 #print axioms Weak.Prom.forbiddenH_iff
 #print axioms Weak.Prom.havocRun_of_prefix
 #print axioms Weak.Prom.sailErr_stable

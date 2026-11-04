@@ -1,0 +1,16 @@
+# Files deliberately outside the default build (tools/lean_lint.py drift lint): `<file> # reason`.
+# HavocProm (2026-11-04): the Weak/Prom executable drivers and audit printers; every proof module of
+# Weak/Prom is imported from Weak.lean.  Run the drivers with `lake env lean --run <file> ...`.
+Weak/Prom/DecoderReport.lean   # driver: `def main` (decoder-check report)
+Weak/Prom/DecoderSail.lean     # driver: `def main` (generates DecoderObs.lean from the Sail model)
+Weak/Prom/LitmusOracle.lean    # driver: `def main` (reference-vs-herd litmus oracle)
+Weak/Prom/MachCertGen.lean     # driver: `def main` (generates MachCerts.lean)
+Weak/Prom/MachOracle.lean      # driver: `def main` (label-level machine-v2 litmus oracle); defines a root `main`
+Weak/Prom/MachSailOracle.lean  # driver: `def main` (Sail-level machine-v2 litmus oracle); defines a root `main`
+Weak/Prom/ProbeCov.lean        # driver: `def main` (probe coverage report)
+Weak/Prom/ProbeG2.lean         # driver: `def main` (G2 probe family runner)
+Weak/Prom/ProbeRun.lean        # driver: `def main` (probe family runner)
+Weak/Prom/ProbeXRun.lean       # driver: `def main` (G5x extended-probe runner)
+Weak/Prom/TableCxRun.lean      # driver: runs the `#tableCx` extractor at import (prints Table C)
+Weak/Prom/MachFixCheck.lean    # audit printer: `#print axioms` only, no declarations (MachFix/HavocProm)
+Weak/Prom/RepairCheck.lean     # audit printer: `#print axioms` only, no declarations (rebase repair)

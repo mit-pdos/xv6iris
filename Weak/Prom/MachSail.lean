@@ -496,7 +496,7 @@ structure MR where
   oos : List String := []
   miss : Nat := 0
   nodes : Nat := 0
-  /-- MachFix-havoc: some path reached a Sail `.error` node with no own promise outstanding -/
+  /-- MachFix-havoc: some path reached a Sail `.error` node (HavocProm [OWN.P10]: own promises outstanding or not) -/
   herr : Bool := false
 
 instance : Inhabited MR := ⟨{}⟩
@@ -508,8 +508,9 @@ def MR.add (a b : MR) : MR :=
 partial def runT (img : Image) (log : List PMsg) (i : Nat) (t : STree) (ws : PState) (prom : GSet Nat) : MR :=
   match t with
   | .done regs => if promDone log prom then { fin := [regs], nodes := 1 } else { nodes := 1 }
-  -- MachFix-havoc: a Sail `.error` node with every own promise fulfilled ends a havoc path (MachHavoc.lean)
-  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" && promDone log prom }
+  -- MachFix-havoc: a Sail `.error` node ends a havoc path (MachHavoc.lean); HavocProm [OWN.P10]: also with an
+  -- own promise outstanding (was: `&& promDone log prom`)
+  | .stop why => { oos := [why], nodes := 1, herr := why == "sail-error" }
   | .lab l t' =>
     match fixPost ws l with
     | some ws' => let r := runT img log i t' ws' prom; { r with nodes := r.nodes + 1 }
@@ -609,8 +610,9 @@ structure SStat where
   budget : Bool := false
   /-- the union differs from the all-true platform's set -/
   platDiff : Bool := false
-  /-- MachFix-havoc: some candidate memory has a HAVOC run (a valid run reaching a Sail `.error` node): every
-  observation is possible, no verdict is "forbidden" -/
+  /-- MachFix-havoc: some candidate memory has a HAVOC run (a run reaching a Sail `.error` node, every other hart
+  ending validly; HavocProm [OWN.P10]: the erroring hart's own promises may be outstanding): every observation is
+  possible, no verdict is "forbidden" -/
   havoc : Bool := false
 
 /-- The outcomes for one final memory `M` (as `outcomesM`), registers mapped back from the relocation. -/

@@ -11,8 +11,9 @@ h=<#> | SM=<cmp> SR=<cmp> SH=<cmp> | vd s/m/r/h | <ms sail> <ms mach> <ms ref>` 
 `r` reference, `h` herd; `<cmp>` as MachOracle: `STRONGER` = the Sail level lacks an outcome of the other side,
 `WEAKER` = it has an extra one), then `only-…` lines on a disagreement.  `SCOPE-SAIL <why>` when the test cannot go
 through Sail (assembly) or a Sail run stopped (`oos=`); the label-level verdict is still printed then.
-MachFix-havoc: `HAVOC <file> …` with Sail-level verdict `HAVOC` when a valid run reaches a Sail `.error` node
-(MachHavoc.lean: every observation is possible; a forbidden verdict is blocked).
+MachFix-havoc: `HAVOC <file> …` with Sail-level verdict `HAVOC` when a run reaches a Sail `.error` node (HavocProm
+[OWN.P10]: with the erroring hart's own promises outstanding or not; MachHavoc.lean: every observation is possible;
+a forbidden verdict is blocked).
 The parsing, herd, reference and label-level code is MachOracle.lean's (copied: that file defines `main`).
 -/
 import Weak.Prom.MachSail
@@ -289,7 +290,8 @@ def main (args : List String) : IO UInt32 := do
           let flags := (if st.oos.isEmpty then "" else s!" oos={st.oos}") ++
             (if st.miss == 0 then "" else s!" MISS={st.miss}") ++ (if st.platDiff then " platDiff" else "") ++
             (if rok then "" else " ref-varsOk-FAIL") ++ (if mbud then " mach-budget" else "")
-          -- MachFix-havoc: a havoc run (a valid run reaching a Sail `.error` node) makes every outcome possible: tag
+          -- MachFix-havoc: a havoc run (a run reaching a Sail `.error` node; HavocProm [OWN.P10]: own promises
+          -- outstanding included) makes every outcome possible: tag
           -- `HAVOC`, Sail-level verdict `HAVOC` (never forbidden; MachHavoc.lean `allowedH`)
           let tag := if st.havoc then "HAVOC" else if st.oos.isEmpty then "S" else "SCOPE-SAIL oos"
           let vds := if st.havoc then "HAVOC" else vdOf obs T.cond so
