@@ -1,28 +1,79 @@
 # S4a progress — ownership track (a), promises-first, frontier-gated resources (plan rev 7 §3, §4 G4, §8 S4a)
 
-## Status (top): GREEN increment 8 (2026-11-04, part 3: G4 (1c) and (3) proved); no kill criterion fired
-- K4: no program-specific normal-form fact; 9,307 lines in Weak/Prom/OwnA*.lean (bound 19k; 2× = 38k).
-- Build: `lake build Weak.Prom.OwnAHold` green (closure includes OwnALock1c and every part-1/2 file).
-  `#print axioms own_lock1c`, `own_lock1c_excl`, `own_hold`: propext, Classical.choice, Quot.sound.
-  No sorry/axiom/native_decide/opaque/implemented_by.
-- Workspace edits: NEW files only in part 3 (OwnALock1c*.lean in namespace `OA.C`, OwnAHold.lean in `OA.H`);
-  no part-1/2 file and no shared file touched; does not depend on `invalRead` beyond the existing
-  `loadOk_weak`/`cld_cases`/`cmo_dead` uses (pcsl6's R-b5 rebase: OwnALock1cLib/CS, as (1a)/(1b)).
-- G4 on track (a), 0 named inputs each, finite runs (prefix lemma S3d separate, [OWN.P4]):
-  - (1c) PROVED `own_lock1c` (+ `own_lock1c_excl`): xv6's exact text `li a4,1; again: mv a5,a4 (c.mv = add);
-    amoswap.w.aq a5,a5,(s1); sext.w a5,a5 (addiw); bnez a5,again; sd a0,16(s1); <ld;addi;sd counter>;
-    sd zero,16(s1); fence rw,w; sw zero,0(s1)`; same `qLk` statement as (1a).  The PLAIN `sw` is release-class
-    through `fence rw,w` (its pre-view `stPreA ⊒ vwNew ⊒ vrOld ⊔ vwOld`): the deposit happens at a plain store's
-    fulfil.  The cpu field `Lk+16` is a second bag in the lock resource `Rs s = cPts(lw ≤ s) ∗ pPts s`.
-  - (3) PROVED `own_hold`: hart 0 runs xv6's acquire/release ops (lock word + cpu field), hart 1 runs xv6's
-    `holding()` (racy `lw` → `beqz`; racy `ld 16(s1)` → `sub; seqz; beqz`) and acquire's panic test; hart 1
-    never panics.  FINDING: needs neither the frontier rule nor ownership on track (a): content classification
-    (all of M known) + `dead_doom` decide the racy value unguarded at the read (bytes of 0 or 0x3000, never
-    0x3100).  The frontier is needed only for resources and for protocol facts content does not determine.
-    The release-side variant (`holding()` = 1 for the holder) is NOT proved (needs a lock-word/cpu-field
-    points-to with latest write for the holder; ≈ 0.6k).
-  - (1a), (1b), (2), (2′), (5) PROVED (part 2).  NOT DONE: (4) pipealloc / runtime γ / saved-prop slots.
-- Criteria: (i) 7 of 8 targets ((4) missing); (ii) PARTIAL (blocked on (4)); (iii) EXPRESSIBLE; (iv) below.
+## Status (top): GREEN increment 9 (2026-11-04, part 4: G4 (4) proved; criteria (ii), (iii) built); no kill criterion fired
+- K4: no program-specific normal-form fact; 12,367 lines in Weak/Prom/OwnA*.lean (bound 19k; 2× = 38k).
+- Build: `lake build Weak.Prom.OwnACtxByte` green (closure includes OwnAPipe and every part-1/2/3 file).
+  `#print axioms own_pipe`: propext, Classical.choice, Quot.sound.  No sorry/axiom/native_decide/opaque/implemented_by.
+- Workspace edits: NEW files only in part 4 (OwnAPipe*.lean, OwnACtxByte.lean, namespace `OA.P`); no existing file
+  touched.  Uses `invalRead` only as parts 1–3 do (`loadOk_weak`, `loadOk_b0`, an invalidate is a dead cmo —
+  `cmo_knd`), so pcsl6's R-b5 rebase touches OwnAPipeLib (`l2_acq`, `l2_src0`), OwnAPipeH1 and OwnAPipeCS as (1c).
+- G4 on track (a): ALL 8 TARGETS, 0 named inputs each, finite runs (prefix lemma S3d separate, [OWN.P4]):
+  - (4) PROVED `own_pipe` (OwnAPipe.lean): the pipealloc shape.  Hart 0: `li t1,J; sw t1,0(s1)` (kfree junk
+    0x01010101 in L2's word), `sd t1,0(a1)` (junk in the field), `sw zero,0(s1)` (INITLOCK: L2 born by a PLAIN store
+    `b`), `li t2,5; sd t2,0(a1)` (field init `c`), `fence rw,w; sw zero,0(a2)` (release of the boot lock L1, born
+    held by hart 0).  Hart 1: xv6's acquire loop on L1, then on L2, `ld; addi; sd` of the field, xv6's release of
+    L2.  VERDICT: every field load reads `toBytes 5 8` (never the image, never the junk).
+    Mechanism, as plan §3 states it: (a) `γ` (the lock's ghost name) is ALLOCATED AT RUNTIME at the initlock step
+    (`token_alloc` in `h0_birth`); (b) L2's birth slot is a PRE-ALLOCATED SAVED-PROPOSITION SLOT (`bSlot`: σ_t, a
+    deposit one-shot δ_t, claim token = (1a)'s `nxtTok`, one per birth-class t, allocated in `p_setup`); (c) the
+    DEFERRED DEPOSIT happens at hart 0's next release-class write `r1` (`h0_rel`: `bslot_deposit` picks
+    `P := cPts c ∗ token γ`, naming the runtime γ; `dshotD b` issued); (d) in the same fulfil, L1's slot gets `Pub1 r1`
+    = the L2 handle `isLockAt … γ Lk (cPts c) b`, `b, c < r1`, and hart 0's later L2 `pend`s; (e) hart 1's aq AMO on
+    L1 claims `Pub1 s` from the release it read; its view `≥ ts > s > b` puts its L2 read above `b`:
+    R-a4 HOLDS — the junk `j < b` and the image are excluded by coherence, later bytes are hart 0's (held `pend`s,
+    fulfilled by the frontier: absurd), its own, or dead; (f) the L2 AMO reading `b` is the first L2 write after
+    `b` (`l2_chain`, (1a)'s atomicity argument) and its token opens `b`'s slot (`bslot_claim`: saved_prop_agree
+    under the opening's ▷, paid by the step's £1; the content is timeless so no second ▷).
+    Deviations (recorded): the reader gets `deposited_b` (`dshotD b`) through L1's deposited resource — the "chain of
+    releases" the plan assigns to the program proof — so the plan's `rOf_t` / `stage ≥ r(t) ⊢ deposited_t` route is
+    NOT exercised (not needed here; needed when a reader can hold the handle before the deposit).  L1 is a boot
+    lock born held by hart 0 with one acquirer (per-release claim tokens); L2 has one acquirer (but the general
+    `nxtL` claim); hart 1's L2 release deposits nothing (no later acquirer; the release-class deposit is (1c)'s
+    `lk_rel1c` and here `l1_deposit`).  L1's resource `Pub1` is FIXED at adequacy start with the runtime names
+    existential; saved propositions are used where agreement on runtime names is needed (L2's slot content must be
+    exactly the handle's `R ∗ token γ`).
+  - (1a), (1b), (1c), (2), (2′), (3), (5) PROVED (parts 2–3).
+- Criteria: (i) 8 of 8; (ii) REPRODUCED (below); (iii) BUILT with fractional sharing (below); (iv) below.
+
+### Criteria, measured 2026-11-04 (part 4)
+- (ii) `isLockN γ lk s R` (OwnACtxByte.lean) `:= isLockA PipeEnv.M PipeEnv.sv γ lk R` (OwnAPipeDefs.lean): persistent;
+  γ = the lock's runtime ghost name (allocated by initlock); `lk`, `s`, `R` parameters; body `∃ b, ⌜b is a plain
+  zero store at lk by its creator⌝ ∗ dshotD b ∗ σ_b ↦□ (R ∗ token γ) ∗ bSlot b` (pre-allocated, plan R-a5).
+  Differences from MachCSL (Lock.lean:3325): `R : IProp`, not `CtxId → IProp` (track (a)'s views are hart-local pure
+  facts); the floors (`lkFloor`, `vecFloors`, `gateFloor`) DIE — the acquirer's "view above the birth" is a pure fact
+  it gets from the publication chain (here `b < s ≤ view`); M and the name families are ambient (`class PipeEnv`, as
+  MachGS's names).  Only the birth slot is in the handle (one acquirer); xv6 needs the release slots of every later
+  release too (as (1c)'s `rSlot`s, but saved-prop: ≈ +0.3k).
+- (iii) `ctxByteA g img M vw a dq v` (OwnACtxByte.lean): latest write `lw` to byte `a` holding `v` (pure), a FRACTION
+  `dq` of the `pend` of every later message touching `a` (`pendq`), `lw ≤ vw` (`keyAt ξ e.t`'s analogue).  Proved:
+  `ctxByteA_split` (fractional sharing), `ctxByteA_view`, `ctxByteA_read` (ANY fraction reads `v` when the answer is
+  below the reader's frontier; else free mode), `ctxByteA_write` (`dq = 1`: the store's `pend` from the bag, the
+  points-to moves).  Not built: (a) the R-a1 read for a FRACTION (an answer above the frontier must doom; `doomInv`
+  stores a full `pend` — soundness needs only incompatibility with `shot`, so a fraction would do: a one-line change
+  of OwnAWp.lean's `doomInv`, not made because part-1 files are not edited); (b) joining two fractions (needs
+  agreement on `lw`: an agreement ghost per byte).
+- (iv) Lines: OwnA*.lean 12,367 (part 1 2,862; part 2 3,770; part 3 2,675; part 4 3,060: (4) 2,866 — Defs 517,
+  Lib 547, Free 236, CS 337, H1 323, H1b 235, H0 397, setup+verdict 274 — and (ii)/(iii) 194).
+  S5-delta projection, revised: lock body over runtime saved-prop slots + address-keyed classes, several acquirers
+  and the release slots 2–3k; ctxByte-shaped bags exist (194 lines), readAU/writeAU leaves over the kit 3–5k (was
+  4–6k); xv6 acquire/release leaves 1–1.5k; boot-time M-indexed setup (every byte's bag to its owner; `p_setup` is
+  the 7-class instance) 2–4k; replacing free mode 2–4k; generic deferred deposits (every pending birth of a hart
+  at its next release-class write, `rOf_t` for readers ahead of the chain) 0.5–1.5k (was 1.5–3k: exercised now);
+  fractional doom 0.1–0.3k; proof-text edits 3–5k; total ≈ 14–24k (was 16–26k), not counting S3c/S3d.
+
+### Part 4 files (Weak/Prom/, namespace `OA.P`)
+24. `OwnAPipeDefs.lean` (517) — texts `p4o`/`p4h`, test `t4` (L1 born held), the 7-class `kind`, `knd`, bags, `SV`
+   (pre-allocated tk/σ/δ), `bSlot` (saved-prop slot), `isLockAt`/`isLockA`, `Pub1`, `l1Slot`, `pCtx`, `ob2`, `q4`,
+   the bundle `ownGF4` (`ownGF` + SavedPropG at 7).
+25. `OwnAPipeLib.lean` (547) — `bslot_deposit`, `bslot_claim`, `l1_deposit`, `l1_claim`, dead/free helpers,
+   `l1_src`/`l1_val`/`l1_acq`, `l2_src`/`l2_val`/`l2_acq`/`l2_src0` (R-a4), `l2_chain` (atomicity).
+26. `OwnAPipeFree.lean` (236) — `p4h_free` (free mode walks hart 1's text).
+27. `OwnAPipeCS.lean` (337) — `h1_cld` (owned read: the verdict's obligation), `h1_addi`, `h1_cst`, `h1_fence`, `h1_rel`.
+28. `OwnAPipeH1.lean` (323) — `postA*` view facts, `a5_val`, `h1_loop2` (the L2 spin loop with the claim).
+29. `OwnAPipeH1b.lean` (235) — `h1_loop1` (the L1 spin loop, the publication), `h1_hart`.
+30. `OwnAPipeH0.lean` (397) — `h0_hart` … `h0_birth` (runtime γ), `h0_rel` (the deferred deposit + L1's deposit).
+31. `OwnAPipe.lean` (274) — `bsl_part7`, `saveds_alloc`, `dps_alloc`, `p_setup`, `p_premise`, THE VERDICT `own_pipe`.
+32. `OwnACtxByte.lean` (194) — criterion (iii) `ctxByteA` + rules; criterion (ii) `isLockN`.
 
 ### Criteria, re-measured 2026-11-04 (part 3)
 - (ii) unchanged: `lkCtx g M tk` is a persistent invariant-only handle (as `isLock`'s `inv lockN …`), and (1c)
@@ -115,13 +166,12 @@ parameterise the lock lemmas by the class predicates instead (≈ −500 lines).
 - Release-class is used as plan §3 defines it: the `.rl` AMO's pre-view contains `vwOld ≥ ts_c`.
 
 ## Next (in order)
-1. (4) pipealloc shape: `SavedPropG` (and a GName-valued ghost for runtime γ) in a new bundle; per-t saved-prop
-   slots σ_t + `rOf_t` deferred-deposit slots pre-allocated (R-a5); lock L2 born by `sw zero` over `kfree` junk
-   (`memset 1`), published through lock L1; the deposit at L1's release names L2's runtime handle.  Estimate
-   3–5k lines (two lock instances; reuse OwnALock1c* parameterised by the lock address).
-2. (3′) release-side `holding()` = 1 for the holder (≈ 0.6k).
-3. Parameterise the class-dependent lock lemmas (OwnALockLib/Acq vs OwnALock1cLib) by the class predicates
-   (≈ −500 lines).
+1. (4′) a contended runtime lock: two acquirers of L2 after publication (release slots as saved-prop slots), and a
+   reader that holds the handle before the deposit (`rOf_t` + `stage ≥ r(t) ⊢ deposited_t`) (≈ 1–1.5k).
+2. Fractional doom (OwnAWp.lean `doomInv`: `∃ q, pendq s q`) and the R-a1 read for a fraction (≈ 0.2k + 0.2k).
+3. (3′) release-side `holding()` = 1 for the holder (≈ 0.6k).
+4. Parameterise the class-dependent lock lemmas (OwnALockLib/Acq vs OwnALock1cLib vs OwnAPipeLib) by the class
+   predicates (≈ −800 lines).
 
 ## Files (Weak/Prom/)
 16. `OwnALock1b.lean` — (1b): text `p1b`, free walker `lk_free1b`, `lk_cs1b`/`lk_cs2_1b`, `lk_rel1b` (fence) +
