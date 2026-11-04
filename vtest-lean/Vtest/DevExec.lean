@@ -17,7 +17,8 @@ witness:
 
 Every other premise is checked, so `devExec_sound` holds for every `ans`.
 A primitive that is BLOCKED (a guard that does not answer, a join on an
-unfinished task, a DMA write into a reserved footprint) returns `none`: the
+unfinished task, a DMA write into a footprint under a blocking reservation,
+one that is not an LR's) returns `none`: the
 relation has a self-loop there, which a run gains nothing by taking.
 -/
 import Vtest.HartExec

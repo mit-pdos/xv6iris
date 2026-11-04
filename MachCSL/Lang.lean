@@ -127,6 +127,25 @@ reservation is left exactly as before, until the hart's next store or
 exclusive read: the SC's outcome is the opaque predicate (`notes/model-diffs.md`
 §5, the platform hooks: the reservation predicates are opaque parameters).
 
+LR reservations (owner ruling, 2026-11-05; `notes/model-policy.md` decision
+(22); the liveness plan's N-D4).  An LR's reservation is recorded as before
+(kind `lr`, until the hart's next store or exclusive read) but blocks nobody:
+the two predicates that decide blocking, `othersReserve` (`MachCSL.TsoMem`)
+and `anyReserve` (below), consider only reservations that are not an LR's
+(`Resv.blocking`).  On hardware an LR registers a watch that holds no other
+hart back -- "the SC must fail if a store to the reservation set from another
+hart can be observed to occur between the LR and SC" -- while the model's
+blocking could last for ever: a hart that never stored again after its LR
+held every other hart's store into those bytes, and the disk's DMA writes,
+blocked for ever, a behaviour hardware does not have, and one that forced the
+liveness plan's harts-progress assumption to exclude LR-blocked retries.
+Cost: the SC's outcome is still the opaque platform predicate, so a
+successful SC may now follow an intervening store; recorded in the LR/SC
+limitation (`notes/design-rulings.md`, "LR reservations do not block"), to
+be removed by the watch model, in which the memory decides the SC through
+the write's answer.  `MState.dropWindow`'s LR exemption stays: the record is
+that future watch.
+
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform
 interrupt; `MSIP`/`STIP`/`MTIP` are recomputed from `msip` and the timer at
@@ -271,9 +290,9 @@ alone) is what makes the MMIO and memory arms of `evStep` exclusive: a byte a
 hart reserves, or a byte the memory has a history for, is a DRAM byte. -/
 def devBytes (pa : PAddr) (n : Nat) : Prop := ∀ j, j < n → devAddr (pa + BitVec.ofNat 64 j) = true
 
-/-- Some hart reserves a byte of the footprint. -/
+/-- Some hart holds a blocking reservation over a byte of the footprint. -/
 def anyReserve (resv : CPU → Option Resv) (pa : PAddr) (n : Nat) : Prop :=
-  ∃ c r, resv c = some r ∧ r.overlaps pa n
+  ∃ c r, resv c = some r ∧ r.blocking ∧ r.overlaps pa n
 
 /-- What a DMA read of `n` bytes at `pa` may answer: every byte the memory
 covers is its byte at the top of the order, the others are anything (the
@@ -455,10 +474,10 @@ The memory transactions:
 * an **exclusive read** (LR, the read half of an AMO) reads at the top,
   takes the reservation, stamps the footprint's coherence floors at the
   top, and moves the floor to the top iff it is an acquire -- unless
-  another hart reserves a byte of the footprint, in which case it is
-  blocked (`blockedStep`);
-* a **write** appends at the top (`MState.store`) unless another hart
-  reserves a byte of the footprint (blocked);
+  another hart holds a blocking reservation (`Resv.blocking`: not an LR's)
+  over a byte of the footprint, in which case it is blocked (`blockedStep`);
+* a **write** appends at the top (`MState.store`) unless another hart holds
+  a blocking reservation over a byte of the footprint (blocked);
 * a **fence** moves the hart's views (`MState.fence`). -/
 abbrev evStep (cpu : CPU) (o : InstructionEffect) (σ : MState) :
     InstructionEffect.ret o → MState → Prop :=
@@ -633,8 +652,8 @@ is answered with `v`, moving the state to `σ'`, emitting `obs` and forking
 * `get`, `choose`: read the local state, any number;
 * `dmaRead`: any value consistent with the top of the order (`dmaView`);
 * `dmaWrite g`: appended at the top as the disk agent if `g` ANSWERS
-  (`g s = some s'`) and the footprint is DRAM (no hart may reserve a byte
-  of it) -- and the device's own state becomes `s'` IN THE SAME
+  (`g s = some s'`) and the footprint is DRAM (no hart may hold a blocking
+  reservation over a byte of it) -- and the device's own state becomes `s'` IN THE SAME
   TRANSITION, a silent move of the device (`devObsOk d s s' []`: a port's
   wire does not move); a silent no-op otherwise;
 * `sample`: the level its device drives on the source;
@@ -668,8 +687,8 @@ def devOpStep (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MS
 
 /-- `devBlocked d o σ`: primitive `o` is blocked (the thread retries it): a
 guard that does not answer (or answers a move unfaithful to its events,
-`devObsOk`), a DMA write into a reserved footprint (or whose guard answers
-a move of a port's wire), a join
+`devObsOk`), a DMA write into a footprint under a blocking reservation (or
+whose guard answers a move of a port's wire), a join
 on an unfinished task. -/
 def devBlocked (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState) : Prop :=
   match o with

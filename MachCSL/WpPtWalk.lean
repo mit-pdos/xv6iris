@@ -144,8 +144,8 @@ theorem swp_checked_mem_write_pte8_cond_S (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  mem_iapply (swp_sail_mem_write_excl_au_kind cpu) w0 data false .pte (vecbytes_to_bitvec_to_bytes_le_8 _) rfl
-    (by decide)
+  mem_iapply (swp_sail_mem_write_excl_au_kind cpu) w0 data false .pte (by decide)
+    (vecbytes_to_bitvec_to_bytes_le_8 _) rfl (by decide)
   iframe Hfrag
   iapply exclWriteAU_wand cpu pa 8 false w0 data Ψ $$ HAU
   inext

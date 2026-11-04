@@ -253,6 +253,53 @@ Each is conditional and reports itself in the regeneration log.
   captures interleave at most whole instructions of their harts, none executes an SC, a blocked step
   would have shown as a stuck run, and a full `tools/ci/vtest.sh passes` run reproduced the green set
   exactly.
+- **An LR's reservation blocks nobody** (owner, 2026-11-05; `notes/model-policy.md` section 8, decision
+  (22); lane `lr-nonblock`, the liveness plan's N-D4): the two predicates that decide blocking,
+  `othersReserve` (`MachCSL/TsoMem.lean`; a RAM store or an exclusive read by a hart) and `anyReserve`
+  (`MachCSL/Lang.lean`; a DMA write), gain the conjunct `r.blocking`, where `Resv.blocking r` is
+  `r.kind ≠ .lr`; an exclusive read of kind `lr` still records its reservation, which lives as before
+  until the hart's next store or exclusive read.  Nothing else in the two trusted modules changes:
+  `evStep`, `blockedStep`, `MState.dropWindow` (the LR exemption stays: the record is the future watch),
+  `afterExcl`, `MState.store`, `hartStep`, `devOpStep` and `devBlocked` keep their text and change
+  meaning through the predicates.  Why: on hardware an LR holds nobody back.  "The SC must fail if a
+  store to the reservation set from another hart can be observed to occur between the LR and SC"
+  (`norm:sc_other_hart_store_fail`, `unpriv/zalrsc.adoc:118-120`): the other hart's store occurs, and
+  the SC fails; a reservation that blocks another hart's store until its holder happens to store or
+  read exclusively, possibly for ever, is a behaviour hardware does not have, and one the Progress Axiom
+  excludes ("no memory operation may be preceded in the global memory order by an infinite sequence of
+  other memory operations", `unpriv/rvwmo.adoc:347-351`).  The drop of 2026-10-24 removed that
+  behaviour for an AMO's and the walker's reservation and left the LR's, because releasing the record
+  would have lost the watch; this change keeps the record and removes only the blocking.  What the
+  liveness plan needed: its harts-progress assumption ("a retry blocked by another hart's reservation
+  that changed nothing is eventually served") had to exclude retries blocked by an LR reservation, since
+  the model could never serve them, and the kernel proof would have carried an invariant on where LR
+  reservations lie; both qualifiers are gone.  Cost, in the other direction: the SC's outcome is still
+  the opaque platform predicate (above), so a successful SC may now follow another hart's intervening
+  store, an outcome hardware forbids; this adds behaviours, so no safety theorem proved on the model is
+  invalidated, and no theorem speaks of user LR/SC (the kernel has none).  The remaining LR/SC gap and
+  its repair, the watch model (the SC's outcome decided by the memory through the write's answer, which
+  needs lean-sail's write event to answer an optional Boolean), are recorded in `notes/design-rulings.md`
+  ("LR reservations do not block").  Proof structure: the two invariants carried in `memModelAt`
+  restrict their reservation clauses to blocking reservations -- `resvInv` (blocking reservations of
+  distinct harts are disjoint; a byte under a blocking reservation has its head under the holder's
+  coherence floor) and `mmOk`'s third clause (a blocking reservation's snapshot agrees with the top of
+  memory), since an atomic window may now overlap an LR record and another hart may store into
+  LR-reserved bytes; the three leaves of `MachCSL/WpAtomic.lean` that speak of a reservation of arbitrary
+  kind (`swp_sail_mem_write_excl_au_kind`, `swp_sail_mem_read_plain_resv_kind`,
+  `swp_sail_mem_read_excl_resv`) take `κ ≠ .lr`, which the kernel's uses at `rmw` and `pte` discharge by
+  `decide`; the user tier's LR and SC rules assume nothing about the predicates and are unchanged.
+  Policy class: a change to M3 (section 1 of the policy), admitted by owner ruling as decision (21)
+  was; A5's "removal of behaviour recorded together with the spec's permission".  What moved in the
+  trusted base (`tools/tcb/expected.json`, re-pinned in this commit; the check against the old baseline
+  named exactly these five constants and no set problem): CHANGED -- `othersReserve`, `anyReserve`
+  (the conjunct), `mmOk` and `resvInv` (the restricted clauses); ENTERED -- `Resv.blocking`.  Nothing
+  LEFT; no module, axiom or `opaque` set changed; 2,599 constants under 2,253 declarations (was 2,598
+  under 2,252).  The leaves and lemmas whose statements changed are theorems, which the pin does not
+  cover, and the constants that merely name the predicates (`evStep`, `blockedStep`, `devOpStep`,
+  `devBlocked`, `memModelAt`) did not move, as the hash covers a constant's name, not its definition.  The
+  conformance harness mirrors the kind test (`vtest-lean/Vtest/HartExec.lean`, `othersReserveB` and
+  `anyReserveB`, each proved equal to its predicate) and no green result changed: no capture executes an
+  LR or an SC, and a full `tools/ci/vtest.sh passes` run reproduced the green set exactly.
 
 ## 6. Open decisions
 

@@ -339,3 +339,16 @@ choice -- is the recorded target for when a theorem over arbitrary user code nee
 decision (19) deferred, presetting A and D in the kernel's `mappages`, becomes optional.  The
 conformance harness mirrors both arms; the content pin moves with the change (`evStep` included, its
 exclusive-read arm now passing the kind).
+
+**Decided by the owner (2026-11-05), on the liveness plan's finding that the harts-progress assumption
+had to exclude retries blocked by an LR reservation** (its `lr-tradeoffs.md` and `assumptions-audit.md`,
+outside the repository; lane `lr-nonblock`): (22) An LR's reservation blocks nobody (owner, 2026-11-05;
+lane `lr-nonblock`; the liveness plan's N-D4).  MachCSL keeps recording the reservation an LR takes, with
+kind `lr`, but the blocking predicates `othersReserve` and `anyReserve` consider only reservations that
+are not an LR's.  Why: on hardware an LR registers a watch that holds no other hart back (the manual:
+"the SC must fail if a store to the reservation set from another hart can be observed to occur between
+the LR and SC"); the model's blocking could last for ever, a behaviour hardware does not have, and it
+forced the liveness assumption for harts to exclude LR-blocked retries.  Cost: a successful SC may now
+follow an intervening store, since the SC's success is still the opaque platform hook; recorded in the
+LR/SC limitation, to be removed by the watch model (`lrsc-future.md` of the liveness plan, outside the
+repository).  Tier M3.

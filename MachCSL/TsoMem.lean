@@ -33,10 +33,16 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   footprint's coherence floors at the top (RVWMO ppo rule 2 applies to it as
   to a plain load; until 2026-10-22 it left the floors alone, so a plain load
   after an exclusive read of the same byte could read back in time -- owner
-  ruling 2026-10-22, the C3 lane).  While a hart holds a reservation, every
+  ruling 2026-10-22, the C3 lane).  While a hart holds a *blocking*
+  reservation -- an AMO's or the page walker's (`Resv.blocking`) -- every
   other hart's store or exclusive read overlapping it is blocked (the hart
-  self-loops).  The paired write appends like any store and releases the
-  reservation; an acquire pair (`.aq`) takes the floor past its own append.
+  self-loops).  A reservation of kind `lr` blocks nobody: on hardware an LR
+  registers a watch that holds no other hart back, and a reservation that
+  blocked until its holder's next store could block for ever, which hardware
+  cannot do (owner ruling 2026-11-05, policy decision (22)); the record is
+  kept for the SC's future watch.  The paired write appends like any store
+  and releases the reservation; an acquire pair (`.aq`) takes the floor past
+  its own append.
   A reservation that is not an LR's is also released at its holder's cycle
   boundary and when its holder is blocked on a plain store (`MachCSL.Lang`,
   `MState.dropWindow`): once its atomic operation is over it has no hardware
@@ -44,7 +50,7 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   next store, possibly for ever (owner ruling 2026-10-24, policy decision
   (21)).  An LR's reservation lives, as before, until the hart's next store
   or exclusive read: its SC comes in a later instruction, so its window spans
-  instructions by design.
+  instructions by design -- and, since 2026-11-05, it excludes nobody.
 * **The non-coherent instruction cache.**  A fetch reads at a view at or
   above the hart's *instruction view* `itv`, as an agent that never authors
   a store (no forwarding: a hart's own store to code is not fetched until
@@ -224,7 +230,9 @@ theorem exists_bv_of_bytes : ∀ (n : Nat) (bs : Nat → BitVec 8),
 A/D update (`pte`), or an LR (`lr`), whose SC comes in a later instruction so
 that its window spans instructions by design.  The cycle boundary and a
 blocked plain store release every reservation but an LR's (`MachCSL.Lang`,
-`MState.dropWindow`; owner ruling 2026-10-24, policy decision (21)). -/
+`MState.dropWindow`; owner ruling 2026-10-24, policy decision (21)), and an
+LR's blocks nobody (`Resv.blocking`; owner ruling 2026-11-05, policy
+decision (22)). -/
 inductive ResvKind
   | rmw
   | pte
@@ -276,9 +284,16 @@ theorem snapOf_get? (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) {kind : ResvKind
 def Resv.overlaps (r : Resv) (pa : PAddr) (n : Nat) : Prop :=
   ∃ j, j < n ∧ (r.snap[pa + BitVec.ofNat 64 j]?).isSome
 
-/-- Some *other* hart reserves a byte of the footprint. -/
+/-- A reservation that excludes other harts: an AMO's window or the page
+walker's update.  An LR's reservation is recorded but excludes nobody: on
+hardware it is a watch, not a lock (owner ruling 2026-11-05, policy decision
+(22)). -/
+def Resv.blocking (r : Resv) : Prop := r.kind ≠ .lr
+
+/-- Some *other* hart holds a blocking reservation over a byte of the
+footprint. -/
 def othersReserve (resv : CPU → Option Resv) (cpu : CPU) (pa : PAddr) (n : Nat) : Prop :=
-  ∃ c, c ≠ cpu ∧ ∃ r, resv c = some r ∧ r.overlaps pa n
+  ∃ c, c ≠ cpu ∧ ∃ r, resv c = some r ∧ r.blocking ∧ r.overlaps pa n
 
 /-! ## The per-hart read side -/
 

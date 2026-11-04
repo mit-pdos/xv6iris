@@ -24,9 +24,12 @@ value is exactly what the memory model says:
   (`swp_sail_mem_write_plain_au`).
 
 Two leaves need no accessor: a plain load, and an exclusive re-read, of
-bytes the hart itself reserves read the reservation's snapshot and keep the
+bytes the hart itself holds a blocking reservation over (an AMO's or the
+page walker's, not an LR's) read the reservation's snapshot and keep the
 reservation (`swp_sail_mem_read_plain_resv`, `swp_sail_mem_read_excl_resv`;
-the reservation invariant `resvInv`).
+the reservation invariant `resvInv`).  The exclusive write after a read half
+likewise needs a blocking reservation (`swp_sail_mem_write_excl_au_kind`):
+an LR's blocks nobody, so its bytes' heads may have moved since.
 -/
 import MachCSL.Wp
 
@@ -109,7 +112,7 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
         · subst hc
           simp only [ite_true, Option.some.injEq] at hr
           subst hr
-          intro a v hav
+          intro _ a v hav
           -- the snapshot's bytes are the top bytes
           have hmem : ∀ j, j < n → (σ.mem[pa + BitVec.ofNat 64 j]?).bind Hist.top = some (nthByte w j) :=
             htop
@@ -709,11 +712,13 @@ theorem swp_sail_mem_read_excl_au (cpu : CPU) {n nt : Nat}
   iapply HG $$ %r Hfrag H
 
 /-- The write half of an exclusive pair inside an accessor, after a read half
-of any origin `κ` (an AMO's, the page walker's, an LR's). -/
+of a blocking origin `κ` (an AMO's or the page walker's; not an LR's, whose
+reservation blocks nobody, so its bytes' heads may have moved since). -/
 theorem swp_sail_mem_write_excl_au_kind (cpu : CPU) {n nt : Nat}
     (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (bytes : Vector (BitVec 8) n) (tags : Vector Bool nt)
-    (w0 w' : BitVec (8 * n)) (acq : Bool) (κ : ResvKind) (hv : vecbytes_to_bitvec bytes = w')
+    (w0 w' : BitVec (8 * n)) (acq : Bool) (κ : ResvKind) (hκ : κ ≠ .lr)
+    (hv : vecbytes_to_bitvec bytes = w')
     (hk : akExcl req.access_kind = true) (hn : n < 2 ^ 64)
     (Φ : Result (Option Bool) Unit → IProp GF) :
     resvFrag cpu (some (snapOf req.address n w0 κ)) acq ∗
@@ -765,7 +770,8 @@ theorem swp_sail_mem_write_excl_au_kind (cpu : CPU) {n nt : Nat}
       iexact HT
     have hheads : headsAre Hs n w0 := by
       intro j hj
-      have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.address n w0 (kind := κ) hn j hj)
+      have h := hmm.2.2.1 cpu _ hres.1 hκ _ (nthByte w0 j)
+        (snapOf_get? req.address n w0 (kind := κ) hn j hj)
       rw [hget j hj, Option.bind_some] at h
       exact h
     have hram : ramBytes req.address n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
@@ -806,30 +812,34 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n nt : Nat}
     resvFrag cpu (some (snapOf req.address n w0)) acq ∗
     exclWriteAU cpu req.address n acq w0 w' iprop(resvFrag cpu none false -∗ Φ (.Ok none))
     ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_write req bytes tags) Φ :=
-  swp_sail_mem_write_excl_au_kind cpu req bytes tags w0 w' acq .rmw hv hk hn Φ
+  swp_sail_mem_write_excl_au_kind cpu req bytes tags w0 w' acq .rmw (by decide) hv hk hn Φ
 
 
 /-! ## Reads of bytes the hart reserves
 
-While a hart holds the reservation its exclusive read took on `h`, the
-reserved bytes' heads are still `h` (`mmOk`: a snapshot agrees with the top
-of memory), no other hart reserves them (`resvInv`, first clause), and their
-heads are under the hart's coherence floors (`resvInv`, second clause: the
-exclusive read stamped them at the top).  So the hart's plain load of them
-reads `h` at every view it may pick, and its exclusive re-read is never
-blocked and reads `h` again.  No accessor: nothing is learned about the
-histories but their heads, which the reservation already pins. -/
+While a hart holds the blocking reservation its exclusive read took on `h`
+(an AMO's or the page walker's), the reserved bytes' heads are still `h`
+(`mmOk`: a blocking reservation's snapshot agrees with the top of memory), no
+other hart holds a blocking reservation over them (`resvInv`, first clause),
+and their heads are under the hart's coherence floors (`resvInv`, second
+clause: the exclusive read stamped them at the top).  So the hart's plain
+load of them reads `h` at every view it may pick, and its exclusive re-read
+is never blocked and reads `h` again.  No accessor: nothing is learned about
+the histories but their heads, which the reservation already pins.  An LR's
+reservation pins nothing: it blocks nobody, so another hart may have stored
+into its bytes since (owner ruling 2026-11-05, policy decision (22)); these
+leaves therefore take a blocking origin (`κ ≠ .lr`). -/
 
 /-- The hart's plain load of the bytes it reserves reads the snapshot, at
 every view above the footprint's coherence floors. -/
 theorem resv_readBytes (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (h : BitVec (8 * n))
-    {κ : ResvKind} (hn : n < 2 ^ 64) (hmm : mmOk σ) (hri : resvInv σ)
+    {κ : ResvKind} (hκ : κ ≠ .lr) (hn : n < 2 ^ 64) (hmm : mmOk σ) (hri : resvInv σ)
     (hres : σ.resv cpu = some (snapOf pa n h κ))
     (tvn : Nat) (hcoh : (σ.hr cpu).cohOk pa n tvn) :
     σ.mem.readBytes (hartAgent cpu) tvn pa n h := by
   intro j hj
   have hsnap := snapOf_get? pa n h (kind := κ) hn j hj
-  have htop := hmm.2.2.1 cpu _ hres _ _ hsnap
+  have htop := hmm.2.2.1 cpu _ hres hκ _ _ hsnap
   unfold FlatMem.read
   cases hg : σ.mem[pa + BitVec.ofNat 64 j]? with
   | none => rw [hg] at htop; cases htop
@@ -839,26 +849,29 @@ theorem resv_readBytes (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (h : Bit
     | nil => cases htop
     | cons e H =>
       have hv : e.v = nthByte h j := Option.some.inj htop
-      have hle := hri.2 cpu _ hres _ (by rw [hsnap]; rfl) e H hg
+      have hle := hri.2 cpu _ hres hκ _ (by rw [hsnap]; rfl) e H hg
       show Hist.read (hartAgent cpu) tvn (e :: H) = some (nthByte h j)
       rw [Hist.read_cons_visible _ _ _ _ (HEnt.visible_of_le _ _ _ (Nat.le_trans hle (hcoh j hj))), hv]
 
-/-- No other hart reserves a byte of the bytes a hart reserves. -/
+/-- No other hart holds a blocking reservation over a byte of the bytes a
+hart holds a blocking reservation over. -/
 theorem resv_not_othersReserve (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (h : BitVec (8 * n))
-    {κ : ResvKind} (hn : n < 2 ^ 64) (hri : resvInv σ) (hres : σ.resv cpu = some (snapOf pa n h κ)) :
+    {κ : ResvKind} (hκ : κ ≠ .lr) (hn : n < 2 ^ 64) (hri : resvInv σ)
+    (hres : σ.resv cpu = some (snapOf pa n h κ)) :
     ¬ othersReserve σ.resv cpu pa n := by
-  rintro ⟨c, hc, r, hr, j, hj, hs⟩
-  have hnone := hri.1 cpu c _ r (Ne.symm hc) hres hr (pa + BitVec.ofNat 64 j)
+  rintro ⟨c, hc, r, hr, hb, j, hj, hs⟩
+  have hnone := hri.1 cpu c _ r (Ne.symm hc) hres hr hκ hb (pa + BitVec.ofNat 64 j)
     (by rw [snapOf_get? pa n h (kind := κ) hn j hj]; rfl)
   rw [hnone] at hs
   cases hs
 
-/-- **A plain load of bytes the hart reserves** (a reservation of any origin
-`κ`) reads the reservation's snapshot, and keeps the reservation. -/
+/-- **A plain load of bytes the hart reserves** (a reservation of any
+blocking origin `κ`: an AMO's or the page walker's) reads the reservation's
+snapshot, and keeps the reservation. -/
 theorem swp_sail_mem_read_plain_resv_kind (cpu : CPU) {n nt : Nat}
     (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (hk : akPlain req.access_kind = true) (hn : n < 2 ^ 64) (h : BitVec (8 * n)) (b : Bool)
-    (κ : ResvKind)
+    (κ : ResvKind) (hκ : κ ≠ .lr)
     (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
     resvFrag cpu (some (snapOf req.address n h κ)) b ∗
     ▷ (resvFrag cpu (some (snapOf req.address n h κ)) b -∗
@@ -884,7 +897,7 @@ theorem swp_sail_mem_read_plain_resv_kind (cpu : CPU) {n nt : Nat}
   ihave %hres : ⌜σ.resv cpu = some (snapOf req.address n h κ) ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
   · iapply memModel_resv _ σ cpu _ b $$ [Hmm Hfrag]
     iframe
-  have hrd := resv_readBytes σ cpu req.address n h hn hmm hri hres.1
+  have hrd := resv_readBytes σ cpu req.address n h hκ hn hmm hri hres.1
   have hcohTop : (σ.hr cpu).cohOk req.address n σ.top := fun j _ => (hmm.2.1 cpu).2.2.2 _
   have hram : ramBytes req.address n :=
     ramBytes_of_readBytes hmm.2.2.2.1 (hrd σ.top hcohTop)
@@ -922,15 +935,17 @@ theorem swp_sail_mem_read_plain_resv (cpu : CPU) {n nt : Nat}
     ▷ (resvFrag cpu (some (snapOf req.address n h)) b -∗
         Φ (.Ok (bitvec_to_vecbytes h, bitvec_to_vecbool 0#nt)))
     ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ :=
-  swp_sail_mem_read_plain_resv_kind cpu req hk hn h b .rmw Φ
+  swp_sail_mem_read_plain_resv_kind cpu req hk hn h b .rmw (by decide) Φ
 
-/-- **An exclusive re-read of bytes the hart reserves** is never blocked,
-reads the reservation's snapshot, and takes the same reservation again (at
-the new acquire bit). -/
+/-- **An exclusive re-read of bytes the hart reserves** (a reservation of a
+blocking origin `κ`: an AMO's or the page walker's) is never blocked, reads
+the reservation's snapshot, and takes the same reservation again (at the new
+acquire bit). -/
 theorem swp_sail_mem_read_excl_resv (cpu : CPU) {n nt : Nat}
     (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc) (acq : Bool)
     (hk : akExcl req.access_kind = true) (hacq : akAcq req.access_kind = acq) (hn : n < 2 ^ 64)
     (h : BitVec (8 * n)) (b : Bool) (κ : ResvKind) (hκ : kindOf req.access_kind = κ)
+    (hlr : κ ≠ .lr)
     (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
     resvFrag cpu (some (snapOf req.address n h κ)) b ∗
     ▷ (resvFrag cpu (some (snapOf req.address n h κ)) acq -∗
@@ -954,10 +969,11 @@ theorem swp_sail_mem_read_excl_resv (cpu : CPU) {n nt : Nat}
       (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
   · iapply memModel_resv _ σ cpu _ b $$ [Hmm Hfrag]
     iframe
-  have hno := resv_not_othersReserve σ cpu req.address n h hn hri hres.1
+  have hno := resv_not_othersReserve σ cpu req.address n h hlr hn hri hres.1
   -- the heads are the snapshot's bytes
   have htop : σ.mem.topBytes req.address n h := fun j hj =>
-    hmm.2.2.1 cpu _ hres.1 _ _ (snapOf_get? req.address n h (kind := kindOf req.access_kind) hn j hj)
+    hmm.2.2.1 cpu _ hres.1 hlr _ _
+      (snapOf_get? req.address n h (kind := kindOf req.access_kind) hn j hj)
   have hram : ramBytes req.address n := fun j hj => inRam_of_top hmm.2.2.2.1 (htop j hj)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask

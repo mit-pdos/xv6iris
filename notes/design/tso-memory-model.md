@@ -20,8 +20,12 @@ Design (trims vs Rocq `RiscvLang.mnode_step`/`TsoMemPa`/`TsoCtx`):
   drop"; `notes/model-policy.md` decision (21)) the record carries its origin
   (`ResvKind`) and a non-LR reservation is released at the boundary and at a
   blocked plain store (`MState.dropWindow`); `wpLoop_restart` takes and returns
-  the hart's `resvFragAny`.  Store arm blocked by others' reservations ->
-  `blockedStep` (hart retries; leaf proofs use `iloeb`).
+  the hart's `resvFragAny`.  Since the owner's ruling of 2026-11-05
+  (decision (22)) an LR's reservation blocks nobody: `othersReserve` and
+  `anyReserve` consider only reservations with `Resv.blocking` (kind not
+  `lr`); the record is kept for the future SC watch.  Store arm blocked by
+  others' blocking reservations -> `blockedStep` (hart retries; leaf proofs
+  use `iloeb`).
 - Resources: `a ↦ₕ{dq} H` (gen_heap over histories); mono_nat mirrors
   (`topName`, per-hart `viewName/iviewName/rviewName`); `authName` ghost map
   timestamp -> author (persistent `authoredBy`); `resvName` ghost map
