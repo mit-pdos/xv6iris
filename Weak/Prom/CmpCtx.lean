@@ -4,7 +4,7 @@ Weak/Prom: **completeness S3a — the hart context** (the reference execution se
 
 `HCtx T trs ν X h sf` bundles what the simulation of hart `h` assumes: `X` is the concrete execution of the paths
 `trs` under the load values `ν` (RefProg.lean `conc`), it is RVWMO-consistent (`rvwmoRef`), has no I/O regions, is
-single-size (NA-6), its path conditions hold (`condsOk`), the program is in S3a's scope, and `sf` is hart `h`'s final
+single-size (NA-6), its path conditions hold (`condsOk`), the program is in S3b's scope, and `sf` is hart `h`'s final
 symbolic state.  Lemmas: hart `h`'s events of `X` are `sf`'s concretised events (`HCtx.sk`, `HCtx.ev`, `HCtx.id`);
 program order is the order of `ii` (`HCtx.po`); answered and written bytes are bytes (`HCtx.rdat_lt`, `wdat_lt`);
 `memOf X` holds each store's bytes at its view (`memByte_st`) and nothing else (`writesIn_memOf`).
@@ -26,7 +26,7 @@ structure HCtx (T : Test) (trs : List SSt) (ν : Val) (X : Exec) (h : Nat) (sf :
   io : X.io = []
   ss : singleSize X
   cond : condsOk ν trs = true
-  scope : progS3aB T = true
+  scope : progS3bB T = true  -- S3b: the S3b scope (was `progS3aB`)
   tr : trs[h]? = some sf
 
 namespace HCtx
@@ -99,11 +99,11 @@ theorem lookup_getD_lt : ∀ (l : List (Nat × Nat)) (x : Nat), (∀ xv ∈ l, x
     · exact h (k, v) (List.mem_cons_self ..)
     · exact lookup_getD_lt ps x (fun xv hxv => h xv (List.mem_cons_of_mem _ hxv))
 
-theorem imgF_lt (T : Test) (hT : progS3aB T = true) (x : Nat) : T.imgF x < 256 := by
+theorem imgF_lt (T : Test) (hT : progS3bB T = true) (x : Nat) : T.imgF x < 256 := by  -- S3b: `progS3bB`
   unfold Test.imgF
   apply lookup_getD_lt
   have := hT
-  simp only [progS3aB, Bool.and_eq_true, List.all_eq_true, decide_eq_true_eq] at this
+  simp only [progS3bB, Bool.and_eq_true, List.all_eq_true, decide_eq_true_eq] at this
   exact this.2
 
 /-- A store's written bytes are bytes. -/

@@ -2,7 +2,7 @@
 Weak/Prom: **completeness S3a — the run assembly for `rvwmo_complete`** (plan rev 7 §0 "(T-cmp)", §6, §8 S3a;
 the theorem itself is in Weak/Prom/CmpMain.lean).
 
-    rvwmo_complete : progS3aB T = true → T.runAll chs = some trs → condsOk ν trs = true →
+    rvwmo_complete : progS3bB T = true → T.runAll chs = some trs → condsOk ν trs = true →
       rvwmoRef (conc T trs ν g) → singleSize (conc T trs ν g) → platformOrd (conc T trs ν g) →
       ∃ run, PF.validRun litStep (testImg T) () (progs T) (memOf (conc T trs ν g)) run ∧ promisesFirst run.evs ∧
         run.cfg.pcAgs.length = T.harts.length ∧ allDone run.cfg ∧ (∀ h, machRow (run.trace h) = refRow (conc T trs ν g) h) ∧
@@ -10,8 +10,8 @@ the theorem itself is in Weak/Prom/CmpMain.lean).
         (∀ a n, finalMem (testImg T) (memOf (conc T trs ν g)) a n = refFinalMem (conc T trs ν g) a n)
 
 Every execution the REFERENCE allows (an execution of the litmus test `T` in RefProg.lean's sense: per-hart paths
-`trs`, load values `ν`, a global memory order `g`, path conditions holding, `rvwmoRef`) of an S3a program (no AMO,
-no LR/SC, no aq/rl, no I/O; NA-6 single-size) is a VALID RUN of machine v2 over the same program (MachCert.lean's
+`trs`, load values `ν`, a global memory order `g`, path conditions holding, `rvwmoRef`) of an S3b program (S3a's
+subset plus Zalasr `l*.aq[rl]`/`s*.[aq]rl`, LR/SC, AMOs with every aq/rl combination; no I/O; NA-6 single-size) is a VALID RUN of machine v2 over the same program (MachCert.lean's
 `litStep` on `progs T`) whose final memory is the execution's stores in gmo order, in PROMISES-FIRST form, in which
 every hart finishes, with the SAME per-hart observations: the same answered bytes of every load in program order
 (`machRow = refRow`; so `run.obsLoad = refObsLoad`, `obsLoad_eq`), the same final registers and the same final

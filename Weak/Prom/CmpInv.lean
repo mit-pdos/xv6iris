@@ -30,14 +30,17 @@ open PLabel
 
 /-! ## 1. The invariant -/
 
-/-- THE FORWARD BANK'S ENTRY for byte `x` after `n` events (Pulte AtoP's `FWDBANK`). -/
+/-- THE FORWARD BANK'S ENTRY for byte `x` after `n` events (Pulte AtoP's `FWDBANK`).  S3b: the forward view is
+STRICTLY below a future AMO that reads the entry (rule 12 / rule 3 / rule 1 into a store; the AMO's single op at its
+write timestamp must find its own read point below it, M0). -/
 def fwdOk (X : Exec) (h nF n x : Nat) : Option (Nat × Nat) → Prop
   | none => ∀ j, j < n → (X.sk (h, j)).kind.isStore = true → touches (X.ev (h, j)) x = false
   | some (tf, vf) => ∃ j, j < n ∧ (X.sk (h, j)).kind.isStore = true ∧ touches (X.ev (h, j)) x = true ∧
       (∀ j2, j < j2 → j2 < n → (X.sk (h, j2)).kind.isStore = true → touches (X.ev (h, j2)) x = false) ∧
       tf = vo X (h, j) ∧
       ∀ j', n ≤ j' → j' < nF → (X.sk (h, j')).kind.isLoad = true → touches (X.ev (h, j')) x = true →
-        rfSrc X (h, j') x = some (h, j) → vf ≤ vo X (h, j')
+        rfSrc X (h, j') x = some (h, j) → vf ≤ vo X (h, j') ∧
+          ((X.sk (h, j')).kind.isStore = true → vf < vo X (h, j'))
 
 /-- THE SIMULATION INVARIANT (see the file header). -/
 structure SimInv (T : Test) (X : Exec) (ν : Val) (h : Nat) (sf : SSt) (s : SSt) (lp : LP) (ws : PState)
@@ -54,7 +57,7 @@ structure SimInv (T : Test) (X : Exec) (ν : Val) (h : Nat) (sf : SSt) (s : SSt)
   vrOld : domF (fun j => vo X (h, j)) (fun j => j < s.evs.length ∧ (X.sk (h, j)).kind.isLoad = true) ws.wVrOld
   vwOld : domF (fun j => vo X (h, j)) (fun j => j < s.evs.length ∧ (X.sk (h, j)).kind.isStore = true) ws.wVwOld
   vrNew : ∀ j, s.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isLoad = true →
-    ws.wVrNew ≤ vo X (h, j)
+    ws.wVrNew ≤ vo X (h, j) ∧ ((X.sk (h, j)).kind.isStore = true → ws.wVrNew < vo X (h, j))  -- S3b: strict for an AMO
   vwNew : ∀ j, s.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isStore = true →
     ws.wVwNew < vo X (h, j)
   vcap : ∀ j, s.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isStore = true →
@@ -74,12 +77,16 @@ structure SimInv (T : Test) (X : Exec) (ν : Val) (h : Nat) (sf : SSt) (s : SSt)
 def rowSeg (X : Exec) (h n m : Nat) : List (List Nat) :=
   ((List.range' n (m - n)).filter (fun j => (X.sk (h, j)).kind.isLoad)).map (fun j => (X.ev (h, j)).rdat)
 
+/-- S3b: the release view and the LR reservation are unchanged.  Every S3a instruction keeps them; `StepOk`
+carries the fact so that the S3b invariant `ExtraInv` (Weak/Prom/CmpInvB.lean) transports over S3a steps. -/
+def keepRR (ws ws' : PState) : Prop := ws'.wVRel = ws.wVRel ∧ ws'.wRes = ws.wRes
+
 /-- ONE INSTRUCTION SIMULATED: machine steps from `(lp, ws, prom)` whose loads answer the reference's new loads,
-reaching a state related to `s'`. -/
+reaching a state related to `s'` (S3b: keeping `wVRel`, `wRes`, `keepRR`). -/
 def StepOk (T : Test) (X : Exec) (ν : Val) (h : Nat) (sf s : SSt) (lp : LP) (ws : PState) (prom : GSet Nat)
     (s' : SSt) : Prop :=
   ∃ tr lp' ws' prom', soloSteps litStep (testImg T) (memOf X) h (lp, ws, prom) tr (lp', ws', prom') ∧
-    machRow tr = rowSeg X h s.evs.length s'.evs.length ∧ SimInv T X ν h sf s' lp' ws' prom'
+    machRow tr = rowSeg X h s.evs.length s'.evs.length ∧ SimInv T X ν h sf s' lp' ws' prom' ∧ keepRR ws ws'
 
 theorem rowSeg_self (X : Exec) (h n : Nat) : rowSeg X h n n = [] := by simp [rowSeg]
 
@@ -237,6 +244,39 @@ theorem regWE_fields (ws : PState) (rd : Nat) (srcs : List Dsrc) :
     (∀ x, coh (regWE ws rd srcs) x = coh ws x) ∧ (regWE ws rd srcs).wLdv = ws.wLdv := by
   unfold regWE; split <;> exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl⟩
 
+/-! ### S3b: `keepRR` for the S3a labels -/
+
+theorem keepRR_refl (ws : PState) : keepRR ws ws := ⟨rfl, rfl⟩
+
+theorem keepRR_trans {a b c : PState} (h1 : keepRR a b) (h2 : keepRR b c) : keepRR a c :=
+  ⟨h2.1.trans h1.1, h2.2.trans h1.2⟩
+
+theorem keepRR_afEff (ws : PState) (l : PLabel) : keepRR ws (afEff ws l) := by
+  cases l <;> exact ⟨rfl, rfl⟩
+
+theorem keepRR_fold : ∀ (labs : List PLabel) (ws : PState), keepRR ws (labs.foldl afEff ws)
+  | [], ws => keepRR_refl ws
+  | l :: rest, ws => keepRR_trans (keepRR_afEff ws l) (keepRR_fold rest (afEff ws l))
+
+theorem keepRR_regWE (ws : PState) (rd : Nat) (srcs : List Dsrc) : keepRR ws (instrE (regWE ws rd srcs)) := by
+  unfold instrE regWE; split <;> exact ⟨rfl, rfl⟩
+
+theorem keepRR_loadBytes (aq : Bool) (vpre : Nat) :
+    ∀ (ws : PState) (a : Int) (tvs : List (Nat × BitVec 8)), keepRR ws (loadBytes aq vpre ws a tvs)
+  | _, _, [] => keepRR_refl _
+  | ws, a, (t, _) :: r => keepRR_trans (⟨rfl, rfl⟩ : keepRR ws (loadByte ws aq vpre a t))
+      (keepRR_loadBytes aq vpre _ (a + 1) r)
+
+theorem keepRR_loadRun (ws : PState) (aq : Bool) (va : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) :
+    keepRR ws (loadRun ws aq false va base tvs) := keepRR_loadBytes aq _ ws base tvs
+
+theorem keepRR_storeBytes : ∀ (ws : PState) (a : Int) (n ts fv : Nat), keepRR ws (storeBytes ws a n ts fv)
+  | _, _, 0, _, _ => keepRR_refl _
+  | ws, a, n + 1, ts, fv => keepRR_storeBytes _ (a + 1) n ts fv
+
+theorem keepRR_storeRun (ws : PState) (va fv : Nat) (base : Int) (n ts : Nat) :
+    keepRR ws (storeRun ws false va fv base n ts) := keepRR_storeBytes ws base n ts fv
+
 /-- An instruction whose labels are all answer-free, over any non-empty label list. -/
 theorem solo_go1' (img : Image) (M : List PMsg) (i : Nat) (lp : LP) (ws : PState) (prom : GSet Nat)
     (ins : Instr) (regs' : List Nat) (pc' : Nat) (labs : List PLabel) (hne : labs ≠ [])
@@ -278,7 +318,7 @@ theorem inv_nomem {T : Test} {X : Exec} {ν : Val} {h : Nat} {sf s s' : SSt} {lp
     (hregv : ∀ r, 0 < r → r < 32 → domF (fun j => vo X (h, j)) (· ∈ (s'.rd r).2) (regv ws' r))
     (hvro : ws'.wVrOld = ws.wVrOld) (hvwo : ws'.wVwOld = ws.wVwOld)
     (hvrn : ∀ j, s'.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isLoad = true →
-      ws'.wVrNew ≤ vo X (h, j))
+      ws'.wVrNew ≤ vo X (h, j) ∧ ((X.sk (h, j)).kind.isStore = true → ws'.wVrNew < vo X (h, j)))
     (hvwn : ∀ j, s'.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isStore = true →
       ws'.wVwNew < vo X (h, j))
     (hvcap : ∀ j, s'.evs.length ≤ j → j < sf.evs.length → (X.sk (h, j)).kind.isStore = true →

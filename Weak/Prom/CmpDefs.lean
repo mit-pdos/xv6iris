@@ -10,6 +10,8 @@ What `rvwmo_complete` (Weak/Prom/CmpRun.lean) is about, and the vocabulary it is
     `fence.i`, `nop`; registers `< 32`; ALU immediates `< 2^64`, Ref.lean's "64-bit two's-complement naturals");
     initial memory bytes `< 256`.  NOT in S3a (plan §6 table): AMOs, LR/SC (S3b), Zalasr / RCpc annotations
     (rules 5–8 are S3b's), mixed-size (S3c), translation (deferred, [OWN.P3]).
+  - S3b: `progS3bB T` — S3a's subset plus Zalasr `l*.aq[rl]`/`s*.[aq]rl`, `lr`, `sc`, AMOs (`instrS3b`); the
+    hypothesis of `rvwmo_complete` since S3b.
   - `singleSize X` — NA-6 verbatim (plan §9: "every byte is always accessed at one width and alignment"), on the
     execution: two memory operations that access a common byte have the same address and the same size.
     Mixed-size completeness is S3c, deferred by [OWN.P5].
@@ -19,7 +21,7 @@ What `rvwmo_complete` (Weak/Prom/CmpRun.lean) is about, and the vocabulary it is
     theorem has the plan's shape; the translation extension replaces it.
 * THE MEMORY OF A REFERENCE EXECUTION (plan §6: "`mem_of_ex` takes the writes in ob order (AtoP.v:26–35). Our gmo
   is given, so M := writes in gmo order"): `memG X g` = the stores of `g`, in order, as machine messages
-  (`msgOf`: address, written bytes, author, class `plain`); `memOf X = memG X X.gmo`.
+  (`msgOf`: address, written bytes, author, class `skCls`); `memOf X = memG X X.gmo`.
 * THE VIEW OF AN EVENT (Pulte's `view_of_eid`, AtoP.v:61): `voG X g e` = the number of stores of `g` up to `e`,
   `e` included when it is a store.  So a store's view is its timestamp in `memOf X`, and a load's view is the
   number of stores before it in gmo.
@@ -68,6 +70,31 @@ def instrS3a : Instr → Bool
 def progS3aB (T : Test) : Bool :=
   T.io.isEmpty && T.harts.all (fun p => p.all instrS3a) && T.img.all (fun xv => decide (xv.2 < 256))
 
+/-- S3b: THE S3b INSTRUCTION SUBSET (plan §6 table, rows S3b-AMO and S3b-LRSC): S3a's, plus the Zalasr
+load-acquire `l{b,h,w,d}.aq[rl]` and store-release `s{b,h,w,d}.[aq]rl` (unpriv_zalasr.adoc), `lr`, `sc` (Zalrsc) and
+the AMOs (Zaamo), with every `aq`/`rl` combination, sizes `szOk` (a superset of the ISA's `.w`/`.d`; Zabha's byte and
+halfword AMOs included).  Not in scope: the hypothetical RCpc `loadAqPc`/`storeRlPc` (not RISC-V instructions,
+RefProg.lean; the machine front end has no label for them), I/O, mixed-size (S3c), translation ([OWN.P3]). -/
+def instrS3b : Instr → Bool
+  | .loadAq sz _ rd rs1 => szOk sz && rOk rd && rOk rs1
+  | .storeRl sz _ rs2 rs1 => szOk sz && rOk rs2 && rOk rs1
+  | .lr sz _ _ rd rs1 => szOk sz && rOk rd && rOk rs1
+  | .sc sz _ _ rd rs2 rs1 => szOk sz && rOk rd && rOk rs2 && rOk rs1
+  | .amo _ sz _ _ rd rs2 rs1 => szOk sz && rOk rd && rOk rs2 && rOk rs1
+  | i => instrS3a i
+
+/-- S3b: THE S3b PROGRAM SCOPE, a Bool (checked by `decide` per test). -/
+def progS3bB (T : Test) : Bool :=
+  T.io.isEmpty && T.harts.all (fun p => p.all instrS3b) && T.img.all (fun xv => decide (xv.2 < 256))
+
+theorem instrS3b_of_S3a : ∀ {i : Instr}, instrS3a i = true → instrS3b i = true := by
+  intro i h; cases i <;> first | exact h | simp [instrS3a] at h
+
+/-- Every S3a program is an S3b program. -/
+theorem progS3bB_of_S3a {T : Test} (h : progS3aB T = true) : progS3bB T = true := by
+  simp only [progS3aB, progS3bB, Bool.and_eq_true, List.all_eq_true] at h ⊢
+  exact ⟨⟨h.1.1, fun p hp i hi => instrS3b_of_S3a (h.1.2 p hp i hi)⟩, h.2⟩
+
 /-- NA-6, single-size (plan §9 NA-6, §Q2 (B): "executions where every byte is always accessed at one width and
 alignment"): two memory operations that access a common byte have the same address and the same size. -/
 def singleSize (X : Exec) : Prop :=
@@ -83,8 +110,16 @@ def platformOrd (_ : Exec) : Prop := True
 /-- `e` is a store operation. -/
 def isSt (X : Exec) (e : EvId) : Bool := (X.sk e).kind.isStore
 
-/-- The machine message of store `e` (Pulte `mem_of_ex`'s `Msg.mk loc val tid`). -/
-def msgOf (X : Exec) (e : EvId) : PMsg := ⟨((X.ev e).pa : Int), (X.ev e).wdat.map bv8, some e.1, .plain⟩
+/-- S3b: THE MESSAGE CLASS of a store event (INERT bookkeeping, Machine.lean `PClass`, fixed at the promise and
+checked at the fulfil): an AMO's or a successful SC's write is EXCLUSIVE (`memStep.rmw`/`.sc` need `.excl`, M1), a
+release store's (Zalasr `s*.rl`) is `rel` (`memStep.store` needs `stClass rl`), a plain store's `plain`. -/
+def skCls (k : Skel) : PClass :=
+  match k.kind with
+  | .amo | .sc => .excl
+  | _ => if k.rlSc || k.rlPc then .rel else .plain
+
+/-- The machine message of store `e` (Pulte `mem_of_ex`'s `Msg.mk loc val tid`); S3b: its class is `skCls`. -/
+def msgOf (X : Exec) (e : EvId) : PMsg := ⟨((X.ev e).pa : Int), (X.ev e).wdat.map bv8, some e.1, skCls (X.sk e)⟩
 
 /-- `1` for a store, `0` otherwise. -/
 def stCnt (X : Exec) (e : EvId) : Nat := if isSt X e then 1 else 0

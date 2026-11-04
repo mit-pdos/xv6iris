@@ -114,7 +114,7 @@ theorem load_pre_le (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp w
     have hd' : d ∈ (X.sk (h, s.evs.length)).adep := by rw [c.sk hm, hadep]; exact hd
     exact vo_le_of_gB (gB_of_ppo c.ref c.io hid (c.id hm)
       (ppo_r9 hmem (by rw [c.sk hm, hld]; rfl) hpo hd'))
-  have hrn := hinv.vrNew s.evs.length (Nat.le_refl _) hl.1 (by rw [c.sk hm, hld]; rfl)
+  have hrn := (hinv.vrNew s.evs.length (Nat.le_refl _) hl.1 (by rw [c.sk hm, hld]; rfl)).1  -- S3b: `.1`
   have hifv := hinv.ifv
   simp only [ldPre, Bool.false_eq_true, if_false]
   omega
@@ -178,7 +178,7 @@ theorem fwdView_le_vo (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp
           simp only [kts] at heq
           obtain ⟨hsg, hsw, _⟩ := rfSrc_spec hs0
           rw [voG_inj X X.gmo s0 (h, j0) hsg hj0g (writesB_store hsw) hs0st (by unfold vo at heq htf; omega)]
-      exact hv s.evs.length (Nat.le_refl _) hl.1 hrl htx hsrc
+      exact (hv s.evs.length (Nat.le_refl _) hl.1 hrl htx hsrc).1  -- S3b: `.1`
     · rename_i hne
       rcases hG with hG | ⟨s0, hs0, hg⟩
       · exact hG

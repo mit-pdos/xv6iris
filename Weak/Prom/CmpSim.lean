@@ -8,7 +8,8 @@ machine hart at `psInit` with every own message promised, as after the promise p
 is a solo run ending done, with no outstanding promise, the reference's final registers, and the reference row.
 No `sorry`, no axiom, no `native_decide`.
 -/
-import Weak.Prom.CmpSimS
+import Weak.Prom.CmpSimA  -- S3b: the S3b steps (imports CmpSimS)
+import Weak.Prom.CmpSymB
 
 namespace Weak.Prom.Cmp
 
@@ -28,9 +29,9 @@ theorem soloSteps_append {P : Type} {pst : P → Unit → PLabel → P → Unit 
   | refl => exact h2
   | step x l ots p' ws' prom' tr y hp hm _ ih => exact .step _ _ _ _ _ _ _ _ hp hm (ih h2)
 
-theorem instr_scope (hT : progS3aB T = true) {pc : Nat} {ins : Instr} (hi : (T.prog h)[pc]? = some ins) :
-    instrS3a ins = true := by
-  simp only [progS3aB, Bool.and_eq_true, List.all_eq_true] at hT
+theorem instr_scope (hT : progS3bB T = true) {pc : Nat} {ins : Instr} (hi : (T.prog h)[pc]? = some ins) :
+    instrS3b ins = true := by  -- S3b: the S3b scope
+  simp only [progS3bB, Bool.and_eq_true, List.all_eq_true] at hT
   unfold Test.prog at hi
   cases hh : T.harts[h]? with
   | none => rw [hh] at hi; simp at hi
@@ -39,15 +40,16 @@ theorem instr_scope (hT : progS3aB T = true) {pc : Nat} {ins : Instr} (hi : (T.p
     simp only [Option.getD_some] at hi
     exact hT.1.2 p (List.mem_of_getElem? hh) ins (List.mem_of_getElem? hi)
 
-/-- THE SIMULATION OF THE REST OF A PATH. -/
+/-- THE SIMULATION OF THE REST OF A PATH (S3b: the invariant is `SimInv` and `ExtraInv`; every S3b instruction). -/
 theorem sim (c : HCtx T trs ν X h sf) :
     ∀ (fuel : Nat) (s : SSt) (ch : List Bool) (lp : LP) (ws : PState) (prom : GSet Nat),
       symRun (T.prog h) h fuel s ch = some sf → SimInv T X ν h sf s lp ws prom →
+      ExtraInv X h s.evs.length ws.wVRel ws.wRes →
       ∃ tr lp' ws' prom', soloSteps litStep (testImg T) (memOf X) h (lp, ws, prom) tr (lp', ws', prom') ∧
         machRow tr = rowSeg X h s.evs.length sf.evs.length ∧ SimInv T X ν h sf sf lp' ws' prom' ∧
         lp'.pc = (T.prog h).length
-  | 0, s, ch, lp, ws, prom, H, _ => by simp [symRun] at H
-  | fuel + 1, s, ch, lp, ws, prom, H, hinv => by
+  | 0, s, ch, lp, ws, prom, H, _, _ => by simp [symRun] at H
+  | fuel + 1, s, ch, lp, ws, prom, H, hinv, hx => by
     unfold symRun at H
     by_cases hpc : s.pc = (T.prog h).length
     · rw [if_pos hpc] at H
@@ -63,44 +65,52 @@ theorem sim (c : HCtx T trs ν X h sf) :
         simp only at H
         have hok := instr_scope c.scope hi
         -- one instruction, then the rest
-        have cont : ∀ s' ch', s.evs.length ≤ s'.evs.length → StepOk T X ν h sf s lp ws prom s' →
+        have cont : ∀ s' ch', s.evs.length ≤ s'.evs.length → StepOkB T X ν h sf s lp ws prom s' →
             symRun (T.prog h) h fuel s' ch' = some sf →
             ∃ tr lp' ws' prom', soloSteps litStep (testImg T) (memOf X) h (lp, ws, prom) tr (lp', ws', prom') ∧
               machRow tr = rowSeg X h s.evs.length sf.evs.length ∧ SimInv T X ν h sf sf lp' ws' prom' ∧
               lp'.pc = (T.prog h).length := by
           intro s' ch' hle hst H'
-          obtain ⟨tr1, lp1, ws1, prom1, hs1, hr1, hinv1⟩ := hst
-          obtain ⟨tr2, lp2, ws2, prom2, hs2, hr2, hinv2, hpc2⟩ := sim c fuel s' ch' lp1 ws1 prom1 H' hinv1
+          obtain ⟨tr1, lp1, ws1, prom1, hs1, hr1, hinv1, hx1⟩ := hst
+          obtain ⟨tr2, lp2, ws2, prom2, hs2, hr2, hinv2, hpc2⟩ := sim c fuel s' ch' lp1 ws1 prom1 H' hinv1 hx1
           refine ⟨tr1 ++ tr2, lp2, ws2, prom2, soloSteps_append hs1 hs2, ?_, hinv2, hpc2⟩
           rw [machRow_append, hr1, hr2, rowSeg_append _ _ _ _ _ hle hinv1.fut.evs.length_le]
-        have hsh := stepI_shape h (T.prog h).length s ins
+        -- an S3a step keeps `ExtraInv`
+        have old : ∀ s', NewOk ins s s' → Future s' sf → notLrScI ins = true →
+            StepOk T X ν h sf s lp ws prom s' → StepOkB T X ν h sf s lp ws prom s' := by
+          intro s' hn hfut' hnl hst
+          have hle : s.evs.length ≤ s'.evs.length := by obtain ⟨new, h1, _⟩ := hn; rw [h1]; simp
+          exact stepOkB_of hx hst hle (fun j h1 h2 => by
+            obtain ⟨se, hse, hok'⟩ := newOk_get hn hfut'.evs h1 h2
+            rw [c.sk hse]; exact newEvOk_noLrSc hnl hok')
+        have hnew := stepI_new h (T.prog h).length s ins
         cases hstep : stepI h (T.prog h).length s ins with
         | stuck => rw [hstep] at H; cases H
         | next s' =>
           rw [hstep] at H
           have hfut := symRun_future (T.prog h) h fuel s' ch sf H
-          have hle : s.evs.length ≤ s'.evs.length := by
-            obtain ⟨⟨new, hn, _⟩, _, _, _⟩ := hsh.1 s' hstep; rw [hn]; simp
+          have hn := hnew.1 s' hstep
+          have hle : s.evs.length ≤ s'.evs.length := by obtain ⟨new, h1, _⟩ := hn; rw [h1]; simp
           refine cont s' ch hle ?_ H
           cases ins with
-          | alui op rd rs1 imm => exact sim_alui c hinv hi hok hstep hfut
-          | alu op rd rs1 rs2 => exact sim_alu c hinv hi hok hstep hfut
-          | load sz sgn rd rs1 off => exact sim_load c hinv hi hok hstep hfut
-          | store sz rs2 rs1 off => exact sim_store c hinv hi hok hstep hfut
-          | fence fs => exact sim_fence c hinv hi hstep hfut
-          | fenceTso => exact sim_fenceTso c hinv hi hstep hfut
+          | alui op rd rs1 imm => exact old s' hn hfut rfl (sim_alui c hinv hi hok hstep hfut)
+          | alu op rd rs1 rs2 => exact old s' hn hfut rfl (sim_alu c hinv hi hok hstep hfut)
+          | load sz sgn rd rs1 off => exact old s' hn hfut rfl (sim_load c hinv hi hok hstep hfut)
+          | store sz rs2 rs1 off => exact old s' hn hfut rfl (sim_store c hinv hi hok hstep hfut)
+          | fence fs => exact old s' hn hfut rfl (sim_fence c hinv hi hstep hfut)
+          | fenceTso => exact old s' hn hfut rfl (sim_fenceTso c hinv hi hstep hfut)
           | br cc rs1 rs2 tgt => simp only [stepI] at hstep; split at hstep <;> cases hstep
-          | jmp tgt => exact sim_jmp hinv hi hstep hfut
-          | csrr rd v => exact sim_csrr c hinv hi hstep hfut
-          | fencei => exact sim_fencei hinv hi hstep hfut
-          | nop => exact sim_nop hinv hi hstep hfut
-          | loadAq => simp [instrS3a] at hok
-          | storeRl => simp [instrS3a] at hok
-          | loadAqPc => simp [instrS3a] at hok
-          | storeRlPc => simp [instrS3a] at hok
-          | lr => simp [instrS3a] at hok
-          | sc => simp [instrS3a] at hok
-          | amo => simp [instrS3a] at hok
+          | jmp tgt => exact old s' hn hfut rfl (sim_jmp hinv hi hstep hfut)
+          | csrr rd v => exact old s' hn hfut rfl (sim_csrr c hinv hi hstep hfut)
+          | fencei => exact old s' hn hfut rfl (sim_fencei hinv hi hstep hfut)
+          | nop => exact old s' hn hfut rfl (sim_nop hinv hi hstep hfut)
+          | loadAq => exact sim_loadAq c hinv hx hi hok hstep hfut
+          | storeRl => exact sim_storeRl c hinv hx hi hok hstep hfut
+          | lr => exact sim_lr c hinv hx hi hok hstep hfut
+          | amo => exact sim_amo c hinv hx hi hok hstep hfut
+          | loadAqPc => simp [instrS3b, instrS3a] at hok
+          | storeRlPc => simp [instrS3b, instrS3a] at hok
+          | sc => simp [stepI] at hstep
         | fork t f =>
           rw [hstep] at H
           simp only at H
@@ -110,15 +120,19 @@ theorem sim (c : HCtx T trs ν X h sf) :
             have H' : symRun (T.prog h) h fuel (if b then t else f) ch' = some sf := by
               cases b <;> simpa using H
             have hfut := symRun_future (T.prog h) h fuel _ ch' sf H'
-            have hle : s.evs.length ≤ (if b then t else f).evs.length := by
-              obtain ⟨⟨⟨n1, hn1, _⟩, _, _, _⟩, ⟨⟨n2, hn2, _⟩, _, _, _⟩⟩ := hsh.2 t f hstep
+            have hn : NewOk ins s (if b then t else f) := by
               cases b
-              · simp only [Bool.false_eq_true, if_false]; rw [hn2]; simp
-              · simp only [if_true]; rw [hn1]; simp
+              · exact (hnew.2 t f hstep).2
+              · exact (hnew.2 t f hstep).1
+            have hle : s.evs.length ≤ (if b then t else f).evs.length := by
+              obtain ⟨new, h1, _⟩ := hn; rw [h1]; simp
             refine cont _ ch' hle ?_ H'
             cases ins with
-            | br cc rs1 rs2 tgt => exact sim_br c hinv hi hok hstep b hfut
-            | sc => simp [instrS3a] at hok
+            | br cc rs1 rs2 tgt => exact old _ hn hfut rfl (sim_br c hinv hi hok hstep b hfut)
+            | sc =>
+              cases b
+              · exact sim_scFail c hinv hx hi hok hstep hfut
+              · exact sim_scOk c hinv hx hi hok hstep hfut
             | jmp tgt => simp only [stepI] at hstep; split at hstep <;> cases hstep
             | _ => simp [stepI] at hstep
 
@@ -201,7 +215,8 @@ theorem simInv_init (c : HCtx T trs ν X h sf) {ch : List Bool} (hrun : T.runH h
         exact ⟨rfl, eval_c_lt 0 ν⟩
   have hfwd0 : ∀ x : Int, get? psInit.wFwd x = none := fun x => lookupEmpty
   refine ⟨symWf_init T h, hfut, rfl, rfl, rfl, by simp [lpInit], fun r => (hreg r).1, fun r => (hreg r).2,
-    fun r _ _ => ?_, domF_zero _ _, domF_zero _ _, fun j _ _ _ => Nat.zero_le _,
+    fun r _ _ => ?_, domF_zero _ _, domF_zero _ _,
+    fun j _ hj hs => ⟨Nat.zero_le _, fun hst => hst1 j hj hst⟩,  -- S3b: strict part
     fun j _ hj hs => hst1 j hj hs, fun j _ hj hs => hst1 j hj hs, fun x j _ hj hs _ => ?_, ?_, ?_, rfl, rfl, ?_⟩
   · have : regv psInit r = 0 := by unfold regv; rw [show psInit.wRegv = ∅ from rfl, lookupEmpty]; rfl
     rw [this]; exact domF_zero _ _
@@ -241,7 +256,7 @@ theorem sim_hart (c : HCtx T trs ν X h sf) {ch : List Bool} (hrun : T.runH h ch
       machRow tr = refRow X h ∧ lp'.pc = lp'.prog.length ∧ lp'.q = [] ∧
       (∀ r, lp'.rd r = (sf.rd r).1.eval ν) := by
   obtain ⟨tr, lp', ws', prom', hs, hrow, hinv, hpc⟩ :=
-    sim c _ (T.init h) ch (lpInit T h) psInit P0 hrun (simInv_init c hrun P0 hP0)
+    sim c _ (T.init h) ch (lpInit T h) psInit P0 hrun (simInv_init c hrun P0 hP0) (extra_init X h)  -- S3b
   have hempty : prom' = ∅ := by
     apply setEq.2
     intro t

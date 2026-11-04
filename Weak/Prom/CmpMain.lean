@@ -40,7 +40,7 @@ theorem filter_memOf {X : Exec} (hX : rvwmoRef X) (x : Nat) :
     cases touches (X.ev w) x <;> rfl
 
 /-- The machine's final memory is the reference's (MachLitmus.lean `finalMem`, Ref.lean `finalByte`). -/
-theorem finalMem_eq {T : Test} (hT : progS3aB T = true) {X : Exec} (hX : rvwmoRef X) (himg : X.img = T.imgF)
+theorem finalMem_eq {T : Test} (hT : progS3bB T = true) {X : Exec} (hX : rvwmoRef X) (himg : X.img = T.imgF)
     (hw : ∀ e, ∀ b ∈ (X.ev e).wdat, b < 256) (a n : Nat) :
     finalMem (testImg T) (memOf X) a n = refFinalMem X a n := by
   unfold finalMem refFinalMem
@@ -81,12 +81,13 @@ theorem obsLoad_eq {P D : Type} {run : PF.PFRun P D} {X : Exec} {h : Nat}
 
 /-! ## 3. The theorem -/
 
-/-- **(T-cmp), S3a: REFERENCE ⊆ MACHINE V2** (plan §0, promises-first form).  Every execution the reference
-allows of an S3a program — paths `trs` (`T.runAll chs = some trs`), load values `ν` satisfying the path
+/-- **(T-cmp), S3a + S3b: REFERENCE ⊆ MACHINE V2** (plan §0, promises-first form).  Every execution the reference
+allows of an S3b program (S3a's subset plus Zalasr `l*.aq[rl]`/`s*.[aq]rl`, LR/SC, AMOs: `progS3bB`) — paths `trs`
+(`T.runAll chs = some trs`), load values `ν` satisfying the path
 conditions, a global memory order `g` with `rvwmoRef` — that is single-size (NA-6) is a valid run of machine v2 over
 the same program, promises first, every hart done, with the same per-hart load observations, final registers and
 final memory.  `platformOrd` is `True` with translation off (CmpDefs.lean). -/
-theorem rvwmo_complete (T : Test) (hT : progS3aB T = true) {chs : List (List Bool)} {trs : List SSt} {ν : Val}
+theorem rvwmo_complete (T : Test) (hT : progS3bB T = true) {chs : List (List Bool)} {trs : List SSt} {ν : Val}
     {g : List EvId} (hrun : T.runAll chs = some trs) (hc : condsOk ν trs = true)
     (hX : rvwmoRef (conc T trs ν g)) (hss : singleSize (conc T trs ν g)) (_ : platformOrd (conc T trs ν g)) :
     ∃ run : PF.PFRun LP Unit,
@@ -98,14 +99,14 @@ theorem rvwmo_complete (T : Test) (hT : progS3aB T = true) {chs : List (List Boo
   -- the setting
   obtain ⟨hlen, hpaths⟩ := runAll_spec hrun
   have hio : T.io = [] := by
-    simp only [progS3aB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
+    simp only [progS3bB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
   have hxio : (conc T trs ν g).io = [] := hio
   generalize hXd : conc T trs ν g = X at hX hss ⊢
   have hxc : X = conc T trs ν X.gmo := by rw [← hXd]; rfl
   have hxio' : X.io = [] := by rw [← hXd]; exact hio
   have hctx : ∀ i (hi : i < trs.length), HCtx T trs ν X i trs[i] :=
     fun i hi => ⟨hxc, hX, hxio', hss, hc, hT, List.getElem?_eq_getElem hi⟩
-  have hprog : ∀ i, ∀ ins ∈ T.prog i, instrS3a ins = true := by
+  have hprog : ∀ i, ∀ ins ∈ T.prog i, instrS3b ins = true := by
     intro i ins hins
     obtain ⟨k, hk, rfl⟩ := List.getElem_of_mem hins
     exact instr_scope (h := i) hT (List.getElem?_eq_getElem hk)
@@ -125,7 +126,7 @@ theorem rvwmo_complete (T : Test) (hT : progS3aB T = true) {chs : List (List Boo
     have c := hctx w1 hw1
     have hw2 := c.idx_lt hwi
     obtain ⟨ch, hch⟩ := hpaths w1 hw1
-    have hsz := symRun_stSz _ (hprog w1) w1 _ _ _ _ hch (fun se hse => by simp [Test.init] at hse)
+    have hsz := symRun_stSzB _ (hprog w1) w1 _ _ _ _ hch (fun se hse => by simp [Test.init] at hse)
       trs[w1].evs[w2] (List.getElem_mem hw2)
     have hsk := c.sk (List.getElem?_eq_getElem hw2)
     have hst : trs[w1].evs[w2].sk.kind.isStore = true := by rw [← hsk]; exact hws
@@ -223,9 +224,9 @@ theorem rvwmo_complete (T : Test) (hT : progS3aB T = true) {chs : List (List Boo
         exact (hctx 0 (by rw [htl]; simp)).wdatAll
     exact finalMem_eq hT hX c0' hw a n
 
-/-- **(T-cmp), S3a, from `progExec`** (RefProg.lean's executions, the form `forbiddenRef`/`allowedRef` quantify
+/-- **(T-cmp), S3a + S3b, from `progExec`** (RefProg.lean's executions, the form `forbiddenRef`/`allowedRef` quantify
 over). -/
-theorem rvwmo_complete_exec (T : Test) (hT : progS3aB T = true) {chs : List (List Bool)} {ν : Val}
+theorem rvwmo_complete_exec (T : Test) (hT : progS3bB T = true) {chs : List (List Bool)} {ν : Val}
     {g : List EvId} (hE : progExec T chs ν g)
     (hss : ∀ trs, T.runAll chs = some trs → singleSize (conc T trs ν g)) :
     ∃ trs, T.runAll chs = some trs ∧ ∃ run : PF.PFRun LP Unit,

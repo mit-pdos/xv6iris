@@ -174,7 +174,8 @@ theorem sim_load (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
     (loadRun ws false false (srcsView ws (srcR rs1)) ((X.ev (h, s.evs.length)).pa : Int)
       (uniTvs t ((ν (h, s.evs.length)).map bv8))) prom (regWL_af _ _) rfl
   rw [foldl_regWL] at htail
-  refine ⟨_, _, _, _, .step _ _ none _ _ _ _ _ hlab hmem htail, ?_, ?_⟩
+  refine ⟨_, _, _, _, .step _ _ none _ _ _ _ _ hlab hmem htail, ?_, ?_,
+    keepRR_trans (keepRR_loadRun _ _ _ _ _) (keepRR_regWE _ _ _)⟩  -- S3b: `keepRR`
   · -- the row
     rw [machRow_load, machRow_af _ (regWL_af _ _), uniTvs_toNat _ _ hbyt]
     have : ((s.emit ⟨{ kind := .ld, ii := s.ii, sz := sz, adep := t1, cdep := s.ctl }, .bin .add e1 (.c off), .c 0⟩).wr

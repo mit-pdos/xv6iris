@@ -90,7 +90,7 @@ theorem sim_store (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
   have hpr : ts ∈ prom := (hinv.prom ts).2 ⟨s.evs.length, Nat.le_refl _, hml, hst, hts⟩
   have hlog : (memOf X)[ts - 1]? = some ⟨((X.ev (h, s.evs.length)).pa : Int), (X.ev (h, s.evs.length)).wdat.map bv8,
       some h, stClass false⟩ := by
-    rw [← hts]; exact memG_voG X X.gmo _ hwg hst
+    rw [← hts]; refine (memG_voG X X.gmo _ hwg hst).trans ?_; unfold msgOf; rw [hsk]; rfl  -- S3b: `skCls`
   have hcohb : cohBelow ws ((X.ev (h, s.evs.length)).pa : Int) ((X.ev (h, s.evs.length)).wdat.map bv8).length ts := by
     rw [hdl]
     refine cohBelow_of ws ts sz _ (fun k hk => ?_)
@@ -127,7 +127,8 @@ theorem sim_store (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
   have htail := solo_af (testImg T) (memOf X) h [LInstr] { lp with pc := lp.pc + 1, q := [LInstr] }
     (storeRun ws false (srcsView ws (srcR rs1)) (max (srcsView ws (srcR rs1)) (srcsView ws (srcR rs2)))
       ((X.ev (h, s.evs.length)).pa : Int) sz ts) (prom \ {ts}) (by simp [afOk]) rfl
-  refine ⟨_, _, _, _, .step _ _ (some ts) _ _ _ _ _ hlab hmem htail, ?_, ?_⟩
+  refine ⟨_, _, _, _, .step _ _ (some ts) _ _ _ _ _ hlab hmem htail, ?_, ?_,
+    keepRR_trans (keepRR_storeRun _ _ _ _ _ _) (keepRR_fold [LInstr] _)⟩  -- S3b: `keepRR`
   · rw [machRow_store, machRow_af _ (by simp [afOk])]
     have : (s.emit ⟨{ kind := .st, ii := s.ii, sz := sz, adep := t1, ddep := t2, cdep := s.ctl },
         .bin .add e1 (.c off), e2⟩).adv.evs.length = s.evs.length + 1 := by simp
@@ -161,7 +162,8 @@ theorem sim_store (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
     rw [i6, hn1]
     exact domF_max (domF_mono hinv.vwOld (fun j hj => ⟨by omega, hj.2⟩))
       (domF_of _ s.evs.length ⟨by omega, hst⟩ (Nat.le_of_eq hts.symm))
-  · intro j h1 h2 h3; show ws1.wVrNew ≤ _; rw [i7]; exact hinv.vrNew j (by rw [hn1] at h1; omega) h2 h3
+  · intro j h1 h2 h3; show ws1.wVrNew ≤ _ ∧ (_ → ws1.wVrNew < _); rw [i7]  -- S3b: strict part
+    exact hinv.vrNew j (by rw [hn1] at h1; omega) h2 h3
   · intro j h1 h2 h3; show ws1.wVwNew < _; rw [i8]; exact hinv.vwNew j (by rw [hn1] at h1; omega) h2 h3
   · -- vcap: rule 13 through the store's address
     intro j h1 h2 h3
@@ -229,7 +231,7 @@ theorem sim_store (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
       have hk : x - (X.ev (h, j')).pa < (X.sk (h, j')).sz := by
         rw [touches_iff] at h4; unfold Exec.sk; omega
       have hxk : (X.ev (h, j')).pa + (x - (X.ev (h, j')).pa) = x := by rw [touches_iff] at h4; omega
-      have hb : ∀ d, d ∈ t1 ++ t2 → vo X (h, d) ≤ vo X (h, j') := by
+      have hbg : ∀ d, d ∈ t1 ++ t2 → gB X.gmo (h, d) (h, j') = true := by
         intro d hd
         have hok : okIdx s.evs d := by
           rcases List.mem_append.1 hd with hd | hd
@@ -238,12 +240,20 @@ theorem sim_store (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
         obtain ⟨hdid, hdm, hpo1⟩ := pf_po c hinv.wf hinv.fut hok (Nat.le_refl _) hml
         have hdd : d ∈ (X.sk (h, s.evs.length)).adep ∨ d ∈ (X.sk (h, s.evs.length)).ddep := by
           rw [hsk]; simpa using List.mem_append.1 hd
-        exact vo_le_of_gB (gB_of_ppo c.ref c.io hdid hjid
-          (ppo_r12 c.io hdm h3 hid hst hpo1 hpo2 hdd hk (by rw [hxk]; exact hsrc)))
+        exact gB_of_ppo c.ref c.io hdid hjid
+          (ppo_r12 c.io hdm h3 hid hst hpo1 hpo2 hdd hk (by rw [hxk]; exact hsrc))
+      have hb : ∀ d, d ∈ t1 ++ t2 → vo X (h, d) ≤ vo X (h, j') := fun d hd => vo_le_of_gB (hbg d hd)
       have e1 := domF_bound (domF_srcR hinv.regv hrs1) (fun d hd => hb d (List.mem_append_left _
         (by rw [hr1] at hd; exact hd)))
       have e2 := domF_bound (domF_srcR hinv.regv hrs2) (fun d hd => hb d (List.mem_append_right _
         (by rw [hr2] at hd; exact hd)))
+      refine ⟨by omega, fun hjs => ?_⟩  -- S3b: strict into an AMO (rule 12 into a store)
+      have hj0 : 0 < vo X (h, j') := Nat.lt_of_lt_of_le (Nat.zero_lt_one)
+        (voG_st_pos X X.gmo _ ((mem_gmo c.ref _).2 ⟨hjid, Kind.isMem_of_isStore _ hjs⟩) hjs)
+      have f1 := domF_lt (domF_srcR hinv.regv hrs1) (fun d hd => vo_lt_of_gB (hbg d (List.mem_append_left _
+        (by rw [hr1] at hd; exact hd))) hjs) hj0
+      have f2 := domF_lt (domF_srcR hinv.regv hrs2) (fun d hd => vo_lt_of_gB (hbg d (List.mem_append_right _
+        (by rw [hr2] at hd; exact hd))) hjs) hj0
       omega
     · rename_i hout
       refine fwdOk_mono (hinv.fwd x) (by omega) (fun j hj1 hj2 hjs => ?_)

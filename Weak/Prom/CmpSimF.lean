@@ -107,7 +107,7 @@ theorem sim_fence (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
     [LFence fs.pr fs.pw fs.sr fs.sw, LInstr] (by simp) hinv.q (lpi_of hinv hi) hlabs (by simp [afOk])
   have hn' : (s.emit ⟨{ kind := .fence fs, ii := s.ii, sz := 0 }, .c 0, .c 0⟩).adv.evs.length =
       s.evs.length + 1 := by simp
-  refine ⟨_, _, _, _, hsolo, ?_, ?_⟩
+  refine ⟨_, _, _, _, hsolo, ?_, ?_, keepRR_fold _ _⟩  -- S3b: `keepRR`
   · rw [machRow_af _ (by simp [afOk]), hn', rowSeg_one]
     rw [c.sk hm]; rfl
   have hfold : [LFence fs.pr fs.pw fs.sr fs.sw, LInstr].foldl afEff ws =
@@ -125,13 +125,13 @@ theorem sim_fence (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
   · intro j h1 h2 h3
     have hjii : s.ii < sf.evs[j].sk.ii := by
       have := (hfut.later j _ h1 (List.getElem?_eq_getElem h2)).1; simp at this; omega
-    show (if fs.sr then max ws.wVrNew _ else ws.wVrNew) ≤ _
+    show (if fs.sr then max ws.wVrNew _ else ws.wVrNew) ≤ _ ∧ (_ → (if fs.sr then max ws.wVrNew _ else ws.wVrNew) < _)
     have hold := hinv.vrNew j (by simp at h1; omega) h2 h3
     split
     · rename_i hsr
-      have := (fence_le c hinv.wf hinv.fut hm rfl rfl h2 hjii (Kind.isMem_of_isLoad _ h3)
-        (inSucc_load c.io hsr h3) hv).1
-      omega
+      have := fence_le c hinv.wf hinv.fut hm rfl rfl h2 hjii (Kind.isMem_of_isLoad _ h3)
+        (inSucc_load c.io hsr h3) hv
+      exact ⟨by omega, fun hs => by have := this.2 hs; have := hold.2 hs; omega⟩  -- S3b: strict for an AMO
     · exact hold
   · intro j h1 h2 h3
     have hjii : s.ii < sf.evs[j].sk.ii := by
@@ -167,7 +167,7 @@ theorem sim_fenceTso (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp 
     (by simp [afOk])
   have hn' : ((s.emit ⟨{ kind := .fence fR, ii := s.ii, sz := 0 }, .c 0, .c 0⟩).emit
       ⟨{ kind := .fence fW, ii := s.ii, sz := 0 }, .c 0, .c 0⟩).adv.evs.length = s.evs.length + 2 := by simp
-  refine ⟨_, _, _, _, hsolo, ?_, ?_⟩
+  refine ⟨_, _, _, _, hsolo, ?_, ?_, keepRR_fold _ _⟩  -- S3b: `keepRR`
   · rw [machRow_af _ (by simp [afOk]), hn', ← rowSeg_append X h _ (s.evs.length + 1) _ (by omega) (by omega),
       rowSeg_one, rowSeg_one, c.sk hm1, c.sk hm2]; rfl
   have hfold : [LFence true false true true, LFence false true false true, LInstr].foldl afEff ws =
@@ -189,12 +189,12 @@ theorem sim_fenceTso (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp 
   · intro j h1 h2 h3
     simp only [hn'] at h1
     have hjii := hfut2 j h1 h2
-    show max ws.wVrNew (max ws.wVrOld 0) ≤ _
+    show max ws.wVrNew (max ws.wVrOld 0) ≤ _ ∧ (_ → max ws.wVrNew (max ws.wVrOld 0) < _)
     have hold := hinv.vrNew j (by omega) h2 h3
-    have := (fence_le c hinv.wf hinv.fut hm1 rfl rfl h2 hjii (Kind.isMem_of_isLoad _ h3)
-      (inSucc_load c.io rfl h3) hv1).1
+    have := fence_le c hinv.wf hinv.fut hm1 rfl rfl h2 hjii (Kind.isMem_of_isLoad _ h3)
+      (inSucc_load c.io rfl h3) hv1
     simp only [fR, if_true, Bool.false_eq_true, if_false] at this
-    omega
+    exact ⟨by omega, fun hs => by have := this.2 hs; have := hold.2 hs; omega⟩  -- S3b: strict for an AMO
   · intro j h1 h2 h3
     simp only [hn'] at h1
     have hjii := hfut2 j h1 h2

@@ -116,7 +116,7 @@ theorem sim_alui (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
   rw [foldl_regWL] at hsolo
   obtain ⟨hv, hvlt⟩ := eval_bin_c (op := op) hlt1 himm
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd (srcR rs1)
-  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_⟩
+  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
     (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
   · intro r
@@ -154,7 +154,7 @@ theorem sim_alu (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws pr
   rw [foldl_regWL] at hsolo
   have hvlt : aluOp op (e1.eval ν) (e2.eval ν) < two64 := aluOp_lt op hlt1 hlt2
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd (srcR rs1 ++ srcR rs2)
-  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_⟩
+  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
     (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
   · intro r
@@ -187,7 +187,7 @@ theorem sim_csrr (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
     (regWL rd [] ++ [LInstr]) (regWL_ne _ _) hinv.q (lpi_of hinv hi) (fun l => rfl) (regWL_af _ _)
   rw [foldl_regWL] at hsolo
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd []
-  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_⟩
+  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
     (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
   · intro r
@@ -216,7 +216,7 @@ theorem sim_plain (hinv : SimInv T X ν h sf s lp ws prom) {ins : Instr} (hi : (
   have hsolo := solo_go1' (testImg T) (memOf X) h lp ws prom ins lp.regs pc' labs hne hinv.q (lpi_of hinv hi) hn hok
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8, f9⟩ := hws
   have hrd : ∀ r, s'.rd r = s.rd r := fun r => by unfold SSt.rd; rw [hregs]
-  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ hok, hevs, rowSeg_self], ?_⟩
+  refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ hok, hevs, rowSeg_self], ?_, keepRR_fold _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by rw [hevs]; exact Nat.le_refl _) (fun j h1 h2 => by rw [hevs] at h2; omega)
     (by rw [lp_after, hinv.prog]) hpc' rfl hinv.lpLen ?_ ?_ ?_ f1 f2 ?_ ?_ hcap f6 f5 f8 f9
   · intro r; rw [hrd]; exact hinv.regEq r

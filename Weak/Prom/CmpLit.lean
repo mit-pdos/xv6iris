@@ -31,117 +31,36 @@ open PLabel
 
 /-! ## 1. NA-6 for uniform-size programs -/
 
-/-- Every load and store of the program has size `s`. -/
+/-- Every memory access of the program has size `s` (S3b: also `l*.aq`, `s*.rl`, `lr`, `sc`, AMOs). -/
 def instrSz (s : Nat) : Instr → Bool
   | .load sz _ _ _ _ => sz == s
   | .store sz _ _ _ => sz == s
+  | .loadAq sz _ _ _ => sz == s
+  | .storeRl sz _ _ _ => sz == s
+  | .loadAqPc sz _ _ _ => sz == s
+  | .storeRlPc sz _ _ _ => sz == s
+  | .lr sz _ _ _ _ => sz == s
+  | .sc sz _ _ _ _ _ => sz == s
+  | .amo _ sz _ _ _ _ _ => sz == s
   | _ => true
 
 def uniformB (T : Test) (s : Nat) : Bool := T.harts.all (fun p => p.all (instrSz s))
 
-theorem stepI_memSz {h n s : Nat} {st : SSt} {i : Instr} (hok : instrS3a i = true) (hu : instrSz s i = true)
-    (hs : ∀ se ∈ st.evs, se.sk.kind.isMem = true → se.sk.sz = s) :
-    (∀ s', stepI h n st i = .next s' → ∀ se ∈ s'.evs, se.sk.kind.isMem = true → se.sk.sz = s) ∧
-    (∀ t f, stepI h n st i = .fork t f →
-      (∀ se ∈ t.evs, se.sk.kind.isMem = true → se.sk.sz = s) ∧
-      (∀ se ∈ f.evs, se.sk.kind.isMem = true → se.sk.sz = s)) := by
+/-- S3b: an appended memory operation of a uniform-size instruction has that size (`newEvOk`, CmpSymB.lean). -/
+theorem newEvOk_memSz {s : Nat} {i : Instr} (hu : instrSz s i = true) {se : SEv} (h : newEvOk i se)
+    (hm : se.sk.kind.isMem = true) : se.sk.sz = s := by
   cases i with
-  | alui => refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-            simp only [stepI, Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | alu => refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-           simp only [stepI, Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | csrr => refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-            simp only [stepI, Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | nop => refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-           simp only [stepI, Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | fencei => refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-              simp only [stepI, Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | jmp tgt =>
-    refine ⟨fun s' e => ?_, fun t f e => by simp only [stepI] at e; split at e <;> cases e⟩
-    simp only [stepI] at e; split at e
-    · cases e
-    · simp only [Ref.StepR.next.injEq] at e; subst e; simpa using hs
-  | br c rs1 rs2 tgt =>
-    refine ⟨fun s' e => (by simp only [stepI] at e; split at e <;> cases e), fun t f e => ?_⟩
-    simp only [stepI] at e; split at e
-    · cases e
-    · simp only [Ref.StepR.fork.injEq] at e; obtain ⟨rfl, rfl⟩ := e; exact ⟨hs, hs⟩
-  | load sz sgn rd rs1 off =>
-    refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-    simp only [stepI, Ref.StepR.next.injEq] at e; subst e
-    intro se hse hm
-    simp only [SSt.adv_evs, SSt.wr_evs, SSt.emit_evs, List.mem_append, List.mem_singleton] at hse
-    rcases hse with hse | rfl
-    · exact hs se hse hm
-    · simpa [instrSz] using hu
-  | store sz rs2 rs1 off =>
-    refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-    simp only [stepI, Ref.StepR.next.injEq] at e; subst e
-    intro se hse hm
-    simp only [SSt.adv_evs, SSt.emit_evs, List.mem_append, List.mem_singleton] at hse
-    rcases hse with hse | rfl
-    · exact hs se hse hm
-    · simpa [instrSz] using hu
-  | fence fs =>
-    refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-    simp only [stepI, Ref.StepR.next.injEq] at e; subst e
-    intro se hse hm
-    simp only [SSt.adv_evs, SSt.emit_evs, List.mem_append, List.mem_singleton] at hse
-    rcases hse with hse | rfl
-    · exact hs se hse hm
-    · cases hm
-  | fenceTso =>
-    refine ⟨fun s' e => ?_, fun t f e => by simp [stepI] at e⟩
-    simp only [stepI, Ref.StepR.next.injEq] at e; subst e
-    intro se hse hm
-    simp only [SSt.adv_evs, SSt.emit_evs, List.mem_append, List.mem_singleton] at hse
-    rcases hse with (hse | rfl) | rfl
-    · exact hs se hse hm
-    · cases hm
-    · cases hm
-  | loadAq => simp [instrS3a] at hok
-  | storeRl => simp [instrS3a] at hok
-  | loadAqPc => simp [instrS3a] at hok
-  | storeRlPc => simp [instrS3a] at hok
-  | lr => simp [instrS3a] at hok
-  | sc => simp [instrS3a] at hok
-  | amo => simp [instrS3a] at hok
+  | load | store | loadAq | storeRl | loadAqPc | storeRlPc | lr | sc | amo =>
+    simp only [instrSz, beq_iff_eq] at hu; rw [h.2, hu]
+  | fence | fenceTso => rw [h.1] at hm; cases hm
+  | _ => exact h.elim
 
-theorem symRun_memSz (p : List Instr) (hp : ∀ i ∈ p, instrS3a i = true) {s : Nat}
-    (hu : ∀ i ∈ p, instrSz s i = true) (h : Nat) :
-    ∀ (fuel : Nat) (st : SSt) (ch : List Bool) (sf : SSt), symRun p h fuel st ch = some sf →
-      (∀ se ∈ st.evs, se.sk.kind.isMem = true → se.sk.sz = s) →
-      ∀ se ∈ sf.evs, se.sk.kind.isMem = true → se.sk.sz = s
-  | 0, st, ch, sf, H, _ => by simp [symRun] at H
-  | fuel + 1, st, ch, sf, H, hs => by
-    unfold symRun at H
-    by_cases hpc : st.pc = p.length
-    · rw [if_pos hpc] at H
-      split at H
-      · cases H; exact hs
-      · cases H
-    · rw [if_neg hpc] at H
-      cases hi : p[st.pc]? with
-      | none => rw [hi] at H; cases H
-      | some i =>
-        rw [hi] at H
-        simp only at H
-        have hsz := stepI_memSz (h := h) (n := p.length) (hp i (List.mem_of_getElem? hi))
-          (hu i (List.mem_of_getElem? hi)) hs
-        cases he : stepI h p.length st i with
-        | stuck => rw [he] at H; cases H
-        | next s' =>
-          rw [he] at H
-          exact symRun_memSz p hp hu h fuel s' ch sf H (hsz.1 s' he)
-        | fork t f =>
-          rw [he] at H
-          simp only at H
-          cases ch with
-          | nil => cases H
-          | cons b ch' =>
-            cases b
-            · exact symRun_memSz p hp hu h fuel f ch' sf H (hsz.2 t f he).2
-            · exact symRun_memSz p hp hu h fuel t ch' sf H (hsz.2 t f he).1
+theorem symRun_memSz (p : List Instr) {s : Nat} (hu : ∀ i ∈ p, instrSz s i = true) (h : Nat)
+    (fuel : Nat) (st : SSt) (ch : List Bool) (sf : SSt) (H : symRun p h fuel st ch = some sf)
+    (hs : ∀ se ∈ st.evs, se.sk.kind.isMem = true → se.sk.sz = s) :
+    ∀ se ∈ sf.evs, se.sk.kind.isMem = true → se.sk.sz = s :=
+  symRun_newProp p h (fun se => se.sk.kind.isMem = true → se.sk.sz = s)
+    (fun i hi se hse hm => newEvOk_memSz (hu i hi) hse hm) fuel st ch sf H hs
 
 theorem aligned_eq {s a b : Nat} (hs : 0 < s) (ha : a % s = 0) (hb : b % s = 0) (h1 : a < b + s) (h2 : b < a + s) :
     a = b := by
@@ -160,7 +79,7 @@ theorem aligned_eq {s a b : Nat} (hs : 0 < s) (ha : a % s = 0) (hb : b % s = 0) 
 
 /-- **NA-6 FOR EVERY EXECUTION of a uniform-size program**: all memory operations have size `s` and are naturally
 aligned (`condsOk`), so overlapping ones have the same address. -/
-theorem singleSize_of_uniform {T : Test} (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s = true)
+theorem singleSize_of_uniform {T : Test} (hT : progS3bB T = true) {s : Nat} (hu : uniformB T s = true)
     (hs : 0 < s) {chs : List (List Bool)} {trs : List SSt} {ν : Val} (g : List EvId)
     (hrun : T.runAll chs = some trs) (hc : condsOk ν trs = true) : singleSize (conc T trs ν g) := by
   obtain ⟨hlen, hpaths⟩ := runAll_spec hrun
@@ -175,10 +94,6 @@ theorem singleSize_of_uniform {T : Test} (hT : progS3aB T = true) {s : Nat} (hu 
     have hst' : trs[e.1] = st := (List.getElem?_eq_some_iff.1 hst).2
     obtain ⟨ch, hch⟩ := hpaths e.1 hi
     have hse : sevAt trs e = st.evs[e.2] := by simp [sevAt, hst, List.getElem?_eq_getElem hl2]
-    have hprog : ∀ i ∈ T.prog e.1, instrS3a i = true := by
-      intro i hin
-      obtain ⟨k, hk, rfl⟩ := List.getElem_of_mem hin
-      exact Weak.Prom.Cmp.instr_scope (h := e.1) hT (List.getElem?_eq_getElem hk)
     have hprogu : ∀ i ∈ T.prog e.1, instrSz s i = true := by
       intro i hin
       simp only [uniformB, List.all_eq_true] at hu
@@ -190,7 +105,7 @@ theorem singleSize_of_uniform {T : Test} (hT : progS3aB T = true) {s : Nat} (hu 
     have hmem : st.evs[e.2] ∈ st.evs := List.getElem_mem hl2
     have hsk : sskOf trs e = st.evs[e.2].sk := by simp [sskOf, hse]
     rw [hsk] at hm ⊢
-    refine ⟨symRun_memSz _ hprog hprogu e.1 _ _ _ _ hch (fun se hse' => by simp [Test.init] at hse')
+    refine ⟨symRun_memSz _ hprogu e.1 _ _ _ _ hch (fun se hse' => by simp [Test.init] at hse')
       _ hmem hm, ?_⟩
     have hcs := List.all_eq_true.1 hc st (List.mem_of_getElem? hst)
     simp only [Bool.and_eq_true, List.all_eq_true] at hcs
@@ -198,7 +113,7 @@ theorem singleSize_of_uniform {T : Test} (hT : progS3aB T = true) {s : Nat} (hu 
     have hacc : st.evs[e.2].sk.kind.isAcc = true := by simp [Kind.isAcc, hm]
     simp only [hacc, Bool.not_true, Bool.false_or, beq_iff_eq] at this
     rw [conc_ev _ _ _ _ _ he, hse]
-    rw [symRun_memSz _ hprog hprogu e.1 _ _ _ _ hch (fun se hse' => by simp [Test.init] at hse') _ hmem hm] at this
+    rw [symRun_memSz _ hprogu e.1 _ _ _ _ hch (fun se hse' => by simp [Test.init] at hse') _ hmem hm] at this
     exact this
   intro a ha b hb ham hbm hov
   rw [conc_sk] at ham hbm
@@ -215,7 +130,7 @@ theorem singleSize_of_uniform {T : Test} (hT : progS3aB T = true) {s : Nat} (hu 
 
 /-- **REF ⇒ MACH ⇒ LIT**: a property `Q` that every valid run of machine v2 (with every hart finished) has, of its
 load observations and final memory, every reference execution has, of its own. -/
-theorem refFromLit (T : Test) (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
+theorem refFromLit (T : Test) (hT : progS3bB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
     (Q : (Nat → Nat → Option Nat) → (Nat → Nat → Nat) → Prop)
     (hlit : ∀ (M : List PMsg) (run : PF.PFRun LP Unit), PF.validRun litStep (testImg T) () (progs T) M run →
       (∀ h, h < T.harts.length → run.done PF.litDone h ()) → Q run.obsLoad (finalMem (testImg T) M)) :
@@ -240,7 +155,7 @@ theorem refFromLit (T : Test) (hT : progS3aB T = true) {s : Nat} (hu : uniformB 
 
 /-- **THE REFERENCE VERDICT, IN THE REFERENCE'S VOCABULARY**: `forbiddenRef T` (the statement of `ref_<test>`)
 from the logic's property `Q` and a bridge "the outcome implies ¬ Q". -/
-theorem forbid_of_lit (T : Test) (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
+theorem forbid_of_lit (T : Test) (hT : progS3bB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
     (Q : (Nat → Nat → Option Nat) → (Nat → Nat → Nat) → Prop)
     (hlit : ∀ (M : List PMsg) (run : PF.PFRun LP Unit), PF.validRun litStep (testImg T) () (progs T) M run →
       (∀ h, h < T.harts.length → run.done PF.litDone h ()) → Q run.obsLoad (finalMem (testImg T) M))
@@ -309,7 +224,7 @@ theorem sext_small {sz u v : Nat} (hsz : 0 < sz ∧ sz ≤ 8) (hu : u < 2 ^ (8 *
 /-- **THE REGISTER BRIDGE**: if register `r` of hart `h` ends with the `k`-th load's value (`regLoadB`) and the
 outcome asks it to be `v` (small enough not to be sign-extended), the reference's `k`-th load observation is
 `v`. -/
-theorem bridge_reg {T : Test} (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
+theorem bridge_reg {T : Test} (hT : progS3bB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
     {chs : List (List Bool)} {ν : Val} {g : List EvId} {trs : List SSt} (hE : progExec T chs ν g)
     (hr : T.runAll chs = some trs) {h r k sz v : Nat} (hB : regLoadB T h r k sz = true)
     (hsz : 0 < sz ∧ sz ≤ 8) (hv : v < 2 ^ (8 * sz - 1)) (hv64 : v < two64)
@@ -339,7 +254,7 @@ theorem bridge_reg {T : Test} (hT : progS3aB T = true) {s : Nat} (hu : uniformB 
       simp only [beq_iff_eq] at hsj
       -- the context
       have hio : T.io = [] := by
-        simp only [progS3aB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
+        simp only [progS3bB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
       have c : HCtx T trs ν (conc T trs ν g) h st :=
         ⟨rfl, hX, hio, singleSize_of_uniform hT hu hs g hr hc, hc, hT, htr⟩
       have hjm : st.evs[j]? = some st.evs[j] := List.getElem?_eq_getElem hjl
@@ -396,7 +311,7 @@ theorem oc_notMem {X : Exec} {fr : Nat → Nat → Nat} {a sz v : Nat} (hv : v <
 
 /-- **THE REGISTER BRIDGE, BOTH WAYS**: the reference's `k`-th load observation is `v` iff the outcome condition
 `.reg h r v` holds (for a register that ends with that load's value, `regLoadB`). -/
-theorem obsReg {T : Test} (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
+theorem obsReg {T : Test} (hT : progS3bB T = true) {s : Nat} (hu : uniformB T s = true) (hs : 0 < s)
     {chs : List (List Bool)} {ν : Val} {g : List EvId} {trs : List SSt} (hE : progExec T chs ν g)
     (hr : T.runAll chs = some trs) {h r k sz v : Nat} (hB : regLoadB T h r k sz = true)
     (hsz : 0 < sz ∧ sz ≤ 8) (hv : v < 2 ^ (8 * sz - 1)) (hv64 : v < two64) (fm : Nat → Nat) :
@@ -428,7 +343,7 @@ theorem obsReg {T : Test} (hT : progS3aB T = true) {s : Nat} (hu : uniformB T s 
         rw [List.getElem?_eq_getElem hjl] at hsj
         simp only [beq_iff_eq] at hsj
         have hio : T.io = [] := by
-          simp only [progS3aB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
+          simp only [progS3bB, Bool.and_eq_true, List.isEmpty_iff] at hT; exact hT.1.1
         have c : HCtx T trs ν (conc T trs ν g) h st :=
           ⟨rfl, hX, hio, singleSize_of_uniform hT hu hs g hr hc, hc, hT, htr⟩
         have hjm : st.evs[j]? = some st.evs[j] := List.getElem?_eq_getElem hjl
@@ -495,7 +410,7 @@ theorem refChk (T : Test) (hF : forbiddenRef T) (R : (Nat → Nat → Option Nat
   exact hbr chs ν g trs hE hr hR
 
 /-- `obsReg` for word loads (`lw`, size 4). -/
-theorem obsReg4 {T : Test} (hT : progS3aB T = true) (hu : uniformB T 4 = true)
+theorem obsReg4 {T : Test} (hT : progS3bB T = true) (hu : uniformB T 4 = true)
     {chs : List (List Bool)} {ν : Val} {g : List EvId} {trs : List SSt} (hE : progExec T chs ν g)
     (hr : T.runAll chs = some trs) {h r k v : Nat} (hB : regLoadB T h r k 4 = true) (hv : v < 2 ^ 31)
     (fm : Nat → Nat) :
@@ -503,7 +418,7 @@ theorem obsReg4 {T : Test} (hT : progS3aB T = true) (hu : uniformB T 4 = true)
   obsReg hT hu (by decide) hE hr hB ⟨by decide, by decide⟩ hv (Nat.lt_trans hv (by decide)) fm
 
 /-- `obsReg` for doubleword loads (`ld`, size 8). -/
-theorem obsReg8 {T : Test} (hT : progS3aB T = true) (hu : uniformB T 8 = true)
+theorem obsReg8 {T : Test} (hT : progS3bB T = true) (hu : uniformB T 8 = true)
     {chs : List (List Bool)} {ν : Val} {g : List EvId} {trs : List SSt} (hE : progExec T chs ν g)
     (hr : T.runAll chs = some trs) {h r k v : Nat} (hB : regLoadB T h r k 8 = true) (hv : v < 2 ^ 63)
     (fm : Nat → Nat) :
