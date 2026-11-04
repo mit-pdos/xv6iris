@@ -1,11 +1,16 @@
 # S4b progress — ownership track (b) "lock-scoped pull promises" (plan rev 7 §4, §8 S4b)
 
-## Status (top): GREEN STOP POINT 2026-11-03 — NF_R proved; track-(b) concurrent logic + adequacy proved; G4 (2)
-## and (5) proved; G4 (1a)/(1b)/(1c)/(2')/(3)/(4) NOT attempted.  No kill criterion fired (3.1k lines ≪ 38k; no
-## program-specific normal-form fact; no named input).
-- Build: `lake build Weak.Prom.OwnMP Weak.Prom.NfrRun` green (all new files; no existing file edited).
-- `#print axioms` of `Nfr.nfR`, `Own.ownAdequacy`, `Own.MP.g4_mpOwn`, `Own.MP.g4_noDoubleClaim`:
-  propext, Classical.choice, Quot.sound.
+## Status (top): GREEN increment 6 (2026-11-03, part 2) — G4 (1a) PROVED with THE (b1) PULL; (2) re-proved on the
+## real front end (part 1's caveats removed); (2′) PROVED; (5) restated.  NOT attempted: (1b), (1c), (3), (4).
+## No kill criterion fired (≈7.8k new lines total ≪ 38k; no program-specific normal-form fact; 0 named inputs).
+- Build: `lake build Weak.Prom.OwnLock Weak.Prom.OwnMP2 Weak.Prom.OwnMPL` green (new files only; NO existing file
+  edited).  `#print axioms` of `Own.Lk.g4_lock`, `g4_lock_regs`, `Own.MP2.g4_mp2`, `Own.MPL.g4_mpOwnL`,
+  `g4_mpOwnL_regs`, `g4_noDoubleClaimL`, `Own.lit_fetchBounded`, `Own.lit_invalFree`: propext, Classical.choice,
+  Quot.sound.  No sorry / axiom / native_decide / opaque / implemented_by.
+- R-b5: statements that DROP the `invalFree` premise after the coordinator's machine fix (load post-view absorbs the
+  cited invalidate): `Nfr.nfR`, `Own.ownAdequacy`, `MPL.loadOk_byte` and its users (`mp_h1`, `h1_x`, `mp2_h1`,
+  `Lk.hA`, `Lk.hC`, `Lk.hB`).  For litmus programs the premise is discharged (`lit_invalFree`), so no G4 verdict
+  changes.
 
 ## Plan of work (order fixed by the brief)
 1. NF_R lemma for machine v2 (program-agnostic), premises (P1) trivial, (P2) fetch-bounded, (P3)/(P4) vacuous on v2.
@@ -76,7 +81,87 @@
   sources), byte width 1 (plan says `sd`/`ld`), image all 0.  The instruction front end `litStep` and the S2 kit are
   not used (the kit is over S2's per-hart wp, not over `wpO`).
 
-## G4 criteria (track b) — as of this stop point
+### Increment 4 — caveats removed for G4 (2): real front end (2026-11-03, part 2): DONE, green
+- `Weak/Prom/OwnKit.lean` (~390 lines): track (b)'s LITMUS KIT over `wpO`: world `litOW img M` (`litStep`, value =
+  final register file `litDoneR`), `wpT` (any trace), `hstepO_cases` (the two NF_R step kinds), `hstepO_quiet`
+  (quiet labels are never write steps, never release-class: no language-state change), `hstepO_store/rmw/load`,
+  the FULFIL FACT `fulO` (non-release-class: own promise in the prefix; release-class: `M[n]` appended in place),
+  `rmwOk`; rules `wpT_drain`, `wpT_quietI`, `wpT_ld`, `wpT_sd`, `wpT_amo`, `wpT_fence`, `wpT_alui`, `wpT_br`,
+  `wpT_end` (loads against `M.take σ.n`, writes against `M.take σ'.n`).
+- `Weak/Prom/OwnLitSide.lean` (~170 lines): for EVERY valid run of ANY litmus test, `lit_fetchBounded` (PO-fetch:
+  `litStep` emits no `LIFetch`) and `lit_invalFree` (no CMO message: `litStep` emits no `LCmo`).
+- `Weak/Prom/OwnMPLDefs.lean` (~420 lines) + `Weak/Prom/OwnMPL.lean` (~560 lines): test `mpT` = track (a)'s
+  `mpOwnT` text (`sd x5,(x6); fence rw,w; sd x7,(x8)` ‖ `ld x5,(x6); fence r,rw; ld x7,(x8)`, x5 = 42, image 0);
+  part 1's protocol lifted to 8-byte footprints (`wrX`, `wrF`, `xVal`); per-byte read reasoning (`loadOk_byte`,
+  `x_byte`, `mpOk_markX`).  **`g4_mpOwnL`**: every valid run, H1 finished with registers g ⇒ g[5] = 1 → g[7] = 42;
+  **`g4_mpOwnL_regs`**: the same on the final configuration (`cfg.pcAgs[1]`).  **`g4_noDoubleClaimL`**: (5) for this
+  state interpretation.  The release-class facts are machine facts (`relClass_store0`: first write; `relClass_fW`:
+  plain store after `fence rw,w`), never program-text facts.  0 named inputs.
+- Part 1's label-level files (OwnMPDefs/OwnMP) are kept (superseded for G4 by OwnMPL).
+
+### Increment 5 — G4 (2′) (2026-11-03, part 2): DONE, green
+- `Weak/Prom/OwnMP2Defs.lean` (~305 lines) + `Weak/Prom/OwnMP2.lean` (~515 lines).  Test `mp2T`: H0 as in `mpT` ‖
+  H1 `ld x5,(x6); fence r,rw; sd x9,(x8)` (x9 = 2).  **`g4_mp2`**: every valid run, H1 finished with x5 = 1 ⇒
+  `lastX2`: some T holds x = 2 (all 8 bytes) and no later message of the final memory writes x — H1's `sd 2` is the
+  coherence-last write to x.  0 named inputs.
+- **FINDING (R-b2, (b2-pull))**: with plan §3's release-class definition, H1's `sd` after `fence r,rw` is ALWAYS
+  release-class (pre-view ≥ `vwNew ≥ vrOld`, and `vwOld = 0`: no earlier store) — `relClass_fRW` — so on track (b)
+  it is appended IN PLACE, and the receiver's early data promise that (b2-pull) exists for is never FULFILLED for
+  the plan's (2′) text: such promises are dead (appended before the claim) or backed (after) and never fulfilled.
+  (2′) therefore does not test (b2-pull).  A text that does: the receiver stores first to an unrelated location
+  (`sd z; ld flag; fence r,rw; sd x`): then `vwOld ≥ t_z` is not covered by `fence r,rw` (pw = false), the `sd x`
+  can be non-release-class, hence promised early.  Not built (see "Next").
+- Protocol additions over MPL: `sp` (x spoiled by a non-holder write: then x5 ≠ 1 or `bad`), `own1` (H1 wrote x as
+  the holder: record (H1, 2) for good); ghost `γb` carries (bad, own1, sp).
+
+### Increment 6 — G4 (1a) with THE (b1) PULL (2026-11-03, part 2): DONE, green
+- Test `lkT` (OwnLockDefs.lean): both harts `amoswap.w.aq x5,x6,(x10); bne x5,x0,END; ld x7,(x11); addi x7,x7,1;
+  sd x7,(x11); amoswap.w.rl x0,x0,(x10)` (lock word 4 bytes, counter 8 bytes, image 0; forward branches only, so a
+  failed acquire gives up — finite runs, S3d separate).  **`g4_lock`** / **`g4_lock_regs`**: in every valid run, if
+  both harts finished with x5 = 0 (both acquired), their final x7 differ (mutual exclusion of the counter CSs).
+- (b1) DESIGN (as built): pure state `LkS` (OwnLockDefs.lean) — live cell `lc` (latest in-place release, or the
+  image), lock state `free | pulled h u | owned h u`, the counter's record (holder, tenure start, latest message,
+  value), dead sets `Dl`/`Dc`, `bad`, `spoil`, per-hart phase / recorded read / mark, counter `cnt`.
+  * THE PULL (`lk_agent`, OwnLockAgent.lean): the agent appending an acquire-shaped message `u` of hart i on a FREE
+    lock moves R (the counter's points-to half) into `pulled(i, u)` — R stays in the state interpretation on i's
+    behalf and i becomes the counter's holder (tenure `u`), so i's counter promises are BACKED (b2-own "owned or
+    pulled").  On a pulled/owned lock: an attempt (b1-none).  Other lock writes: dead (releases are in place).
+    Counter writes: backed iff by the holder (b2-own) else dead (b2-none).  The split is TOTAL over any final memory.
+  * THE AMO LEAF (`lk_acq`, OwnLockSteps.lean): an acquire whose byte-0 answer is 0 from a live message, with no
+    other-hart write to the lock byte in (t0, ts) (atomicity), CONSUMES the pull (invariant `LockOk.taker`: such an
+    AMO finds `pulled(h, u)`, u ≤ ts); an in-place (release-class) acquire on a free lock pulls itself; a nonzero
+    answer gives up; a 0 from a dead message makes a ROGUE and SPOILS the protocol (a permanent dead lock message
+    witnesses invalidity).
+  * THE DEPOSIT: `amoswap.w.rl` is always release-class (`relClass_rl`), so in place: R goes to the new live cell
+    (`lk_rel`).  The holder's read (`lk_ldc`) and store (`lk_sdc`) as in MPL, with holders changing.
+  * Iris layer (OwnLock.lean): R = ghost half `hv γc (xr cr)`; `Rbox` (R's place: the state interpretation while
+    free/pulled); per-hart phase ghost; one generic hart proof `hA … hG` instantiated for both harts.
+- Files: OwnLockDefs (275), OwnLockAgent (315), OwnLockSteps (330), OwnLockSteps2 (436), OwnLock (935).
+
+## Findings for the plan (part 2)
+- **(2′) does not exercise (b2-pull)**: under plan §3's release-class definition, `ld flag; fence r,rw; sd x` by a
+  receiver with no earlier store is release-class (`relClass_fRW`), hence in place; an early data promise of the
+  receiver is never fulfilled.  A test that does exercise (b2-pull): give the receiver an earlier unrelated store.
+- **(1b) needs (b1-def) / deferred deposits**: the release `fence rw,w; amoswap.w x0,x0,(a0)` is NOT always
+  release-class on v2 — `relClass` compares with `vrOld` of the state AFTER the AMO's own read (`wrState`), and that
+  read may return another hart's later attempt above `vwNew`.  So the release can be promised early, its deposit
+  cannot be in place, and the agent rule "non-acquire lock writes are dead" fails for it.
+- **(1c) needs a front-end extension**: xv6's `sext.w` (addiw) and `jal mycpu` are not in the litmus ISA; the release
+  `sd zero,16(s1); fence rw,w; sw zero,0(s1)` IS release-class (`relClass_fW`) and would be deposited in place, but its
+  lock message is `.plain` (not `.excl`), and the CS also writes the cpu field — a protocol variant.  Not built.
+
+## G4 criteria (track b) — as of increment 6
+- (i) (1a) ✓ `g4_lock`; (2) ✓ `g4_mpOwnL`; (2′) ✓ `g4_mp2`; (5) ✓ lemma form (`g4_noDoubleClaimL`); (1b), (1c),
+  (3), (4) ✗ not attempted (findings above for (1b), (1c)).  0 named inputs throughout.
+- (ii) `isLock γ lk s R` shape: NOT reproduced — the lock protocol is per test (R hard-wired as the counter's half;
+  no saved-proposition slot, no lock-name parameter).
+- (iii) ctxByte-shaped points-to: partial — per-location 8-byte record (holder, tenure, latest message, value) as a
+  ghost half; no fractions `dq`, no context ξ, no per-address family.
+- (iv) lines: part 1 3,093 + part 2 4,671 = 7,764.  S5 projection: FAILS under the default (E1′ rejected): PO-fetch
+  unprovable for xv6, NF_R also needs `invalFree` (R-b5) and `D = Unit` (PO-dev); in addition xv6 needs (4)
+  deferred deposits (`initlock`) and a per-lock generic library; cost counted as unbounded research (plan G4 (iv)).
+
+## G4 criteria (track b) — as of increment 3 (superseded)
 - (i) (2) ✓, (5) ✓ (lemma form); (1a), (1b), (1c), (2'), (3), (4) ✗ not attempted.  (1a–c) need the (b1) PULL at the
   acquiring AMO's promise (the agent pulls R into `pulled(γ, ts)` when the lock's latest message below ts is an
   in-place release); (2') needs (b2-pull) (agent claims W(x) for the designated receiver for x-messages appended
@@ -100,7 +185,13 @@
 - Spin loops: all statements are over FINITE valid runs (NF_R and `ownAdequacy`); the spinlock targets also need
   the prefix lemma (S3d), separate.
 
-## Next (if continued)
+## Next (if continued, after part 2)
+1. (1b): (b1-def) deferred deposits for a non-release-class release AMO; (1c): litmus front-end extension
+   (addiw/`sext.w`, `jal`) in a new file + the plain-store release protocol variant; (3): ⟦·⟧-guarded racy read;
+   (4): lock birth by plain stores with γ allocated at runtime (saved-prop slot).
+2. Generic per-lock library (isLock shape) over the `LkS` mechanism.
+
+## Next (as of part 1)
 1. Generic ownership library over a ghost map (per-address records, release cells keyed by timestamp).
 2. (b1) pull at AMO promise + AMO leaf → (1a) amoswap.aq/amoswap.rl spinlock with counter client.
 3. (b2-pull) → (2'); then (1b), (1c) on the instruction front end (needs a `wpO` litmus kit).
