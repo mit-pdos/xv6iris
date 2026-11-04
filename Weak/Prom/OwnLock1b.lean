@@ -172,7 +172,8 @@ variable [InvGS_gen hlc GF] (M : List PMsg) (γc γm γo : GName) (k ko : Nat) (
 DEPOSIT. -/
 theorem hF (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k)
     (s : LP) (ws : PState) (hprog : s.prog = lk1bProg) (hpc : s.pc = 7) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (hfw : max ws.wVrOld ws.wVwOld ≤ ws.wVwNew) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (hfw : max ws.wVrOld ws.wVwOld ≤ ws.wVwNew)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     KF (GF := GF) γc γm k (s.rd 7) ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_amo (op := .swap) (sz := 4) (aq := false) (rl := false) (rd := 0) (rs2 := 0) (rs1 := 10) hq
@@ -262,7 +263,8 @@ theorem hF (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm �
 /-- `fence rw,w`: it raises `vwNew` to `vrOld ⊔ vwOld`, so the release AMO after it is in place. -/
 theorem hF0 (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k)
     (s : LP) (ws : PState) (hprog : s.prog = lk1bProg) (hpc : s.pc = 6) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     KF (GF := GF) γc γm k (s.rd 7) ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_fence (f := ⟨true, true, false, false, false, true, false, false⟩) hq (by rw [hprog, hpc]; rfl))
@@ -275,7 +277,8 @@ theorem hF0 (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm 
 /-- **THE COUNTER STORE** `sd x7,(x11)`: the holder's message becomes the counter's latest (`lk_sdc`). -/
 theorem hE (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k) (hk2 : k < 2)
     (s : LP) (ws : PState) (ts : Nat) (hprog : s.prog = lk1bProg) (hpc : s.pc = 5) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     KE (GF := GF) γc γm k (s.rd 7) ts ws ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_sd (sz := 8) (rs2 := 7) (rs1 := 11) (off := 0) hq (by rw [hprog, hpc]; rfl) (by rw [h11]; decide))
@@ -430,7 +433,8 @@ theorem hE (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm �
 /-- `addi x7,x7,1`. -/
 theorem hD (hX : ∀ σ, (X σ ⊢ Xf M γc γm γo k ko σ) ∧ (Xf M γc γm γo k ko σ ⊢ X σ)) (hko : ko ≠ k) (hk2 : k < 2)
     (s : LP) (ws : PState) (ts : Nat) (hprog : s.prog = lk1bProg) (hpc : s.pc = 4) (hq : s.q = [])
-    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) (hlen : s.regs.length = 32) :
+    (h10 : s.rd 10 = Weak.Prom.Ref.Lit.Y) (h11 : s.rd 11 = Weak.Prom.Ref.Lit.X) (hlen : s.regs.length = 32)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     KC (GF := GF) γc γm k (s.rd 7) ts ws ⊢ wpT (hlc := hlc) X lkImg M k s ws (fun _ => iprop(True)) := by
   iintro H
   iapply (wpT_alui (op := .add) (rd := 7) (rs1 := 7) (imm := 1) hq (by rw [hprog, hpc]; rfl) (by decide))
@@ -848,7 +852,7 @@ theorem g4_lock1b {evs : List PEvt} {cfg : PCfg LP Unit} (hvr : validRun litStep
           · unfold hv; iexact H12
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply lk_finalI) hvr rfl (lit_fetchBoundedPre hvr hps) hinv
+      · iapply lk_finalI) hvr rfl (lit_fetchBoundedPre hvr hps)   -- [rebase-repair] MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key r0 r1 h0 h1
 
 /-- **G4 (1b), on the final configuration**: if both harts ran their whole program and both acquired the lock, their

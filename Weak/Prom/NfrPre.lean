@@ -20,8 +20,8 @@ text (plan §3).  Example 2's release is always `relClassPre` (OwnLock1b.lean `r
 
 Contents: a copy of NfrRun.lean §§1–6 (`soloQ` … `nfR`, `fetchBounded_ofImg`) in namespace `Nfr.Pre`, with
 `relClassPre` for `relClass`; the only proof change is the schedule's read bound `hrd` (now `memStep_reads_lt`).
-Premises as `Nfr.nfR`: (P2) `fetchBounded` (for `relClassPre`), `invalFree` (R-b5: drops with the coordinator's
-machine fix exactly as for `Nfr.nfR`).  The coordinator may replace NfrRun.lean by this file's lemma (the plan's
+Premises as `Nfr.nfR`: (P2) `fetchBounded` (for `relClassPre`); [rebase-repair] `invalFree` (R-b5) dropped exactly
+as MachFix did for `Nfr.nfR`.  The coordinator may replace NfrRun.lean by this file's lemma (the plan's
 class is a special case of the step side conditions used here).
 No `sorry`, no axiom, no `native_decide`.
 -/
@@ -433,7 +433,7 @@ theorem promsUpTo (hmsg : ∀ m ∈ M, msgOk N m) {k : Nat} :
     exact ⟨.prom i m :: es, c'', .prom _ _ _ _ _ _ hst h1, h2, fun h => by simp only [traceOf]; exact h3 h⟩
 
 /-- RUNNING ONE HART'S RELEASE-FREE SEGMENT against the current prefix (restriction). -/
-theorem runSeg (hinv : invalFree M) {A : Nat} :
+theorem runSeg {A : Nat} :   -- [rebase-repair] MachFix-R-b5: no `invalFree` premise
     ∀ {x z : P × PState × GSet Nat} {τ1 : List (PLabel × Option Nat)}, soloQ pstep img M A QN x τ1 z →
       ∀ (c : PCfg P Unit) (Q : GSet Nat), c.pcImg = img → c.pcLog <+: M → c.pcAgs[A]? = some ⟨x.1, x.2.1, Q⟩ →
       (∀ t, t ∈ Q ↔ t ∈ x.2.2 ∧ t ≤ c.pcLog.length) → psBounded x.2.1 (bnd x.2.1) →
@@ -459,7 +459,8 @@ theorem runSeg (hinv : invalFree M) {A : Nat} :
       · have hl := memStep_len hm
         exact ⟨fun b t e => bytesAll_mono (fun _ _ _ h => by omega) _ _ (hl.1 b t e),
           fun ts e => by have := hl.2 ts e; omega⟩
-    obtain ⟨Q1, hm1, hQ1⟩ := memStep_restrict Q hm hpre hinv hr.1 hr.2 hQ
+    obtain ⟨Q1, hm1, hQ1⟩ := memStep_restrict Q hm hpre
+      (fun _ => hfit.elim (fun hf => .inl (by unfold bnd at hz hf; omega)) .inr) hr.1 hr.2 hQ   -- [rebase-repair] MachFix-R-b5
     have hst : pmStep pstep c (.st A l ots) ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A ⟨p', ws', Q1⟩⟩ :=
       pmStep.state c A _ l ots p' () ws' Q1 hag hp (himg ▸ hm1)
     obtain ⟨Q', h1, h2, h3, h4, h5⟩ := ih ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A ⟨p', ws', Q1⟩⟩ Q1 himg hpre
@@ -484,7 +485,7 @@ theorem runSeg (hinv : invalFree M) {A : Nat} :
 
 /-- THE FINAL PHASE: with the whole of `M` in the log and no release left, run the harts `0, …, k−1` to their
 ends. -/
-theorem runAll (hinv : invalFree M) {c : PCfg P Unit} {J : Fin N → Job P}
+theorem runAll {c : PCfg P Unit} {J : Fin N → Job P}
     (himg : c.pcImg = img) (hlog : c.pcLog = M) (hlen : c.pcAgs.length = N)
     (hh : ∀ h : Fin N, ∃ Q, c.pcAgs[(h : Nat)]? = some ⟨(J h).x.1, (J h).x.2.1, Q⟩ ∧
       (∀ t, t ∈ Q ↔ t ∈ (J h).x.2.2 ∧ t ≤ M.length) ∧ soloQ pstep img M h QN (J h).x (J h).τ (J h).y ∧
@@ -511,7 +512,7 @@ theorem runAll (hinv : invalFree M) {c : PCfg P Unit} {J : Fin N → Job P}
     obtain ⟨hag, hQ⟩ := hA (by omega)
     obtain ⟨_, _, _, hrun, hb⟩ := hh A
     rw [← h3] at hQ
-    obtain ⟨Q', g1, g2, _, _, _⟩ := runSeg hinv hrun c' Q h2 (by rw [h3]; exact List.prefix_refl _) hag hQ hb
+    obtain ⟨Q', g1, g2, _, _, _⟩ := runSeg hrun c' Q h2 (by rw [h3]; exact List.prefix_refl _) hag hQ hb
       (.inr (by rw [h3]; exact Nat.le_refl _))
     refine ⟨es ++ stEvs A (J A).τ, _, nfSteps_append h1 g1, h2, h3, by simp [h4], fun h => ?_, fun h => ?_⟩
     · by_cases e : (h : Nat) = k
@@ -543,7 +544,7 @@ theorem runAll (hinv : invalFree M) {c : PCfg P Unit} {J : Fin N → Job P}
         simp [hN, e]
 
 /-- THE SCHEDULE (plan §4's construction), by induction on `|M| − n`. -/
-theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) (hinv : invalFree M) :
+theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) :   -- [rebase-repair] MachFix-R-b5: no `invalFree`
     ∀ (d : Nat) {c : PCfg P Unit} {J : Fin N → Job P} {n : Nat}, M.length - n ≤ d → Inv pstep img M N c J n →
       ∃ es c', nfSteps pstep c es c' ∧ Final img M N c' J ∧
         ∀ h, traceOf h es = if hN : h < N then (J ⟨h, hN⟩).τ else [] := by
@@ -613,7 +614,7 @@ theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) (hinv : invalFree M) :
     have hbz : bnd z.2.1 < r := by
       have h1 := relClassPre_lt k6 k2
       unfold bnd; omega
-    obtain ⟨Qz, s1, s2, s3, s4, s5⟩ := runSeg hinv k1 c1 QA g1 (by rw [g2]; exact take_prefix M _) hagA
+    obtain ⟨Qz, s1, s2, s3, s4, s5⟩ := runSeg k1 c1 QA g1 (by rw [g2]; exact take_prefix M _) hagA
       (by rw [hc1len]; exact hQA) hbA (.inl (by omega))
     -- 3. the release: promise `M[r − 1]`, then fulfil it in place
     let c2 : PCfg P Unit := ⟨c1.pcImg, c1.pcLog, c1.pcDev, c1.pcAgs.set A ⟨z.1, z.2.1, Qz⟩⟩
@@ -650,7 +651,7 @@ theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) (hinv : invalFree M) :
       have := memStep_reads_lt k6 b t e
       rw [hlog3, take_length_of hrM]
       exact bytesAll_mono (fun _ _ _ u => by omega) _ _ this
-    obtain ⟨Q4, hm4, hQ4⟩ := memStep_restrict _ k6 (by rw [hlog3]; exact take_prefix M r) hinv hrd
+    obtain ⟨Q4, hm4, hQ4⟩ := memStep_restrict _ k6 (by rw [hlog3]; exact take_prefix M r) (fun h => by cases h) hrd   -- [rebase-repair] MachFix-R-b5
       (fun ts e => by cases e; rw [hlog3, take_length_of hrM]; exact Nat.le_refl _) hQ3
     have hag3 : c3.pcAgs[(A : Nat)]? = some ⟨z.1, z.2.1, {c2.pcLog.length + 1} ∪ Qz⟩ := getElem?_set_eq_of hag2
     let c4 : PCfg P Unit := ⟨c3.pcImg, c3.pcLog, (), c3.pcAgs.set A ⟨p', ws', Q4⟩⟩
@@ -730,7 +731,7 @@ theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) (hinv : invalFree M) :
       ⟨himg, hlog, hle, hlen, hh⟩ (Nat.le_refl _) (fun h => soloQ_QN_QFG (hN h))
     obtain ⟨g1, g2, _, g4, g5⟩ := i1
     have hlogM : c1.pcLog = M := by rw [g2]; exact List.take_length
-    obtain ⟨es2, c2, n2, f1, f2, f3, f5, f6⟩ := runAll hinv g1 hlogM g4 (fun h => by
+    obtain ⟨es2, c2, n2, f1, f2, f3, f5, f6⟩ := runAll g1 hlogM g4 (fun h => by
       obtain ⟨Q, u1, u2, _, _, _, u6⟩ := g5 h
       exact ⟨Q, u1, u2, hN h, u6⟩) N (Nat.le_refl _)
     refine ⟨es1 ++ es2, c2, nfSteps_append n1 n2, ⟨f1, f2, f3, fun h => ?_⟩, fun h => ?_⟩
@@ -773,13 +774,13 @@ def fetchBounded {P : Type} (pstep : P → Unit → PLabel → P → Unit → Pr
     soloSteps pstep img M h (p, psInit, P0) (traceOf h evs) y →
     soloQ pstep img M h QF (p, psInit, P0) (traceOf h evs) y
 
-/-- THE NF_R LEMMA (plan §4, program-agnostic; machine v2, no device fabric).  Every valid run whose final memory
-has no invalidate-class CMO and which is fetch-bounded (P2) can be rescheduled into an NF_R run (`nfRun`) with the
+/-- THE NF_R LEMMA (plan §4, program-agnostic; machine v2, no device fabric).  Every valid run which is
+fetch-bounded (P2) can be rescheduled into an NF_R run (`nfRun`) with the
 same final configuration (memory, program states, hart states, empty promise sets) and the same per-hart traces.
-(P1) holds of every v2 run by construction; (P3), (P4) are vacuous on v2 (no walk, no A/D arm). -/
+[rebase-repair] MachFix-R-b5: no `invalFree` premise (the invalidate clause's view is absorbed).  (P1) holds of every v2 run by construction; (P3), (P4) are vacuous on v2 (no walk, no A/D arm). -/
 theorem nfR {P : Type} {pstep : P → Unit → PLabel → P → Unit → Prop} {img : Image} {ps : List P}
     {evs : List PEvt} {cfg : PCfg P Unit} (hv : validRun pstep img () ps evs cfg)
-    (hfb : fetchBounded pstep img ps cfg.pcLog evs) (hinv : invalFree cfg.pcLog) :
+    (hfb : fetchBounded pstep img ps cfg.pcLog evs) :   -- [rebase-repair] MachFix-R-b5: no `invalFree` premise
     ∃ evs', nfRun pstep img () ps evs' cfg ∧ ∀ h, traceOf h evs' = traceOf h evs := by
   classical
   let M := cfg.pcLog
@@ -814,7 +815,7 @@ theorem nfR {P : Type} {pstep : P → Unit → PLabel → P → Unit → Prop} {
     · obtain ⟨u1, m, hm, hmt⟩ := (h1 t).1 ht
       exact ⟨u1, by have := (List.getElem?_eq_some_iff.1 hm).1; omega, m, hm, hmt⟩
     · exact (h1 t).2 ⟨by omega, ho⟩
-  obtain ⟨es, c', hnf, ⟨f1, f2, f3, f4⟩, htr⟩ := schedule hmsg hinv (M.length - 0) (Nat.le_refl _) hI
+  obtain ⟨es, c', hnf, ⟨f1, f2, f3, f4⟩, htr⟩ := schedule hmsg (M.length - 0) (Nat.le_refl _) hI
   have hc : c' = cfg := by
     have hags : c'.pcAgs = cfg.pcAgs := by
       apply List.ext_getElem?
@@ -870,11 +871,11 @@ theorem soloQ_ofImg {P : Type} {pstep : P → Unit → PLabel → P → Unit →
       | fetch base tvs hok =>
         show max x.2.1.wIfr (bytesMax (fun _ t => t) base tvs) = 0
         rw [bytesMax_zero base tvs (hf _ (List.mem_cons_self ..) base tvs rfl), h0]; rfl
-      | load => simp only [loadRun]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0
-      | lr => simp only [loadRun]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0
-      | amoLd => simp only [loadRun]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0
+      | load => simp only [loadRunV]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0   -- [rebase-repair] MachFix-R-b5: `loadRunV`
+      | lr => simp only [loadRunV]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0
+      | amoLd => simp only [loadRunV]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0
       | rmw =>
-        simp only [amoPost]; rw [(storeRun_keep _ _ _ _ _ _ _).2.2, (loadRun_keep _ _ _ _ _ _).2.2.1]; exact h0
+        simp only [amoPost]; rw [(storeRun_keep _ _ _ _ _ _ _).2.2, (loadRunV_keep _ _ _ _ _ _ _).2.2.1]; exact h0
       | store => simp only [acqPost]; rw [(storeRun_keep _ _ _ _ _ _ _).2.2]; exact h0
       | amoSt => simp only [amoPost]; rw [(storeRun_keep _ _ _ _ _ _ _).2.2]; exact h0
       | sc => simp only [acqPost]; rw [(storeRun_keep _ _ _ _ _ _ _).2.2]; exact h0

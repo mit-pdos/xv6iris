@@ -1329,7 +1329,7 @@ theorem g4_lock1c {evs : List PEvt} {cfg : PCfg LP Unit}
           · unfold hv; iexact H12
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply lk_finalI) hvr rfl (x_fetchBounded hvr hps) hinv
+      · iapply lk_finalI) hvr rfl (x_fetchBounded hvr hps)   -- [rebase-repair] MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key r0 r1 h0 h1
 
 /-- **G4 (1c) + (3), on the final configuration**: if both harts ran their whole text, their final x7 differ and

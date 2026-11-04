@@ -334,7 +334,8 @@ theorem q0 (ev : Trace) : qs3 0 ev := fun h => absurd h (by decide)
 
 /-- Hart 0's text from `pc = k` on: every fulfil takes its `pend` from the bag of its shape. -/
 theorem h0_run (g : AGN) (M : List PMsg) (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b3o) (hpc : s0.pc = 0)
-    (hq : s0.q = []) (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h10 : s0.rd 10 = 0x3000) :
+    (hq : s0.q = []) (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h10 : s0.rd 10 = 0x3000)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     (bS (GF := GF) g M mA ∗ bS g M mC1 ∗ bS g M mC0 ∗ bS g M mR) ∗
       lhA g Proto.triv (w3 M 0) (qs3 0) psInit P0 [] ⊢ wpKA g Proto.triv (w3 M 0) qs3 s0 (Φ3 g M) := by
   have hw := litW_x xs3 imgL M 0
@@ -537,7 +538,8 @@ theorem h1_doomed (g : AGN) (M : List PMsg) (s : LP) (ws : PState) (pr : GSet Na
 /-- **HART 1**: `holding()` reads the lock word and the cpu field racily; acquire's panic branch is not taken. -/
 theorem h1_run (g : AGN) (M : List PMsg) (hdd : g.dd = ddL M) (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b3h)
     (hpc : s0.pc = 0) (hq : s0.q = []) (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X)
-    (h10 : s0.rd 10 = 0x3100) (h12 : s0.rd 12 = 0x4000) :
+    (h10 : s0.rd 10 = 0x3100) (h12 : s0.rd 12 = 0x4000)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ctx3 (GF := GF) g M ∗ bF g M ∗ lhA g Proto.triv (w3 M 1) (qs3 1) psInit P0 [] ⊢
       wpKA g Proto.triv (w3 M 1) qs3 s0 (Φ3 g M) := by
   have hw := litW_x xs3 imgL M 1
@@ -656,7 +658,8 @@ end hart1
 theorem progs_3 : ∃ p0 p1 : LP, progs t3 = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (3). -/
-theorem premise3 (M : List PMsg) :
+theorem premise3 (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF (xStep xs3) litDone imgL M (progs t3) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qs3 h)) (ddL M) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -716,6 +719,7 @@ panic store: `holding()` returns 0 in `acquire` of a hart that does not hold the
 writes.  0 named inputs; loop-free.  See the header for why the frontier rule is not needed here. -/
 theorem own_hold (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun (xStep xs3) imgL () (progs t3) M run) : noF (run.trace 1) := by
+  have hnoinv := x_noInvalT hrun   -- [rebase-repair] MachFix-R-b5: the front end issues no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qs3 h)) (ddL M) trivial (fun h => ⟨fun _ => noF_nil, wrOk_nil M⟩) (premise3 M) hrun
   have hq := (hΨ 1 (run.trace 1).length).1

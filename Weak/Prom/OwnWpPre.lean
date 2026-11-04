@@ -2,7 +2,7 @@
 Weak/Prom: **track (b)'s wp, lifting lemmas and adequacy over NF_R with the PRE-STATE RELEASE CLASS** (stage S4b
 part 3, tag S4b3).  A copy of OwnWp.lean over OwnLangPre.lean's language: `wpO`, `wpO_hart_lift`, `wpO_agent`,
 `ownAdequacy` (now through `Nfr.Pre.nfR`).  Premises as `Own.ownAdequacy`: (P2) `fetchBounded` (for `relClassPre`)
-and `invalFree` (R-b5; drops with the coordinator's machine fix exactly as for `Own.ownAdequacy`).
+([rebase-repair] `invalFree` (R-b5) dropped exactly as MachFix did for `Own.ownAdequacy`).
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.OwnLangPre
@@ -123,16 +123,17 @@ theorem bigSepL_hartsFrom_len (w : OW P V) (ps : List P) :
   simp [hartsFrom_length]
 
 /-- **THE ADEQUACY OF TRACK (b)'s LOGIC**: a client state interpretation `X`, the agent obligation, the hart wps and a
-final extraction give `φ` of the final value map of every valid, fetch-bounded, `invalFree` run. -/
+final extraction give `φ` of the final value map of every valid, fetch-bounded run ([rebase-repair] MachFix-R-b5:
+the former `invalFree` premise is gone). -/
 theorem ownAdequacy [InvGpreS GF] {w : OW P V} {ps : List P} (φ : (Nat → Option V) → Prop)
     (Hwp : ∀ [InvGS_gen hlc GF], ⊢@{IProp GF} |={⊤}=> ∃ X : OSt V → IProp GF,
       X σ0 ∗ □ (∀ σ σ', ⌜agentStep w σ σ'⌝ -∗ X σ -∗ |={⊤}=> X σ') ∗
       ([∗list] e ∈ hartsFrom w 0 ps, wpO X e (fun _ => iprop(True))) ∗
       (∀ σ, ⌜σ.n = w.M.length ∧ ∀ h, σ.pr h = ∅⌝ -∗ X σ -∗ |={⊤,∅}=> ⌜φ σ.done⌝))
     {evs : List PEvt} {cfg : PCfg P Unit} (hv : validRun w.pstep w.img () ps evs cfg) (hM : cfg.pcLog = w.M)
-    (hfb : fetchBounded w.pstep w.img ps cfg.pcLog evs) (hinv : Nfr.invalFree cfg.pcLog) :
+    (hfb : fetchBounded w.pstep w.img ps cfg.pcLog evs) :   -- [rebase-repair] MachFix-R-b5: no `invalFree` premise
     φ (doneOf w ps.length cfg) := by
-  obtain ⟨evs', ⟨hnf, hno⟩, _⟩ := nfR hv hfb hinv
+  obtain ⟨evs', ⟨hnf, hno⟩, _⟩ := nfR hv hfb
   let N := ps.length
   have hs0 : Sim w N (pmInit w.img () ps) (hartsFrom w 0 ps ++ [OExpr.agent w]) σ0 := by
     refine ⟨rfl, by simp [pmInit, σ0], Nat.zero_le _, by simp [pmInit, N], by simp [hartsFrom_length, N], ?_,

@@ -217,7 +217,8 @@ theorem h1_cld (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (c : Nat)
     (hs : s.prog = b4h ∧ s.q = [] ∧ s.pc = 9 ∧ s.rd 9 = X ∧ s.rd 11 = Y ∧ s.rd 12 = Z ∧ s.rd 14 = 1 ∧
       s.regs.length = 32)
-    (hc5 : cAt5 M c) (hvr : c ≤ ws.wVrNew) (hq4 : q4 ev) :
+    (hc5 : cAt5 M c) (hvr : c ≤ ws.wVrNew) (hq4 : q4 ev)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     pCtx (GF := GF) g M sv ∗ r2Bag g M ∗ cPts g M c ∗ lhA g Proto.triv (w4 M 1) (qs4 1) ws pr ev ⊢
       wpKA g Proto.triv (w4 M 1) qs4 s (Φ4 g M) := by
   obtain ⟨hprog, hq, hpc, h9, h11, h12, h14, hlen⟩ := hs

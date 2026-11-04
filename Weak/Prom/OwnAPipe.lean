@@ -190,7 +190,8 @@ end setup
 theorem progs_4 : ∃ p0 p1 : LP, progs t4 = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (4). -/
-theorem p_premise (M : List PMsg) :
+theorem p_premise (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF4 (xStep xs4) litDone img4 M (progs t4) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qs4 h)) (dd4 M) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -262,6 +263,7 @@ hart 1's L2 read lies above the birth (R-a4) and its AMO, the first L2 write aft
 theorem own_pipe (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun (xStep xs4) img4 () (progs t4) M run) :
     ∀ h, ∀ e ∈ run.trace h, ∀ tvs, isCLd e tvs → tvs.map Prod.snd = toBytes 5 8 := by
+  have hnoinv := x_noInvalT hrun   -- [rebase-repair] MachFix-R-b5: the front end issues no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF4) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qs4 h)) (dd4 M) trivial (fun h => ⟨q4_nil, wrOk_nil M⟩) (p_premise M) hrun
   intro h

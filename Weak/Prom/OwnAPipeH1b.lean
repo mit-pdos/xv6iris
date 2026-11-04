@@ -30,7 +30,8 @@ def lhS1 (s : LP) : Prop :=
   s.prog = b4h ∧ s.q = [] ∧ s.pc = 1 ∧ s.rd 14 = 1 ∧ s.rd 9 = X ∧ s.rd 11 = Y ∧ s.rd 12 = Z ∧ s.regs.length = 32
 
 /-- **THE L1 SPIN LOOP** (Löb induction at `pc = 1`; see the header). -/
-theorem h1_loop1 (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M) :
+theorem h1_loop1 (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo : Nat), ⌜lhS1 s⌝ -∗
       ⌜lo ≤ coh ws L1 ∧ q4 ev⌝ -∗ pCtx (GF := GF) g M sv -∗ ([∗list] t ∈ bagK M 2 lo, pend g t) -∗
       tk1 M sv -∗ ob2 g M sv 0 0 -∗ r2Bag g M -∗
@@ -210,7 +211,8 @@ theorem h1_loop1 (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M) :
 /-- **HART 1**: `li a4,1`, then the L1 spin loop. -/
 theorem h1_hart (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M)
     (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b4h) (hpc : s0.pc = 0) (hq : s0.q = [])
-    (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h11 : s0.rd 11 = Y) (h12 : s0.rd 12 = Z) :
+    (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h11 : s0.rd 11 = Y) (h12 : s0.rd 12 = Z)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     pCtx (GF := GF) g M sv ∗ ([∗list] t ∈ bagK M 2 0, pend g t) ∗ tk1 M sv ∗ ob2 g M sv 0 0 ∗ r2Bag g M ∗
       lhA g Proto.triv (w4 M 1) (qs4 1) psInit P0 [] ⊢
       wpKA g Proto.triv (w4 M 1) qs4 s0 (Φ4 g M) := by

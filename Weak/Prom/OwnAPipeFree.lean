@@ -46,7 +46,8 @@ section free
 variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG GF] [SavedPropG GF] [InvGS GF]
 
 /-- **FREE MODE RUNS THE REST OF HART 1's TEXT** (see the header). -/
-theorem p4h_free (g : AGN) (M : List PMsg) (hdd : g.dd = dd4 M) :
+theorem p4h_free (g : AGN) (M : List PMsg) (hdd : g.dd = dd4 M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace), ⌜frS4 s⌝ -∗ dfree (GF := GF) g -∗ dshot g -∗
       lhA g Proto.triv (w4 M 1) (qs4 1) ws pr ev -∗ wpKA g Proto.triv (w4 M 1) qs4 s (Φ4 g M) := by
   have hw := litW_x xs4 img4 M 1

@@ -363,7 +363,8 @@ theorem lk_cs2_1c (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh :
 theorem lk_cs1c (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw sp : Nat)
     (hs : s.prog = b1c ∧ s.q = [] ∧ s.pc = 6 ∧ s.rd 9 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hsp : sp ≤ coh ws Pc) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev) :
+    (hlo : lo ≤ coh ws Lk) (hsp : sp ≤ coh ws Pc) (hvr : lw ≤ ws.wVrNew) (hnoC : noC ev)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗ pPts g M sp ∗
       lhA g Proto.triv (wL1c M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL1c M h) (qsLk M) s (ΦL g M) := by
@@ -482,7 +483,8 @@ the pre-view `⊒ vwNew ≥ s0` (the aq AMO put `vwNew ≥ ts_acq > s0`), so its
 theorem lk_cpu1 (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo lw s0 : Nat)
     (hs : s.prog = b1c ∧ s.q = [] ∧ s.pc = 5 ∧ s.rd 9 = X ∧ s.rd 11 = Y)
-    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hs0 : s0 ≤ ws.wVwNew) (hnoC : noC ev) :
+    (hlo : lo ≤ coh ws Lk) (hvr : lw ≤ ws.wVrNew) (hs0 : s0 ≤ ws.wVwNew) (hnoC : noC ev)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h lo 0 ∗ cPts g M lw ∗ pPts g M s0 ∗
       lhA g Proto.triv (wL1c M h) (qsLk M h) ws pr ev ⊢
       wpKA g Proto.triv (wL1c M h) (qsLk M) s (ΦL g M) := by

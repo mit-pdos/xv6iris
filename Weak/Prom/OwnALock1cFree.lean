@@ -85,7 +85,8 @@ section free
 variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG GF] [InvGS GF]
 
 /-- **FREE MODE RUNS THE REST OF (1c)'s TEXT** (see the header). -/
-theorem lk_free1c (g : AGN) (M : List PMsg) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M) :
+theorem lk_free1c (g : AGN) (M : List PMsg) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace), ⌜frS1c s⌝ -∗ dfree (GF := GF) g -∗ dshot g -∗
       lhA g Proto.triv (wL1c M h) (qsLk M h) ws pr ev -∗ wpKA g Proto.triv (wL1c M h) (qsLk M) s (ΦL g M) := by
   have hw := litW_x xs1c imgL M h

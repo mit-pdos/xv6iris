@@ -36,7 +36,8 @@ def lhS1c (s : LP) : Prop :=
 
 /-- **THE SPIN LOOP** of (1c) (Löb induction at `again:`): `mv a5,a4; amoswap.w.aq a5,a5,(s1); sext.w a5,a5;
 bnez a5,again`; the claim at the AMO's step (aq: the frontier covers `ts`, plan §3 "Acquire"). -/
-theorem lk_loop1c (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M) :
+theorem lk_loop1c (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo : Nat), ⌜lhS1c s⌝ -∗
       ⌜lo ≤ coh ws Lk ∧ noC ev⌝ -∗ lkCtx (GF := GF) g M tk -∗ obag g M tk h lo 0 -∗
       lhA g Proto.triv (wL1c M h) (qsLk M h) ws pr ev -∗ wpKA g Proto.triv (wL1c M h) (qsLk M) s (ΦL g M) := by
@@ -263,7 +264,8 @@ variable {GF : BundledGFunctors} [GhostVarG GF HSt] [GhostVarG GF Bool] [TokenG 
 /-- **A HART** of (1c): `li a4,1`, then the spin loop. -/
 theorem lk_hart1c (g : AGN) (M : List PMsg) (tk : Nat → GName) (h : Nat) (hh : h < 2) (hdd : g.dd = ddL M)
     (s0 : LP) {P0 : GSet Nat} (hprog : s0.prog = b1c) (hpc : s0.pc = 0) (hq : s0.q = [])
-    (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h11 : s0.rd 11 = Y) :
+    (hlen : s0.regs.length = 32) (h9 : s0.rd 9 = X) (h11 : s0.rd 11 = Y)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     lkCtx (GF := GF) g M tk ∗ obag g M tk h 0 0 ∗ lhA g Proto.triv (wL1c M h) (qsLk M h) psInit P0 [] ⊢
       wpKA g Proto.triv (wL1c M h) (qsLk M) s0 (ΦL g M) := by
   have hw := litW_x xs1c imgL M h
@@ -421,7 +423,8 @@ end hart
 theorem progs_1c : ∃ p0 p1 : LP, progs t1c = [p0, p1] := ⟨_, _, rfl⟩
 
 /-- THE ADEQUACY PREMISE for (1b). -/
-theorem lk_premise1c (M : List PMsg) :
+theorem lk_premise1c (M : List PMsg)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     wpPremise .hasLC ownGF (xStep xs1c) litDone imgL M (progs t1c) Proto.triv (fun _ _ => True)
       (fun h => ΨK M (qsLk M h)) (ddL M) := by
   intro Hinv g P0 hn hm hdd hP0
@@ -486,6 +489,7 @@ reading each release.  0 named inputs; finite runs (a hart may stop anywhere in 
 is separate, [OWN.P4]). -/
 theorem own_lock1c (M : List PMsg) (run : PFRun LP Unit)
     (hrun : PF.validRun (xStep xs1c) imgL () (progs t1c) M run) : ∀ h, qLk M (run.trace h) := by
+  have hnoinv := x_noInvalT hrun   -- [rebase-repair] MachFix-R-b5: the front end issues no CMO (`vi = 0`)
   obtain ⟨_, hΨ, _⟩ := adequacyA (hlc := .hasLC) (GF := ownGF) Proto.triv (fun _ _ => True)
     (fun h => ΨK M (qsLk M h)) (ddL M) trivial (fun h => ⟨qLk_noC noC_nil, wrOk_nil M⟩) (lk_premise1c M) hrun
   intro h

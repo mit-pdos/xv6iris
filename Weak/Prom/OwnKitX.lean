@@ -223,7 +223,8 @@ theorem wpT_quietI {s k : LP} {ws wsf : PState} {l0 : PLabel} {rest : List PLabe
 
 /-- **LOAD instruction** `l{b,h,w,d} rd, off(rs1)` against the current prefix. -/
 theorem wpT_ld {s : LP} {sz rd rs1 off : Nat} {sgn : Bool} {ws : PState} (hq : s.q = []) (hpl : XP Xs s)
-    (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off)) (ha : aligned ((s.rd rs1 + off) % two64) sz = true) :
+    (hp : s.prog[s.pc]? = some (.load sz sgn rd rs1 off)) (ha : aligned ((s.rd rs1 + off) % two64) sz = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ▷ (∀ σ tvs, ⌜tvs.length = sz⌝ -∗
         ⌜loadOk img (M.take σ.n) ws (ldPre ws false false (srcsView ws (srcR rs1)))
           (((s.rd rs1 + off) % two64 : Nat) : Int) tvs⌝ -∗ X' σ -∗ £ 1 -∗
@@ -279,7 +280,8 @@ theorem wpT_sd {s : LP} {sz rs2 rs1 off : Nat} {ws : PState} (hq : s.q = []) (hp
 `rmwOk`, against the prefix after the step. -/
 theorem wpT_amo {s : LP} {op : Weak.Prom.Ref.AmoOp} {sz : Nat} {aq rl : Bool} {rd rs2 rs1 : Nat} {ws : PState}
     (hq : s.q = []) (hpl : XP Xs s) (hp : s.prog[s.pc]? = some (.amo op sz aq rl rd rs2 rs1))
-    (ha : aligned (s.rd rs1) sz = true) :
+    (ha : aligned (s.rd rs1) sz = true)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ▷ (∀ σ tvs ts σ', ⌜tvs.length = sz⌝ -∗
         ⌜fulO M h σ (relClass ws (LRmw aq rl ((s.rd rs1 : Nat) : Int) tvs (amoD op sz (s.rd rs2) tvs) (srcR rs1)
           (srcR rs2))) ts σ'⌝ -∗

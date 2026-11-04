@@ -930,7 +930,7 @@ theorem g4_lockBirth {evs : List PEvt} {cfg : PCfg LP Unit} (hvr : validRun litS
           · unfold hv; iexact H12
           iapply H
         exact BigSepL.bigSepL_nil_intro
-      · iapply i4_finalI) hvr rfl (lit_fetchBounded hvr hps) hinv
+      · iapply i4_finalI) hvr rfl (lit_fetchBounded hvr hps)   -- [rebase-repair] MachFix-R-b5: `ownAdequacy` has no `invalFree` premise
   exact key r1 h1
 
 /-- **G4 (4), on the final configuration.** -/

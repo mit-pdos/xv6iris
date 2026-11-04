@@ -67,7 +67,8 @@ def lhS2 (s : LP) : Prop :=
 
 /-- **THE L2 SPIN LOOP** (Löb induction at `pc = 5`; see the header). -/
 theorem h1_loop2 (g : AGN) (M : List PMsg) (sv : SV) (hdd : g.dd = dd4 M) (γ : GName) (b c : Nat)
-    (hb : bthAt M Lk b) (hc5 : cAt5 M c) :
+    (hb : bthAt M Lk b) (hc5 : cAt5 M c)
+    (hnoinv : ∀ t a, ¬ cmoAt M isInvalK t a := by assumption) :   -- [rebase-repair] MachFix-R-b5: `vi = 0`
     ⊢ ∀ (s : LP) (ws : PState) (pr : GSet Nat) (ev : Trace) (lo : Nat), ⌜lhS2 s⌝ -∗
       ⌜lo ≤ coh ws Lk ∧ b ≤ ws.wVrNew ∧ c ≤ ws.wVrNew ∧ q4 ev⌝ -∗ pCtx (GF := GF) g M sv -∗
       isLockAt M sv γ Lk (cPts g M c) b -∗ ob2 g M sv lo 0 -∗ r2Bag g M -∗ zBag g M b -∗
