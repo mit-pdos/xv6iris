@@ -963,6 +963,9 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.AmoSplit
+import Weak.Prom.AmoSplitV2
+import Weak.Prom.AmoSplitLit
 import Weak.Prom.Machine
 import Weak.Prom.NfrPre
 import Weak.Prom.NfrRun
