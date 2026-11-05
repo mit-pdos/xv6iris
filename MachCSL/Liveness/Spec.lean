@@ -6,10 +6,10 @@ import MachCSL.Liveness.Cycle
 This file states the hypotheses of xv6's liveness theorem and the shapes of its conclusions, over
 the runs of `Fairness.lean`.  It proves only what the statements need to be usable: the small
 temporal lemmas, the facts the bundle gives along a run, and the forms the logic consumes.  It is
-milestone C2 of lane `xv6-liveness-spec` (`local-plan/xv6-liveness-spec/PLAN.md`, outside the
-repository); the prose it formalises is `local-plan/liveness/fairness-formulas.md` §3, §4 and
-§7.1.  Nothing in the trusted base imports it, and it follows the naming policy of
-`Fairness.lean`'s header.
+milestones C2 and C4 (section 9) of lane `xv6-liveness-spec`
+(`local-plan/xv6-liveness-spec/PLAN.md`, outside the repository); the prose it formalises is
+`local-plan/liveness/fairness-formulas.md` §3, §4 and §7.1.  Nothing in the trusted base imports
+it, and it follows the naming policy of `Fairness.lean`'s header.
 
 A run is a sequence `σ : Nat → Cfg` of configurations in which every position is a step of some
 thread of the pool (`PoolRun`, the convention of the previous lane).  The prose states the theorem
@@ -37,7 +37,10 @@ integration removes the stutters of a behaviour before it applies this bundle.
    (`sf_of_dead_from`), the attempt–grant forms the logic consumes (`ag_of_hyps`), and, under fair
    scheduling, the equivalence of the two forms at every position (`sf_iff_ag`).
 8. The theorem shapes: `Component`, `xv6EraLive`, `xv6Live`, and `xv6Live_of_xv6EraLive`.
-9. The targets.  The first target is milestone C4's and is added here later.
+9. The targets.  The first, T1 (milestone C4, `Target1`): every secondary hart leaves its boot
+   spin on `started` (`atSpinLoad`, `pastSpin`, `components`), with the two kernel-side facts
+   its proof takes as hypotheses (`PrimaryStores`, `StartedOnce`), the lemmas tying the trigger
+   to `Fresh`, and the glue to `xv6EraLive` (`xv6EraLive_of_target1`).
 
 **Where the tree differs from the prose.**  The disk image is a parameter `img` of the bundle,
 because the closed adequacy theorem assumes the disk holds `fs.img` (`Xv6.fsImgDisk`), which this
@@ -670,7 +673,227 @@ example (img : Nat → BitVec 8) (σ : Nat → Cfg) :
 
 /-! ## 9. The targets
 
-The first target, T1 (every secondary hart leaves its boot spin on `started`), is milestone C4's;
-its component and the statement `xv6EraLive img [T1]` are added here. -/
+A target is a list of components with the run predicates its proof takes as hypotheses.  The
+first, T1 (plan decision D1): every secondary hart leaves its boot spin on the kernel's `started`
+flag.  It is stated here as the components `Target1.components`, one per hart but the primary;
+the two kernel-side facts its proof needs (`Target1.PrimaryStores`, `Target1.StartedOnce`) are
+stated and not proved (plan decision D3); `Target1.xv6EraLive_of_target1` turns the per-hart
+theorem into the list form. -/
+
+namespace Target1
+
+/-! ### The spin in the kernel image
+
+The secondary harts of xv6's `main` (`kernel/main.c`, the image built from xv6-riscv `b72cbac1`,
+branch `verified`) spin on `__atomic_load_n(&started, __ATOMIC_ACQUIRE) == 0`.  In the image the
+loop is four instructions, `main+0x16` to `main+0x1e`: `lw a5,0(a4)` at `0x80000ee4`, a plain
+four-byte read of the flag; `fence r,rw`; `sext.w a5,a5`; and `beqz a5` back to the load.  The
+first instruction after the loop, at `0x80000eee` (`main+0x20`), is reached only by the branch's
+fall-through.  The primary, hart 0, is the flag's only writer: `fence rw,w`, then `sw` of the value
+`1`.  The rows are those of `Xv6/KernelImage.lean`, which this library cannot import, so the
+constants below are literals; each docstring names the `Xv6/` fact it mirrors. -/
+
+/-- The flag's physical address, the first word of `.bss`, four bytes.  It mirrors
+`MachCSL.KA.«started»` of `Xv6/KernelImage.lean` (`Xv6.startedAddr`, `Xv6/StartedInv.lean`). -/
+def startedAddr : PAddr := 0x8000a400
+
+/-- The address of the spin's load, `lw a5,0(a4)` at `main+0x16` (`Xv6/KernelImage.lean`, the row
+of `0x80000ee4`; the safety proof's step `wp_s_lw_aur` in `Xv6/MainSecondaryParts.lean`). -/
+def spinLoadPC : BitVec 64 := 0x80000ee4
+
+/-- The address of the first instruction after the spin, `jal cpuid` at `main+0x20`
+(`Xv6/KernelImage.lean`, the row of `0x80000eee`; the safety proof's stage `ms_printk`).  No row
+branches or jumps there and no call returns there: only the loop branch's fall-through reaches
+it. -/
+def afterSpinPC : BitVec 64 := 0x80000eee
+
+/-- The flag's only writer, hart 0 (`cpuid() == 0`).  It mirrors `Xv6.startedPrimary`. -/
+def primary : CPU := ⟨0, by decide⟩
+
+/-- The word the primary stores.  It mirrors `Xv6.startedSet`. -/
+def startedSet : BitVec (8 * 4) := 1
+
+/-- The word the flag holds before the store, the boot image's (`.bss` is zero).  It mirrors
+`Xv6.startedClear`. -/
+def startedClear : BitVec (8 * 4) := 0
+
+/-- The program counter of hart `x` in the configuration, the Sail register `PC` of its register
+file.  Inside a cycle the model keeps the executing instruction's address there: it writes the
+next address to `nextPC` before it executes the instruction, and copies `nextPC` into `PC` only at
+the end of the cycle (`tick_pc` in `try_step`, `model/Lean_RV64D/LeanRV64D/Step.lean`).  So at a
+memory event of the cycle, `pcOf` is the address of the instruction that issued it. -/
+def pcOf (c : Cfg) (x : CPU) : BitVec 64 := c.2.m.regs x Register.PC
+
+/-! ### The component -/
+
+/-- The trigger: hart `x` is live and at the spin's load.  Some position of the pool holds hart
+`x` of a live generation whose head event is a plain four-byte read of the flag, issued by the
+instruction at `spinLoadPC`.  The PC conjunct names this load: the image has no other load of the
+flag, but the conjunct is cheaper than proving that.  The lw's cycle reaches this node once, so
+the trigger holds once per iteration of the loop.  It is `Fresh.atLoad`'s shape at the flag
+(`atSpinLoad_atLoad`). -/
+def atSpinLoad (x : CPU) (c : Cfg) : Prop := ∃ i gen : Nat, ∃ req k,
+  c.1[i]? = some (.hart gen x (.impure (.inl (.ok (.memRead req))) k)) ∧ threadLive c.2 gen ∧
+  req.pa = startedAddr ∧ req.size = 4 ∧ akPlain req.accessKind = true ∧ pcOf c x = spinLoadPC
+
+/-- The goal: hart `x` is past the spin, its PC at `afterSpinPC`.  It first holds at the end of
+the cycle of the loop branch that falls through, and stays true until the end of the next
+cycle. -/
+def pastSpin (x : CPU) (c : Cfg) : Prop := pcOf c x = afterSpinPC
+
+/-- Hart `x`'s component: whenever `x` is at the spin's load, it is past the spin then or
+later. -/
+def T1 (x : CPU) : Component := ⟨atSpinLoad x, pastSpin x⟩
+
+/-- The first target: one component per hart but the primary. -/
+def components : List Component := (cpus.filter (· ≠ primary)).map T1
+
+/-! ### The kernel-side facts
+
+Both are the kernel proof's to discharge (plan decision D3); the target's proof takes them as
+hypotheses.  A history's last entry is the boot image's byte at position 0 of the store order
+(`imgFlat`), and every store after it is at a positive position (`MState.store` writes at
+`top + 1`), so the boot image's entries and the stores are told apart by their positions. -/
+
+/-- The primary's store of the flag is in the memory at position `t` of the store order: the
+history of the flag's first byte has an entry at `t` by hart `primary` holding the low byte of
+`startedSet`. -/
+def flagStored (t : Nat) (c : Cfg) : Prop := ∃ H e, c.2.m.mem[startedAddr]? = some H ∧ e ∈ H ∧
+  e.t = t ∧ e.tid = hartAgent primary ∧ e.v = nthByte startedSet 0
+
+/-- The primary stores the flag: whenever the power is on and the flag is not stored, it is stored
+then or later, or the power is cut.  This is the primary's own liveness from its boot to the
+store, a target of its own; the kernel proof discharges it. -/
+def PrimaryStores (σ : Nat → Cfg) : Prop :=
+  EraLive (fun c => powerOn c ∧ ¬ ∃ t, flagStored t c) (fun c => ∃ t, flagStored t c) σ
+
+/-- The flag's histories in one configuration: every entry of the history of each of the flag's
+four bytes is the boot image's, at position 0 with that byte of `startedClear`, or the primary's,
+at a positive position with that byte of `startedSet`.  It is the content of the safety proof's
+invariant `Xv6.startedInv` (the cell of the boot image's word with at most the one store of
+`startedSet` by `Xv6.startedPrimary` above it). -/
+def OnceAt (c : Cfg) : Prop :=
+  ∀ j, j < 4 → ∀ H, c.2.m.mem[startedAddr + BitVec.ofNat 64 j]? = some H → ∀ e ∈ H,
+    (e.t = 0 ∧ e.v = nthByte startedClear j) ∨
+    (0 < e.t ∧ e.tid = hartAgent primary ∧ e.v = nthByte startedSet j)
+
+/-- Only the primary writes the flag, and only `startedSet`: at every position where the power is
+on, the flag's histories are as `OnceAt` says.  With the histories' timestamps descending (the
+memory's well-formedness, `histOk`), a read of the word at a view at or past a store's position
+reads `startedSet`.  The kernel proof discharges it.  Positions where the power is off are left
+out: before the first power-on the memory is arbitrary (`boot` assumes nothing of it). -/
+def StartedOnce (σ : Nat → Cfg) : Prop := ∀ n, powerOn (σ n) → OnceAt (σ n)
+
+/-! ### What the trigger and the facts give
+
+The trigger is `Fresh`'s attempt condition at the flag once the store has happened.  At every
+power-on the flag is unstored and its histories meet `StartedOnce`'s clause, so neither fact
+excludes a run at its boot. -/
+
+variable {x : CPU} {t : Nat}
+
+/-- The flag's four bytes are DRAM bytes. -/
+theorem startedAddr_ram : ramBytes startedAddr 4 := by
+  intro j hj
+  rcases j with _ | _ | _ | _ | j
+  all_goals first | decide | omega
+
+theorem atSpinLoad_live (h : atSpinLoad x c) : ∃ i, liveAt i c :=
+  let ⟨i, gen, _, _, he, hl, _⟩ := h
+  ⟨i, gen, Or.inl ⟨x, _, he⟩, hl⟩
+
+/-- A hart at the spin's load is at a plain RAM load of the flag, in the sense of the visibility
+pair `Fresh`. -/
+theorem atSpinLoad_atLoad (h : atSpinLoad x c) : ∃ i, Fresh.atLoad i startedAddr c := by
+  obtain ⟨i, gen, req, k, he, hl, hpa, hsz, hpl, -⟩ := h
+  refine ⟨i, gen, x, req, k, he, hl, hpl, ?_, 0, ?_, ?_⟩
+  · rw [hpa, hsz]
+    exact startedAddr_ram
+  · rw [hsz]
+    decide
+  · rw [hpa]
+    simp
+
+/-- Once the flag is stored at `t`, a hart at the spin's load is enabled for the visibility of
+store `t` at the flag.  The bound `t ≤ top` is a hypothesis: it follows from the memory's
+well-formedness (`mmOk`, through `histOk`), which no lemma about runs alone gives; the program
+logic's state interpretation carries it. -/
+theorem fresh_enabled_of_stored (h : atSpinLoad x c) (_hs : flagStored t c)
+    (ht : t ≤ c.2.m.top) : ∃ i, Fresh.enabled i t startedAddr c :=
+  let ⟨i, hi⟩ := atSpinLoad_atLoad h
+  ⟨i, hi, ht⟩
+
+/-- Past the spin is not at its load: the two addresses differ. -/
+theorem pastSpin_not_atSpinLoad (h : pastSpin x c) : ¬ atSpinLoad x c := by
+  rintro ⟨_, _, _, _, -, -, -, -, -, hpc⟩
+  unfold pastSpin at h
+  rw [h] at hpc
+  exact absurd hpc (by decide)
+
+/-- Under `StartedOnce`, a stored flag is at a positive position of the store order: the boot
+image's entry holds the low byte of `startedClear`, which is not that of `startedSet`. -/
+theorem flagStored_pos {n : Nat} (ho : StartedOnce σ) (hon : powerOn (σ n))
+    (hs : flagStored t (σ n)) : 0 < t := by
+  obtain ⟨H, e, hH, he, rfl, -, hv⟩ := hs
+  have hH' : (σ n).2.m.mem[startedAddr + BitVec.ofNat 64 0]? = some H := by simpa using hH
+  rcases ho n hon 0 (by decide) H hH' e he with ⟨-, hv'⟩ | ⟨hpos, -⟩
+  · rw [hv] at hv'
+    exact absurd hv' (by decide)
+  · exact hpos
+
+/-- The history of each of the flag's bytes in a booted memory: the boot image's zero, at
+position 0. -/
+theorem hist_of_bootFacts (hb : bootFacts c.2.m) {j : Nat} (hj : j < 4) :
+    c.2.m.mem[startedAddr + BitVec.ofNat 64 j]? = some [⟨0, 0, nthByte startedClear j⟩] := by
+  have hram : inRam (startedAddr + BitVec.ofNat 64 j) 1 := startedAddr_ram j hj
+  have hnat : (startedAddr + BitVec.ofNat 64 j).toNat = 0x8000a400 + j := by
+    rcases j with _ | _ | _ | _ | j
+    all_goals first | decide | omega
+  have hz : nthByte startedClear j = 0#8 := by
+    rcases j with _ | _ | _ | _ | j
+    all_goals first | decide | omega
+  rw [hb.1, imgFlat_get?, ite_eq_left hram, bootImage_get?, ite_eq_left hram, hnat, hz,
+    bootByte_zero _ (by unfold KernelElf.elfEnd; omega)]
+  rfl
+
+/-- At every power-on the flag's histories are as `StartedOnce` says. -/
+theorem onceAt_of_bootFacts (hb : bootFacts c.2.m) : OnceAt c := by
+  intro j hj H hH e he
+  rw [hist_of_bootFacts hb hj, Option.some.injEq] at hH
+  subst hH
+  rw [List.mem_singleton] at he
+  subst he
+  exact Or.inl ⟨rfl, rfl⟩
+
+/-- At every power-on the flag is not stored, so the trigger of `PrimaryStores` holds there. -/
+theorem not_flagStored_of_bootFacts (hb : bootFacts c.2.m) : ¬ flagStored t c := by
+  rintro ⟨H, e, hH, he, -, -, hv⟩
+  have h0 := hist_of_bootFacts hb (j := 0) (by decide)
+  simp only [BitVec.add_zero] at h0
+  rw [h0, Option.some.injEq] at hH
+  subst hH
+  rw [List.mem_singleton] at he
+  subst he
+  exact absurd hv (by decide)
+
+/-! ### The statement -/
+
+/-- The statement glue: the per-hart theorem, for every hart but the primary under the bundle and
+the two kernel-side facts, gives the era form of xv6's liveness theorem for the first target. -/
+theorem xv6EraLive_of_target1 {img : Nat → BitVec 8}
+    (h : ∀ x, x ≠ primary → Hyps img σ → PrimaryStores σ → StartedOnce σ →
+      EraLive (atSpinLoad x) (pastSpin x) σ)
+    (hp : PrimaryStores σ) (ho : StartedOnce σ) : xv6EraLive img components σ := by
+  intro hh c hc
+  obtain ⟨x, hx, rfl⟩ := List.mem_map.1 hc
+  have hne : x ≠ primary := of_decide_eq_true (List.mem_filter.1 hx).2
+  exact h x hne hh hp ho
+
+/-- The component typechecks against the bundle: the statement for the first target is the
+bundle's hypotheses giving every component in the era form. -/
+example (img : Nat → BitVec 8) (σ : Nat → Cfg) :
+    xv6EraLive img components σ = (Hyps img σ → ∀ c ∈ components, EraLive c.T c.B σ) := rfl
+
+end Target1
 
 end Fairness.Spec

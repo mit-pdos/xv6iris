@@ -94,3 +94,12 @@ Fairness.Spec.Hart.progressOrCut_of_hyps
 Fairness.Spec.Dma.ag_of_hyps
 Fairness.Spec.Dma.sf_iff_ag
 Fairness.Spec.xv6Live_of_xv6EraLive
+
+# MachCSL/Liveness/Spec.lean, section 9: the targets (T1, the secondary harts'
+# boot spin on started)
+Fairness.Spec.Target1.atSpinLoad_atLoad
+Fairness.Spec.Target1.fresh_enabled_of_stored
+Fairness.Spec.Target1.flagStored_pos
+Fairness.Spec.Target1.onceAt_of_bootFacts
+Fairness.Spec.Target1.not_flagStored_of_bootFacts
+Fairness.Spec.Target1.xv6EraLive_of_target1
