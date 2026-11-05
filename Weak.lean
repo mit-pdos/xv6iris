@@ -963,6 +963,9 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.HartLift
+import Weak.Prom.HartSwp
+import Weak.Prom.HartAdeq
 import Weak.Prom.OwnAAdLang
 import Weak.Prom.OwnAAdSched
 import Weak.Prom.OwnAAdWp
