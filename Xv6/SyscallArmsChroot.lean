@@ -8,9 +8,11 @@ header, chroot.md §4), so the process's own `syscSysIn` is dropped unread
 and its `syscSysOut` is paid quiet (`syscSysOut_quiet`: 24 is `syscNumNofs`),
 and the callee's blanket post is the whole answer.  The reference ledger
 closes at two as chdir's does (`irefSlots 2` borrowed out of `IREFSPARE`
-and joined back), and the only fields that move are `root` / `rti`, which
-no row the dispatcher states reads -- so every row is the identity at 24
-(`syscPath_rows` at the unmoved cwd).
+and joined back), and the only fields that move are `root` / `rti` and,
+since xv6 173e8ade's jail fix, `cwd` / `cwi` (the cwd follows the root on
+success).  No row the dispatcher states reads the root; the cwd's row is
+`SyscRows.cwi`, which names chroot beside chdir and is paid by the success
+arm's `a0 = 0`; every other row is the identity at 24 (`syscPath_rows`).
 
 **Deviations from Rocq**: as SyscallArmsPath's (the rows through
 `syscPath_rows`; the block at argstr's raised count, `∀ k' ≥ V.ev`).  The
@@ -37,21 +39,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- **The post's two arms as one record**: the block the call leaves is the
-one it came in with, or that one with its root moved -- pointer and inum
-only. -/
+one it came in with, or -- at `a0 = 0` -- that one with its root AND its
+cwd moved to one inode (xv6 173e8ade), pointer and inum only. -/
 theorem sysChrootPost_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (r : BitVec 64) :
     sysChrootPost (GF := GF) γ pa pid V M r ⊢
-      ∃ V1 : ProcPriv, ⌜V1 = V ∨ ∃ (ipv : BitVec 64) (z : Nat), V1 = { V with root := ipv, rti := z }⌝ ∗
+      ∃ V1 : ProcPriv, ⌜V1 = V ∨ (r = 0#64 ∧ ∃ (ipv : BitVec 64) (z : Nat),
+          V1 = { V with root := ipv, rti := z, cwd := ipv, cwi := z })⌝ ∗
         procPrivFd γ pa pid V1 M := by
   unfold sysChrootPost
   iintro (⟨%hr, Hpriv⟩ | ⟨%ipv, %z, %hr, Hpriv⟩)
   · iexists V
     iframe Hpriv
     ipureintro; exact Or.inl rfl
-  · iexists { V with root := ipv, rti := z }
+  · iexists { V with root := ipv, rti := z, cwd := ipv, cwi := z }
     iframe Hpriv
-    ipureintro; exact Or.inr ⟨ipv, z, rfl⟩
+    ipureintro; exact Or.inr ⟨hr, ipv, z, rfl⟩
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_chroot`** (table index 24). -/
@@ -109,20 +112,22 @@ theorem syscall_arm_chroot (SCR : SYSCHROOT)
   k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
   k_norm_g at hcs
   have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
-  -- the block the post returned: `{V with upt := P'}`, its ROOT moved on
-  -- success -- nothing any row reads
+  -- the block the post returned: `{V with upt := P'}`, its ROOT and (xv6
+  -- 173e8ade) its CWD moved on success -- the cwd's row is paid at `a0 = 0`
   have hV1 : V1.upt = P' ∧ V1.tf = V.tf ∧ V1.sz = V.sz ∧ V1.pvLazy = V.pvLazy ∧ V1.fdg = V.fdg ∧
-      V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.kstack = V.kstack ∧ V1.cwi = V.cwi ∧
+      V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.kstack = V.kstack ∧
+      (((24 : Int) = USYS_chdir ∨ (24 : Int) = USYS_chroot) ∧
+        (R2 10#5).toNat = 0 ∨ V1.cwi = V.cwi) ∧
       V1.pvSecc = V.pvSecc := by
-    rcases hdisj with rfl | ⟨ipv, z, rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    rcases hdisj with rfl | ⟨hr, ipv, z, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inr rfl, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨Or.inr rfl, by rw [hr]; rfl⟩, rfl⟩
   obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi, hsc⟩ := hV1
   have hs2' : R2 18#5 = pageAddr V1.upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
   have hrows := syscPath_rows V M sts sts cs pid P' V1 (R2 10#5) 24 hn24 (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hl hext hup
-    htf hsz hlz hfdg hchg hgen hks (Or.inr hcwi)
+    htf hsz hlz hfdg hchg hgen hks hcwi
     (syscFdOk_refl_at V _ sts 24 hn24 (by decide) (by decide) (by decide) (by decide)) (by decide) hsc
   unfold syscallRet syscallAddr at *
   iapply (syscall_ret_tail PT Γ c0 c k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1

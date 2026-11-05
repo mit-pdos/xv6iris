@@ -7,20 +7,21 @@ sys_chdir's proof (`ProofSysChdir`) at the other cell, without the trace:
 the walk runs at namei's plain set-form contract (`SpecNamei.NAMEI`), the
 type test reads the locked record's type cell and fires nothing, and the
 block's root moves on the success arm, pointer and inum (the inum the walk's
-reference carries).
+reference carries), and since xv6 173e8ade the cwd with it.
 
     +0x00 .. +0x08  the 20-slot frame (SysChdirFrame.wp_prologue_sys_chdir)
     +0x0a .. +0x10  jal myproc ; mv s2,a0 ; jal begin_op        (sys_chroot_main)
     +0x14 .. +0x1e  li a2,128 ; addi a1,s0,-160 ; li a0,0 ; jal argstr
                                                                 (sys_chroot_args)
-    +0x22           bltz a0 -> +0x68 (ARM A)                    (sys_chroot_fetched)
+    +0x22           bltz a0 -> +0x7a (ARM A)                    (sys_chroot_fetched)
     +0x26 .. +0x2c  sd s1,136(sp) ; addi a0,s0,-160 ; jal namei
-    +0x30 .. +0x32  mv s1,a0 ; beqz a0 -> +0x66 (ARM B)         (sys_chroot_miss / _found)
+    +0x30 .. +0x32  mv s1,a0 ; beqz a0 -> +0x78 (ARM B)         (sys_chroot_miss / _found)
     +0x34           jal ilock
-    +0x38 .. +0x3e  lh a4,68(s1) ; li a5,1 ; bne a4,a5 -> +0x70 (sys_chroot_tested)
-    +0x42 ..        the success tail           (SysChrootParts.sys_chroot_tail_ok)
-    +0x66 / +0x68   ARM B's reload / ARM A-B's tail (SysChrootParts.sys_chroot_tail_68)
-    +0x70 ..        ARM C                      (SysChrootParts.sys_chroot_tail_70)
+    +0x38 .. +0x3e  lh a4,68(s1) ; li a5,1 ; bne a4,a5 -> +0x82 (sys_chroot_tested)
+    +0x42 ..        the success tail, with xv6 173e8ade's iput(p->cwd) and
+                    p->cwd = idup(ip)           (SysChrootParts.sys_chroot_tail_ok)
+    +0x78 / +0x7a   ARM B's reload / ARM A-B's tail (SysChrootParts.sys_chroot_tail_68)
+    +0x82 ..        ARM C                      (SysChrootParts.sys_chroot_tail_70)
 
 **Deviations from Rocq** (beyond SpecSysChroot's and SysChrootParts'): as
 ProofSysChdir's 1, 2, 4 and 5 -- eb generic, one level-0 stretch with the
@@ -58,7 +59,7 @@ set_option maxHeartbeats 32000000 in
 /-- **`+0x38 .. +0x3e`**: `lh a4,68(s1)` off the locked record's type cell,
 `li a5,1`, and the `bne` dispatching to the success tail (+0x42) or ARM C
 (+0x70). -/
-theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
+theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) (ID : IDUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
@@ -68,12 +69,12 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
     (hpins : sysChdirPins k R (ientry kk) (procAddr A.j))
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hkk : kk < NINODE) (hnib : inum.toNat < 16 * icfgNib) (hpos : 0 < inum.toNat)
-    (hle : lo ≤ tl) (hn : iputUnits ≤ n) :
+    (hle : lo ≤ tl) (hn : iputUnits + iputUnits ≤ n) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chroot» + 0x38#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
-    sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti ∗
+    sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti A.V.cwd A.V.cwi ∗
     sysChrootHole A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
     (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
@@ -113,11 +114,11 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
   by_cases hnt : dn.diType ≠ T_DIR
   · -- ===== NOT A DIRECTORY: ARM C =====
     have hd : decide (dn.diType ≠ T_DIR) = true := by simp [hnt]
-    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x3e#64) false 50#13 14#5 15#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x3e#64) false 68#13 14#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hbt1, hd]
     iintro Hk Hpc
     iapply (sys_chroot_tail_70 IUP EO Γ cpu k A P2 spie spp _ kk q g lo tl γil γisl inum dn bm n Sb
-        hj hproc hK hnoff htier ?hp1 hal hP2 hkk hnib hle hn)
+        hj hproc hK hnoff htier ?hp1 hal hP2 hkk hnib hle (Nat.le_trans (Nat.le_add_right _ _) hn))
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hlk $Hbs $Hir $Hop]
     case hp1 =>
       repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
@@ -125,10 +126,10 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
   · -- ===== A DIRECTORY: the success tail =====
     have hty : dn.diType = T_DIR := Classical.not_not.mp hnt
     have hd : decide (dn.diType ≠ T_DIR) = false := by simp [hty]
-    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x3e#64) false 50#13 14#5 15#5 (by decide) bop.BNE)
+    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x3e#64) false 68#13 14#5 15#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hbt1, hd]
     iintro Hk Hpc
-    iapply (sys_chroot_tail_ok IU IP EO Γ cpu k A P2 spie spp _ kk q g lo tl γil γisl inum dn bm n Sb
+    iapply (sys_chroot_tail_ok IU IP EO ID Γ cpu k A P2 spie spp _ kk q g lo tl γil γisl inum dn bm n Sb
         hj hproc hK hnoff htier ?hp1 hal hP2 hkk hnib hpos hle hn)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hlk $Hbs $Hir $Hop]
     case hp1 =>
@@ -165,13 +166,13 @@ theorem sys_chroot_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x32  beqz a0,+0x34 : taken
-  k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x32#64) true 52#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x32#64) true 70#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
   iintro Hk Hpc
   -- +0x66  ld s1,136(sp)
   unfold sysChdirCells
   icases Hcells with ⟨Hra, Hs0, H3, H4⟩
-  k_step_e (wp_s_ld cpu _ (KA.«sys_chroot» + 0x66#64) true 136#12 9#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«sys_chroot» + 0x78#64) true 136#12 9#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 9#5))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hpins.1, sys_chdir_sp136, sys_chdir_sp136']
@@ -191,6 +192,7 @@ set_option maxHeartbeats 16000000 in
 the reference taken apart (shed, share named at its generation), and
 `ilock(ip)` at the write arm; then `sys_chroot_tested`. -/
 theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
+    (ID : IDUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (pl rest : List (BitVec 8)) (n : Nat) (Sb : List Nat) (ipv : BitVec 64)
@@ -198,7 +200,7 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hct : curTier = KTier.kpt)
     (hpins : sysChdirPins k R (k.regs 9#5) (procAddr A.j)) (h10 : R 10#5 = ipv)
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hlen : pl.length + 1 + rest.length = 128) (hn : iputUnits ≤ n) :
+    (hlen : pl.length + 1 + rest.length = 128) (hn : iputUnits + iputUnits ≤ n) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chroot» + 0x30#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
@@ -221,7 +223,7 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
   iintro Hk Hpc
   -- +0x32  beqz a0 : falls through
   have hd : decide (ipv = 0#64) = false := by simp [hnz]
-  k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x32#64) true 52#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x32#64) true 70#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
   iintro Hk Hpc
   -- +0x34  jal ilock
@@ -238,7 +240,7 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
   icases icSleeplocks_lookup fscIc kk hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases sys_chroot_rootpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
   unfold sysChrootRows
-  icases Hrows with ⟨Hpid, Hrt, Hrtr⟩
+  icases Hrows with ⟨Hpid, Hrt, Hrtr, Hcw, Hcwr⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (sys_chdir_ilock IL Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
       A.j sysfilePidQ γil γisl kk q.half g lo tl inum A.pid hj ?lp ?lK ?ln ?lt hkk hnib ?la hle)
@@ -263,9 +265,10 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
   ihave Hlk : sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm
     $$ [Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hkeep Hru]
   · unfold sysChdirLocked; iframe; iframe #
-  ihave Hrows : sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti $$ [Hpid Hrt Hrtr]
+  ihave Hrows : sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti A.V.cwd A.V.cwi
+    $$ [Hpid Hrt Hrtr Hcw Hcwr]
   · unfold sysChrootRows; iframe
-  iapply (sys_chroot_tested IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 kk q g lo tl γil γisl inum dn bm
+  iapply (sys_chroot_tested IU IP IUP EO ID Γ cpu k A P2 spie1 spp1 R1 kk q g lo tl γil γisl inum dn bm
       n Sb hj hproc hK hnoff htier hp1 hal hP2 hkk hnib hpos hle hn)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hrows $Hhole $HΦ $Hlk $Hbs $Hir $Hop]
 
@@ -277,7 +280,7 @@ string did not fetch) or the path read as namei's buffer, `sd s1`,
 `addi a0,s0,-160` and `namei(path)` at the plain set-form contract; namei's
 two arms go to `sys_chroot_miss` / `sys_chroot_found`. -/
 theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IUP : IUNLOCKPUT) (EO : END_OP) (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₃ v : BitVec 64) (old bs : List (BitVec 8))
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -304,7 +307,7 @@ theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
     subst hbs
     rw [hold] at hlt
     -- +0x22  bltz a0 : falls through
-    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x22#64) false 70#13 10#5 0#5 (by decide) bop.BLT)
+    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x22#64) false 88#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hr, sysfile_bltz_nat pl'.length (by omega)]
     iintro Hk Hpc
@@ -360,12 +363,12 @@ theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
     · -- ===== the walk LANDED =====
       ihave Harm := Xv6.kxcA_ite_t _ _ $$ Harm
       icases Harm with ⟨%h10, Hheld, Hir⟩
-      have hn : iputUnits ≤ n' := sys_chdir_bud_iput n' w true hlo
-      iapply (sys_chroot_found IL IU IP IUP EO Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' ipv hj hproc
+      have hn : iputUnits + iputUnits ≤ n' := sys_chroot_bud_iput2 n' w hlo
+      iapply (sys_chroot_found IL IU IP IUP EO ID Γ cpu k A P2 spie1 spp1 R1 pl' _ n' Sb' ipv hj hproc
           hK hnoff htier hct hp1 h10 hal hP2 hlen hn)
         $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Htx $Hheld]
   · -- ===== the string did not fetch: ARM A =====
-    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x22#64) false 70#13 10#5 0#5 (by decide) bop.BLT)
+    k_step_e (wp_s_branch cpu _ (KA.«sys_chroot» + 0x22#64) false 88#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, MachCSL.bltz_m1]
     iintro Hk Hpc
     ihave Hbuf : sysfileAny (sysChdirBuf (k.regs 2#5)) 128 $$ [Hbuf]
@@ -382,7 +385,7 @@ set_option maxHeartbeats 32000000 in
 `argstr(0, path, 128)` over the bare block (the block re-closes at argstr's
 grown descriptor and raised count); then `sys_chroot_fetched`. -/
 theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IUP : IUNLOCKPUT) (EO : END_OP) (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (spie spp : Bool) (R : RegMap)
     (w₃ v : BitVec 64) (hv : A.V.tf[tfArgIdx 0]? = some v)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -452,7 +455,7 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
     repeat (refine sysChdirPins_set _ _ _ _ _ _ ?_ (by decide))
     exact hpins
-  iapply (sys_chroot_fetched NI IL IU IP IUP EO Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj
+  iapply (sys_chroot_fetched NI IL IU IP IUP EO ID Γ cpu k (A.raise kv) P2 spie1 spp1 R1 w₃ v old bs hj
       hproc hK hnoff htier hct hp1 hal hext hold hret)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop]
 
@@ -464,7 +467,7 @@ contract's continuation made hart-free, the prologue (`+0x00 .. +0x08`),
 `myproc()` (`+0x0a`), `mv s2,a0` (`+0x0e`) and `begin_op()` (`+0x10`) with
 the pid quarter lent through the root seam; then `sys_chroot_args`. -/
 theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK)
-    (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
+    (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) (ID : IDUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v : BitVec 64)
@@ -533,7 +536,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   iintro Hk Hpc
   icases sys_chroot_rootpid hct _ _ _ _ _ $$ Hblk with ⟨Hrows, Hhole⟩
   unfold sysChrootRows
-  icases Hrows with ⟨Hpid, Hrt, Hrtr⟩
+  icases Hrows with ⟨Hpid, Hrt, Hrtr, Hcw, Hcwr⟩
   iapply (sysfile_begin_op BO Γ cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc)
       j pid sysfilePidQ hj ?bp ?bK ?bn ?bt)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid]
@@ -545,13 +548,13 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   case bt => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_chroot_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
-  ihave Hblk := sys_chroot_hole_close _ _ _ _ _ $$ [Hhole Hpid Hrt Hrtr]
+  ihave Hblk := sys_chroot_hole_close _ _ _ _ _ $$ [Hhole Hpid Hrt Hrtr Hcw Hcwr]
   · unfold sysChrootRows; iframe
   have hp2 : sysChdirPins k R2 (k.regs 9#5) (procAddr j) := by
     refine sysChdirPins_cs k _ R2 _ _ ?_ hcs2
     refine sysChdirPins_set _ _ _ _ 1#5 _ ?_ (Or.inl rfl)
     exact sysChdirPins_s2_eq k R1 _ _ _ _ hp1 (by simp [h10, hproc])
-  iapply (sys_chroot_args AS NI IL IU IP IUP EO Γ cpu k ⟨γ, j, pid, V, M⟩ spie2 spp2 R2
+  iapply (sys_chroot_args AS NI IL IU IP IUP EO ID Γ cpu k ⟨γ, j, pid, V, M⟩ spie2 spp2 R2
       w₃ v hv hj hproc hK hnoff htier hct hp2 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop]
 
@@ -561,9 +564,9 @@ end
 `SysChrootProof Myproc BeginOp Argstr Namei Ilock Iunlock Iput Iunlockput
 EndOp`). -/
 theorem sys_chroot_proof (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK)
-    (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) : SYSCHROOT :=
+    (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) (ID : IDUP) : SYSCHROOT :=
   ⟨fun Γ _ cpu k γ j pid V M v hj hproc htier hnoff hK hv =>
-    sys_chroot_main MP AS BO NI IL IU IP IUP EO Γ cpu k γ j pid V M v hj hproc htier hnoff
+    sys_chroot_main MP AS BO NI IL IU IP IUP EO ID Γ cpu k γ j pid V M v hj hproc htier hnoff
       hK hv⟩
 
 end Xv6

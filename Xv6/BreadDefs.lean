@@ -52,7 +52,7 @@ theorem bd_br_acq : KA.«bread» + 0xffffffffffffdf9e#64 = KA.«acquire» := by 
 theorem bd_br_rel : KA.«bread» + 0xffffffffffffe026#64 = KA.«release» := by decide
 theorem bd_br_aslp : KA.«bread» + 0x147e#64 = KA.«acquiresleep» := by decide
 theorem bd_br_panic : KA.«bread» + 0xffffffffffffdb7e#64 = KA.«panic» := by decide
-theorem bd_br_vdr : KA.«bread» + 0x2e3a#64 = KA.«virtio_disk_rw» := by decide
+theorem bd_br_vdr : KA.«bread» + 0x2e4a#64 = KA.«virtio_disk_rw» := by decide
 
 theorem bd_ret_1e : jumpPc (KA.«bread» + 0x1e#64) = (KA.«bread» + 0x1e#64) := by decide
 theorem bd_ret_5a : jumpPc (KA.«bread» + 0x5a#64) = (KA.«bread» + 0x5a#64) := by decide

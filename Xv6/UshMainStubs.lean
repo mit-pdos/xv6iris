@@ -130,7 +130,7 @@ theorem wp_ksh_write (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU)
   unfold stubRet
   iapply HS.quiet N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) _ 16 avail (by rw [ush_usysno]; decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by rw [hpc]; decide)
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by rw [hpc]; decide) (by decide)
     $$ Hi Hrun []
   · unfold shDeps
     iapply udepw_of_law $$ Hdp

@@ -897,13 +897,13 @@ class IS the functional row -/
 theorem usysDetQuiet_ne {n : Int} (h : usysDetQuiet n) :
     n ≠ USYS_exec ∧ n ≠ USYS_sbrk ∧ n ≠ USYS_wait ∧ n ≠ USYS_pipe ∧ n ≠ USYS_read ∧
       n ≠ USYS_fstat ∧ n ≠ USYS_fork ∧ n ≠ USYS_exit ∧ n ≠ USYS_close ∧ n ≠ USYS_dup ∧
-      n ≠ USYS_open ∧ n ≠ USYS_chdir ∧ n ≠ USYS_seccomp := by
+      n ≠ USYS_open ∧ n ≠ USYS_chdir ∧ n ≠ USYS_seccomp ∧ n ≠ USYS_chroot := by
   rcases h with rfl | rfl | rfl | rfl <;> decide
 
 theorem usysDetResumes_ne {n : Int} (h : usysDetResumes n) :
     n ≠ USYS_exec ∧ n ≠ USYS_pipe ∧ n ≠ USYS_read ∧
       n ≠ USYS_fstat ∧ n ≠ USYS_exit ∧ n ≠ USYS_close ∧ n ≠ USYS_dup ∧
-      n ≠ USYS_open ∧ n ≠ USYS_chdir ∧ n ≠ USYS_seccomp := by
+      n ≠ USYS_open ∧ n ≠ USYS_chdir ∧ n ≠ USYS_seccomp ∧ n ≠ USYS_chroot := by
   rcases h with (rfl | rfl | rfl | rfl) | rfl | rfl | rfl <;> decide
 
 /-- (NI M2-G3) sbrk's functional row satisfies the landed one: the
@@ -1011,7 +1011,7 @@ theorem usysDet_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n) :
     (n ≠ USYS_wait → n ≠ USYS_fork → usysChOk n (usysDetRet n W ι) W.ch (usysDet n W ι).ch) ∧
     usysIotaFits n W (usysDetRet n W ι) (usysDet n W ι).ch (usysDet n W ι).M (usysDet n W ι).sz
       (usysDet n W ι).lazy ι := by
-  obtain ⟨-, h4, -, -, -, hcl, hdp, hop, hcd, h23⟩ := usysDetResumes_ne h
+  obtain ⟨-, h4, -, -, -, hcl, hdp, hop, hcd, h23, h24⟩ := usysDetResumes_ne h
   have hfd : (usysDet n W ι).fd = W.fd := by
     unfold usysDet usysDetWait usysDetFork usysDetSbrk; split <;> (repeat' split) <;> rfl
   have hcw : (usysDet n W ι).cwd = W.cwd := by
@@ -1074,7 +1074,7 @@ theorem usysDet_of_rows {n : Int} (W : Uvis) (ι : UIota) (h : usysDetResumes n)
     (hch : n ≠ USYS_wait → n ≠ USYS_fork → cs' = W.ch)
     (hfit : usysIotaFits n W r cs' M' szv' lz' ι) :
     r = usysDetRet n W ι ∧ bump W r M' π' szv' fdv' cw' g' cs' lz' secc' = usysDet n W ι := by
-  obtain ⟨h7, h4, h5, h8, -, hcl, hdp, hop, hcd, h23⟩ := usysDetResumes_ne h
+  obtain ⟨h7, h4, h5, h8, -, hcl, hdp, hop, hcd, h23, h24⟩ := usysDetResumes_ne h
   have hfd' := usysFdOk_quiet hcl hdp hop h4 hfd
   have hc' := usysCwdOk_quiet hcd hc
   have hs' := usysSeccOk_quiet h23 hs

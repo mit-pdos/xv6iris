@@ -210,7 +210,44 @@ SYSCHROOT` parameter (and `LinkSyscall` its ascription check), and the arm
 is `sysc_arm_chdir`'s shape minus the walk deposit.  Every syscall row the
 program tier reads (`usys_cwd_ok`, `usys_fd_ok`, `sysc_mem_ok`, …) is quiet
 at 24 by construction — `chroot` moves only `pv_root`/`pv_rti`, which no
-row mentions.  `UsysMemOk.USYS_chroot := 24`.
+row mentions.  `UsysMemOk.USYS_chroot := 24`.  **(Superseded at xv6
+173e8ade for the cwd: see §4.1.)**
+
+### 4.1 The jail fix (xv6 `173e8ade`, "vuln-fix: fix chroot bypass")
+
+At `b72cbac1` the success arm left `p->cwd` alone, so a jailed process
+could `chroot` into a subdirectory while keeping a cwd OUTSIDE its new
+root; relative `..` from there never meets `dirlookup`'s self arm (which
+compares against `p->root`) and climbs to the real root.  The contract
+above stated exactly that behaviour and was provable — the bug was in the
+specification's silence about the cwd, not in a proof.  173e8ade adds
+`iput(p->cwd)` inside the operation and `p->cwd = idup(ip)` after the
+root's store, and the Lean tree follows it (2026-11-05):
+
+- **The contract.**  `SpecSysChroot.sysChrootPost`'s ret-0 arm is
+  `{ V with root := ipv, rti := z, cwd := ipv, cwi := z }`: the new root
+  IS the new cwd.  The seam lending the rows is
+  `ProcPrivAcc.procPrivFd_rootCwdPid` (root cell + reference, cwd cell +
+  reference, pid quarter; one wand at any two pairs), so
+  `SysChrootParts.sysChrootRows` carries five rows.
+- **The ledger** still closes at two: namei's one unit + the two `iput`s'
+  units − `idup`'s.  **The log budget**: the two `iput`s share one
+  operation, `2 · iputUnits = 6 ≤ 9` left by a found walk
+  (`sys_chroot_bud_iput2`).  `idup` is called through
+  `SysChrootParts.sys_chroot_idup` (the general-`sie` form, `namex_rel`'s
+  call); its frame sits under namei's, so `K_sys_chroot` did not move.
+- **The user-visible rows widen, honestly.**  `UsysMemOk.usysCwdOk` and
+  `SpecSyscall.SyscRows.cwi` now say "only a successful `chdir` OR
+  `chroot` moves the cwd".  Every quiet consumer gains `n ≠ USYS_chroot`,
+  discharged by `decide` at a concrete number (a trailing default argument
+  on `usysCwdOk_quiet`/`_refl_at`, `ukSys_quietRows`/`_memRows` and the
+  generic ecall leaves) and from the class lists in `UsysDet`.  No
+  verified program calls chroot, so no application proof moved.  This is a
+  change to a TRUSTED definition: `UsysMemOk` is in the NI statements'
+  trusted base.  `lean`'s `tools/ci/tcb.sh` pins module sets, axioms and
+  opaques only, none of which moved; a branch carrying the content pin
+  (d546b6a1a, `lean-lantana`) will see `usysCwdOk`'s hash move and must
+  re-baseline it deliberately.
 
 ## 5. Boot: `igetroot` replaces the `namei("/")` corner
 

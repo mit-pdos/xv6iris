@@ -71,6 +71,8 @@ def wpUkEcallQuiet : Prop :=
     n ≠ USYS_close → n ≠ USYS_dup → n ≠ USYS_open → n ≠ USYS_chdir →
     (0 ≤ n ∧ n < 64) → n ≠ USYS_seccomp →
     (pc + 4#64) &&& 1#64 = 0#64 →
+    -- chroot moves the cwd since xv6 173e8ade (`UsysMemOk.usysCwdOk`)
+    n ≠ USYS_chroot →
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepw (hlc := hlc) N m pc n -∗
       (∀ (h' : CPU) (r : BitVec 64), urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h

@@ -10,6 +10,13 @@ root (`p->root`, `sys_chroot`, `igetroot`, `dirlookup`'s self arm at the root, t
 vocabulary); design in `claude-notes/design/chroot.md`; the gate (build, audit, tcb, coverage, vtest)
 is green.
 
+**2026-11-05.**  The kernel is xv6-riscv `173e8ade` (branch `verified`, "vuln-fix: fix chroot
+bypass"): a successful `sys_chroot` also moves the cwd to the new root (`iput(p->cwd)`, `p->cwd =
+idup(ip)`).  Only `sys_chroot` reshaped (+0x12; `sys_exec`/`sys_pipe` +0x12, `kernelvec` on +0x10, data
+unmoved; user images and `fs.img` byte-identical).  The contract's success post moves `cwd`/`cwi`
+with `root`/`rti`, and the user-visible cwd row (`usysCwdOk`, `SyscRows.cwi`) names chroot beside
+chdir (`claude-notes/design/chroot.md` §4.1).
+
 - `Xv6.xv6FsAdequacy_closed` — the system theorem (hypotheses: generation 0, power off, disk = `fs.img`).
 - `Xv6.userProof : USER` — the user-mode machine layer, no hypotheses.
 - `Xv6.unionAdequacyClosed` — union adequacy for init/sh/cat/grep/echo/seccomp/sync, concluding

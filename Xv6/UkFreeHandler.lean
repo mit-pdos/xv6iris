@@ -243,7 +243,7 @@ theorem fh_t_write (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps 
   unfold stubRet
   iapply SYS.quiet N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) _ 16 avail (by rw [fh_usysno]; decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by rw [hpc]; exact fh_align _ hal)
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by rw [hpc]; exact fh_align _ hal) (by decide)
     $$ Hi Hrun []
   · iapply udepw_of_law $$ Hlaw
   rw [hpc]

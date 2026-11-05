@@ -226,8 +226,10 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
   fdg : V'.fdg = V.fdg
   chg : V'.chg = V.chg
   gen : V'.gen = V.gen
-  /-- the cwd's inum: chdir, and only when it succeeds -/
-  cwi : (syscNum V = USYS_chdir ∧ (syscA0 V').toNat = 0) ∨ V'.cwi = V.cwi
+  /-- the cwd's inum: chdir or chroot (xv6 173e8ade), and only when it
+  succeeds -/
+  cwi : ((syscNum V = USYS_chdir ∨ syscNum V = USYS_chroot) ∧ (syscA0 V').toNat = 0) ∨
+    V'.cwi = V.cwi
   /-- sbrk's answer (deviation 4) -/
   sbrk : syscNum V ≠ USYS_sbrk ∨ usysSbrkRet V.tf (syscA0 V') V.sz.toNat V'.sz.toNat
   /-- fork's answer: -1 or a pid, nonzero either way -/

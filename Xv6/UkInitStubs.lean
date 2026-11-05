@@ -145,7 +145,7 @@ theorem wp_kinit_mknod (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CP
   unfold stubRet
   iapply HS.quiet N h1 (ukWr m 17#5 (BitVec.ofInt 64 17)) _ 17 avail (by rw [kinit_usysno]; decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) $$ Hi Hrun []
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) $$ Hi Hrun []
   · iapply udepw_of_law $$ Hw
   rw [hpc]
   iintro %h2 %r Hrun
@@ -168,7 +168,7 @@ theorem wp_kinit_write (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CP
   unfold stubRet
   iapply HS.quiet N h1 (ukWr m 17#5 (BitVec.ofInt 64 16)) _ 16 avail (by rw [kinit_usysno]; decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
-    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) $$ Hi Hrun []
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) $$ Hi Hrun []
   · iapply udepw_of_law $$ Hw
   rw [hpc]
   iintro %h2 %r Hrun

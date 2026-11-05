@@ -50,7 +50,7 @@ theorem mn_br_92 : KA.«main» + 8892#64 = KA.«iinit» := by decide
 theorem mn_ret_96 : jumpPc (KA.«main» + 150#64) = KA.«main» + 150#64 := by decide
 theorem mn_br_96 : KA.«main» + 13120#64 = KA.«fileinit» := by decide
 theorem mn_ret_9a : jumpPc (KA.«main» + 154#64) = KA.«main» + 154#64 := by decide
-theorem mn_br_9a : KA.«main» + 19038#64 = KA.«virtio_disk_init» := by decide
+theorem mn_br_9a : KA.«main» + 19054#64 = KA.«virtio_disk_init» := by decide
 theorem mn_ret_9e : jumpPc (KA.«main» + 158#64) = KA.«main» + 158#64 := by decide
 theorem mn_br_9e : KA.«main» + 3492#64 = KA.«userinit» := by decide
 theorem mn_ret_a2 : jumpPc (KA.«main» + 162#64) = KA.«main» + 162#64 := by decide
@@ -296,7 +296,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   iintro ⟨Hk, Hpc, #Hkml, Hav, #Hdinv, #Hcc, Hcfg, Hgh, ⟨%vl, %vn, %vc, %pd0, %pav0, %pu0, %free0, Hcells⟩,
     Hlf, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18884#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18900#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9a]
   iintro Hk Hpc
   have hvd := VD.wp_virtio_disk_init (hlc := hlc) (GF := GF) cpu

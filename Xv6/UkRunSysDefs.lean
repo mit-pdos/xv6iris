@@ -222,7 +222,8 @@ theorem ukSys_quietRows {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' 
     (h8 : n ≠ USYS_fstat) (h21 : n ≠ USYS_close) (h10 : n ≠ USYS_dup) (h15 : n ≠ USYS_open) (h9 : n ≠ USYS_chdir)
     (h23 : n ≠ USYS_seccomp)
     (hok : usysMemOk n tf r M pm sz false M' pm' sz' lz') (hfd : usysFdOk n tf r fdv fdv')
-    (hcw : usysCwdOk n r cw cw') (hsc : usysSeccOk n tf seccAll secc' r) :
+    (hcw : usysCwdOk n r cw cw') (hsc : usysSeccOk n tf seccAll secc' r)
+    (h24 : n ≠ USYS_chroot := by first | decide | assumption) :
     M' = M ∧ pm' = pm ∧ sz' = sz ∧ lz' = false ∧ fdv' = fdv ∧ cw' = cw ∧ secc' = seccAll := by
   obtain ⟨hM, hp, hs⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hok
   exact ⟨hM, hp, hs, usysMemOk_lazy h12 hok, usysFdOk_quiet h21 h10 h15 h4 hfd, usysCwdOk_quiet h9 hcw,
@@ -235,7 +236,7 @@ theorem ukSys_memRows {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' : 
     (h7 : n ≠ USYS_exec) (h12 : n ≠ USYS_sbrk) (h3 : n ≠ USYS_wait) (h4 : n ≠ USYS_pipe) (h5 : n ≠ USYS_read)
     (h8 : n ≠ USYS_fstat) (h9 : n ≠ USYS_chdir) (h23 : n ≠ USYS_seccomp)
     (hok : usysMemOk n tf r M pm sz false M' pm' sz' lz') (hcw : usysCwdOk n r cw cw')
-    (hsc : usysSeccOk n tf seccAll secc' r) :
+    (hsc : usysSeccOk n tf seccAll secc' r) (h24 : n ≠ USYS_chroot := by first | decide | assumption) :
     M' = M ∧ pm' = pm ∧ sz' = sz ∧ lz' = false ∧ cw' = cw ∧ secc' = seccAll := by
   obtain ⟨hM, hp, hs⟩ := usysMemOk_quiet h7 h12 h3 h4 h5 h8 hok
   exact ⟨hM, hp, hs, usysMemOk_lazy h12 hok, usysCwdOk_quiet h9 hcw, usysSeccOk_quiet h23 hsc⟩

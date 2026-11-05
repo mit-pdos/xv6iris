@@ -92,7 +92,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     (hup : V1.upt = P') (htf : V1.tf = V.tf) (hsz : V1.sz = V.sz) (hlz : V1.pvLazy = V.pvLazy)
     (hfdg : V1.fdg = V.fdg) (hchg : V1.chg = V.chg) (hgen : V1.gen = V.gen)
     (hks : V1.kstack = V.kstack)
-    (hcwi : (n = USYS_chdir ∧ r.toNat = 0) ∨ V1.cwi = V.cwi)
+    (hcwi : ((n = USYS_chdir ∨ n = USYS_chroot) ∧ r.toNat = 0) ∨ V1.cwi = V.cwi)
     (hfd : syscFdOk V r sts sts') (h23 : n ≠ 23 := by decide)
     (hsc : V1.pvSecc = V.pvSecc := by first | rfl | assumption) (h14 : n ≠ 14 := by decide) :
     SyscRows V M (syscStore V1 r) (viewFaulted V.upt P' M) sts sts' cs cs pid := by
@@ -122,7 +122,7 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
   · rw [syscStore_upt, hup]; exact hext.1.2.1
   · rw [ha0, syscStore_cwi]
     rcases hcwi with ⟨hc, hr⟩ | hc
-    · exact Or.inl ⟨hnum.trans hc, hr⟩
+    · exact Or.inl ⟨hc.imp (hnum.trans ·) (hnum.trans ·), hr⟩
     · exact Or.inr hc
 
 /-- The stored answer reads back at a record whose trapframe is the entry's. -/
@@ -356,17 +356,17 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   -- the block the arms returned: `{V with upt := P'}`, its cwd moved on success
   have hV1 : V1.upt = P' ∧ V1.tf = V.tf ∧ V1.sz = V.sz ∧ V1.pvLazy = V.pvLazy ∧ V1.fdg = V.fdg ∧
       V1.chg = V.chg ∧ V1.gen = V.gen ∧ V1.kstack = V.kstack ∧
-      ((USYS_chdir = USYS_chdir ∧ (R2 10#5).toNat = 0) ∨ V1.cwi = V.cwi) ∧ V1.pvSecc = V.pvSecc := by
+      (((USYS_chdir = USYS_chdir ∨ USYS_chdir = USYS_chroot) ∧ (R2 10#5).toNat = 0) ∨ V1.cwi = V.cwi) ∧ V1.pvSecc = V.pvSecc := by
     rcases hdisj with ⟨-, rfl⟩ | ⟨hr, ipv, i, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inr rfl, rfl⟩
-    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨rfl, by rw [hr]; rfl⟩, rfl⟩
+    · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨Or.inl rfl, by rw [hr]; rfl⟩, rfl⟩
   obtain ⟨hup, htf, hsz, hlz, hfdg, hchg, hgen, hks, hcwi, hsc⟩ := hV1
   have hs2' : R2 18#5 = pageAddr V1.upt.tfp := by
     rw [hcs.2.2.2.1.trans hs2, hup, hext.1.2.1]
   have hrows := syscPath_rows V M sts sts cs pid P' V1 (R2 10#5) 9 hn9 (by decide) (by decide)
     (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) hl hext hup
     htf hsz hlz hfdg hchg hgen hks
-    (by rcases hcwi with h | h; exact Or.inl ⟨rfl, h.2⟩; exact Or.inr h)
+    (by rcases hcwi with h | h; exact Or.inl ⟨Or.inl rfl, h.2⟩; exact Or.inr h)
     (syscFdOk_refl_at V _ sts 9 hn9 (by decide) (by decide) (by decide) (by decide))
   have ha0 := syscPath_a0 V V1 (R2 10#5) hl htf
   have hup' : ({ V with upt := P' } : ProcPriv).upt = P' := rfl

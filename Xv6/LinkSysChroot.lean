@@ -1,7 +1,8 @@
 /-
 Link `sys_chroot` (Rocq `LinkSysChroot.v`: `Module SysChroot := SysChrootProof
-Myproc BeginOp Argstr Namei Ilock Iunlock Iput Iunlockput EndOp`), the only
-place sys_chroot's proof meets its nine callees'.
+Myproc BeginOp Argstr Namei Ilock Iunlock Iput Iunlockput EndOp`, and `Idup`
+since xv6 173e8ade's `p->cwd = idup(ip)`), the only place sys_chroot's proof
+meets its ten callees'.
 
 namei enters at its plain set-form contract (`LinkNamei.Namei`, SpecSysChroot's
 header).  `copyout` stays a parameter, as in `LinkNamei` / `LinkSysChdir`;
@@ -22,6 +23,7 @@ import Xv6.LinkBeginOp
 import Xv6.LinkNamei
 import Xv6.LinkEndOp
 import Xv6.LinkCopyout
+import Xv6.LinkIdup
 
 namespace Xv6
 
@@ -29,7 +31,7 @@ namespace Xv6
 walkers `copyinstr` runs over. -/
 theorem SysChroot (CO : COPYOUT) (WA : WALKADDR) (VF : VMFAULT) : SYSCHROOT :=
   sys_chroot_proof Myproc (Argstr (Argraw Myproc) (Fetchstr Myproc (Copyinstr WA VF) Strlen)) BeginOp
-    (Namei CO) Ilock Iunlock Iput Iunlockput EndOp
+    (Namei CO) Ilock Iunlock Iput Iunlockput EndOp (Idup Acquire ReleaseHook)
 
 /-- `sys_chroot` CLOSED over `CopyoutClosed` and the closed walkers. -/
 theorem SysChrootClosed : SYSCHROOT :=

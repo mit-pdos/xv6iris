@@ -38,7 +38,7 @@ theorem wp_uk_ecall_quiet (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMa
     (hsbrk : n ≠ USYS_sbrk) (h3 : n ≠ USYS_wait) (h4 : n ≠ USYS_pipe) (h5 : n ≠ USYS_read)
     (h8 : n ≠ USYS_fstat) (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup) (hop : n ≠ USYS_open)
     (hcd : n ≠ USYS_chdir) (hrng : 0 ≤ n ∧ n < 64) (h23 : n ≠ USYS_seccomp)
-    (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (hal4 : (pc + 4#64) &&& 1#64 = 0#64) (h24 : n ≠ USYS_chroot := by first | decide | assumption) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepw (hlc := hlc) N m pc n -∗
       (∀ (h' : CPU) (r : BitVec 64), urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by

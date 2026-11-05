@@ -102,6 +102,8 @@ def USYS_pause : Int := 13
 def USYS_uptime : Int := 14
 def USYS_open : Int := 15
 def USYS_close : Int := 21
+/-- `chroot` (xv6 b72cbac1): since 173e8ade it also moves the cwd, to the new root. -/
+def USYS_chroot : Int := 24
 
 /-! ## §2 The image table -/
 
@@ -569,18 +571,22 @@ theorem usysPipeOk_epc {n : Int} {tf : List (BitVec 64)} {w r : BitVec 64} {M M'
 
 /-! ## §2d The working-directory row -/
 
-/-- Rocq `usys_cwd_ok`: only chdir moves the cwd's inum, and a failed chdir
-does not. -/
+/-- Rocq `usys_cwd_ok`: only chdir and chroot move the cwd's inum, and a
+failed one does not.  CHROOT JOINED chdir at xv6 173e8ade ("vuln-fix: fix
+chroot bypass"): a successful chroot now also sets `p->cwd = idup(ip)`, so
+a jailed process cannot keep a cwd outside its new root
+(`SpecSysChroot`'s header). -/
 def usysCwdOk (n : Int) (r : BitVec 64) (c c' : Nat) : Prop :=
-  if n = USYS_chdir then (r.toNat ≠ 0 → c' = c) else c' = c
+  if n = USYS_chdir ∨ n = USYS_chroot then (r.toNat ≠ 0 → c' = c) else c' = c
 
 theorem usysCwdOk_quiet {n : Int} {r : BitVec 64} {c c' : Nat} (h : n ≠ USYS_chdir)
-    (H : usysCwdOk n r c c') : c' = c := by
-  unfold usysCwdOk at H; rwa [if_neg h] at H
+    (H : usysCwdOk n r c c') (h24 : n ≠ USYS_chroot := by first | decide | assumption) : c' = c := by
+  unfold usysCwdOk at H; rwa [if_neg (by rintro (h' | h') <;> contradiction)] at H
 
-theorem usysCwdOk_refl_at (n k : Int) (r : BitVec 64) (c : Nat) (hk : n = k) (h : k ≠ USYS_chdir) :
+theorem usysCwdOk_refl_at (n k : Int) (r : BitVec 64) (c : Nat) (hk : n = k) (h : k ≠ USYS_chdir)
+    (h24 : k ≠ USYS_chroot := by first | decide | assumption) :
     usysCwdOk n r c c := by
-  subst hk; unfold usysCwdOk; rw [if_neg h]
+  subst hk; unfold usysCwdOk; rw [if_neg (by rintro (h' | h') <;> contradiction)]
 
 /-! ## §2e The generation row: no entry re-incarnates the caller -/
 

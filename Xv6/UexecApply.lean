@@ -616,7 +616,7 @@ the other, and the kernel holding either may only resume at `usysDet`.
 free, its functional answer is the key's at a lazy-free console only. -/
 theorem uexecRetContF_det (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis)
     (h : usysDetQuiet n) (hw : n ≠ USYS_write) : uexecRetContF X n f W ⊣⊢ uexecRetDetF X n f W := by
-  obtain ⟨h7, h12, h3, h4, h5, h8, hf, -, hcl, hdp, hop, hcd, h23⟩ := usysDetQuiet_ne h
+  obtain ⟨h7, h12, h3, h4, h5, h8, hf, -, hcl, hdp, hop, hcd, h23, h24⟩ := usysDetQuiet_ne h
   constructor
   · unfold uexecRetContF uexecRetContGen uexecRetDetF
     iintro H %ι Hsp

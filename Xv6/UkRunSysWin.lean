@@ -164,7 +164,7 @@ theorem wp_uk_ecall_window (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
     (dst : BitVec 64) (cap k : Nat) (f : Nat → BitVec 8) (avail : Nat) (hn : usysno m = n)
     (hwin : usyswin m n = some (dst, cap)) (hck : cap ≤ k) (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup)
     (hop : n ≠ USYS_open) (hpp : n ≠ USYS_pipe) (hwt : n ≠ USYS_wait) (hrng : 0 ≤ n ∧ n < 64)
-    (h23 : n ≠ USYS_seccomp) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (h23 : n ≠ USYS_seccomp) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) (h24 : n ≠ USYS_chroot := by first | decide | assumption) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepw (hlc := hlc) N m pc n -∗
       ubytes N.d dst.toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),

@@ -1,6 +1,7 @@
 /-
-The interface of `sys_chroot` (kernel/sysfile.c, upstream b72cbac1).  A port
-of Rocq `SpecSysChroot.v` (branch `chroot/bump`).
+The interface of `sys_chroot` (kernel/sysfile.c, upstream b72cbac1, with
+the jail fix of 173e8ade).  A port of Rocq `SpecSysChroot.v` (branch
+`chroot/bump`), moved on by the jail fix (below).
 
     uint64 sys_chroot(void) {
       char path[MAXPATH];
@@ -16,16 +17,32 @@ of Rocq `SpecSysChroot.v` (branch `chroot/bump`).
       if (ip->type != T_DIR) { iunlockput(ip); end_op(); return -1; }
       iunlock(ip);
       iput(p->root);
+      iput(p->cwd);                 -- 173e8ade
       end_op();
       p->root = ip;
+      p->cwd = idup(ip);            -- 173e8ade
       return 0;
     }
 
-`KA.«sys_chroot»` = 0x80005544, 128 bytes / 45 instructions: sys_chdir's
-image instruction for instruction, the two `p->cwd` displacements (336)
-reading 344 (`p->root`).  The same TWENTY-slot frame: ra @ `sp0-8`, s0 @
-`sp0-16`, s1 @ `sp0-24` (the inode, saved late), s2 @ `sp0-32` (the proc),
-the low sixteen slots being `char path[128]`.
+`KA.«sys_chroot»` = 0x80005544, 146 bytes / 50 instructions: up to +0x50
+sys_chdir's image instruction for instruction, the `p->cwd` displacement
+(336) reading 344 (`p->root`); then the jail fix's five instructions, `ld
+a0,336(s2); jal iput` at +0x50 and `mv a0,s1; jal idup; sd a0,336(s2)` at
++0x60, shifting the failure arms by 0x12.  The same TWENTY-slot frame: ra @
+`sp0-8`, s0 @ `sp0-16`, s1 @ `sp0-24` (the inode, saved late), s2 @
+`sp0-32` (the proc), the low sixteen slots being `char path[128]`.
+
+## THE JAIL FIX (xv6 173e8ade, "vuln-fix: fix chroot bypass")
+
+At b72cbac1 a successful chroot left `p->cwd` where it was, so a jailed
+process could chroot into a subdirectory while keeping a cwd OUTSIDE the
+new root, and relative `..` traversal from there never meets the root clamp
+(`dirlookup`'s self arm compares against `p->root`).  The b72cbac1 contract
+said exactly that -- the post moved `root`/`rti` and left `cwd`/`cwi` alone
+-- and it was provable.  Now the success post moves BOTH to the walk's
+inode: `{ V with root := ipv, rti := z, cwd := ipv, cwi := z }`.  The
+user-visible half is `UsysMemOk.usysCwdOk` and `SyscRows.cwi`, which now
+name chroot beside chdir as the calls that may move the cwd.
 
 ## sys_chdir's MOULD, WITH ONE CONTRACT AND NO BUNDLE (Rocq's header)
 
@@ -37,9 +54,10 @@ directory the cwd moved to.  No program-tier deposit exists for number 24
 and no verified program calls chroot (chroot.md §1, §4), so the plain
 blanket post is the whole contract:
 
-* ret 0 -- `∃ ipv z, procPrivFd … { V with root := ipv, rti := z }`: the
-  walk's inode, a directory, is the new root, pointer and inum both, the
-  inum being the one the reference carries;
+* ret 0 -- `∃ ipv z, procPrivFd … { V with root := ipv, rti := z, cwd :=
+  ipv, cwi := z }`: the walk's inode, a directory, is the new root AND the
+  new cwd, pointer and inum both, the inum being the one the reference
+  carries (the jail fix);
 * ret -1 -- `procPrivFd … V`, on all three failure arms (argstr failed, the
   walk died, not a directory).
 
@@ -53,9 +71,13 @@ not a counted one: an unbounded path under `MAXOPBLOCKS` needs the set
 form's `walkNeed L ≤ 4` (SpecSysChdir's header has the ledger).
 
 THE REFERENCE LEDGER CLOSES AT TWO, as sys_chdir's: namei takes two units
-and returns one beside its reference; the success arm's `iput(p->root)`
-frees the old root's unit; the not-a-directory arm's `iunlockput` frees the
-walk's; the argstr / walk-died arms never made one.
+and returns one beside its reference; the success arm's `iput(p->root)` and
+`iput(p->cwd)` free the old root's and the old cwd's units and `idup(ip)`
+spends one on the cwd's new reference (1 + 1 + 1 - 1); the
+not-a-directory arm's `iunlockput` frees the walk's; the argstr / walk-died
+arms never made one.  THE LOG BUDGET: the two `iput`s sit in one operation,
+`2 * iputUnits = 6` of the nine the found walk leaves
+(`SysChrootParts.sys_chroot_bud_iput2`).
 
 THE CROSSING IS THE LITERAL `true`: this function sleeps in its callees.
 
@@ -86,7 +108,7 @@ def sysChrootAddr : BitVec 64 := KA.«sys_chroot»
 /-- sys_chroot's own frame is 160 bytes -- TWENTY slots (`c.addi16sp
 sp,-160` at +0x00), sixteen of them the `path` buffer -- over its deepest
 callee, namei (120); iunlockput (82), end_op (80), iput (78), ilock (66),
-argstr (60), begin_op / iunlock (26) and myproc (10) all sit under namei's
+argstr (60), begin_op / iunlock (26), idup (14) and myproc (10) all sit under namei's
 (Rocq's `K_sys_chroot = 20 + K_namei`). -/
 def sysChrootSlots : Nat := 20 + nameiSlots
 
@@ -102,12 +124,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `sys_chroot_post`, Rocq's `sys_chdir_post` at the other cell).  `ipv`
 and `z` are existential: the entry the path resolves to is not something
 the caller named, and `z` is the REAL inum of the installed inode, the one
-`ProcInv.rootRefAt` ties the pointer to. -/
+`ProcInv.rootRefAt` and `ProcInv.cwdRefAt` tie both pointers to (xv6
+173e8ade: the cwd follows the root into the jail). -/
 def sysChrootPost (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ procPrivFd γ pa pid V M) ∨
     (∃ (ipv : BitVec 64) (z : Nat), ⌜r = 0#64⌝ ∗
-      procPrivFd γ pa pid { V with root := ipv, rti := z } M))
+      procPrivFd γ pa pid { V with root := ipv, rti := z, cwd := ipv, cwi := z } M))
 
 /-- **THE CONTRACT'S CONTINUATION** (the `wp_next true pj (…)` body of
 Rocq's `wp_sys_chroot_body`): the registers, the complement, the two

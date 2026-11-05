@@ -355,6 +355,37 @@ theorem procPrivFd_rootPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **The root, the cwd and the pid quarter together** (xv6 173e8ade's
+sys_chroot): `procPrivFd_rootPid` with the cwd cell and its reference lent
+beside the root's, and both moved at once -- the jail fix's `iput(p->cwd)`
+and `p->cwd = idup(ip)` sit in the same stretch as the root's swap. -/
+theorem procPrivFd_rootCwdPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) V.root ∗
+      @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.root V.rti ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+      @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      (∀ (v : BitVec 64) (z : Nat) (v' : BitVec 64) (z' : Nat),
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pRoot pa) 8 (DFrac.own 1) v -∗
+        @rootRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v z -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
+        @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
+        @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
+        procPrivFd γ pa pid { V with root := v, rti := z, cwd := v', cwi := z' } M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩, Hc, Hr, Hg⟩, Ho⟩
+  icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
+  iframe Hrt Hr Hcwd Hc Hpid Hev
+  iintro %v %z %v' %z' Hrt Hr Hcwd Hc Hpid
+  ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
+  · iframe
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hrt Hpt Htfp Hc Hr Hg Ho
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
 /-- **The root and the pid cell together, at the cell's own fraction**
 (chroot): `dirlookup` reads `p->root` and its reference, and `dirlink`
 relays them, beside the pid cell every sleeping callee takes at `pidPriv`.

@@ -30,8 +30,8 @@ end UkSysPHolds
 
 /-- **`UK_SYS_P` holds**, at the engine. -/
 theorem ukSysP_holds (UL : UK_LEAVES) : UK_SYS_P where
-  quiet := fun N h m pc n avail hn h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h13 h14 hal4 =>
-    wp_uk_ecall_quiet UL N h m pc n avail hn h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h13 h14 hal4
+  quiet := fun N h m pc n avail hn h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h13 h14 hal4 h24 =>
+    wp_uk_ecall_quiet UL N h m pc n avail hn h1 h2 h3 h4 h5 h6 h7 h8 h9 h10 h11 h12 h13 h14 hal4 h24
   «open» := fun N h m pc l avail hn hal4 => wp_uk_ecall_open UL N h m pc l avail hn hal4
   dup := fun N h m pc l fd0 st avail hn ha hs hal4 => wp_uk_ecall_dup UL N h m pc l fd0 st avail hn ha hs hal4
   dupUntracked := fun N h m pc l avail hn hal4 => wp_uk_ecall_dup_untracked UL N h m pc l avail hn hal4

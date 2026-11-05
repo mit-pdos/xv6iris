@@ -42,12 +42,12 @@ theorem sys_pipe_ret_b0 : jumpPc (KA.«sys_pipe» + 0xb0#64) = (KA.«sys_pipe» 
 theorem sys_pipe_ret_d0 : jumpPc (KA.«sys_pipe» + 0xd0#64) = (KA.«sys_pipe» + 0xd0#64) := by decide
 theorem sys_pipe_ret_d8 : jumpPc (KA.«sys_pipe» + 0xd8#64) = (KA.«sys_pipe» + 0xd8#64) := by decide
 
-theorem sys_pipe_br_myproc : KA.«sys_pipe» + 0xffffffffffffc2ac#64 = KA.«myproc» := by decide
-theorem sys_pipe_br_argaddr : KA.«sys_pipe» + 0xffffffffffffd282#64 = KA.«argaddr» := by decide
-theorem sys_pipe_br_pipealloc : KA.«sys_pipe» + 0xffffffffffffef3a#64 = KA.«pipealloc» := by decide
-theorem sys_pipe_br_fdalloc : KA.«sys_pipe» + 0xfffffffffffff654#64 = KA.«fdalloc» := by decide
-theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffbef2#64 = KA.«copyout» := by decide
-theorem sys_pipe_br_fileclose : KA.«sys_pipe» + 0xffffffffffffec06#64 = KA.«fileclose» := by decide
+theorem sys_pipe_br_myproc : KA.«sys_pipe» + 0xffffffffffffc29a#64 = KA.«myproc» := by decide
+theorem sys_pipe_br_argaddr : KA.«sys_pipe» + 0xffffffffffffd270#64 = KA.«argaddr» := by decide
+theorem sys_pipe_br_pipealloc : KA.«sys_pipe» + 0xffffffffffffef28#64 = KA.«pipealloc» := by decide
+theorem sys_pipe_br_fdalloc : KA.«sys_pipe» + 0xfffffffffffff642#64 = KA.«fdalloc» := by decide
+theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffbee0#64 = KA.«copyout» := by decide
+theorem sys_pipe_br_fileclose : KA.«sys_pipe» + 0xffffffffffffebf4#64 = KA.«fileclose» := by decide
 
 theorem sys_pipe_li4 : 0#64 + BitVec.signExtend 64 4#12 = 4#64 := by decide
 theorem sys_pipe_add0' (x : BitVec 64) : x + 0#64 = x := by simp
