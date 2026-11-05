@@ -318,6 +318,46 @@ Each is conditional and reports itself in the regeneration log.
   conformance harness mirrors the kind test (`vtest-lean/Vtest/HartExec.lean`, `othersReserveB` and
   `anyReserveB`, each proved equal to its predicate) and no green result changed: no capture executes an
   LR or an SC, and a full `tools/ci/vtest.sh passes` run reproduced the green set exactly.
+- **The state interpretation mirrors each hart's coherence floors, per RAM byte** (2026-11-05; lane
+  `xv6-liveness-now`, milestone B3 of the liveness plan): the machine's semantics did not change --
+  `MachCSL/TsoMem.lean` and `MachCSL/Lang.lean` keep their text, and so do `HRead`, `evStep` and the
+  step relation -- what changed is how the logic interprets the state.  The era's ghost names
+  (`EraGS`, and the ambient instance `MachGS` that mirrors it) gain `cohName : CPU → PAddr → GName`,
+  and `hartViewsAt`, the per-hart part of `memModelAt`, gains a fourth conjunct, `cohFloorsAt E cpu
+  (σ.hr cpu).coh`: one monotone counter per RAM byte, at the hart's coherence floor of that byte
+  (`HRead.coh`, the view the byte was last read at), over `ramAddrs`, the RAM byte addresses
+  `[ramBase, ramEnd)` once each (a list of 2^27 elements that no proof evaluates; it is built on
+  `List.range'` so that a kernel check that looks at its head does not run through it).  The
+  counters' lower bounds are persistent receipts, `floorLbAt E cpu a t` ("hart `cpu`'s floor of byte
+  `a` has passed `t`"; `MachCSL/Ctx.lean`, the ambient form `floorLb`): a plain load leaves them for
+  its footprint at the view it read at (`memModel_load_floor`, and the leaves
+  `swp_sail_mem_read_plain_ctx_floor` and `swp_sail_mem_read_plain_floor`), an exclusive read at
+  the top of the order (`memModel_read_excl_floor`), and `memModel_floorLb` reads one back against
+  the machine.  The mirror is sound because no step but a power-on lowers a floor (`coh_mono`,
+  `MachCSL/Liveness/Fairness.lean` section 6.3: a plain load reads at or above its footprint's
+  floors, an exclusive read at the top, which bounds every floor while `mmOk` holds, and every other
+  step keeps the read side or only clears its acquire bit), and a power-on mints a fresh era whose
+  counters start at 0, where `bootFacts` puts every floor.  Why: the liveness plan's memory-fairness
+  grant (`Fairness.Fresh.grant`: the load of `a` reads at a view at or past the store `t`, so the
+  hart's floor of `a` passes `t`) is a fact about `HRead.coh`, and the proof that consumes it needs
+  the floor as a resource the hart carries from the load to the point where it uses the grant, not
+  only as machine state.  Policy class: none of M1-M4 (no model, board, schedule or contract moved);
+  a change of the trusted base's content only (`notes/model-policy.md` section 6).  What moved in
+  the trusted base (`tools/tcb/expected.json`, re-pinned in this commit; the check against the old
+  baseline named exactly these 25 constants and no set problem): CHANGED -- `hartViewsAt` (the new
+  conjunct), `EraGS.mk` and `MachGS.mk` (the new field), `MachGS.era` (it passes the field on), and
+  the projections after the new field, whose index moved by one: `EraGS.topName`, `authName`,
+  `resvName`, `lockSetName`, `kmapName`, `kptRootName`, `devName`, `mirrorName`, and the same eight of
+  `MachGS` with `MachGS.gen`; ENTERED -- `EraGS.cohName`, `MachGS.cohName`, `cohFloorsAt` and
+  `ramAddrs`.  Nothing LEFT; no module, axiom or `opaque` set changed; 2,603 constants under 2,257
+  declarations (was 2,599).  `memModelAt` and `eraInterp` did not move, as the hash covers the name
+  of `hartViewsAt`, not its definition.  Theorems that depend on it (the pin's per-theorem tables):
+  `riscvPowerAdequacy`, `xv6PowerAdequacy`, `xv6FsAdequacy_xv6GF` and `userProof` reach
+  `hartViewsAt`, `cohFloorsAt` and `ramAddrs` through `memModelAt`, and the last three `MachGS.era`;
+  the closed statements reach none of it.  Two definitions of `Xv6/` that build a `MachGS` with every
+  name 0 (`preGSAt` in `Xv6/AppPreGS.lean`, `atFixedGS` in `Xv6/AppUnionPre.lean`) gained the field
+  at 0 (`cohName := fun _ _ => 0`).  The conformance harness runs the machine, not the logic, and
+  is unaffected: `tools/ci/vtest.sh check-ci` stayed green.
 
 ## 6. Open decisions
 

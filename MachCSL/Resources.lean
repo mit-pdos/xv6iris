@@ -17,11 +17,12 @@ Eras (the Rocq prototype's generations).  The ghost state has two layers:
   names of that generation's era;
 * the *era* layer (`EraGS`), re-minted at every power-on: one register ghost
   map per hart, the memory heap, and the memory-model mirrors -- the top of
-  the store order and each hart's data view, instruction view and read
-  watermark (monotone counters, so their lower bounds are persistent
-  receipts), the author log (persistent elements: "the store at timestamp
-  `t` is agent `h`'s") and the reservation map (one fully owned element per
-  hart).  A power loss simply abandons it.
+  the store order, each hart's data view, instruction view and read
+  watermark, and each hart's coherence floor of every RAM byte (monotone
+  counters, so their lower bounds are persistent receipts), the author log
+  (persistent elements: "the store at timestamp `t` is agent `h`'s") and the
+  reservation map (one fully owned element per hart).  A power loss simply
+  abandons it.
 
 `MachGS` is the *ambient* instance a proof is stated at: the fixed layer, one
 era and its generation number.  All the register/memory resources are stated
@@ -119,6 +120,9 @@ structure EraGS where
   iviewName : CPU → GName
   /-- each hart's read watermark, a monotone counter -/
   rviewName : CPU → GName
+  /-- each hart's coherence floor of each RAM byte (`HRead.coh`), a monotone
+  counter (liveness plan, 2026-11-05: the receipt a plain load leaves) -/
+  cohName : CPU → PAddr → GName
   /-- the top of the store order, a monotone counter -/
   topName : GName
   /-- the author log: timestamp ↦ author, persistent elements -/
@@ -433,6 +437,8 @@ class MachGS (GF : BundledGFunctors.{0}) where
   viewName : CPU → GName
   iviewName : CPU → GName
   rviewName : CPU → GName
+  /-- the coherence floors (see `EraGS.cohName`) -/
+  cohName : CPU → PAddr → GName
   topName : GName
   authName : GName
   resvName : GName
@@ -475,7 +481,7 @@ era's heap names.  (The order-check exemption dates from `MachGS`'s former
   ⟨MachGS.regName (GF := GF), MachGS.heapName (GF := GF),
    MachGS.metaName (GF := GF),
    MachGS.viewName (GF := GF), MachGS.iviewName (GF := GF),
-   MachGS.rviewName (GF := GF), MachGS.topName (GF := GF),
+   MachGS.rviewName (GF := GF), MachGS.cohName (GF := GF), MachGS.topName (GF := GF),
    MachGS.authName (GF := GF), MachGS.resvName (GF := GF),
    MachGS.lockSetName (GF := GF), MachGS.kmapName (GF := GF),
    MachGS.kptRootName (GF := GF),
@@ -1226,26 +1232,89 @@ theorem resvInv_boot (σ : MState) (h : bootFacts σ) : resvInv σ := by
   · rw [(hhart c).2.2.2] at hr; cases hr
   · rw [(hhart c).2.2.2] at hr; cases hr
 
+/-! ### The RAM bytes, as a list -/
+
+/-- Every RAM byte address once, in order: `ramBase + k` for `k < ramEnd - ramBase`.  A list of
+2^27 elements that nothing may evaluate: every use goes through `mem_ramAddrs`, `ramAddrs_nodup`
+and `ramAddrs_get?`.  Built on `List.range'`, whose head is one step away (`List.range` builds
+its list from the end, and a kernel check that looks at the head of a list built that way runs
+through all of it). -/
+def ramAddrs : List PAddr := (List.range' ramBase (ramEnd - ramBase)).map (BitVec.ofNat 64)
+
+theorem lt_of_ramAddr {k : Nat} (hk : k < ramBase + (ramEnd - ramBase)) : k < 2 ^ 64 := by
+  have : ramEnd < 2 ^ 64 := by unfold ramEnd; omega
+  have : ramBase ≤ ramEnd := by unfold ramBase ramEnd; omega
+  omega
+
+theorem mem_ramAddrs (a : PAddr) : a ∈ ramAddrs ↔ inRam a 1 := by
+  have hle : ramBase ≤ ramEnd := by unfold ramBase ramEnd; omega
+  unfold ramAddrs inRam
+  rw [List.mem_map]
+  constructor
+  · rintro ⟨k, hk, rfl⟩
+    rw [List.mem_range'_1] at hk
+    rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (lt_of_ramAddr hk.2)]
+    omega
+  · rintro ⟨h1, h2⟩
+    refine ⟨a.toNat, List.mem_range'_1.2 ⟨h1, by omega⟩, ?_⟩
+    simp only [BitVec.ofNat_toNat, BitVec.setWidth_eq]
+
+theorem ramAddrs_nodup : ramAddrs.Nodup := by
+  unfold ramAddrs List.Nodup
+  rw [List.pairwise_map]
+  refine (List.nodup_range' (s := ramBase) (n := ramEnd - ramBase)).imp_of_mem
+    fun {k k'} hk hk' hne h => hne ?_
+  rw [List.mem_range'_1] at hk hk'
+  have := congrArg BitVec.toNat h
+  rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (lt_of_ramAddr hk.2),
+    Nat.mod_eq_of_lt (lt_of_ramAddr hk'.2)] at this
+  exact this
+
+/-- `ramAddrs` lists every RAM byte at its offset from `ramBase` (as `cpus_get?` does for harts). -/
+theorem ramAddrs_get? {a : PAddr} (ha : inRam a 1) : ramAddrs[a.toNat - ramBase]? = some a := by
+  unfold inRam at ha
+  unfold ramAddrs
+  rw [List.getElem?_map, List.getElem?_range' (by omega), Option.map_some, Nat.one_mul,
+    Nat.add_sub_cancel' ha.1]
+  simp only [BitVec.ofNat_toNat, BitVec.setWidth_eq]
+
+/-- Hart `cpu`'s coherence-floor mirrors at the floors `coh`: one monotone counter per RAM byte
+(`HRead.coh`; a byte outside RAM has no history, so no load reads it and it has no mirror). -/
+def cohFloorsAt [MachFixedGS GF] (E : EraGS) (cpu : CPU) (coh : PAddr → Nat) : IProp GF := iprop%
+  [∗list] a ∈ ramAddrs, MonoNat.auth_own (E.cohName cpu a) (DFrac.own 1) (.ofNat (coh a))
+
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
-view, read watermark. -/
+view, read watermark, and the coherence floor of every RAM byte. -/
 def hartViewsAt [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) : IProp GF := iprop%
   MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
   MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
-  MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv)
+  MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ∗
+  cohFloorsAt E cpu (σ.hr cpu).coh
 
 theorem hartViewsAt_cases [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     hartViewsAt E σ cpu ⊢@{IProp GF}
       MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
-      MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) := by
+      MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ∗
+      cohFloorsAt E cpu (σ.hr cpu).coh := by
   unfold hartViewsAt; iintro H; iexact H
 
 theorem hartViewsAt_intro [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
-      MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ⊢@{IProp GF}
+      MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ∗
+      cohFloorsAt E cpu (σ.hr cpu).coh ⊢@{IProp GF}
     hartViewsAt E σ cpu := by
   unfold hartViewsAt; iintro H; iexact H
+
+/-- The view mirrors of a hart depend only on its views and its read side's watermark and
+floors. -/
+theorem hartViewsAt_congr [MachFixedGS GF] (E : EraGS) {σ σ' : MState} {cpu : CPU}
+    (h1 : σ'.tv cpu = σ.tv cpu) (h2 : σ'.itv cpu = σ.itv cpu) (h3 : (σ'.hr cpu).rv = (σ.hr cpu).rv)
+    (h4 : (σ'.hr cpu).coh = (σ.hr cpu).coh) :
+    hartViewsAt (GF := GF) E σ' cpu = hartViewsAt E σ cpu := by
+  unfold hartViewsAt
+  rw [h1, h2, h3, h4]
 
 /-- Era `E`'s memory-model mirrors at the machine `σ`, with the step
 invariant and the reservation invariant. -/

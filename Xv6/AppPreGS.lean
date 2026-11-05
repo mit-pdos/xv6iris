@@ -53,7 +53,8 @@ is `m`: the literal `AppIface.bootFixedGS` at the trivial interface and names
         (fun _ _ => iprop(emp)) (fun _ _ => inferInstance) with
       mono := m }
   { regName := fun _ => 0, heapName := 0, metaName := 0, viewName := fun _ => 0,
-    iviewName := fun _ => 0, rviewName := fun _ => 0, topName := 0, authName := 0, resvName := 0,
+    iviewName := fun _ => 0, rviewName := fun _ => 0, cohName := fun _ _ => 0, topName := 0,
+    authName := 0, resvName := 0,
     lockSetName := fun _ => 0, kmapName := 0, kptRootName := 0, devName := fun _ => 0,
     mirrorName := 0, gen := 0, claimP := fun _ _ => iprop(True), claim_idle := fun _ => BI.true_intro }
 

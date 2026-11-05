@@ -80,7 +80,7 @@ theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :
   iintro ⟨⟨_, _, Hviews, _⟩, ⟨Hlb, _⟩⟩
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => hartViewsAt E σ c) (cpus_get? cpu) $$ Hviews
     with ⟨Hc, _⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨_, _, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨_, _, Hr, _⟩
   ihave %Hv := MonoNat.auth_lb_own_valid $$ Hr Hlb
   ipureintro
   have := Hv.2
@@ -96,9 +96,17 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr, Hf⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
     (by simp only [MaxNat.le_toNat]; omega) $$ Hr with ⟨Hr, #Hrlb⟩
+  imod cohFloors_update E cpu (σ.hr cpu).coh ((σ.hr cpu).afterLoad pa n tvn).coh
+    (fun a _ => by
+      simp only [HRead.afterLoad]
+      split
+      · rename_i ha
+        obtain ⟨j, hj, rfl⟩ := ha
+        exact hcoh j hj
+      · exact Nat.le_refl _) $$ Hf with ⟨Hf, _⟩
   ihave #Htoplb := MonoNat.lb_own_get $$ Htop
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
@@ -108,16 +116,18 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
   rw [hresv]
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose]
+  isplitl [Htop Hauth Hresv Hv Hi Hr Hf Hclose]
   · iframe Htop Hauth Hresv
-    isplitl [Hv Hi Hr Hclose]
+    isplitl [Hv Hi Hr Hf Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
       · ipureintro
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [updCpu, ite_true, HRead.afterLoad]
-        iframe Hv Hi Hr
+        simp only [updCpu, ite_true]
+        iframe Hv Hi Hf
+        simp only [HRead.afterLoad]
+        iexact Hr
     · isplit
       · ipureintro
         exact mmOk_afterLoad σ cpu pa n tvn htv hmm
