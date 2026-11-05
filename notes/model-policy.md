@@ -352,3 +352,15 @@ forced the liveness assumption for harts to exclude LR-blocked retries.  Cost: a
 follow an intervening store, since the SC's success is still the opaque platform hook; recorded in the
 LR/SC limitation, to be removed by the watch model (`lrsc-future.md` of the liveness plan, outside the
 repository).  Tier M3.
+
+**Decided by the owner (2026-11-05), on the independent audit of lane `xv6-liveness-now` (finding R3,
+`local-plan/xv6-liveness-now/audit-2026-11-05.md`, outside the repository):** (23) A change to the
+logic's state interpretation alone -- `memModelAt`, `hartViewsAt`, the era's ghost names and their
+kin -- that leaves M1-M4, the text of every contract and every closed statement unchanged is admitted
+under section 6 by its register bullet, the re-pin in the same commit with the diff read, and the
+owner's merge, which is the acceptance; it needs no numbered ruling of its own.  Why: such a change
+moves the pin of the open statements (`SpecUser.USER`, the open adequacy statements quantify over the
+interpretation) although their text does not move, so the pin records it and section 6's process
+reviews it, while the semantics the statements are about is untouched.  The first instance is the
+floor mirror of 2026-11-05 (`notes/model-diffs.md` section 5, "The state interpretation mirrors each
+hart's coherence floors"), merged as `9b71f6d58`, whose register bullet is read under this decision.
