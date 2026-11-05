@@ -103,3 +103,36 @@ Fairness.Spec.Target1.flagStored_pos
 Fairness.Spec.Target1.onceAt_of_bootFacts
 Fairness.Spec.Target1.not_flagStored_of_bootFacts
 Fairness.Spec.Target1.xv6EraLive_of_target1
+
+# MachCSL/Liveness/DiskProtocol.lean: one root per device, bounded paths, the
+# kernel's facts, one serving task per head, the latch's holder, the gate
+# theorems' side conditions
+Fairness.Disk.fork_ne_root
+Fairness.Disk.oneRoot
+Fairness.Disk.bounded_fetch
+Fairness.Disk.bounded_serve
+Fairness.Disk.bounded_arm
+Fairness.Disk.boundedAt_step
+Fairness.Disk.pure_within
+Fairness.Disk.forked_moves_le
+Fairness.Disk.serve_within
+Fairness.Disk.arm_within
+Fairness.Disk.noBusyReset_of_busyStores
+Fairness.Disk.noWceOff_of_busyStores
+Fairness.Disk.noConfigWrite_of_busyStores
+Fairness.Disk.oneServer
+Fairness.Disk.inflight_of_serving
+Fairness.Disk.latchHolder_unique
+Fairness.Disk.latch_inflight
+Fairness.Disk.competitor_unique
+Fairness.Disk.serving_within
+Fairness.Disk.latch_closers
+Fairness.Disk.push_closers
+Fairness.Disk.pop_closers
+Fairness.Disk.req_closers
+Fairness.Disk.snap_closers
+Fairness.Disk.latch_hK
+Fairness.Disk.push_hK
+Fairness.Disk.pop_hK
+Fairness.Disk.req_hK
+Fairness.Disk.snap_hK
