@@ -963,6 +963,11 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.OwnAAdLang
+import Weak.Prom.OwnAAdSched
+import Weak.Prom.OwnAAdWp
+import Weak.Prom.OwnAAdAdeq
+import Weak.Prom.OwnAAdMP
 import Weak.Prom.OwnAE3Defs
 import Weak.Prom.OwnAE3
 import Weak.Prom.OwnAE2Defs
