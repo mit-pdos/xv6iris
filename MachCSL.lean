@@ -254,4 +254,5 @@ import MachCSL.OwnAllocSame
 -- The liveness lemmas (plan: `local-plan/xv6-liveness-now/PLAN.md`, outside the repository); outside
 -- the trusted base: nothing above imports them.
 import MachCSL.Liveness.Fairness
+import MachCSL.Liveness.Gates
 import MachCSL.Liveness.Cycle

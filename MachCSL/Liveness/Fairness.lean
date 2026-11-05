@@ -36,7 +36,8 @@ unchanged otherwise, so it moves only at the thread's own steps.
      scheduling alone (`wf_of_certain`).
 5. `Era`, MachCSL's runs: liveness, generations, the power thread; persistence for an attempt
    condition that is a live thread's and is stable under every thread but the power thread
-   (`persists_of_liveStable`).
+   (`persists_of_liveStable`), or under the steps that meet a side condition
+   (`persists_of_liveStableUnder`, for a gate another thread can close).
 6. The four instances, `Tick`, `Arm`, `Fresh`, `Hart`: each gives `enabled` (the `A`) and `grant`
    (the `G`), its `SF` and `AG` forms, and proves `live`, `stable`, `persists`, `sf_iff` and
    `counter_of_sf`.  Then the device tasks: `Dev`, a task at a gate, whose grant is certain
@@ -821,6 +822,18 @@ def StableExceptPower (i : Nat) (A : Cfg → Prop) : Prop :=
   ∀ {j : Nat} {c c' : Cfg}, j ≠ i → Step j c c' → (∀ e, c.1[j]? = some e → e ≠ .power) →
     A c → A c'
 
+/-- Stability under the steps of every thread but the power thread that meet the side condition
+`P` on the configurations before and after the step.  The form a gate that another thread can
+close takes: `P` excludes the closing transitions (`MachCSL/Liveness/Gates.lean`). -/
+def StableExceptPowerUnder (i : Nat) (P : Cfg → Cfg → Prop) (A : Cfg → Prop) : Prop :=
+  ∀ {j : Nat} {c c' : Cfg}, j ≠ i → Step j c c' → (∀ e, c.1[j]? = some e → e ≠ .power) →
+    P c c' → A c → A c'
+
+/-- Stability outright is stability under any side condition. -/
+theorem stableExceptPowerUnder_of_stable {A : Cfg → Prop} (P : Cfg → Cfg → Prop)
+    (h : StableExceptPower i A) : StableExceptPowerUnder i P A :=
+  fun hji hs hnp _ hA => h hji hs hnp hA
+
 /-- A step of a thread that is not the power thread keeps the generation and the power bit. -/
 theorem genPow_of_step (hs : Step j c c') (hnp : ∀ e, c.1[j]? = some e → e ≠ .power) :
     c'.2.gen = c.2.gen ∧ c'.2.pow = c.2.pow := by
@@ -940,9 +953,11 @@ theorem power_kills (hs : Step j c c') (hpj : c.1[j]? = some .power) (hl : liveA
   · exact absurd hpow (by simpa using hoff)
 
 /-- Persistence on a run of the pool, for an attempt condition that is a live thread's and is
-stable under every thread but the power thread. -/
-theorem persists_of_liveStable (hrun : PoolRun σ) {A : Cfg → Prop}
-    (hlive : ∀ c, A c → liveAt i c) (hstab : StableExceptPower i A) : Action.Persists i A σ := by
+stable under every step but the power thread's that meets the side condition `P`, on a run where
+every step meets `P`. -/
+theorem persists_of_liveStableUnder (hrun : PoolRun σ) {A : Cfg → Prop} {P : Cfg → Cfg → Prop}
+    (hlive : ∀ c, A c → liveAt i c) (hstab : StableExceptPowerUnder i P A)
+    (hP : ∀ n, P (σ n) (σ (n + 1))) : Action.Persists i A σ := by
   intro n hA
   obtain ⟨j, hs⟩ := hrun n
   by_cases hji : j = i
@@ -958,9 +973,16 @@ theorem persists_of_liveStable (hrun : PoolRun σ) {A : Cfg → Prop}
       have h1 := power_kills hs hpw (hlive _ hA)
       have h2 := gen_mono_run hrun (n := n + 1) (m := m) hnm
       omega
-    · refine Or.inr (Or.inl (hstab hji hs ?_ hA))
+    · refine Or.inr (Or.inl (hstab hji hs ?_ (hP n) hA))
       intro e he hep
       exact hpw (hep ▸ he)
+
+/-- Persistence on a run of the pool, for an attempt condition that is a live thread's and is
+stable under every thread but the power thread. -/
+theorem persists_of_liveStable (hrun : PoolRun σ) {A : Cfg → Prop}
+    (hlive : ∀ c, A c → liveAt i c) (hstab : StableExceptPower i A) : Action.Persists i A σ :=
+  persists_of_liveStableUnder (P := fun _ _ => True) hrun hlive
+    (fun hji hs hnp _ hA => hstab hji hs hnp hA) fun _ => trivial
 
 end Era
 
@@ -1326,7 +1348,8 @@ an unblocked primitive; the primitive is answered" has no misses, its counter is
 (`counter_zero`), and its weak fairness follows from fair scheduling (`wf`).  What the task waits
 on is the opener's obligation, and whether an open gate stays open until the task's step
 (persistence) is a property of the protocol, the stable-gate lemma of the plan (`HANDOFF.md` §6
-task 5); with it the action's strong fairness follows too (`sf_of_persists`). -/
+task 5), proved gate by gate in `MachCSL/Liveness/Gates.lean`; with it the action's strong
+fairness follows too (`sf_of_persists`). -/
 
 namespace Dev
 
