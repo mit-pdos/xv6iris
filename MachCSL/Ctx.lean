@@ -8,7 +8,8 @@ there), trimmed to the surface the kernel proofs consume.
 their lower bounds are persistent facts: `viewLb cpu K` ("hart `cpu`'s floor
 has passed `K`", the Rocq `hart_view_lb`), `topLb K` ("the store order has
 reached `K`", the Rocq `llb`), `authoredBy t h` ("the store at timestamp `t`
-is agent `h`'s").
+is agent `h`'s"), `floorLb cpu a t` ("hart `cpu`'s coherence floor of byte `a`
+has passed `t`", what a plain load leaves; no Rocq counterpart).
 
 **Contexts.**  A context `ξ : CtxId` is a ghost identity for a thread of
 control: a *bound* (a monotone counter) and a *dirty set* (a ghost map
@@ -64,6 +65,11 @@ def iviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
 def rviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
   MonoNat.lb_own (E.rviewName cpu) (.ofNat K) ∗ topLbAt E K
 
+/-- Hart `cpu`'s coherence floor of byte `a` has passed `t` (persistent): what a plain load of
+`a` at a view at or past `t` leaves (`HRead.coh`; the liveness plan's per-byte floor). -/
+def floorLbAt (cpu : CPU) (a : PAddr) (t : Nat) : IProp GF :=
+  MonoNat.lb_own (E.cohName cpu a) (.ofNat t)
+
 /-- The store at timestamp `t` is agent `h`'s (persistent). -/
 def authoredByAt (t : Nat) (h : Agent) : IProp GF := E.authName ↪◯MAP[t]{.discard} h
 
@@ -114,6 +120,10 @@ instance (cpu : CPU) (K : Nat) : Persistent (PROP := IProp GF) (iviewLbAt E cpu 
   unfold iviewLbAt; infer_instance
 instance (cpu : CPU) (K : Nat) : Persistent (PROP := IProp GF) (rviewLbAt E cpu K) := by
   unfold rviewLbAt; infer_instance
+instance (cpu : CPU) (a : PAddr) (t : Nat) : Persistent (PROP := IProp GF) (floorLbAt E cpu a t) := by
+  unfold floorLbAt; infer_instance
+instance (cpu : CPU) (a : PAddr) (t : Nat) : Timeless (PROP := IProp GF) (floorLbAt E cpu a t) := by
+  unfold floorLbAt; infer_instance
 instance (t : Nat) (h : Agent) : Persistent (PROP := IProp GF) (authoredByAt E t h) := by
   unfold authoredByAt; infer_instance
 instance (t : Nat) (h : Agent) : Timeless (PROP := IProp GF) (authoredByAt E t h) := by
@@ -147,6 +157,17 @@ theorem viewLbAt_le (cpu : CPU) (K K' : Nat) (h : K' ≤ K) :
   isplitl [Hv]
   · iapply MonoNat.lb_own_le _ _ _ (by simp only [MaxNat.le_toNat]; omega) $$ Hv
   · iapply topLbAt_le E K K' h $$ Ht
+
+theorem floorLbAt_le (cpu : CPU) (a : PAddr) (t t' : Nat) (h : t' ≤ t) :
+    floorLbAt E cpu a t ⊢@{IProp GF} floorLbAt E cpu a t' := by
+  unfold floorLbAt
+  iintro H
+  iapply MonoNat.lb_own_le _ _ _ (by simp only [MaxNat.le_toNat]; omega) $$ H
+
+/-- A floor receipt at 0 is free. -/
+theorem floorLbAt_0 (cpu : CPU) (a : PAddr) : ⊢@{IProp GF} |==> floorLbAt E cpu a 0 := by
+  unfold floorLbAt
+  exact MonoNat.lb_own_0 _
 
 end era
 
@@ -312,6 +333,8 @@ abbrev topLb (K : Nat) : IProp GF := topLbAt (MachGS.era (GF := GF)) K
 abbrev viewLb (cpu : CPU) (K : Nat) : IProp GF := viewLbAt (MachGS.era (GF := GF)) cpu K
 abbrev iviewLb (cpu : CPU) (K : Nat) : IProp GF := iviewLbAt (MachGS.era (GF := GF)) cpu K
 abbrev rviewLb (cpu : CPU) (K : Nat) : IProp GF := rviewLbAt (MachGS.era (GF := GF)) cpu K
+abbrev floorLb (cpu : CPU) (a : PAddr) (t : Nat) : IProp GF :=
+  floorLbAt (MachGS.era (GF := GF)) cpu a t
 abbrev authoredBy (t : Nat) (h : Agent) : IProp GF := authoredByAt (MachGS.era (GF := GF)) t h
 abbrev resvFrag (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
   resvFragAt (MachGS.era (GF := GF)) cpu r b
@@ -370,6 +393,10 @@ theorem lockSet_delete (cpu : CPU) (locks : List String) (s : String) :
 instance (K : Nat) : Persistent (PROP := IProp GF) (topLb K) := by unfold topLb; infer_instance
 instance (cpu : CPU) (K : Nat) : Persistent (PROP := IProp GF) (viewLb cpu K) := by
   unfold viewLb; infer_instance
+instance (cpu : CPU) (a : PAddr) (t : Nat) : Persistent (PROP := IProp GF) (floorLb cpu a t) := by
+  unfold floorLb; infer_instance
+instance (cpu : CPU) (a : PAddr) (t : Nat) : Timeless (PROP := IProp GF) (floorLb cpu a t) := by
+  unfold floorLb; infer_instance
 instance (t : Nat) (h : Agent) : Persistent (PROP := IProp GF) (authoredBy t h) := by
   unfold authoredBy; infer_instance
 

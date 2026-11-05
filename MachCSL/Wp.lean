@@ -1419,7 +1419,8 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
     ([∗list] c ∈ cpus, hartViewsAt E σ c) ⊢@{IProp GF}
       hartViewsAt E σ cpu ∗
       ∀ σ' : MState,
-        ⌜∀ c, c ≠ cpu → σ'.tv c = σ.tv c ∧ σ'.itv c = σ.itv c ∧ (σ'.hr c).rv = (σ.hr c).rv⌝ -∗
+        ⌜∀ c, c ≠ cpu → σ'.tv c = σ.tv c ∧ σ'.itv c = σ.itv c ∧ (σ'.hr c).rv = (σ.hr c).rv ∧
+          (σ'.hr c).coh = (σ.hr c).coh⌝ -∗
         hartViewsAt E σ' cpu -∗ [∗list] c ∈ cpus, hartViewsAt E σ' c := by
   iintro H
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => hartViewsAt E σ c) (cpus_get? cpu) $$ H
@@ -1430,23 +1431,92 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
-    obtain ⟨e1, e2, e3⟩ := hσ' y hy
-    unfold hartViewsAt
-    simp only [e1, e2, e3]
+    obtain ⟨e1, e2, e3, e4⟩ := hσ' y hy
+    simp only [hartViewsAt_congr E e1 e2 e3 e4]
     iexact Hy
   · iexact Hc'
 
+/-! ### The coherence floors
+
+A hart's floor mirrors (`cohFloorsAt`, the fourth part of `hartViewsAt`) move only at its loads,
+and only up; every other step keeps the hart's floors, so the mirrors are carried over by
+`hartViewsAt_congr` (in `hartViews_acc` for the other harts).  Nothing here may look into the
+list of RAM bytes (`ramAddrs`, 2^27 elements) element by element: the lemmas below quantify over
+its members. -/
+
+/-- Raise every floor mirror of a hart to floors at or above the old ones (on RAM), minting the
+receipt of every new floor. -/
+theorem cohFloors_update (cpu : CPU) (coh coh' : PAddr → Nat) (h : ∀ a, inRam a 1 → coh a ≤ coh' a) :
+    cohFloorsAt E cpu coh ⊢@{IProp GF}
+      |==> (cohFloorsAt E cpu coh' ∗ [∗list] a ∈ ramAddrs, floorLbAt E cpu a (coh' a)) := by
+  unfold cohFloorsAt
+  iintro H
+  ihave H := BigSepL.bigSepL_mono
+    (Ψ := fun _ a => iprop(|==> (MonoNat.auth_own (E.cohName cpu a) (DFrac.own 1) (.ofNat (coh' a)) ∗
+      floorLbAt E cpu a (coh' a))))
+    (fun {_ a} hk => by
+      have ha := h a ((mem_ramAddrs a).1 (List.mem_of_getElem? hk))
+      unfold floorLbAt
+      iintro Ha
+      iapply MonoNat.own_update _ (.ofNat (coh a)) (.ofNat (coh' a))
+        (by simp only [MaxNat.le_toNat]; omega) $$ Ha) $$ H
+  imod BigSepL.bigSepL_bupd _ _ $$ H with H
+  imodintro
+  iapply BigSepL.bigSepL_sep_eqv.1 $$ H
+
+/-- The receipts of the footprint's bytes, out of the receipts of every RAM byte. -/
+theorem floorLbs_footprint (cpu : CPU) (coh : PAddr → Nat) (pa : PAddr) (n t : Nat)
+    (hram : ramBytes pa n) (hc : ∀ j, j < n → coh (pa + BitVec.ofNat 64 j) = t) :
+    ([∗list] a ∈ ramAddrs, floorLbAt E cpu a (coh a)) ⊢@{IProp GF}
+      [∗list] j ∈ List.range n, floorLbAt E cpu (pa + BitVec.ofNat 64 j) t := by
+  iintro #H
+  iapply (BigSepL.bigSepL_intro (P := iprop(□ [∗list] a ∈ ramAddrs, floorLbAt (GF := GF) E cpu a (coh a)))
+    fun _ j hk => by
+      have hj : j < n := List.mem_range.1 (List.mem_of_getElem? hk)
+      rw [← hc j hj]
+      exact intuitionistically_elim.trans
+        (BigSepL.bigSepL_mem (Φ := fun a => floorLbAt E cpu a (coh a)) ((mem_ramAddrs _).2 (hram j hj))))
+  iexact H
+
+/-- A floor receipt of a RAM byte is under the hart's floor of that byte. -/
+theorem memModel_floorLb (σ : MState) (cpu : CPU) (a : PAddr) (t : Nat) (ha : inRam a 1) :
+    memModelAt E σ ∗ floorLbAt E cpu a t ⊢@{IProp GF} ⌜t ≤ (σ.hr cpu).coh a⌝ := by
+  unfold memModelAt floorLbAt
+  iintro ⟨⟨_, _, Hviews, _⟩, Hlb⟩
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => hartViewsAt E σ c) (cpus_get? cpu) $$ Hviews
+    with ⟨Hc, _⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨_, _, _, Hf⟩
+  unfold cohFloorsAt
+  ihave Ha := BigSepL.bigSepL_mem
+    (Φ := fun a => MonoNat.auth_own (E.cohName cpu a) (DFrac.own 1) (.ofNat ((σ.hr cpu).coh a)))
+    ((mem_ramAddrs a).2 ha) $$ Hf
+  ihave %Hv := MonoNat.auth_lb_own_valid $$ Ha Hlb
+  ipureintro
+  have := Hv.2
+  simpa [MaxNat.le_toNat] using this
+
 /-- A plain load moves only the read side of its hart (at a view above the
-footprint's coherence floors, as the language's plain read requires). -/
-theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+footprint's coherence floors, as the language's plain read requires), and
+mints the receipt of every new floor. -/
+theorem memModel_load_lbs (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
     (hcoh : (σ.hr cpu).cohOk pa n tvn) :
-    memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
+    memModelAt E σ ⊢@{IProp GF}
+      |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗
+        [∗list] a ∈ ramAddrs, floorLbAt E cpu a (((σ.hr cpu).afterLoad pa n tvn).coh a)) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr, Hf⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
     (by simp only [MaxNat.le_toNat]; omega) $$ Hr with ⟨Hr, _⟩
+  imod cohFloors_update E cpu (σ.hr cpu).coh ((σ.hr cpu).afterLoad pa n tvn).coh
+    (fun a _ => by
+      simp only [HRead.afterLoad]
+      split
+      · rename_i ha
+        obtain ⟨j, hj, rfl⟩ := ha
+        exact hcoh j hj
+      · exact Nat.le_refl _) $$ Hf with ⟨Hf, Hlbs⟩
   imodintro
   have hresv : resvMap (σ.afterLoad cpu pa n tvn) = resvMap σ :=
     resvMap_congr _ _ (fun c => by
@@ -1455,20 +1525,48 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
   rw [hresv]
-  iframe Htop Hauth Hresv
-  isplitl [Hv Hi Hr Hclose]
+  iframe Htop Hauth Hresv Hlbs
+  isplitl [Hv Hi Hr Hf Hclose]
   · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
     · ipureintro
       intro c hc
       simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [updCpu, ite_true, HRead.afterLoad]
-      iframe Hv Hi Hr
+      simp only [updCpu, ite_true]
+      iframe Hv Hi Hf
+      simp only [HRead.afterLoad]
+      iexact Hr
   · isplit
     · ipureintro
       exact mmOk_afterLoad σ cpu pa n tvn htv hmm
     · ipureintro
       exact resvInv_afterLoad σ cpu pa n tvn hcoh hri
+
+/-- `memModel_load_lbs` at the footprint: the receipts of the footprint's floors at the load's
+view. -/
+theorem memModel_load_floor (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+    (hcoh : (σ.hr cpu).cohOk pa n tvn) (hram : ramBytes pa n) :
+    memModelAt E σ ⊢@{IProp GF}
+      |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗
+        [∗list] j ∈ List.range n, floorLbAt E cpu (pa + BitVec.ofNat 64 j) tvn) := by
+  iintro Hmm
+  imod memModel_load_lbs E σ cpu pa n tvn htv hcoh $$ Hmm with ⟨Hmm, Hlbs⟩
+  imodintro
+  iframe Hmm
+  iapply floorLbs_footprint E cpu ((σ.hr cpu).afterLoad pa n tvn).coh pa n tvn hram
+    (fun j hj => by
+      simp only [HRead.afterLoad]
+      exact ite_eq_left ⟨j, hj, rfl⟩) $$ Hlbs
+
+/-- A plain load moves only the read side of its hart (at a view above the
+footprint's coherence floors, as the language's plain read requires). -/
+theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+    (hcoh : (σ.hr cpu).cohOk pa n tvn) :
+    memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
+  iintro Hmm
+  imod memModel_load_lbs E σ cpu pa n tvn htv hcoh $$ Hmm with ⟨Hmm, _⟩
+  imodintro
+  iexact Hmm
 
 /-- A fence moves its hart's data and instruction views (never down), and
 mints the view receipt at the new floor. -/
@@ -1478,7 +1576,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr, Hf⟩
   have hmm' := mmOk_fence σ cpu b hmm
   have htv' : (σ.fence cpu b).tv cpu ≤ σ.top := (hmm'.2.1 cpu).1
   have e_tv : (σ.fence cpu b).tv cpu =
@@ -1497,16 +1595,16 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   imodintro
   have hresv : resvMap (σ.fence cpu b) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose]
+  isplitl [Htop Hauth Hresv Hv Hi Hr Hf Hclose]
   · iframe Htop Hauth Hresv
-    isplitl [Hv Hi Hr Hclose]
+    isplitl [Hv Hi Hr Hf Hclose]
     · iapply Hclose $$ %(σ.fence cpu b)
       · ipureintro
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        rw [show ((σ.fence cpu b).hr cpu).rv = (σ.hr cpu).rv from rfl]
-        iframe Hv Hi Hr
+        rw [show (σ.fence cpu b).hr cpu = σ.hr cpu from rfl]
+        iframe Hv Hi Hr Hf
     · isplit
       · ipureintro
         exact hmm'
@@ -1521,13 +1619,14 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
 
 theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (c : CPU) : hartViewsAt (GF := GF) E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
-  unfold hartViewsAt
   have e1 : (σ.store cpu pa n w false).tv c = σ.tv c := by
     simp only [updCpu, Bool.false_and]; split <;> simp_all
   have e2 : (σ.store cpu pa n w false).itv c = σ.itv c := rfl
   have e3 : ((σ.store cpu pa n w false).hr c).rv = (σ.hr c).rv := by
     simp only [updCpu]; split <;> simp_all [HRead.clearAcq]
-  rw [e1, e2, e3]
+  have e4 : ((σ.store cpu pa n w false).hr c).coh = (σ.hr c).coh := by
+    simp only [updCpu]; split <;> simp_all [HRead.clearAcq]
+  exact hartViewsAt_congr E e1 e2 e3 e4
 
 /-- A plain store by a hart: the store order grows by the hart's message,
 whose authorship and position become persistent facts; the hart's
@@ -1896,13 +1995,16 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n nt : Nat}
   · rw [hex] at hex'
     exact absurd hex' (by decide)
 
-/-- A plain load of the running context's bytes returns them. -/
-theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n nt : Nat}
+/-- A plain load of the running context's bytes returns them, and leaves the receipts of the
+hart's coherence floors of the footprint's bytes at the view the load read at (in the hart's
+current era). -/
+theorem swp_sail_mem_read_plain_ctx_floor (cpu : CPU) {n nt : Nat}
     (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
     (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
     ownCtx cpu ξ ∗ ctxBytes ξ req.address n dq w ∗
     ▷ (ownCtx cpu ξ -∗ ctxBytes ξ req.address n dq w -∗
+        (∃ tvn, [∗list] j ∈ List.range n, floorLb cpu (req.address + BitVec.ofNat 64 j) tvn) -∗
         Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
     ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   iintro ⟨Hctx, Hb, HΦ⟩
@@ -1941,15 +2043,54 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n nt : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.address n tvn htop hcoh $$ Hmm with Hmm
+    imod memModel_load_floor _ σ cpu req.address n tvn htop hcoh hram $$ Hmm with ⟨Hmm, Hfl⟩
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu req.address n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hb
+      iexists tvn
+      iexact Hfl
   · rw [hk'.2] at hex'
     exact absurd hex' (by decide)
+
+/-- A plain load of the running context's bytes returns them. -/
+theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ownCtx cpu ξ ∗ ctxBytes ξ req.address n dq w ∗
+    ▷ (ownCtx cpu ξ -∗ ctxBytes ξ req.address n dq w -∗
+        Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
+  iintro ⟨Hctx, Hb, HΦ⟩
+  iapply swp_sail_mem_read_plain_ctx_floor cpu req ξ dq w hk Φ
+  iframe Hctx Hb
+  inext
+  iintro Hctx Hb _
+  iapply HΦ $$ Hctx Hb
+
+/-- `swp_sail_mem_read_plain_ctx_floor` over the whole memory token (what the
+stage lemmas thread). -/
+theorem swp_sail_mem_read_plain_floor (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ctxTok cpu ξ ∗ ctxBytes ξ req.address n dq w ∗
+    ▷ (ctxTok cpu ξ -∗ ctxBytes ξ req.address n dq w -∗
+        (∃ tvn, [∗list] j ∈ List.range n, floorLb cpu (req.address + BitVec.ofNat 64 j) tvn) -∗
+        Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
+  iintro ⟨Htok, Hb, HΦ⟩
+  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
+  iapply swp_sail_mem_read_plain_ctx_floor cpu req ξ dq w hk Φ
+  iframe Hctx Hb
+  inext
+  iintro Hctx Hb Hfl
+  iapply HΦ $$ [Hctx Hfrag] Hb Hfl
+  iapply ctxTok_intro cpu ξ r
+  iframe Hctx Hfrag
 
 /-- `swp_sail_mem_read_plain_ctx` over the whole memory token (what the
 stage lemmas thread). -/
@@ -1962,14 +2103,11 @@ theorem swp_sail_mem_read_plain (cpu : CPU) {n nt : Nat}
         Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
     ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
   iintro ⟨Htok, Hb, HΦ⟩
-  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  iapply swp_sail_mem_read_plain_ctx cpu req ξ dq w hk Φ
-  iframe Hctx Hb
+  iapply swp_sail_mem_read_plain_floor cpu req ξ dq w hk Φ
+  iframe Htok Hb
   inext
-  iintro Hctx Hb
-  iapply HΦ $$ [Hctx Hfrag] Hb
-  iapply ctxTok_intro cpu ξ r
-  iframe Hctx Hfrag
+  iintro Htok Hb _
+  iapply HΦ $$ Htok Hb
 
 /-- A plain store of the running context's bytes: full ownership is required,
 and is handed back at the new value (justified at ξ as ξ's own store).  The value written is the

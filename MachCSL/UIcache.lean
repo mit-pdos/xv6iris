@@ -64,7 +64,7 @@ theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
     · iapply Hclose $$ %σ
       · ipureintro
         intro c _
-        exact ⟨rfl, rfl, rfl⟩
+        exact ⟨rfl, rfl, rfl, rfl⟩
       · iapply hartViewsAt_intro
         iframe Hv Hi Hr
     · isplit

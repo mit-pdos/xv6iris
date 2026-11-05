@@ -54,42 +54,52 @@ variable [MachFixedGS GF] (E : EraGS)
 
 /-- An exclusive read that no other hart blocks: the read side goes to the
 top (the watermark and the footprint's coherence floors), the floor too iff
-an acquire, and the snapshot of the (top) bytes becomes the reservation. -/
-theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+an acquire, and the snapshot of the (top) bytes becomes the reservation; the
+receipt of every new coherence floor is minted. -/
+theorem memModel_read_excl_lbs (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (r : Option Resv) (b acq : Bool) (kind : ResvKind) (hn : n < 2 ^ 64) (htop : σ.mem.topBytes pa n w)
     (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterExcl cpu pa n w acq kind) ∗
-        resvFragAt E cpu (some (snapOf pa n w kind)) acq) := by
+        resvFragAt E cpu (some (snapOf pa n w kind)) acq ∗
+        [∗list] a ∈ ramAddrs, floorLbAt E cpu a (((σ.hr cpu).afterExcl pa n σ.top acq).coh a)) := by
   iintro ⟨Hmm, Hfrag⟩
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, %hri⟩
   unfold resvFragAt
   imod ghost_map_update ((some (snapOf pa n w kind), acq) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr, Hf⟩
   have htv : σ.tv cpu ≤ σ.top := (hmm.2.1 cpu).1
   have hrv : (σ.hr cpu).rv ≤ σ.top := (hmm.2.1 cpu).2.2.1
   imod MonoNat.own_update _ (.ofNat (σ.tv cpu)) (.ofNat (if acq then σ.top else σ.tv cpu))
     (by simp only [MaxNat.le_toNat]; split <;> omega) $$ Hv with ⟨Hv, _⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat σ.top)
     (by simp only [MaxNat.le_toNat]; omega) $$ Hr with ⟨Hr, _⟩
+  imod cohFloors_update E cpu (σ.hr cpu).coh ((σ.hr cpu).afterExcl pa n σ.top acq).coh
+    (fun a _ => by
+      simp only [HRead.afterExcl]
+      split
+      · exact (hmm.2.1 cpu).2.2.2 a
+      · exact Nat.le_refl _) $$ Hf with ⟨Hf, Hlbs⟩
   imodintro
-  iframe Hfrag Htop Hauth
+  iframe Hfrag Htop Hauth Hlbs
   have hresv : resvMap (σ.afterExcl cpu pa n w acq kind) =
       Iris.Std.PartialMap.insert (resvMap σ) cpu.val (some (snapOf pa n w kind), acq) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.afterExcl])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hresv
-  isplitl [Hv Hi Hr Hclose]
+  isplitl [Hv Hi Hr Hf Hclose]
   · iapply Hclose $$ %(σ.afterExcl cpu pa n w acq kind)
     · ipureintro
       intro c hc
       simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [updCpu, ite_true, HRead.afterExcl]
-      iframe Hv Hi Hr
+      simp only [updCpu, ite_true]
+      iframe Hv Hi Hf
+      simp only [HRead.afterExcl]
+      iexact Hr
   · isplit
     · ipureintro
       obtain ⟨h1, h2, h3, h4⟩ := hmm
@@ -126,6 +136,38 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
     · ipureintro
       exact resvInv_afterExcl σ cpu pa n w acq kind hmm hno hri
 
+/-- `memModel_read_excl_lbs` at the footprint: the receipts of the footprint's floors at the
+top of the order (an exclusive read reads there). -/
+theorem memModel_read_excl_floor (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (r : Option Resv) (b acq : Bool) (kind : ResvKind) (hn : n < 2 ^ 64)
+    (htop : σ.mem.topBytes pa n w) (hno : ¬ othersReserve σ.resv cpu pa n) (hram : ramBytes pa n) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
+      |==> (memModelAt E (σ.afterExcl cpu pa n w acq kind) ∗
+        resvFragAt E cpu (some (snapOf pa n w kind)) acq ∗
+        [∗list] j ∈ List.range n, floorLbAt E cpu (pa + BitVec.ofNat 64 j) σ.top) := by
+  iintro H
+  imod memModel_read_excl_lbs E σ cpu pa n w r b acq kind hn htop hno $$ H with ⟨Hmm, Hfrag, Hlbs⟩
+  imodintro
+  iframe Hmm Hfrag
+  iapply floorLbs_footprint E cpu ((σ.hr cpu).afterExcl pa n σ.top acq).coh pa n σ.top hram
+    (fun j hj => by
+      simp only [HRead.afterExcl]
+      exact ite_eq_left ⟨j, hj, rfl⟩) $$ Hlbs
+
+/-- An exclusive read that no other hart blocks: the read side goes to the
+top (the watermark and the footprint's coherence floors), the floor too iff
+an acquire, and the snapshot of the (top) bytes becomes the reservation. -/
+theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (r : Option Resv) (b acq : Bool) (kind : ResvKind) (hn : n < 2 ^ 64) (htop : σ.mem.topBytes pa n w)
+    (hno : ¬ othersReserve σ.resv cpu pa n) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
+      |==> (memModelAt E (σ.afterExcl cpu pa n w acq kind) ∗
+        resvFragAt E cpu (some (snapOf pa n w kind)) acq) := by
+  iintro H
+  imod memModel_read_excl_lbs E σ cpu pa n w r b acq kind hn htop hno $$ H with ⟨Hmm, Hfrag, _⟩
+  imodintro
+  iframe Hmm Hfrag
+
 /-- The write half of an exclusive pair (the store consumes the
 reservation and the acquire bit; an acquire pair's floor passes its own
 append). -/
@@ -148,7 +190,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
   unfold resvFragAt
   imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
-  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
+  icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr, Hf⟩
   have htv : σ.tv cpu ≤ σ.top := (hmm.2.1 cpu).1
   imod MonoNat.own_update _ (.ofNat (σ.tv cpu)) (.ofNat (if acq then σ.top + 1 else σ.tv cpu))
     (by simp only [MaxNat.le_toNat]; split <;> omega) $$ Hv with ⟨Hv, #Hvlb⟩
@@ -159,18 +201,18 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
-  isplitl [Htop Hauth Hv Hi Hr Hclose]
+  isplitl [Htop Hauth Hv Hi Hr Hf Hclose]
   · rw [show (σ.store cpu pa n w true).top = σ.top + 1 by simp [MState.top],
         show (σ.store cpu pa n w true).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
     iframe Htop Hauth
-    isplitl [Hv Hi Hr Hclose]
+    isplitl [Hv Hi Hr Hf Hclose]
     · iapply Hclose $$ %(σ.store cpu pa n w true)
       · ipureintro
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
         simp only [updCpu, ite_true, HRead.clearAcq, Bool.true_and, hres.2]
-        iframe Hv Hi Hr
+        iframe Hv Hi Hr Hf
     · isplit
       · ipureintro
         exact mmOk_store σ cpu pa n w true hram hno hmm

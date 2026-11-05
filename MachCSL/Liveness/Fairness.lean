@@ -42,7 +42,9 @@ unchanged otherwise, so it moves only at the thread's own steps.
    (the `G`), its `SF` and `AG` forms, and proves `live`, `stable`, `persists`, `sf_iff` and
    `counter_of_sf`.  Then the device tasks: `Dev`, a task at a gate, whose grant is certain
    (`certain`, `counter_zero`, `wf`); and `Dma`, a DMA write under a reservation, an instance like
-   `Hart` whose persistence is a protocol property.
+   `Hart` whose persistence is a protocol property.  `Fresh` (6.3) also proves that no step but a
+   power-on lowers a coherence floor (`coh_mono`), the fact behind the logic's floor receipts
+   (`MachCSL.floorLbAt`), in which its grant is consumed.
 
 **Naming policy.**  Namespaces are the layers.  Capitalised names are propositions about a whole
 run (`SF`, `AttemptGrant`, `Response`, `IsCounter`, `Persists`, `Stable`); lower-case names are
@@ -1234,6 +1236,161 @@ theorem top_mono (hs : Step j c c') (hnp : ∀ e, c.1[j]? = some e → e ≠ .po
     rcases hp with ⟨-, m', σ', -, hst, rfl⟩ | ⟨-, -, -, -, rfl⟩
     · exact devStep_top hst
     · exact Nat.le_refl _
+  | power => exact absurd rfl (hnp _ he)
+
+/-! #### The coherence floors never go down, except at a power-on
+
+The floors of the hart that steps move at its loads only: a plain load reads at a view at or
+above the footprint's floors (`HRead.cohOk`), an exclusive read at the top of the order, which
+is at or above every floor while the step invariant holds (`HRead.bound`, part of `mmOk`).  Every
+other step keeps every hart's read side, or only clears its acquire bit. -/
+
+/-- Every coherence floor of every hart in `σ` is at or below the same floor in `σ'`. -/
+def cohLe (σ σ' : MState) : Prop := ∀ x a, (σ.hr x).coh a ≤ (σ'.hr x).coh a
+
+theorem cohLe_refl (σ : MState) : cohLe σ σ := fun _ _ => Nat.le_refl _
+
+theorem dropWindow_hr (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).hr = σ.hr := by
+  unfold MState.dropWindow
+  split
+  · split <;> rfl
+  · rfl
+
+theorem cohLe_of_hr {σ σ' : MState} (h : σ'.hr = σ.hr) : cohLe σ σ' := fun x a => by
+  rw [h]
+  exact Nat.le_refl _
+
+/-- A step that replaces one hart's read side by one whose floors are at or above the old ones. -/
+theorem cohLe_updCpu {σ σ' : MState} {cpu : CPU} {hr' : HRead}
+    (hσ : σ'.hr = updCpu σ.hr cpu hr') (h : ∀ a, (σ.hr cpu).coh a ≤ hr'.coh a) : cohLe σ σ' := by
+  intro x a
+  rw [hσ]
+  simp only [updCpu]
+  split
+  · rename_i hx
+    subst hx
+    exact h a
+  · exact Nat.le_refl _
+
+theorem evStep_coh {cpu : CPU} {o : InstructionEffect} {σ σ' : MState}
+    {v : InstructionEffect.ret o} (h : evStep cpu o σ v σ') (hb : ∀ x, (σ.hr x).bound σ.top) :
+    cohLe σ σ' := by
+  cases o with
+  | memRead req =>
+    rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
+      ⟨-, -, tvn, w, -, -, hcoh, -, -, rfl⟩ | ⟨-, -, -, w, -, -, rfl⟩
+    · exact cohLe_refl _
+    · exact cohLe_refl _
+    · refine cohLe_updCpu rfl fun a => ?_
+      simp only [HRead.afterLoad]
+      split
+      · rename_i ha
+        obtain ⟨j, hj, rfl⟩ := ha
+        exact hcoh j hj
+      · exact Nat.le_refl _
+    · refine cohLe_updCpu rfl fun a => ?_
+      simp only [HRead.afterExcl]
+      split
+      · exact (hb cpu).2 a
+      · exact Nat.le_refl _
+  | memWrite req w a =>
+    rcases h with ⟨-, ds', -, -, rfl⟩ | ⟨-, -, -, rfl⟩
+    · exact cohLe_refl _
+    · exact cohLe_updCpu rfl fun _ => Nat.le_refl _
+  | _ =>
+    first
+    | (obtain rfl := h; exact cohLe_refl _)
+    | (obtain ⟨-, rfl⟩ := h; exact cohLe_refl _)
+
+theorem blockedStep_coh {cpu : CPU} {o : InstructionEffect} {σ σ' : MState}
+    (h : blockedStep cpu o σ σ') : cohLe σ σ' := by
+  cases o with
+  | memRead req =>
+    obtain ⟨-, -, rfl⟩ := h
+    exact cohLe_refl _
+  | memWrite req w a =>
+    obtain ⟨-, rfl⟩ := h
+    split
+    · exact cohLe_refl _
+    · exact cohLe_of_hr (dropWindow_hr _ _)
+  | _ => exact h.elim
+
+theorem hartStep_coh {cpu : CPU} {m m' : SailM Unit} {σ σ' : MState}
+    (h : hartStep cpu m σ m' σ') (hb : ∀ x, (σ.hr x).bound σ.top) : cohLe σ σ' := by
+  unfold hartStep at h
+  split at h
+  · obtain ⟨-, -, -, rfl⟩ := h
+    exact cohLe_of_hr (dropWindow_hr _ _)
+  · exact h.elim
+  · rcases h with ⟨v, -, hev⟩ | ⟨hbl, -⟩
+    · exact evStep_coh hev hb
+    · exact blockedStep_coh hbl
+  · obtain ⟨-, -, rfl⟩ := h
+    exact cohLe_refl _
+
+theorem devOpStep_coh {gen : Nat} {d : DevId} {o : DevOp (DevSt d) (DevTask d)} {σ σ' : MState}
+    {v : o.ret} {obs : List Obs} {efs : List Expr} (h : devOpStep gen d o σ v σ' obs efs) :
+    cohLe σ σ' := by
+  cases o with
+  | step g =>
+    obtain ⟨s', os, -, -, rfl, -, -⟩ := h
+    exact cohLe_refl _
+  | get =>
+    obtain ⟨-, rfl, -, -⟩ := h
+    exact cohLe_refl _
+  | choose =>
+    obtain ⟨rfl, -, -⟩ := h
+    exact cohLe_refl _
+  | dmaRead pa n =>
+    obtain ⟨-, rfl, -, -⟩ := h
+    exact cohLe_refl _
+  | dmaWrite g pa n w =>
+    obtain ⟨-, -, ⟨s', -, -, -, -, rfl⟩ | ⟨-, rfl⟩⟩ := h
+    · exact cohLe_refl _
+    · exact cohLe_refl _
+  | sample src =>
+    obtain ⟨-, rfl, -, -⟩ := h
+    exact cohLe_refl _
+  | setPin cpu mmode b =>
+    obtain ⟨-, -, rfl⟩ := h
+    cases mmode <;> exact cohLe_refl _
+  | fork t =>
+    obtain ⟨-, -, rfl, -⟩ := h
+    exact cohLe_refl _
+  | join tid =>
+    obtain ⟨-, rfl, -, -⟩ := h
+    exact cohLe_refl _
+
+theorem devStep_coh {gen : Nat} {d : DevId} {tid : TaskId} {m m' : DevProg d} {σ σ' : MState}
+    {obs : List Obs} {efs : List Expr} (h : devStep gen d tid m σ obs m' σ' efs) :
+    cohLe σ σ' := by
+  unfold devStep at h
+  split at h
+  · obtain ⟨-, -, ⟨-, -, rfl⟩ | ⟨-, -, rfl⟩⟩ := h
+    · exact cohLe_refl _
+    · split <;> exact cohLe_refl _
+  · rcases h with ⟨v, -, hop⟩ | ⟨-, -, rfl, -, -⟩
+    · exact devOpStep_coh hop
+    · exact cohLe_refl _
+
+/-- Every step of a thread that is not the power thread keeps or raises the coherence floor of
+every byte of every hart, provided every floor is at or below the top of the order before the
+step: the step invariant's `HRead.bound` (from `h : mmOk c.2.m`, it is `fun x => (h.2.1 x).2.2`).
+A power-on resets every read side, hence the exclusion. -/
+theorem coh_mono (hs : Step j c c') (hnp : ∀ e, c.1[j]? = some e → e ≠ .power)
+    (hb : ∀ x, (c.2.m.hr x).bound c.2.m.top) : cohLe c.2.m c'.2.m := by
+  rcases c with ⟨p, g⟩
+  rcases c' with ⟨p', g'⟩
+  obtain ⟨e, obs, e', efs, he, hp, -⟩ := hs
+  cases e with
+  | hart gen cpu m =>
+    rcases hp with ⟨-, ⟨-, -, m', σ', -, hst, rfl⟩ | ⟨-, -, -, rfl⟩⟩
+    · exact hartStep_coh hst hb
+    · exact cohLe_refl _
+  | dev gen d tid m =>
+    rcases hp with ⟨-, m', σ', -, hst, rfl⟩ | ⟨-, -, -, -, rfl⟩
+    · exact devStep_coh hst
+    · exact cohLe_refl _
   | power => exact absurd rfl (hnp _ he)
 
 theorem atLoad_stable (h : atLoad i a c) (hs : Step j c c') (hji : j ≠ i)
