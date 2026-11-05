@@ -329,20 +329,31 @@ Each is conditional and reports itself in the regeneration log.
   `[ramBase, ramEnd)` once each (a list of 2^27 elements that no proof evaluates; it is built on
   `List.range'` so that a kernel check that looks at its head does not run through it).  The
   counters' lower bounds are persistent receipts, `floorLbAt E cpu a t` ("hart `cpu`'s floor of byte
-  `a` has passed `t`"; `MachCSL/Ctx.lean`, the ambient form `floorLb`): a plain load leaves them for
-  its footprint at the view it read at (`memModel_load_floor`, and the leaves
-  `swp_sail_mem_read_plain_ctx_floor` and `swp_sail_mem_read_plain_floor`), an exclusive read at
-  the top of the order (`memModel_read_excl_floor`), and `memModel_floorLb` reads one back against
-  the machine.  The mirror is sound because no step but a power-on lowers a floor (`coh_mono`,
-  `MachCSL/Liveness/Fairness.lean` section 6.3: a plain load reads at or above its footprint's
-  floors, an exclusive read at the top, which bounds every floor while `mmOk` holds, and every other
-  step keeps the read side or only clears its acquire bit), and a power-on mints a fresh era whose
+  `a` has passed `t`"; `MachCSL/Ctx.lean`, the ambient form `floorLb`): the bridge
+  `memModel_load_floor` mints them for a plain load's footprint at the view the load read at, and
+  `memModel_read_excl_floor` for an exclusive read at the top of the order; `memModel_floorLb` reads
+  one back against the machine.  The two leaves `swp_sail_mem_read_plain_ctx_floor` and
+  `swp_sail_mem_read_plain_floor` pass the receipts to their continuation under an existential view
+  that the statement ties to nothing the caller holds, so as stated they add no information to the
+  old leaves (the independent audit of 2026-11-05, R1); a proof that needs a receipt goes through the
+  bridge, or restates the leaf so that the view is tied, for example to `viewLb`.  No exclusive-read
+  leaf uses its bridge yet (R2).  The mirror is sound because every step lemma of `memModelAt`
+  re-establishes it, each discharging `cohFloors_update`'s requirement that a floor only rises: a
+  plain load reads at or above its footprint's floors, an exclusive read at the top, which bounds
+  every floor while `mmOk` holds, and every other step keeps the read side or only clears its acquire
+  bit; `coh_mono` (`MachCSL/Liveness/Fairness.lean` section 6.3) is the same fact proved purely, an
+  independent confirmation the trusted base does not use; and a power-on mints a fresh era whose
   counters start at 0, where `bootFacts` puts every floor.  Why: the liveness plan's memory-fairness
   grant (`Fairness.Fresh.grant`: the load of `a` reads at a view at or past the store `t`, so the
   hart's floor of `a` passes `t`) is a fact about `HRead.coh`, and the proof that consumes it needs
   the floor as a resource the hart carries from the load to the point where it uses the grant, not
-  only as machine state.  Policy class: none of M1-M4 (no model, board, schedule or contract moved);
-  a change of the trusted base's content only (`notes/model-policy.md` section 6).  What moved in
+  only as machine state.  Policy class: none of M1-M4 (no model, board or schedule moved; the contracts' text did not
+  move, but their meaning moved with the interpretation they quantify over, since `SpecUser.USER`
+  and the open adequacy statements reach `hartViewsAt`, which is what the moved pin records); a
+  change of the trusted base's content (`notes/model-policy.md` section 6), accepted by the owner at
+  the merge `9b71f6d58`.  Whether an interpretation-only change needs a numbered ruling as a change
+  to the user tier's contract is the owner's question, raised by the independent audit of 2026-11-05
+  (R3).  What moved in
   the trusted base (`tools/tcb/expected.json`, re-pinned in this commit; the check against the old
   baseline named exactly these 25 constants and no set problem): CHANGED -- `hartViewsAt` (the new
   conjunct), `EraGS.mk` and `MachGS.mk` (the new field), `MachGS.era` (it passes the field on), and
@@ -351,7 +362,9 @@ Each is conditional and reports itself in the regeneration log.
   `MachGS` with `MachGS.gen`; ENTERED -- `EraGS.cohName`, `MachGS.cohName`, `cohFloorsAt` and
   `ramAddrs`.  Nothing LEFT; no module, axiom or `opaque` set changed; 2,603 constants under 2,257
   declarations (was 2,599).  `memModelAt` and `eraInterp` did not move, as the hash covers the name
-  of `hartViewsAt`, not its definition.  Theorems that depend on it (the pin's per-theorem tables):
+  of `hartViewsAt`, not its definition, and likewise the names of the projections `memModelAt`
+  applies; the moved projections' value hashes are a pure index shift (each new hash equals the old
+  hash of the field one place later).  Theorems that depend on it (the pin's per-theorem tables):
   `riscvPowerAdequacy`, `xv6PowerAdequacy`, `xv6FsAdequacy_xv6GF` and `userProof` reach
   `hartViewsAt`, `cohFloorsAt` and `ramAddrs` through `memModelAt`, and the last three `MachGS.era`;
   the closed statements reach none of it.  Two definitions of `Xv6/` that build a `MachGS` with every

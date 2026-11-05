@@ -1236,7 +1236,7 @@ theorem resvInv_boot (σ : MState) (h : bootFacts σ) : resvInv σ := by
 
 /-- Every RAM byte address once, in order: `ramBase + k` for `k < ramEnd - ramBase`.  A list of
 2^27 elements that nothing may evaluate: every use goes through `mem_ramAddrs`, `ramAddrs_nodup`
-and `ramAddrs_get?`.  Built on `List.range'`, whose head is one step away (`List.range` builds
+and the generic big-op lemmas (`ramAddrs_get?` is provided for the same purpose).  Built on `List.range'`, whose head is one step away (`List.range` builds
 its list from the end, and a kernel check that looks at the head of a list built that way runs
 through all of it). -/
 def ramAddrs : List PAddr := (List.range' ramBase (ramEnd - ramBase)).map (BitVec.ofNat 64)
