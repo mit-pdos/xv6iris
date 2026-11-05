@@ -251,3 +251,6 @@ import MachCSL.URunXSwp
 import MachCSL.UkfWalk
 import MachCSL.BvLemmas
 import MachCSL.OwnAllocSame
+-- The liveness lemmas (plan: `local-plan/xv6-liveness-now/PLAN.md`, outside the repository); outside
+-- the trusted base: nothing above imports them.
+import MachCSL.Liveness.Fairness
