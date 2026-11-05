@@ -65,8 +65,10 @@ def iviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
 def rviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
   MonoNat.lb_own (E.rviewName cpu) (.ofNat K) ∗ topLbAt E K
 
-/-- Hart `cpu`'s coherence floor of byte `a` has passed `t` (persistent): what a plain load of
-`a` at a view at or past `t` leaves (`HRead.coh`; the liveness plan's per-byte floor). -/
+/-- Hart `cpu`'s coherence floor of the RAM byte `a` has passed `t` (persistent): what a plain
+load of `a` at a view at or past `t` leaves (`HRead.coh`; the liveness plan's per-byte floor).  For a
+byte outside RAM the name is the default one and the receipt means nothing (`memModel_floorLb` needs
+`inRam a 1`). -/
 def floorLbAt (cpu : CPU) (a : PAddr) (t : Nat) : IProp GF :=
   MonoNat.lb_own (E.cohName cpu a) (.ofNat t)
 

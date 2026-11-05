@@ -1995,9 +1995,12 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n nt : Nat}
   · rw [hex] at hex'
     exact absurd hex' (by decide)
 
-/-- A plain load of the running context's bytes returns them, and leaves the receipts of the
-hart's coherence floors of the footprint's bytes at the view the load read at (in the hart's
-current era). -/
+/-- A plain load of the running context's bytes returns them, and hands the continuation the
+receipts of the hart's coherence floors of the footprint's bytes, under an existential view.  As
+stated the view is tied to nothing the caller holds, so the receipts carry no information beyond
+`swp_sail_mem_read_plain_ctx`'s (the independent audit of 2026-11-05, R1); the informative form
+is the bridge `memModel_load_floor`, and a restatement that ties the view (for example to
+`viewLb`) is left for the first proof that needs it. -/
 theorem swp_sail_mem_read_plain_ctx_floor (cpu : CPU) {n nt : Nat}
     (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (ξ : CtxId) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
