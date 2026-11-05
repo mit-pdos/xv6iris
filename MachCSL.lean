@@ -256,3 +256,4 @@ import MachCSL.OwnAllocSame
 import MachCSL.Liveness.Fairness
 import MachCSL.Liveness.Gates
 import MachCSL.Liveness.Cycle
+import MachCSL.Liveness.Spec

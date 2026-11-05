@@ -62,3 +62,35 @@ Fairness.Disk.pop_sf
 Fairness.Disk.push_sf
 Fairness.Disk.req_sf_iff
 Fairness.Disk.snap_sf_iff
+
+# MachCSL/Liveness/Spec.lean: the temporal vocabulary, boot, fair scheduling,
+# the declared arms, the MMIO discipline, the bundle Hyps, era-locality, the
+# theorem shapes
+Fairness.Spec.live_of_eraLive
+Fairness.Spec.EraLive.trans
+Fairness.Spec.step_of_boot
+Fairness.Spec.progs_of_boot
+Fairness.Spec.stepsInfOften_of_fairSched
+Fairness.Spec.live_or_dead
+Fairness.Spec.armFair_iff
+Fairness.Spec.declaredArms_classes
+Fairness.Spec.noBusyReset_of_kernelStores
+Fairness.Spec.noWceOff_of_kernelStores
+Fairness.Spec.noConfigWrite_of_kernelStores
+Fairness.Spec.Hyps.progs_all
+Fairness.Spec.Hyps.ramHist_of_liveAt
+Fairness.Spec.Hyps.stepsInfOften
+Fairness.Spec.Action.sf_of_dead_from
+Fairness.Spec.Action.sf_iff_ag
+Fairness.Spec.Tick.ag_of_hyps
+Fairness.Spec.Tick.sf_iff_ag
+Fairness.Spec.Arm.ag_of_hyps
+Fairness.Spec.Arm.sf_iff_ag
+Fairness.Spec.Fresh.ag_of_hyps
+Fairness.Spec.Fresh.sf_iff_ag
+Fairness.Spec.Hart.ag_of_hyps
+Fairness.Spec.Hart.sf_iff_ag
+Fairness.Spec.Hart.progressOrCut_of_hyps
+Fairness.Spec.Dma.ag_of_hyps
+Fairness.Spec.Dma.sf_iff_ag
+Fairness.Spec.xv6Live_of_xv6EraLive
