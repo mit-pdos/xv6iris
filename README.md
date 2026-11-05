@@ -202,7 +202,9 @@ and in each file's "Deviations from Rocq" header.
 - **toolchain / lint / check-gen**: pins agree; Spec/Proof/Link layering, no `sorry`/`axiom` (and no
   `native_decide` in the proofs), no orphan modules; generated files equal their generators' output.
 - **build**: the Sail model and libraries (cached), then `lake build Xv6 MachCSL` from clean, timed.
-- **audit**: the axioms and `opaque`s of every top theorem against `tools/audit/baseline.json`.
+- **audit**: the axioms and `opaque`s of every top theorem against `tools/audit/baseline.json`.  The main
+  theorems of `MachCSL/Liveness/`, listed in `tools/audit/liveness.txt`, must rest only on Lean's three
+  standard axioms and `bv_decide` certificates (counted, not pinned).
 - **tcb**: the definitions each top theorem's statement depends on -- the module sets and, for
   `MachCSL/`, `Xv6/` and `model/Xv6Extras.lean`, the content of every trusted definition (a hash of its
   elaborated type and body) -- against `tools/tcb/expected.json`; then the check's self-test.

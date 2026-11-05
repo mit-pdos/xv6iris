@@ -38,6 +38,11 @@ WHAT A READER MUST TRUST, AND WHAT THE CHECK ENFORCES.
      `Xv6`/`MachCSL`.  A baseline axiom that is no longer used also fails
      (the baseline is stale; tighten it).
 
+The main theorems of `MachCSL/Liveness/` (`tools/audit/liveness.txt`) are
+checked against items 1 to 3 without pinning: item 1's axioms and any number of
+item 2's certificates pass; anything of item 3, or a listed name that no longer
+exists, fails.  Their cones are not searched for `opaque` constants.
+
 WHAT `#print axioms` CANNOT SEE, reported and pinned separately:
 
   * `opaque` constants.  An `opaque` is inhabited, so it is no axiom, but
@@ -80,7 +85,8 @@ statement to mean what they think -- is `tools/tcb/Tcb.lean`.
 Output (directory `$XV6_CI_OUT`, default `.lake/ci`): `audit.json`
 (machine-readable) and `audit.md` (the summary).  The executable exits
 non-zero iff the audit fails (or the tree cannot be loaded).
-(`$XV6_AUDIT_BASELINE` names another baseline file; for testing the check.)
+(`$XV6_AUDIT_BASELINE` names another baseline file and `$XV6_AUDIT_LIVENESS`
+another liveness list; for testing the check.)
 ======================================================================
 -/
 import Lean
@@ -101,6 +107,16 @@ def isLocalConst (env : Environment) (c : Name) : Bool :=
   match moduleOf? env c with
   | some m => localRoots.contains m.getRoot
   | none => false
+
+/-- Lean's three standard axioms. -/
+def coreAxioms : List Name := [``propext, ``Classical.choice, ``Quot.sound]
+
+/-- The names of a list in the format of `tools/ci/roots.txt`: one fully
+qualified name per line, `#` to the end of the line a comment. -/
+def parseNameList (s : String) : Array Name :=
+  (s.splitOn "\n").foldl (init := #[]) fun acc l =>
+    let n := ((l.splitOn "#").headD "").trimAscii.toString
+    if n.isEmpty then acc else acc.push n.toName
 
 /-- `<decl>._native.bv_decide.ax_*`, by name. -/
 def isBvCertName (c : Name) : Bool :=
@@ -241,6 +257,17 @@ structure ThmResult where
   coneSize : Nat
   problems : Array String
 
+/-- A theorem of `tools/audit/liveness.txt`: the standard axioms it uses, its
+certificates (counted) and every other axiom (a malformed certificate among
+them). -/
+structure LiveResult where
+  name : Name
+  found : Bool
+  core : Array Name
+  certs : Nat
+  other : Array Name
+  problems : Array String
+
 def sortNames (xs : Array Name) : Array Name := xs.qsort (fun a b => a.toString < b.toString)
 
 def strs (xs : Array Name) : Array String := xs.map toString
@@ -263,6 +290,9 @@ def run : CoreM Bool := do
   let bl ← match parseBaseline (← IO.FS.readFile baselinePath) with
     | .ok b => pure b
     | .error e => throwError "audit: cannot parse {baselinePath}: {e}"
+  let livePath : System.FilePath := (← IO.getEnv "XV6_AUDIT_LIVENESS").getD "tools/audit/liveness.txt"
+  let liveNames ← try pure (parseNameList (← IO.FS.readFile livePath))
+    catch e => throwError "audit: cannot read {livePath}: {e.toMessageData}"
   let t0 ← IO.monoMsNow
   -- 1. per theorem: axioms (table lookup) and the cone's opaques (one shared walk)
   for tb in bl.theorems do
@@ -307,6 +337,21 @@ def run : CoreM Bool := do
         problems := problems.push s!"{tb.name}: baseline opaque `{o}` is no longer reached (stale baseline; remove it)"
     results := results.push { name := tb.name, plain, certs := certNamed.size - badCerts.size, badCerts,
                               opaques := ops, extOpaques := sortNames extOps, coneSize, problems }
+  -- 1b. the liveness theorems: the baseline kinds, counted, nothing pinned
+  let mut liveResults : Array LiveResult := #[]
+  for n in liveNames do
+    unless (env.find? n).isSome do
+      liveResults := liveResults.push { name := n, found := false, core := #[], certs := 0, other := #[],
+                                        problems := #[s!"liveness theorem `{n}` does not exist"] }
+      continue
+    let axs ← collectAxioms n
+    let isCert (a : Name) : Bool := isBvCertName a && bvCertShapeOk env a
+    let other := sortNames (axs.filter fun a => !coreAxioms.contains a && !isCert a)
+    let problems := other.map fun a =>
+      if isBvCertName a then s!"liveness theorem `{n}`: `{a}` is named like a bv_decide certificate but is not one"
+      else s!"liveness theorem `{n}`: axiom `{a}` is not one of the baseline kinds"
+    liveResults := liveResults.push { name := n, found := true, core := coreAxioms.toArray.filter (axs.contains ·),
+                                      certs := (axs.filter isCert).size, other, problems }
   let t1 ← IO.monoMsNow
   -- 2. the Sail platform hooks
   let mut hookProblems : Array String := #[]
@@ -338,7 +383,6 @@ def run : CoreM Bool := do
   let mut treeDecls := 0
   let mut sorryDecls : Array Name := #[]
   let mut treeOther : Std.HashMap Name Nat := {}
-  let coreAxioms : List Name := [``propext, ``Classical.choice, ``Quot.sound]
   for i in [0:env.header.moduleNames.size] do
     let m := env.header.moduleNames[i]!
     unless localRoots.contains m.getRoot do continue
@@ -366,7 +410,8 @@ def run : CoreM Bool := do
       if m.getRoot == `MachCSL || m.getRoot == `Xv6 then
         treeProblems := treeProblems.push s!"`{a}` is an axiom declared in {m}"
   let t2 ← IO.monoMsNow
-  let problems : Array String := results.foldl (fun acc r => acc ++ r.problems) #[] ++ hookProblems ++ treeProblems
+  let problems : Array String := results.foldl (fun acc r => acc ++ r.problems) #[] ++
+    liveResults.foldl (fun acc r => acc ++ r.problems) #[] ++ hookProblems ++ treeProblems
   let ok : Bool := problems.isEmpty
   -- machine-readable output
   let treeOtherArr := treeOther.toArray.qsort (fun a b => a.1.toString < b.1.toString)
@@ -381,6 +426,11 @@ def run : CoreM Bool := do
       ("opaques", toJson (strs r.opaques)),
       ("external_opaques", toJson (strs r.extOpaques)),
       ("cone_constants", toJson r.coneSize),
+      ("ok", toJson r.problems.isEmpty)]),
+    ("liveness", Json.arr <| liveResults.map fun r => Json.mkObj [
+      ("name", toJson r.name.toString),
+      ("axioms", toJson (strs (r.core ++ r.other))),
+      ("bv_decide_certificates", toJson r.certs),
       ("ok", toJson r.problems.isEmpty)]),
     ("platform_hooks", Json.arr <| hookRows.map fun (h, rk, ak) => Json.mkObj [
       ("hook", toJson h), ("LeanRV64D.Functions", toJson rk), ("root", toJson ak)]),
@@ -429,6 +479,20 @@ def run : CoreM Bool := do
   else
     md := md ++ " Axioms outside the baseline kinds, used by declarations NOT in an audited cone (reported, not failed): "
       ++ ", ".intercalate (treeOtherArr.toList.map fun (a, n) => s!"`{a}` ({n})") ++ ".\n"
+  md := md ++ "\n### Liveness theorems (counted, not pinned)\n\n"
+  md := md ++ "| theorem | axioms | `bv_decide` certificates | anything else |\n|---|---|---:|---|\n"
+  for r in liveResults do
+    if r.found then
+      md := md ++ s!"| `{r.name}` | {mdList r.core} | {r.certs} | {mdList r.other} |\n"
+    else
+      md := md ++ s!"| `{r.name}` | | | does not exist |\n"
+  let liveBad := liveResults.filter (!·.problems.isEmpty)
+  md := md ++ s!"\n{liveResults.size} theorems of `MachCSL/Liveness/` audited; "
+  if liveBad.isEmpty then
+    md := md ++ "all rest on the baseline kinds.\n"
+  else
+    md := md ++ s!"{liveBad.size} fail: " ++ ", ".intercalate (liveBad.toList.map fun r =>
+      if r.found then s!"`{r.name}` ({mdList r.other})" else s!"`{r.name}` (does not exist)") ++ ".\n"
   let dir ← outDir
   IO.FS.createDirAll dir
   IO.FS.writeFile (dir / "audit.json") (json.pretty ++ "\n")

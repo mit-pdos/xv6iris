@@ -20,7 +20,9 @@
 #   build            the proofs, `lake build Xv6 MachCSL`, through
 #                    tools/ci/timed_build.sh so the profile has its log
 #   audit            tools/ci/audit.sh: axioms / opaques of the top theorems
-#                    against tools/audit/baseline.json            (BLOCKING)
+#                    against tools/audit/baseline.json, and the axioms of
+#                    the MachCSL/Liveness/ theorems of tools/audit/liveness.txt
+#                    against the same kinds, counted, not pinned  (BLOCKING)
 #   tcb              tools/ci/tcb.sh: what the STATEMENTS depend on -- the
 #                    module sets and the content of the trusted definitions
 #                    -- against tools/tcb/expected.json, then its self-test

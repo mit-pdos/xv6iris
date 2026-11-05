@@ -5,7 +5,7 @@
 
 | what | run (on a build machine or in CI, against a built tree) | checked against | fails when |
 |---|---|---|---|
-| assumption audit: what the PROOFS assume | `tools/ci/audit.sh` (`tools/audit/Audit.lean`) | `tools/audit/baseline.json` (hand-kept) | a theorem's axioms outside the `bv_decide` certificate family, or the `opaque` constants in its cone, differ from the baseline in either direction; a certificate-named axiom has the wrong shape; a platform hook is not a definition; any declaration of `MachCSL`/`Xv6` depends on `sorryAx` |
+| assumption audit: what the PROOFS assume | `tools/ci/audit.sh` (`tools/audit/Audit.lean`) | `tools/audit/baseline.json` (hand-kept) | a theorem's axioms outside the `bv_decide` certificate family, or the `opaque` constants in its cone, differ from the baseline in either direction; a certificate-named axiom has the wrong shape; a platform hook is not a definition; any declaration of `MachCSL`/`Xv6` depends on `sorryAx`; a theorem of `tools/audit/liveness.txt` is missing or rests on an axiom other than Lean's three and the certificates |
 | trusted base: what a reader must READ | `tools/ci/tcb.sh` (`tools/tcb/Tcb.lean`), then `tools/ci/tcb.sh --self-test` | `tools/tcb/expected.json` (`tools/ci/tcb.sh --update`) | for some theorem, the set of this tree's modules its STATEMENT reaches, or the axioms/opaques it reaches, moved; or (since 2026-10-23) the CONTENT of a trusted constant of `MachCSL`/`Xv6`/`LeanRV64D.Xv6Extras` -- a hash of its elaborated type and value, pinned per source declaration -- moved, entered or left; the self-test fails when the tool does not fail on a doctored baseline |
 
 Both write `.lake/ci/{audit,tcb}.{json,md}` (and `tcb.txt`), append the markdown to `$GITHUB_STEP_SUMMARY`
@@ -14,7 +14,9 @@ when set, and exit non-zero on a regression.  Audited theorems (the 13 of `tools
 `Xv6.unionSyncCutNeg`, `Xv6.unionResults`, and the seven NI theorems `Xv6.xv6NiAdequacy`, `xv6NiTwoRun`,
 `xv6NiTwoRunObs`, `xv6NiStrongInstance`, `xv6NiOut`, `xv6NiPrefix`, `xv6NiDet`; the trusted-base report adds
 the ladder's upper rungs `MachCSL.riscvPowerAdequacy` and `Xv6.xv6PowerAdequacy` (Rocq's CI reports the same
-ladder).
+ladder).  Since 2026-11-05 the audit also checks the main theorems of `MachCSL/Liveness/`, listed in
+`tools/audit/liveness.txt`: each may use Lean's three axioms and any number of certificates, nothing is
+pinned, and their cones are not searched for `opaque` constants.
 
 ## What a reader must trust (measured by the tools at a31d988e8, the sail-riscv 0.16 tree, Oct 19 2026; the audit and trusted-base checks re-run green by `tools/ci/run_all.sh` after the regeneration of c618d63e7, at 78f851447, 8bfa5fee8 and every later commit, Oct 20 2026, and after the C3 lane's model and memory-model changes at bb793d966, Oct 22 2026, with every certificate count below unchanged and the declaration count of item 5 grown; first measured at lean 6fe1eb37b, Sept 30 2026)
 

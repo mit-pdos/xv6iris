@@ -1,0 +1,64 @@
+# The main theorems of MachCSL/Liveness/, whose axioms the assumption audit
+# checks (tools/audit/Audit.lean, run by tools/ci/audit.sh).  One fully
+# qualified name per line; `#` starts a comment.
+#
+# The list is counted, not pinned.  Each theorem may rest on any of Lean's
+# three standard axioms (propext, Classical.choice, Quot.sound) and on any
+# number of shape-checked bv_decide certificates.  Any other axiom fails the
+# audit: sorryAx, a native_decide certificate, a hook axiom of the Sail fork,
+# an axiom of the tree.  No statement and no exact axiom set is pinned, so a
+# theorem whose statement or proof changes needs no edit here, and a theorem
+# that uses fewer axioms passes.  A listed name that no longer exists fails
+# the audit: rename it here when you rename it in the source.
+#
+# These theorems are proofs, not trusted statements.  They are not roots of
+# the coverage cone (tools/ci/roots.txt) and not in tools/audit/baseline.json,
+# and the audit does not search their cones for `opaque` constants.
+#
+# The author of every new MachCSL/Liveness/ module adds its main theorems here.
+
+# MachCSL/Liveness/Fairness.lean: the attempt-grant theory, eras, the instances
+Fairness.Action.counter_of_sf
+Fairness.Action.sf_iff_attemptGrant
+Fairness.Era.persists_of_liveStable
+Fairness.Era.persists_of_liveStableUnder
+Fairness.Tick.sf_iff
+Fairness.Arm.sf_iff
+Fairness.Fresh.sf_iff
+Fairness.Hart.sf_iff
+Fairness.Dev.wf
+Fairness.Dma.sf_iff
+Fairness.Fresh.coh_mono
+
+# MachCSL/Liveness/Cycle.lean: a hart's cycle, the closure of the choice
+# instances, ramHist along a run, harts' progress in response form
+Fairness.Cycle.boundary_or_dead_or_retry
+Fairness.Cycle.boundary_of_live
+Fairness.Cycle.riscvStep_false_ne_true
+Fairness.Hart.pending_of_blocked
+Fairness.Hart.served_of_unblocked
+Fairness.Tick.exists_grant
+Fairness.Tick.exists_not_grant
+Fairness.Arm.exists_answer
+Fairness.Arm.exists_grant
+Fairness.Fresh.exists_grant
+Fairness.Hart.exists_served
+Fairness.ramHist_run
+Fairness.Hart.sf_iff_progressOrCut
+Fairness.Hart.sf_iff_response
+
+# MachCSL/Liveness/Gates.lean: the stable gates of the device programs
+Fairness.Gate.sf_of_neverBlocks
+Fairness.Gate.sf_join
+Fairness.Gate.progs_run
+Fairness.Disk.progs_run
+Fairness.Disk.latch_stable
+Fairness.Disk.pop_stable
+Fairness.Disk.push_stable
+Fairness.Disk.req_stable
+Fairness.Disk.snap_stable
+Fairness.Disk.latch_sf
+Fairness.Disk.pop_sf
+Fairness.Disk.push_sf
+Fairness.Disk.req_sf_iff
+Fairness.Disk.snap_sf_iff
