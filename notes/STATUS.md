@@ -17,6 +17,11 @@ unmoved; user images and `fs.img` byte-identical).  The contract's success post 
 with `root`/`rti`, and the user-visible cwd row (`usysCwdOk`, `SyscRows.cwi`) names chroot beside
 chdir (`claude-notes/design/chroot.md` §4.1).
 
+**2026-11-05 (later).**  xv6-riscv `071927a2` ("no need for chdir in user/chroot.c"): only
+`user/chroot.c` changed, a program with no proof; the kernel and the seven verified programs are
+byte-identical and `fs.img` moved only in `/chroot`'s bytes (36104 -> 35944, still 24 live
+inodes).  The dumps are re-pinned; no proof changed.
+
 - `Xv6.xv6FsAdequacy_closed` — the system theorem (hypotheses: generation 0, power off, disk = `fs.img`).
 - `Xv6.userProof : USER` — the user-mode machine layer, no hypotheses.
 - `Xv6.unionAdequacyClosed` — union adequacy for init/sh/cat/grep/echo/seccomp/sync, concluding
