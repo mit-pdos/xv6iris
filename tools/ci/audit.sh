@@ -5,15 +5,18 @@
 # Runs tools/audit/Audit.lean against an ALREADY-BUILT tree: the axioms of each
 # top theorem, the `opaque` constants in its cone and the Sail platform hooks,
 # checked against tools/audit/baseline.json.  That file's header says what a
-# reader must trust.  ~3 s (a native executable, built here if CI's build
-# step has not), ~5 GB.
+# reader must trust.  The main theorems of MachCSL/Liveness/, listed in
+# tools/audit/liveness.txt, must rest only on Lean's three standard axioms and
+# bv_decide certificates (counted, not pinned).  ~3 s (a native executable,
+# built here if CI's build step has not), ~5 GB.
 #
 #   --build   `lake build Xv6 MachCSL` first (Rocq's `make audit` vs `audit-only`).
 #             Without it a stale .lake/build is audited as it stands.
 #
 # EXIT STATUS: non-zero iff the audit fails (an axiom or opaque outside the
-# baseline, a stale baseline entry, a `sorryAx` anywhere in MachCSL/Xv6) or
-# Lean cannot load the tree.  No pipe masks it.
+# baseline, a stale baseline entry, a `sorryAx` anywhere in MachCSL/Xv6, a
+# listed liveness theorem that is missing or rests on another axiom) or Lean
+# cannot load the tree.  No pipe masks it.
 #
 # Output in $XV6_CI_OUT (default .lake/ci): audit.json, audit.md, audit.log.
 # The summary is also appended to $GITHUB_STEP_SUMMARY when that is set.

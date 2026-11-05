@@ -1,0 +1,138 @@
+# The main theorems of MachCSL/Liveness/, whose axioms the assumption audit
+# checks (tools/audit/Audit.lean, run by tools/ci/audit.sh).  One fully
+# qualified name per line; `#` starts a comment.
+#
+# The list is counted, not pinned.  Each theorem may rest on any of Lean's
+# three standard axioms (propext, Classical.choice, Quot.sound) and on any
+# number of shape-checked bv_decide certificates.  Any other axiom fails the
+# audit: sorryAx, a native_decide certificate, a hook axiom of the Sail fork,
+# an axiom of the tree.  No statement and no exact axiom set is pinned, so a
+# theorem whose statement or proof changes needs no edit here, and a theorem
+# that uses fewer axioms passes.  A listed name that no longer exists fails
+# the audit: rename it here when you rename it in the source.
+#
+# These theorems are proofs, not trusted statements.  They are not roots of
+# the coverage cone (tools/ci/roots.txt) and not in tools/audit/baseline.json,
+# and the audit does not search their cones for `opaque` constants.
+#
+# The author of every new MachCSL/Liveness/ module adds its main theorems here.
+
+# MachCSL/Liveness/Fairness.lean: the attempt-grant theory, eras, the instances
+Fairness.Action.counter_of_sf
+Fairness.Action.sf_iff_attemptGrant
+Fairness.Era.persists_of_liveStable
+Fairness.Era.persists_of_liveStableUnder
+Fairness.Tick.sf_iff
+Fairness.Arm.sf_iff
+Fairness.Fresh.sf_iff
+Fairness.Hart.sf_iff
+Fairness.Dev.wf
+Fairness.Dma.sf_iff
+Fairness.Fresh.coh_mono
+
+# MachCSL/Liveness/Cycle.lean: a hart's cycle, the closure of the choice
+# instances, ramHist along a run, harts' progress in response form
+Fairness.Cycle.boundary_or_dead_or_retry
+Fairness.Cycle.boundary_of_live
+Fairness.Cycle.riscvStep_false_ne_true
+Fairness.Hart.pending_of_blocked
+Fairness.Hart.served_of_unblocked
+Fairness.Tick.exists_grant
+Fairness.Tick.exists_not_grant
+Fairness.Arm.exists_answer
+Fairness.Arm.exists_grant
+Fairness.Fresh.exists_grant
+Fairness.Hart.exists_served
+Fairness.ramHist_run
+Fairness.Hart.sf_iff_progressOrCut
+Fairness.Hart.sf_iff_response
+
+# MachCSL/Liveness/Gates.lean: the stable gates of the device programs
+Fairness.Gate.sf_of_neverBlocks
+Fairness.Gate.sf_join
+Fairness.Gate.progs_run
+Fairness.Disk.progs_run
+Fairness.Disk.latch_stable
+Fairness.Disk.pop_stable
+Fairness.Disk.push_stable
+Fairness.Disk.req_stable
+Fairness.Disk.snap_stable
+Fairness.Disk.latch_sf
+Fairness.Disk.pop_sf
+Fairness.Disk.push_sf
+Fairness.Disk.req_sf_iff
+Fairness.Disk.snap_sf_iff
+
+# MachCSL/Liveness/Spec.lean: the temporal vocabulary, boot, fair scheduling,
+# the declared arms, the MMIO discipline, the bundle Hyps, era-locality, the
+# theorem shapes
+Fairness.Spec.live_of_eraLive
+Fairness.Spec.EraLive.trans
+Fairness.Spec.step_of_boot
+Fairness.Spec.progs_of_boot
+Fairness.Spec.stepsInfOften_of_fairSched
+Fairness.Spec.live_or_dead
+Fairness.Spec.armFair_iff
+Fairness.Spec.declaredArms_classes
+Fairness.Spec.noBusyReset_of_kernelStores
+Fairness.Spec.noWceOff_of_kernelStores
+Fairness.Spec.noConfigWrite_of_kernelStores
+Fairness.Spec.Hyps.progs_all
+Fairness.Spec.Hyps.ramHist_of_liveAt
+Fairness.Spec.Hyps.stepsInfOften
+Fairness.Spec.Action.sf_of_dead_from
+Fairness.Spec.Action.sf_iff_ag
+Fairness.Spec.Tick.ag_of_hyps
+Fairness.Spec.Tick.sf_iff_ag
+Fairness.Spec.Arm.ag_of_hyps
+Fairness.Spec.Arm.sf_iff_ag
+Fairness.Spec.Fresh.ag_of_hyps
+Fairness.Spec.Fresh.sf_iff_ag
+Fairness.Spec.Hart.ag_of_hyps
+Fairness.Spec.Hart.sf_iff_ag
+Fairness.Spec.Hart.progressOrCut_of_hyps
+Fairness.Spec.Dma.ag_of_hyps
+Fairness.Spec.Dma.sf_iff_ag
+Fairness.Spec.xv6Live_of_xv6EraLive
+
+# MachCSL/Liveness/Spec.lean, section 9: the targets (T1, the secondary harts'
+# boot spin on started)
+Fairness.Spec.Target1.atSpinLoad_atLoad
+Fairness.Spec.Target1.fresh_enabled_of_stored
+Fairness.Spec.Target1.flagStored_pos
+Fairness.Spec.Target1.onceAt_of_bootFacts
+Fairness.Spec.Target1.not_flagStored_of_bootFacts
+Fairness.Spec.Target1.xv6EraLive_of_target1
+
+# MachCSL/Liveness/DiskProtocol.lean: one root per device, bounded paths, the
+# kernel's facts, one serving task per head, the latch's holder, the gate
+# theorems' side conditions
+Fairness.Disk.fork_ne_root
+Fairness.Disk.oneRoot
+Fairness.Disk.bounded_fetch
+Fairness.Disk.bounded_serve
+Fairness.Disk.bounded_arm
+Fairness.Disk.boundedAt_step
+Fairness.Disk.pure_within
+Fairness.Disk.forked_moves_le
+Fairness.Disk.serve_within
+Fairness.Disk.arm_within
+Fairness.Disk.noBusyReset_of_busyStores
+Fairness.Disk.noWceOff_of_busyStores
+Fairness.Disk.noConfigWrite_of_busyStores
+Fairness.Disk.oneServer
+Fairness.Disk.inflight_of_serving
+Fairness.Disk.latchHolder_unique
+Fairness.Disk.latch_inflight
+Fairness.Disk.competitor_unique
+Fairness.Disk.serving_within
+Fairness.Disk.latch_closers
+Fairness.Disk.push_closers
+Fairness.Disk.pop_closers
+Fairness.Disk.req_closers
+Fairness.Disk.snap_closers
+Fairness.Disk.latch_hK
+Fairness.Disk.push_hK
+Fairness.Disk.pop_hK
+Fairness.Disk.req_hK
+Fairness.Disk.snap_hK
