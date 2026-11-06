@@ -4,7 +4,7 @@ import MachCSL.Liveness.FairnessTheory
 /-! # The attempt–grant model of fairness: MachCSL's instance
 
 MachCSL's runs as an instance of the general theory of `MachCSL/Liveness/FairnessTheory.lean`
-(layers 0 to 3, generic over a thread pool).  This file gives MachCSL's pool, its eras and the six
+(layers 0 to 2, generic over a thread pool).  This file gives MachCSL's pool, its eras and the six
 actions the liveness proof uses.  Five of the actions are assumptions: they are the `SF`
 hypotheses of `Spec.Hyps` (`Tick`, `Arm`, `Fresh`, `Hart`, `Dma`).  The sixth, `Dev`, is derived:
 its grant is certain at the task's attempts, and its forms are theorems.  The theory file is a
@@ -16,7 +16,8 @@ are `local-plan/liveness/attempt-grant.md` and `fairness-base.md`; all of `local
 the repository).  It was re-layered 2026-11-06 (lane `fairness-layers`): the state form of an
 action is the base, and the thread's view is built on top of it.  The same day (lane
 `fairness-split`) the general theory moved to `FairnessTheory.lean`, generic over the pool, and
-this file kept MachCSL's instance.  Nothing in the trusted base imports this directory
+this file kept MachCSL's instance; later that day (lane `fairness-ag`) the theory's layer 0 became
+the attempt–grant pair, three layers in all.  Nothing in the trusted base imports this directory
 (`MachCSL/Liveness/`); it is built by `lake build MachCSL` and checked by CI like every module of
 the library.
 
@@ -30,7 +31,7 @@ the library.
    (`persists_of_liveStable`), or under the steps that meet a side condition
    (`persists_of_liveStableUnder`, for a gate another thread can close).
 3. The actions `Tick`, `Arm`, `Fresh`, `Hart`: each gives `enabled` (the `A`) and `grant` (the
-   `G`, a step of the thread that states its transition), its `SF` (layer 1) and `AG` (layer 3)
+   `G`, a step of the thread that states its transition), its `SF` (layer 1) and `AG` (layer 2)
    forms, and proves `ownGrant`, `live`, `stable`, `persists`, `sf_iff` and `counter_of_sf`.  Then
    the device tasks: `Dev`, a task at a gate, whose grant is certain at its attempts (`certain`,
    `counter_zero`, `wf`); and `Dma`, a DMA write under a reservation, an action like `Hart`
@@ -55,7 +56,7 @@ namespace Fairness
 
 A configuration is MachCSL's thread pool and global state, and the step of the thread at a
 position is a primitive step of its expression.  The two make MachCSL's pool a pool of the
-general theory (`FairnessTheory.lean` section 2).  A run is then a sequence of configurations, and
+general theory (`FairnessTheory.lean` section 3).  A run is then a sequence of configurations, and
 `Steps`, `PoolRun` and `StepsInfOften` are the theory's, read at this pool. -/
 
 open MachCSL Sail Sail.ArchSem LeanRV64D
@@ -90,7 +91,7 @@ MachCSL has no values: a thread never finishes, and what ends its attempts is th
 Every enabling condition of the actions is a live thread's, and is stable under the steps of
 every thread but the power thread.  The power thread breaks stability only by a cut, which bumps
 the generation and so falsifies the condition for ever.  That gives persistence, the hypothesis
-of layer 3's completeness (`Thread.Persists`).  The section is MachCSL's own; Lantana takes nothing
+of layer 2's completeness (`Thread.Persists`).  The section is MachCSL's own; Lantana takes nothing
 from it. -/
 
 namespace Era
@@ -277,9 +278,9 @@ end Era
 /-! ## 3. The six actions
 
 Each action gives its enabling condition `enabled` (the `A`) and its grant relation `grant` (the
-`G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 3).  Every `grant` begins
+`G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 2).  Every `grant` begins
 with the thread's step, `Step i c c'`, and then states the thread's transition, so every action
-has own grant and takes the cheap path of layer 3.  The first four actions prove: `ownGrant`,
+has own grant and takes the cheap path of layer 2.  The first four actions prove: `ownGrant`,
 the grant is one of the thread's transitions; `live`, the condition is a live thread's; `stable`,
 it survives every thread's step but the power thread's; `persists`, from the two; `sf_iff`, the
 two forms coincide under fair scheduling; `counter_of_sf`, the trusted form gives the thread's
@@ -838,7 +839,7 @@ answer (or answers an unfaithful move), a join on an unfinished task, and a DMA 
 footprint is under a blocking reservation (3.6, excluded here by `isDma`).  The first two are
 *gates*.  What opens a gate is a change of shared state by another thread: the device state the
 guard reads, or the joined task's end.  Once the gate is open, the task's step through it is
-certain (`certain`, a grant certain at the thread's attempts in the sense of layer 3).  So the
+certain (`certain`, a grant certain at the thread's attempts in the sense of layer 2).  So the
 action "a live task at an unblocked primitive; the primitive is answered" has no misses, its
 counter is zero (`counter_zero`), and its weak fairness follows from fair scheduling (`wf`).  What
 the task waits on is the opener's obligation.  Whether an open gate stays open until the task's
