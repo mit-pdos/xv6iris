@@ -123,8 +123,8 @@ theorem off_iff_not_powerOn : off c ↔ ¬ powerOn c := by
   unfold off powerOn
   cases c.2.pow <;> simp
 
-/-- The bridge to `Fairness.lean`: holding infinitely often is holding eventually after every
-position. -/
+/-- The bridge to `FairnessTheory.lean`: holding infinitely often is holding eventually after
+every position. -/
 theorem infOften_iff : MissHit.InfOften (fun n => P (σ n)) ↔ ∀ n, Eventually P σ n := Iff.rfl
 
 theorem LeadsTo.trans (h₁ : LeadsTo T B σ) (h₂ : LeadsTo B C σ) : LeadsTo T C σ := by
@@ -271,7 +271,7 @@ Each device's root program begins with a `choose` node, and so do the PLIC's two
 and its pin choice.  `chooseLt n` answers `k % n` and `chooseBool` answers `k % 2 = 1`, so the
 class of an answer `k` modulo `n` decides the continuation.  An arm is a node with a modulus and
 a class; the arm assumption says a root that stands at the node infinitely often takes the class
-infinitely often (`Arm.SF`, `Fairness.lean` 7.2).  The list below is `fairness-formulas.md` §3.4.
+infinitely often (`Arm.SF`, `Fairness.lean` 3.2).  The list below is `fairness-formulas.md` §3.4.
 The classes left free are the UART's receive and idle arms, the PLIC's unwired sources and its
 machine-mode pin, the disk's idle arm, and which cached sector the disk's drain arm writes. -/
 
@@ -528,14 +528,14 @@ ends.  Every enabling condition is a live thread's, so on a run where the thread
 point on the condition holds at finitely many positions and the strong fairness holds vacuously
 (`sf_of_dead_from`; a thread that dies stays dead, `eventuallyDead_of_dead`).
 
-Strong fairness is the state form of an action (`Fairness.lean` section 3), and it names no
+Strong fairness is the state form of an action (`FairnessTheory.lean` section 3), and it names no
 thread.  The thread is in the enabling condition, which is the thread at `i`'s, and in the grant,
 one of its transitions.  The forms the logic consumes are the attempt–grant forms, the thread's
-view of the action (`Fairness.lean` section 5).  The view is derived from the state form under own
-grant, which every instance proves (`ownGrant`).  Strong fairness gives the view on every run
-(`Thread.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The converse needs it: under
-fair scheduling and own grant the two forms coincide at every position (`sf_iff_ag`), by the
-instance's `sf_iff` where the thread is eventually live and vacuously where it is eventually
+view of the action (`FairnessTheory.lean` section 5).  The view is derived from the state form
+under own grant, which every instance proves (`ownGrant`).  Strong fairness gives the view on
+every run (`Thread.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The converse needs
+it: under fair scheduling and own grant the two forms coincide at every position (`sf_iff_ag`), by
+the instance's `sf_iff` where the thread is eventually live and vacuously where it is eventually
 dead. -/
 
 namespace Action
