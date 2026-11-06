@@ -38,15 +38,20 @@ thread's view the cheap path for the logic.
    `StepsInfOften`).
 3. `Action`, layer 1: the state form of an action `(A, G)`, with no thread anywhere (`hit`,
    `miss`, `SF`, `Response`, `WF`, `Certain`, `IsCounter`).  `SF` is miss–hit fairness
-   (`sf_iff_fair`), hence the existence of a counter (`sf_iff_counter`), whose rules hold at any
-   position.  A certain grant gives `SF` outright (`sf_of_certain`).
+   (`sf_iff_fair`), hence the existence of a counter (`sf_iff_counter`).  Its three rules hold at
+   any position and define it (`isCounter_iff`).  A certain grant gives `SF` outright
+   (`sf_of_certain`).
 4. `Pair`, layer 2: a thread's pair of positions, with `Attempt` and `Hit` as primitives; the
    requirements R1 (`HitsAttempt`) and R2 (`OwnStep`); the counter and its rules, among them the
    stay at other threads' steps (`counter_stay_of_other`); restriction (`attemptGrant_of_fair`).
+   Layer 1's pair is a pair of this layer that meets R1 and need not meet R2
+   (`Action.hitsAttempt_enabled`, `Action.sf_iff_pair`, `Action.isCounter_iff_pair`).
 5. `Thread`, layer 3: the thread's view of an action, a pair of layer 2 by construction
-   (`attempt`, `hit`, `miss`, `AttemptGrant`, `IsCounter`), and own grant (`OwnGrant`).
-   * Soundness: under own grant, `SF` gives the attempt–grant form and the counter
-     (`attemptGrant_of_sf`, `counter_of_sf`); the counter rules in terms of `A` and `G`.
+   (`attempt`, `hit`, `miss`, `AttemptGrant`, `IsCounter`), and own grant (`OwnGrant`).  Its hits
+   and misses are the action's at the thread's steps (`hit_iff_steps_action_hit`,
+   `miss_iff_steps_action_miss`).
+   * Soundness: under own grant, `SF` gives the attempt–grant form (`attemptGrant_of_sf`, a
+     restriction) and the counter (`counter_of_sf`); the counter rules in terms of `A` and `G`.
    * Completeness: under persistence of `A` (`Persists`, from stability `Stable`) and fair
      scheduling, the attempt–grant form gives `SF` back (`sf_of_attemptGrant`), hence
      `sf_iff_attemptGrant`.
@@ -405,8 +410,9 @@ end Budget
 Fairness is monotone: more hits and fewer misses keep it (`fair_mono`).  It can also be read
 through any set of *attempts* that contains the misses and is covered by the hits and the misses:
 infinitely many attempts force infinitely many hits (`fair_iff_attempt`).  The layers above use
-the two to restrict a fairness statement.  `SF` is fairness read through the positions where the
-action is enabled, and a thread's view has the hits of `SF` and fewer misses. -/
+the two to restrict a fairness statement.  `SF` (section 3) is fairness read through the positions
+where the action is enabled.  Under own grant, the thread's view of section 5 has the hits of `SF`
+and fewer misses. -/
 
 /-- Holding infinitely often is monotone in the predicate. -/
 theorem infOften_mono {P Q : Nat → Prop} (h : ∀ n, P n → Q n) (hP : InfOften P) : InfOften Q :=
@@ -439,7 +445,7 @@ theorem fair_iff_attempt {hit miss attempt : Nat → Prop} (hmiss : ∀ n, miss 
 /-! ### What a counter bounds
 
 A miss has a positive counter, and until the next hit the counter dominates the misses to come.
-These are the facts a thread consumes from its counter. -/
+These are the facts the layers above consume from a counter. -/
 
 section Bounds
 
@@ -601,7 +607,8 @@ theorem sf_of_counter (hδ : IsCounter A G σ δ) : SF A G σ := sf_iff_counter.
 /-! ### The counter rules, at any position of the run
 
 At the step from `σ n` to `σ (n + 1)`, whoever takes it: if `A` holds and the step is a grant, the
-counter resets; if `A` holds and the step is not a grant, it drops; if `A` fails, it stays. -/
+counter resets; if `A` holds and the step is not a grant, it drops; if `A` fails, it stays.  The
+three rules are the counter's definition in terms of `A` and `G` (`isCounter_iff`). -/
 
 /-- Reset: the counter is zero at a granted position. -/
 theorem counter_reset (hδ : IsCounter A G σ δ) (hA : A (σ n)) (hG : G (σ n) (σ (n + 1))) :
@@ -614,8 +621,19 @@ theorem counter_drop (hδ : IsCounter A G σ δ) (hA : A (σ n)) (hG : ¬ G (σ 
   hδ.2.1 n ⟨hA, hG⟩
 
 /-- Stay: where `A` fails the counter is unchanged. -/
-theorem counter_stay (hδ : IsCounter A G σ δ) (hA : ¬ A (σ n)) : δ n = δ (n + 1) :=
+theorem counter_stay_of_not_enabled (hδ : IsCounter A G σ δ) (hA : ¬ A (σ n)) :
+    δ n = δ (n + 1) :=
   hδ.2.2 n (fun h => hA h.1) (fun h => hA h.1)
+
+/-- The counter, by its three rules. -/
+theorem isCounter_iff : IsCounter A G σ δ ↔
+    (∀ n, A (σ n) → G (σ n) (σ (n + 1)) → δ n = 0) ∧
+    (∀ n, A (σ n) → ¬ G (σ n) (σ (n + 1)) → δ n = δ (n + 1) + 1) ∧
+    (∀ n, ¬ A (σ n) → δ n = δ (n + 1)) :=
+  ⟨fun hδ => ⟨fun _ hA hG => counter_reset hδ hA hG, fun _ hA hG => counter_drop hδ hA hG,
+      fun _ hA => counter_stay_of_not_enabled hδ hA⟩,
+    fun ⟨hr, hd, hs⟩ => ⟨fun n h => hr n h.1 h.2, fun n h => hd n h.1 h.2,
+      fun n hh hm => hs n fun hA => (enabled_iff.1 hA).elim hh hm⟩⟩
 
 /-- A refused position has a positive counter. -/
 theorem counter_pos_of_miss (hδ : IsCounter A G σ δ) (h : miss A G σ n) : 0 < δ n :=
@@ -673,9 +691,14 @@ counter of layer 0.
 The pair is a thread's when two requirements hold.  R1 (`HitsAttempt`) says a hit is an attempt.
 R2 (`OwnStep`) says an attempt is a step of the thread at `i`.  Then the counter never moves at
 another thread's step (`counter_stay_of_other`), and the thread can consume it at its own steps
-alone.  The pair of layer 1, with the positions where `A` holds as attempts, meets R1 and not R2.
-A pair whose misses are among those of a fair pair with the same hits is fair
-(`attemptGrant_of_fair`).  Lantana's witness kind is stated against this layer. -/
+alone.  A pair whose hits include those of a fair pair and whose misses are among that pair's
+misses is fair (`attemptGrant_of_fair`).  Layer 3's soundness is this restriction.  Lantana's
+witness kind is stated against this layer.
+
+The pair of layer 1, with the positions where `A` holds as attempts, is a pair of this layer.  It
+meets R1 (`Action.hitsAttempt_enabled`) and need not meet R2.  Its misses are layer 1's misses, its
+attempt–grant form is `SF` (`Action.sf_iff_pair`), and its counters are layer 1's
+(`Action.isCounter_iff_pair`). -/
 
 namespace Pair
 
@@ -792,13 +815,43 @@ theorem attemptGrant_of_response (h : ∀ n, Attempt n → ∃ m ≥ n, Hit m) :
     let ⟨k, hk, hhit⟩ := h m hmiss_m.1
     ⟨k, Nat.le_trans hm hk, hhit⟩
 
-/-- A pair whose misses are among the misses of a fair pair with the same hits is fair: the
-restriction of a fairness statement to a thread. -/
-theorem attemptGrant_of_fair {Enabled : Nat → Prop} (hsub : ∀ n, Miss Attempt Hit n → Enabled n)
-    (h : MissHit.Fair Hit Enabled) : AttemptGrant Attempt Hit :=
-  MissHit.fair_mono (fun _ hh => hh) hsub h
+/-- Restriction: a pair whose hits include those of a fair pair and whose misses are among that
+pair's misses is fair. -/
+theorem attemptGrant_of_fair {Hit' Miss' : Nat → Prop} (hh : ∀ n, Hit' n → Hit n)
+    (hm : ∀ n, Miss Attempt Hit n → Miss' n) (h : MissHit.Fair Hit' Miss') :
+    AttemptGrant Attempt Hit :=
+  MissHit.fair_mono hh hm h
 
 end Pair
+
+/-! ### Layer 1's pair as a pair of layer 2
+
+Read with the positions where `A` holds as its attempts, the action's pair of layer 1 is a pair of
+this layer.  It meets R1.  It need not meet R2, because the step at a position where `A` holds may
+be any thread's. -/
+
+namespace Action
+
+variable {A : Cfg → Prop} {G : Cfg → Cfg → Prop} {σ : Nat → Cfg} {δ : Nat → Nat} {n : Nat}
+
+/-- Layer 1's pair, read with the positions where `A` holds as the attempts: it meets R1. -/
+theorem hitsAttempt_enabled : Pair.HitsAttempt (fun n => A (σ n)) (hit A G σ) := fun _ h => h.1
+
+/-- Layer 1's miss is layer 2's miss of that pair. -/
+theorem miss_iff_pairMiss : miss A G σ n ↔ Pair.Miss (fun n => A (σ n)) (hit A G σ) n :=
+  ⟨fun ⟨hA, hG⟩ => ⟨hA, fun h => hG h.2⟩, fun ⟨hA, hh⟩ => ⟨hA, fun hG => hh ⟨hA, hG⟩⟩⟩
+
+/-- `SF` is the attempt–grant form of that pair. -/
+theorem sf_iff_pair : SF A G σ ↔ Pair.AttemptGrant (fun n => A (σ n)) (hit A G σ) :=
+  Pair.attemptGrant_iff_attempt.symm
+
+/-- The counters of the two readings are the same. -/
+theorem isCounter_iff_pair :
+    IsCounter A G σ δ ↔ Pair.IsCounter (fun n => A (σ n)) (hit A G σ) δ :=
+  Iff.of_eq (congrArg (fun M => MissHit.IsCounter (hit A G σ) M δ)
+    (funext fun _ => propext miss_iff_pairMiss))
+
+end Action
 
 /-! ## 5. Layer 3: the thread's view of an action (`Thread`)
 
@@ -893,8 +946,18 @@ theorem attemptGrant_iff_attempt :
 
 /-! ### Against the state form
 
-A hit of the thread is a granted position of the action, and under own grant the converse holds.
-A miss of the thread is a refused position of the action. -/
+The view is the restriction of the action's pair to the thread's steps.  A hit of the thread is a
+step of the thread at a granted position of the action (`hit_iff_steps_action_hit`), and a miss of
+the thread is a step of the thread at a refused position (`miss_iff_steps_action_miss`).  So a hit
+is a granted position (`action_hit_of_hit`) and a miss a refused one (`action_miss_of_miss`).  Under
+own grant every granted position is a hit (`hit_of_action_hit`). -/
+
+/-- A hit of the thread is a step of the thread at a granted position of the action. -/
+theorem hit_iff_steps_action_hit : hit i A G σ n ↔ Steps i σ n ∧ Action.hit A G σ n :=
+  ⟨fun ⟨⟨hs, hA⟩, hG⟩ => ⟨hs, hA, hG⟩, fun ⟨hs, hA, hG⟩ => ⟨⟨hs, hA⟩, hG⟩⟩
+
+/-- A miss of the thread is a step of the thread at a refused position of the action. -/
+theorem miss_iff_steps_action_miss : miss i A G σ n ↔ Steps i σ n ∧ Action.miss A G σ n := miss_iff
 
 /-- A hit of the thread is a granted position of the action. -/
 theorem action_hit_of_hit (h : hit i A G σ n) : Action.hit A G σ n := ⟨h.1.2, h.2⟩
@@ -913,12 +976,12 @@ theorem action_miss_of_miss (h : miss i A G σ n) : Action.miss A G σ n :=
 
 /-! ### Soundness: under own grant, `SF` gives the thread's counter -/
 
-/-- **Soundness.**  Under own grant, `SF` gives the attempt–grant form.  It is `MissHit.fair_mono`
-applied to `Action.sf_iff_fair`: the thread has the action's hits (`hit_of_action_hit`) and fewer
-misses (`action_miss_of_miss`). -/
+/-- **Soundness.**  Under own grant, `SF` gives the attempt–grant form.  It is the restriction
+`Pair.attemptGrant_of_fair` applied to `Action.sf_iff_fair`: the thread has the action's hits
+(`hit_of_action_hit`) and fewer misses (`action_miss_of_miss`). -/
 theorem attemptGrant_of_sf (hown : OwnGrant i G) (hsf : Action.SF A G σ) :
     AttemptGrant i A G σ :=
-  MissHit.fair_mono (fun _ => hit_of_action_hit hown) (fun _ => action_miss_of_miss)
+  Pair.attemptGrant_of_fair (fun _ => hit_of_action_hit hown) (fun _ => action_miss_of_miss)
     (Action.sf_iff_fair.1 hsf)
 
 /-- Under own grant, the response form gives the attempt–grant form. -/

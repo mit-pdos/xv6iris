@@ -341,7 +341,7 @@ Each is conditional and reports itself in the regeneration log.
   re-establishes it, each discharging `cohFloors_update`'s requirement that a floor only rises: a
   plain load reads at or above its footprint's floors, an exclusive read at the top, which bounds
   every floor while `mmOk` holds, and every other step keeps the read side or only clears its acquire
-  bit; `coh_mono` (`MachCSL/Liveness/Fairness.lean` section 6.3) is the same fact proved purely, an
+  bit; `coh_mono` (`MachCSL/Liveness/Fairness.lean` section 7.3) is the same fact proved purely, an
   independent confirmation the trusted base does not use; and a power-on mints a fresh era whose
   counters start at 0, where `bootFacts` puts every floor.  Why: the liveness plan's memory-fairness
   grant (`Fairness.Fresh.grant`: the load of `a` reads at a view at or past the store `t`, so the

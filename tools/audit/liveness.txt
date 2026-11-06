@@ -17,12 +17,23 @@
 #
 # The author of every new MachCSL/Liveness/ module adds its main theorems here.
 
-# MachCSL/Liveness/Fairness.lean: the state form of an action (layer 1), the
-# thread's view of it (layer 3), eras, the instances
+# MachCSL/Liveness/Fairness.lean: miss-hit fairness (layer 0), the state form
+# of an action (layer 1), a thread's pair (layer 2) and layer 1's pair as one,
+# the thread's view of an action (layer 3), eras, the instances
+Fairness.MissHit.fair_iff_counter
+Fairness.MissHit.fair_mono
 Fairness.Action.sf_iff_counter
 Fairness.Action.counter_of_sf
+Fairness.Action.sf_of_certain
+Fairness.Pair.attemptGrant_iff_counter
+Fairness.Pair.counter_stay_of_other
+Fairness.Action.sf_iff_pair
+Fairness.Action.isCounter_iff_pair
+Fairness.Thread.attemptGrant_of_sf
+Fairness.Thread.sf_of_attemptGrant
 Fairness.Thread.counter_of_sf
 Fairness.Thread.sf_iff_attemptGrant
+Fairness.Thread.counter_stay_of_other
 Fairness.Era.persists_of_liveStable
 Fairness.Era.persists_of_liveStableUnder
 Fairness.Tick.sf_iff
