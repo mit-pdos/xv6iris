@@ -3,8 +3,9 @@ import MachCSL.Liveness.Fairness
 /-! # The stable gates of the device programs
 
 Milestone B2 of lane `xv6-liveness-now`: the plan's stable-gate lemma, for each gate of the three
-device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (6.5),
-whose grant is certain; its strong fairness follows from fair scheduling and persistence
+device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (3.5).
+Its grant is certain at the task's own attempts, in the thread's view of the action (section 5 of
+`FairnessTheory.lean`).  Its strong fairness follows from fair scheduling and persistence
 (`Dev.sf_of_persists`).  The lemma says, for each gate, that once the gate is open no other
 thread's step but the power thread's closes it before the task steps through, except for named
 closing transitions.  Each gate's theorem takes a hypothesis excluding its closers while the gate
@@ -21,7 +22,7 @@ is open, and gives persistence through `Era.persists_of_liveStableUnder` (a gene
    node with primitive `o`, and `o` not blocked), its strong fairness (`SF`, `sf_of_persists`).
    The primitives that never block (`neverBlocks`), whose gate is stable outright; the join, whose
    gate is stable outright because finished tasks stay finished (`stable_join`).  The node form
-   of `Dma`'s attempt condition (`dmaAt`).
+   of `Dma`'s enabling condition (`dmaAt`).
 2. `Port`, the UART: the transmit and receive arms answer faithfully and never block.
 3. `Disk`, the virtio disk.  Its primitives (`Prim`) and the proof that its programs reach only
    those (`prims_serve`, `prims_body`, so `progs` holds along every run that starts with it,
@@ -60,7 +61,7 @@ a closer is named by the program node it steps at. -/
 namespace Fairness
 
 open MachCSL Sail Sail.ArchSem LeanRV64D
-open Action (Persists)
+open Thread (Persists)
 open Era (liveAt StableExceptPower StableExceptPowerUnder)
 
 namespace Gate
@@ -544,7 +545,7 @@ def taskAt (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d)
     Prop :=
   ∃ e k, c.1[i]? = some (.dev e d tid (.op o k)) ∧ threadLive c.2 e
 
-/-- The attempt condition of a gate: the thread at `i` is a live task `tid` of device `d` at a
+/-- The enabling condition of a gate: the thread at `i` is a live task `tid` of device `d` at a
 node whose primitive is `o`, and `o` is not blocked (the gate is open). -/
 def enabled (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d)) (c : Cfg) :
     Prop :=
@@ -554,7 +555,7 @@ def enabled (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d
 many steps through it.  The grant is the device tasks' (`Dev.grant`). -/
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d))
     (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i d tid o) (Dev.grant i d tid) σ
+  Action.SF (enabled i d tid o) (Dev.grant i d tid) σ
 
 /-- Another live task of device `d`, at a position other than `i` and at a node whose primitive
 satisfies `K`, takes the step from `c` to `c'`: the shape of a closing transition. -/
@@ -578,19 +579,20 @@ theorem taskAt_stable : StableExceptPower i (taskAt i d tid o) := by
 /-- An open gate is a live thread's. -/
 theorem live (h : enabled i d tid o c) : liveAt i c := taskAt_live h.1
 
-/-- An open gate at a primitive other than a DMA write is the device tasks' attempt condition. -/
+/-- An open gate at a primitive other than a DMA write is the device tasks' enabling condition. -/
 theorem dev_enabled (hdma : ¬ Dev.isDma o) (h : enabled i d tid o c) : Dev.enabled i d tid c :=
   let ⟨⟨e, k, he, hl⟩, hnb⟩ := h; ⟨e, o, k, he, hl, hdma, hnb⟩
 
-/-- Stepping through an open gate is certain. -/
+/-- Stepping through an open gate is certain: every attempt of the task at the open gate is
+granted. -/
 theorem certain (hdma : ¬ Dev.isDma o) :
-    Action.Certain i (enabled i d tid o) (Dev.grant i d tid) σ :=
+    Thread.Certain i (enabled i d tid o) (Dev.grant i d tid) σ :=
   fun n ⟨hs, hA⟩ => Dev.certain n ⟨hs, dev_enabled hdma hA⟩
 
 /-- Strong fairness of a gate follows from fair scheduling and its persistence. -/
 theorem sf_of_persists (hdma : ¬ Dev.isDma o) (hsched : StepsInfOften i σ)
     (hper : Persists i (enabled i d tid o) σ) : SF i d tid o σ :=
-  Action.sf_of_certain hsched hper (certain hdma)
+  Thread.sf_of_certain hsched hper (certain hdma)
 
 /-- Strong fairness of a gate that is stable under the steps meeting a side condition, on a run
 whose every step meets it. -/
@@ -601,7 +603,7 @@ theorem sf_of_stableUnder {P : Cfg → Cfg → Prop} (hdma : ¬ Dev.isDma o) (hr
 
 /-! ### A task at a DMA write -/
 
-/-- The attempt condition of `Dma` at one node: the thread at `i` is a live task `tid` of device
+/-- The enabling condition of `Dma` at one node: the thread at `i` is a live task `tid` of device
 `d` at a DMA write with guard `g` into RAM at `pa`, and the guard answers a faithful move. -/
 def dmaAt (i : Nat) (d : DevId) (tid : TaskId) (g : DevSt d → Option (DevSt d)) (pa : PAddr)
     (n : Nat) (w : BitVec (8 * n)) (c : Cfg) : Prop :=
@@ -613,7 +615,7 @@ theorem dmaAt_live {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w 
     (h : dmaAt i d tid g pa n w c) : liveAt i c :=
   taskAt_live h.1
 
-/-- A task at one DMA-write node with its guard answering is the attempt condition of `Dma`. -/
+/-- A task at one DMA-write node with its guard answering is the enabling condition of `Dma`. -/
 theorem dma_enabled {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (h : dmaAt i d tid g pa n w c) : Dma.enabled i d tid c :=
   let ⟨⟨e, k, he, hl⟩, hg, hr⟩ := h; ⟨e, g, pa, n, w, k, he, hl, hg, hr⟩
@@ -2117,7 +2119,7 @@ theorem idxGuard_isSome {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {c : Virti
   unfold idxGuard snapOk
   split <;> simp_all
 
-/-- At a DMA write of the disk (a silent device), the attempt condition is the task there, its
+/-- At a DMA write of the disk (a silent device), the enabling condition is the task there, its
 guard answering, and the footprint in RAM. -/
 theorem dmaAt_iff {g : VirtioState → Option VirtioState} {pa : PAddr} {n : Nat}
     {w : BitVec (8 * n)} :
@@ -2156,7 +2158,7 @@ theorem req_stable {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitV
   rw [hc']
   exact hq
 
-/-- The fill's and the status byte's attempt condition persists on a run whose disk tasks run its
+/-- The fill's and the status byte's enabling condition persists on a run whose disk tasks run its
 programs, with no busy reset, and where no other live disk task writes the head's phase or
 completes it while the guard answers. -/
 theorem req_persists {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
@@ -2174,10 +2176,10 @@ theorem req_sf_iff {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitV
     (hR : NoBusyReset σ)
     (hK : ∀ m, Gate.dmaAt i .virtio tid (reqGuard h r) pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ completes h o) (σ m) (σ (m + 1))) :
-    Action.SF i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w) (Dma.grant i .virtio tid) σ ↔
-      Action.AttemptGrant i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w)
+    Action.SF (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w) (Dma.grant i .virtio tid) σ ↔
+      Thread.AttemptGrant i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w)
         (Dma.grant i .virtio tid) σ :=
-  Action.sf_iff_attemptGrant hsched (req_persists hrun hprog hR hK)
+  Thread.sf_iff_attemptGrant Dma.ownGrant hsched (req_persists hrun hprog hR hK)
 
 /-- **The used element's and the used index's guard is stable except for five closers.**  Once a
 DMA write guarded on the snapshot (`snapOk`: the request is still `r`, the used index is still
@@ -2210,7 +2212,7 @@ theorem snap_stable {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {cf : VirtioCf
   rw [hc'] at hcfg ⊢
   exact ⟨⟨hq.1.1, hq.1.2.1, hcfg.trans hq.1.2.2⟩, hq.2⟩
 
-/-- The used element's and the used index's attempt condition persists on a run whose disk tasks
+/-- The used element's and the used index's enabling condition persists on a run whose disk tasks
 run its programs, with no busy reset and no configuration write while a request is in flight,
 and where no other live disk task writes the head's phase or a used index while the guard
 answers. -/
@@ -2234,9 +2236,9 @@ theorem snap_sf_iff {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {cf : VirtioCf
     (hprog : ∀ n, progs (σ n)) (hR : NoBusyReset σ) (hC : NoConfigWrite σ)
     (hK : ∀ m, Gate.dmaAt i .virtio tid g pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ isUsedIdx o) (σ m) (σ (m + 1))) :
-    Action.SF i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ ↔
-      Action.AttemptGrant i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ :=
-  Action.sf_iff_attemptGrant hsched (snap_persists hg hrun hprog hR hC hK)
+    Action.SF (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ ↔
+      Thread.AttemptGrant i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ :=
+  Thread.sf_iff_attemptGrant Dma.ownGrant hsched (snap_persists hg hrun hprog hR hC hK)
 
 end Disk
 end Fairness
