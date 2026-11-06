@@ -84,7 +84,10 @@ for an attempt–grant form, `hown` for `OwnGrant`, `hsched` for `StepsInfOften`
 `Persists`, `hstab` for stability, `hrun` for `PoolRun`, `hδ` for a counter, `hc` for `Certain`,
 `h1` and `h2` for R1 and R2, and `hA`, `hG`, `hs` for the facts at a position (`A` holds, the step
 is a grant, the thread steps).  Every instance uses the same names: `enabled`, `grant`,
-`ownGrant`, `SF`, `AG`, `live`, `stable`, `persists`, `sf_iff`, `counter_of_sf`.
+`ownGrant`, `SF`, `AG`, `live`; the four strong assumptions (`Tick`, `Arm`, `Fresh`, `Hart`) add
+`stable`, `persists`, `sf_iff` and `counter_of_sf`; `Dma` has `counter_of_sf` and an `sf_iff` that
+takes persistence as a hypothesis; `Dev`, whose grant is certain, has `certain`, `ag`,
+`counter_zero`, `wf` and `sf_of_persists`.
 -/
 
 namespace Fairness
@@ -837,7 +840,7 @@ def miss (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → C
   Pair.Miss (attempt i A σ) (hit i A G σ) n
 
 /-- The attempt–grant form of the thread's view: infinitely many refused attempts force infinitely
-many granted ones.  The form the logic consumes. -/
+many granted ones.  The form the logic consumes on the cheap path. -/
 def AttemptGrant (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
   Pair.AttemptGrant (attempt i A σ) (hit i A G σ)
 
