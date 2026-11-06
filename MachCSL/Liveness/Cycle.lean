@@ -22,7 +22,7 @@ The file, in order:
    (`served_of_unblocked`), a blocked retry that leaves it blocked when it is
    (`pending_of_blocked`).  So the hart's step is a grant exactly when the access is not blocked
    (`grant_iff_not_blocked`).  The action's hit is then a served access (`hit_iff`).  The hart's
-   miss, from the thread's view of the action (section 5 of `MachCSL.Liveness.FairnessTheory`), is a
+   miss, from the thread's view of the action (section 4 of `MachCSL.Liveness.FairnessTheory`), is a
    blocked retry (`miss_iff`).
 3. The machine closure of the choice instances.  At each enabling condition the thread has a step
    for the outcomes named here, and each grant is such a step: both restarts at a

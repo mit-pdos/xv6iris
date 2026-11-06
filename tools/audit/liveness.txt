@@ -17,18 +17,17 @@
 #
 # The author of every new MachCSL/Liveness/ module adds its main theorems here.
 
-# MachCSL/Liveness/FairnessTheory.lean, generic over a pool: miss-hit fairness
-# (layer 0), the state form of an action (layer 1), a thread's pair (layer 2)
-# and layer 1's pair as one, the thread's view of an action (layer 3)
+# MachCSL/Liveness/FairnessTheory.lean, generic over a pool: the attempt-grant
+# pair over positions (layer 0) and its engine, miss-hit fairness; the state
+# form of an action (layer 1); a pair that is one thread's; the thread's view
+# of an action (layer 2)
 Fairness.MissHit.fair_iff_counter
-Fairness.MissHit.fair_mono
+Fairness.AttemptGrant.fair_iff_counter
+Fairness.AttemptGrant.fair_mono
 Fairness.Action.sf_iff_counter
 Fairness.Action.counter_of_sf
 Fairness.Action.sf_of_certain
-Fairness.Pair.attemptGrant_iff_counter
-Fairness.Pair.counter_stay_of_other
-Fairness.Action.sf_iff_pair
-Fairness.Action.isCounter_iff_pair
+Fairness.AttemptGrant.counter_stay_of_other
 Fairness.Thread.attemptGrant_of_sf
 Fairness.Thread.sf_of_attemptGrant
 Fairness.Thread.counter_of_sf
