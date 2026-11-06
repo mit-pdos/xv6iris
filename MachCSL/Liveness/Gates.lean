@@ -22,7 +22,7 @@ is open, and gives persistence through `Era.persists_of_liveStableUnder` (a gene
    node with primitive `o`, and `o` not blocked), its strong fairness (`SF`, `sf_of_persists`).
    The primitives that never block (`neverBlocks`), whose gate is stable outright; the join, whose
    gate is stable outright because finished tasks stay finished (`stable_join`).  The node form
-   of `Dma`'s attempt condition (`dmaAt`).
+   of `Dma`'s enabling condition (`dmaAt`).
 2. `Port`, the UART: the transmit and receive arms answer faithfully and never block.
 3. `Disk`, the virtio disk.  Its primitives (`Prim`) and the proof that its programs reach only
    those (`prims_serve`, `prims_body`, so `progs` holds along every run that starts with it,
@@ -545,7 +545,7 @@ def taskAt (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d)
     Prop :=
   ∃ e k, c.1[i]? = some (.dev e d tid (.op o k)) ∧ threadLive c.2 e
 
-/-- The attempt condition of a gate: the thread at `i` is a live task `tid` of device `d` at a
+/-- The enabling condition of a gate: the thread at `i` is a live task `tid` of device `d` at a
 node whose primitive is `o`, and `o` is not blocked (the gate is open). -/
 def enabled (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d)) (c : Cfg) :
     Prop :=
@@ -579,7 +579,7 @@ theorem taskAt_stable : StableExceptPower i (taskAt i d tid o) := by
 /-- An open gate is a live thread's. -/
 theorem live (h : enabled i d tid o c) : liveAt i c := taskAt_live h.1
 
-/-- An open gate at a primitive other than a DMA write is the device tasks' attempt condition. -/
+/-- An open gate at a primitive other than a DMA write is the device tasks' enabling condition. -/
 theorem dev_enabled (hdma : ¬ Dev.isDma o) (h : enabled i d tid o c) : Dev.enabled i d tid c :=
   let ⟨⟨e, k, he, hl⟩, hnb⟩ := h; ⟨e, o, k, he, hl, hdma, hnb⟩
 
@@ -603,7 +603,7 @@ theorem sf_of_stableUnder {P : Cfg → Cfg → Prop} (hdma : ¬ Dev.isDma o) (hr
 
 /-! ### A task at a DMA write -/
 
-/-- The attempt condition of `Dma` at one node: the thread at `i` is a live task `tid` of device
+/-- The enabling condition of `Dma` at one node: the thread at `i` is a live task `tid` of device
 `d` at a DMA write with guard `g` into RAM at `pa`, and the guard answers a faithful move. -/
 def dmaAt (i : Nat) (d : DevId) (tid : TaskId) (g : DevSt d → Option (DevSt d)) (pa : PAddr)
     (n : Nat) (w : BitVec (8 * n)) (c : Cfg) : Prop :=
@@ -615,7 +615,7 @@ theorem dmaAt_live {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w 
     (h : dmaAt i d tid g pa n w c) : liveAt i c :=
   taskAt_live h.1
 
-/-- A task at one DMA-write node with its guard answering is the attempt condition of `Dma`. -/
+/-- A task at one DMA-write node with its guard answering is the enabling condition of `Dma`. -/
 theorem dma_enabled {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (h : dmaAt i d tid g pa n w c) : Dma.enabled i d tid c :=
   let ⟨⟨e, k, he, hl⟩, hg, hr⟩ := h; ⟨e, g, pa, n, w, k, he, hl, hg, hr⟩
@@ -2119,7 +2119,7 @@ theorem idxGuard_isSome {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {c : Virti
   unfold idxGuard snapOk
   split <;> simp_all
 
-/-- At a DMA write of the disk (a silent device), the attempt condition is the task there, its
+/-- At a DMA write of the disk (a silent device), the enabling condition is the task there, its
 guard answering, and the footprint in RAM. -/
 theorem dmaAt_iff {g : VirtioState → Option VirtioState} {pa : PAddr} {n : Nat}
     {w : BitVec (8 * n)} :
@@ -2158,7 +2158,7 @@ theorem req_stable {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitV
   rw [hc']
   exact hq
 
-/-- The fill's and the status byte's attempt condition persists on a run whose disk tasks run its
+/-- The fill's and the status byte's enabling condition persists on a run whose disk tasks run its
 programs, with no busy reset, and where no other live disk task writes the head's phase or
 completes it while the guard answers. -/
 theorem req_persists {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
@@ -2212,7 +2212,7 @@ theorem snap_stable {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {cf : VirtioCf
   rw [hc'] at hcfg ⊢
   exact ⟨⟨hq.1.1, hq.1.2.1, hcfg.trans hq.1.2.2⟩, hq.2⟩
 
-/-- The used element's and the used index's attempt condition persists on a run whose disk tasks
+/-- The used element's and the used index's enabling condition persists on a run whose disk tasks
 run its programs, with no busy reset and no configuration write while a request is in flight,
 and where no other live disk task writes the head's phase or a used index while the guard
 answers. -/

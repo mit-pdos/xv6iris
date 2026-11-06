@@ -24,12 +24,12 @@ The file, in order:
    (`grant_iff_not_blocked`).  The action's hit is then a served access (`hit_iff`).  The hart's
    miss, from the thread's view of the action (section 5 of `MachCSL.Liveness.Fairness`), is a
    blocked retry (`miss_iff`).
-3. The machine closure of the choice instances.  At each attempt condition the thread has a step
+3. The machine closure of the choice instances.  At each enabling condition the thread has a step
    for the outcomes named here, and each grant is such a step: both restarts at a
    live boundary (`Tick.exists_grant`, `Tick.exists_not_grant`; a restarted cycle is never empty,
    `Cycle.riscvStep_impure`), every answer at a `choose` node (`Arm.exists_answer`), a load at
    the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).  Every own step at a
-   plain load takes the load, so `Fresh`'s grant is, under its attempt condition, the post-state
+   plain load takes the load, so `Fresh`'s grant is, under its enabling condition, the post-state
    floor alone (`Fresh.takes_load`, `Fresh.grant_iff_coh`).  Subsection 3.5 does for a DMA write
    what section 2 does for a hart's access: the task's step is a grant exactly when the write is
    not blocked, so the action's hit is a served write and the task's miss is a blocked retry
@@ -488,7 +488,7 @@ end Hart
 
 /-! ## 3. Machine closure of the choice instances
 
-Each instance's attempt condition admits a step of the thread for every outcome the action
+Each instance's enabling condition admits a step of the thread for every outcome the action
 distinguishes.  The memory reads need the footprint's bytes to have histories: `ramHist`, every
 RAM byte has a nonempty history.  It is not part of `mmOk`, which says the converse (every
 history sits at a RAM byte) and that every history is well formed; it holds of a booted memory
@@ -716,7 +716,7 @@ theorem takes_load {c' : Cfg} (h : atLoad i a c) (hs : Step i c c') :
       exact absurd hp (by decide)
   · exact absurd hl hd
 
-/-- Under the attempt condition and the hart's step, the grant is the post-state fact alone: the
+/-- Under the enabling condition and the hart's step, the grant is the post-state fact alone: the
 hart's coherence floor of `a` is at or past `t` afterwards.  This was the grant's statement before
 2026-11-06; the trusted hypothesis `Fresh.SF` means the same under both. -/
 theorem grant_iff_coh {c' : Cfg} {t : Nat} (h : enabled i t a c) (hs : Step i c c') :
