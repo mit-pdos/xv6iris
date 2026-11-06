@@ -11,12 +11,14 @@ section and theorem name are `local-plan/liveness/attempt-grant.md` and `fairnes
 (`MachCSL/Liveness/`); it is built by `lake build MachCSL` and checked by CI like every module of
 the library.
 
-**The idea.**  A fairness assumption about one thread is a pair of an *attempt* condition `A` on
-configurations and a *grant* relation `G` on the thread's steps.  The trusted hypothesis is the
-textbook strong fairness of that action, `SF := □◇ A → □◇ hit`.  The form the logic consumes is the
-*attempt–grant* form, `AttemptGrant := □◇ miss → □◇ hit`, whose misses are the thread's own refused
-attempts; it comes with a *counter* that is zero at a hit, goes down by one at a miss and is
-unchanged otherwise, so it moves only at the thread's own steps.
+**The idea.**  A fairness assumption about one thread is an *action*: an *attempt* condition `A`
+on configurations and a *grant* relation `G` that is one of the thread's transitions.  The trusted
+hypothesis is the textbook strong fairness of the action, `SF := □◇ A → □◇ (A ∧ G)`.  It is a
+statement about the run and names no thread.  The form the logic consumes is the *attempt–grant*
+form, `AttemptGrant := □◇ miss → □◇ hit`, whose misses are the thread's own refused attempts.  It
+comes with a *counter* that is zero at a hit, goes down by one at a miss and is unchanged
+otherwise.  Because the grant is one of the thread's transitions, the counter moves only at the
+thread's own steps.
 
 **Map of the file.**
 
@@ -26,9 +28,12 @@ unchanged otherwise, so it moves only at the thread's own steps.
 3. `Pair`, layer 1: `Attempt` and `Hit` as primitives, the requirements R1 (`HitsAttempt`) and
    R2 (`OwnStep`), the counter and its rules.
 4. `Action`, layer 2: the pair of an action `(A, G)`.
-   * Definitions: `attempt`, `hit`, `miss`, `SF`, `Response`, `AttemptGrant`, `IsCounter`.
+   * Definitions: `attempt`, `hit`, `miss`, `SF`, `Response`, `AttemptGrant`, `IsCounter`, and
+     the own-grant requirement `OwnGrant`, that the grant is one of the thread's transitions.
    * Soundness: `SF → AttemptGrant → ∃ counter` (`counter_of_sf`), with no hypothesis on the run,
-     and the counter rules in terms of `A` and `G`.
+     and the counter rules in terms of `A` and `G`.  `OwnGrant` is needed only where a hit must be
+     an attempt (`hitsAttempt`), in particular for the stay rule at other threads' steps
+     (`counter_stay_of_other`).
    * Completeness: with fair scheduling of the thread and persistence of `A`,
      `AttemptGrant → SF` (`sf_of_attemptGrant`), hence `SF ↔ AttemptGrant`; persistence from
      stability (`persists_of_stable`).
@@ -39,19 +44,23 @@ unchanged otherwise, so it moves only at the thread's own steps.
    (`persists_of_liveStable`), or under the steps that meet a side condition
    (`persists_of_liveStableUnder`, for a gate another thread can close).
 6. The four instances, `Tick`, `Arm`, `Fresh`, `Hart`: each gives `enabled` (the `A`) and `grant`
-   (the `G`), its `SF` and `AG` forms, and proves `live`, `stable`, `persists`, `sf_iff` and
-   `counter_of_sf`.  Then the device tasks: `Dev`, a task at a gate, whose grant is certain
-   (`certain`, `counter_zero`, `wf`); and `Dma`, a DMA write under a reservation, an instance like
-   `Hart` whose persistence is a protocol property.  `Fresh` (6.3) also proves that no step but a
-   power-on lowers a coherence floor (`coh_mono`), the fact behind the logic's floor receipts
-   (`MachCSL.floorLbAt`), in which its grant is consumed.
+   (the `G`, a step of the thread that states its transition), its `SF` and `AG` forms, and proves
+   `ownGrant`, `live`, `stable`, `persists`, `sf_iff` and `counter_of_sf`.  Then the device tasks:
+   `Dev`, a task at a gate, whose grant is certain (`certain`, `counter_zero`, `wf`); and `Dma`, a
+   DMA write under a reservation, an instance like `Hart` whose persistence is a protocol
+   property.  `Fresh` (6.3) also proves that no step but a power-on lowers a coherence floor
+   (`coh_mono`), the fact behind the logic's floor receipts (`MachCSL.floorLbAt`), in which its
+   grant is consumed.  What a hit and a miss of `Hart` and a miss of `Dma` are in machine terms
+   (`Hart.hit_iff`, `Hart.miss_iff`, `Dma.miss_iff`) is proved in `MachCSL/Liveness/Cycle.lean`.
+   It needs two machine facts: a blocked retry keeps the head, and an unblocked access is served.
 
 **Naming policy.**  Namespaces are the layers.  Capitalised names are propositions about a whole
-run (`SF`, `AttemptGrant`, `Response`, `IsCounter`, `Persists`, `Stable`); lower-case names are
-position or configuration predicates (`attempt`, `hit`, `miss`, `enabled`, `grant`).  Theorems
-read `conclusion_of_hypothesis` (`attemptGrant_of_sf`, `counter_of_sf`, `sf_of_attemptGrant`) or
-`subject_property` (`counter_reset`, `hit_miss_exclusive`).  Every instance uses the same six
-names: `enabled`, `grant`, `SF`, `AG`, `live`, `stable`, `persists`, `sf_iff`, `counter_of_sf`.
+run or a relation (`SF`, `AttemptGrant`, `Response`, `IsCounter`, `Persists`, `Stable`,
+`OwnGrant`); lower-case names are position or configuration predicates (`attempt`, `hit`, `miss`,
+`enabled`, `grant`).  Theorems read `conclusion_of_hypothesis` (`attemptGrant_of_sf`,
+`counter_of_sf`, `sf_of_attemptGrant`) or `subject_property` (`counter_reset`,
+`hit_miss_exclusive`).  Every instance uses the same names: `enabled`, `grant`, `ownGrant`, `SF`,
+`AG`, `live`, `stable`, `persists`, `sf_iff`, `counter_of_sf`.
 -/
 
 namespace Fairness
@@ -539,9 +548,22 @@ end Pair
 
 /-! ## 4. Layer 2: the pair of an action (`Action`)
 
-An action of the thread at `i` is an attempt condition `A` on configurations and a grant relation
-`G` between the configurations before and after one of its steps.  Its attempts are the thread's
-steps from configurations where `A` holds; the hits are the granted ones. -/
+An action is an attempt condition `A` on configurations and a grant relation `G` on pairs of
+configurations.  The grant is one of the thread's transitions: `G c c'` implies that the thread at
+`i` steps from `c` to `c'` (`OwnGrant`).  Strong fairness of the action, `SF`, is a statement about
+the run and names no thread.  It says that where `A` holds infinitely often, a grant happens
+infinitely often.
+
+The thread enters in two places.  It enters through `G`, by the own-grant requirement, and
+through the attempts, which are the thread's own steps from configurations where `A` holds.  A hit
+is a position where `A` holds and the step taken is a grant.  A miss is an attempt that is not a
+hit.
+
+The two bridges between `SF` and the attempt–grant form need no requirement, because a miss and a
+hit are both positions where `A` holds.  The counter rules need `OwnGrant` where layer 1 needed R1.
+With it a hit is an attempt (`hitsAttempt`), and the counter stays at every other thread's step
+(`counter_stay_of_other`).  Without it a grant could happen at another thread's step, and the
+counter would reset there.  That is the loss the requirement prevents. -/
 
 namespace Action
 
@@ -553,37 +575,54 @@ variable {i : Nat} {σ : Nat → Cfg}
 def attempt (i : Nat) (A : Cfg → Prop) (σ : Nat → Cfg) (n : Nat) : Prop :=
   Steps i σ n ∧ A (σ n)
 
-/-- A granted attempt. -/
-def hit (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) (n : Nat) : Prop :=
-  attempt i A σ n ∧ G (σ n) (σ (n + 1))
+/-- Position `n` is granted: `A` holds there and the step taken is a grant.  It names no thread;
+with `OwnGrant` below the step is the thread's, so a granted position is a granted attempt. -/
+def hit (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) (n : Nat) : Prop :=
+  A (σ n) ∧ G (σ n) (σ (n + 1))
 
 /-- A refused attempt. -/
 def miss (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) (n : Nat) : Prop :=
-  Pair.Miss (attempt i A σ) (hit i A G σ) n
+  Pair.Miss (attempt i A σ) (hit A G σ) n
 
-/-- Strong fairness of the action, in state form: `A` holding infinitely often, at any position,
-forces infinitely many hits.  The trusted hypothesis. -/
-def SF (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
-  MissHit.InfOften (fun n => A (σ n)) → MissHit.InfOften (hit i A G σ)
+/-- Strong fairness of the action: `A` holding infinitely often forces infinitely many grants.  The
+trusted hypothesis.  A statement about the run, naming no thread. -/
+def SF (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
+  MissHit.InfOften (fun n => A (σ n)) → MissHit.InfOften (hit A G σ)
 
-/-- The response form: every position where `A` holds is eventually followed by a hit. -/
-def Response (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
-  ∀ n, A (σ n) → ∃ m ≥ n, hit i A G σ m
+/-- The response form: every position where `A` holds is eventually followed by a grant. -/
+def Response (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
+  ∀ n, A (σ n) → ∃ m ≥ n, hit A G σ m
 
-/-- The attempt–grant form of the action: infinitely many refused attempts force infinitely many
-hits.  The form the logic consumes. -/
+/-- The attempt–grant form of the action of the thread at `i`: infinitely many refused attempts
+force infinitely many grants.  The form the logic consumes. -/
 def AttemptGrant (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
-  Pair.AttemptGrant (attempt i A σ) (hit i A G σ)
+  Pair.AttemptGrant (attempt i A σ) (hit A G σ)
 
-/-- The fairness counter of the action. -/
+/-- The fairness counter of the action of the thread at `i`. -/
 def IsCounter (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) (δ : Nat → Nat) :
     Prop :=
-  Pair.IsCounter (attempt i A σ) (hit i A G σ) δ
+  Pair.IsCounter (attempt i A σ) (hit A G σ) δ
+
+/-- The grant is one of the thread's transitions.  Layer 2's form of R1: with it a granted position
+is a granted attempt (`hitsAttempt`), and the counter stays at every other thread's step
+(`counter_stay_of_other`).  The bridges between `SF` and `AttemptGrant` do not need it. -/
+def OwnGrant (i : Nat) (G : Cfg → Cfg → Prop) : Prop :=
+  ∀ {c c' : Cfg}, G c c' → Step i c c'
 
 variable {A : Cfg → Prop} {G : Cfg → Cfg → Prop}
 
-/-- R1 holds for every action. -/
-theorem hitsAttempt : Pair.HitsAttempt (attempt i A σ) (hit i A G σ) := fun _ h => h.1
+/-- With the own-grant requirement, the step at a granted position is the thread's. -/
+theorem hit_steps (hown : OwnGrant i G) {n : Nat} (h : hit A G σ n) : Steps i σ n :=
+  hown h.2
+
+/-- With the own-grant requirement, a granted position is a granted attempt. -/
+theorem hit_iff_attempt (hown : OwnGrant i G) {n : Nat} :
+    hit A G σ n ↔ attempt i A σ n ∧ G (σ n) (σ (n + 1)) :=
+  ⟨fun h => ⟨⟨hown h.2, h.1⟩, h.2⟩, fun h => ⟨h.1.2, h.2⟩⟩
+
+/-- R1 holds for an action whose grant is the thread's own. -/
+theorem hitsAttempt (hown : OwnGrant i G) : Pair.HitsAttempt (attempt i A σ) (hit A G σ) :=
+  fun _ h => ⟨hown h.2, h.1⟩
 
 /-- R2 holds for every action. -/
 theorem ownStep : Pair.OwnStep i σ (attempt i A σ) := fun _ h => h.1
@@ -592,34 +631,37 @@ theorem miss_iff {n : Nat} :
     miss i A G σ n ↔ Steps i σ n ∧ A (σ n) ∧ ¬ G (σ n) (σ (n + 1)) := by
   constructor
   · rintro ⟨⟨hs, hA⟩, hh⟩
-    exact ⟨hs, hA, fun hg => hh ⟨⟨hs, hA⟩, hg⟩⟩
+    exact ⟨hs, hA, fun hg => hh ⟨hA, hg⟩⟩
   · rintro ⟨hs, hA, hg⟩
     exact ⟨⟨hs, hA⟩, fun hh => hg hh.2⟩
 
 /-- The meaning of the attempt–grant form. -/
 theorem attemptGrant_iff_attempt :
-    AttemptGrant i A G σ ↔ (MissHit.InfOften (attempt i A σ) → MissHit.InfOften (hit i A G σ)) :=
+    AttemptGrant i A G σ ↔ (MissHit.InfOften (attempt i A σ) → MissHit.InfOften (hit A G σ)) :=
   Pair.attemptGrant_iff_attempt
 
-/-- `SF` is itself a layer-1 pair: the attempts are *all* positions where `A` holds, whoever steps
-there, the hits the thread's hits.  That pair meets R1 but not R2.  Layer 2 restricts the attempts
-to the thread's own steps; the restriction loses nothing exactly when `A` persists
-(`sf_iff_attemptGrant` below). -/
-theorem sf_iff_pair : SF i A G σ ↔ Pair.AttemptGrant (fun n => A (σ n)) (hit i A G σ) :=
+/-- `SF` is itself a layer-1 pair, `(A ∘ σ, hit A G σ)`.  Its attempts are all the positions where
+`A` holds, whoever steps there, and its hits are the granted positions.  That pair meets R1 and
+not R2.  Layer 2 restricts the attempts to the thread's own steps.  The restriction loses nothing
+exactly when `A` persists (`sf_iff_attemptGrant` below). -/
+theorem sf_iff_pair : SF A G σ ↔ Pair.AttemptGrant (fun n => A (σ n)) (hit A G σ) :=
   Pair.attemptGrant_iff_attempt.symm
 
-theorem sf_pair_hitsAttempt : Pair.HitsAttempt (fun n => A (σ n)) (hit i A G σ) :=
-  fun _ h => h.1.2
+theorem sf_pair_hitsAttempt : Pair.HitsAttempt (fun n => A (σ n)) (hit A G σ) :=
+  fun _ h => h.1
 
-/-! ### Soundness: from `SF` to the counter, with no hypothesis on the run -/
+/-! ### Soundness: from `SF` to the counter, with no hypothesis on the run
 
-theorem attemptGrant_of_sf (h : SF i A G σ) : AttemptGrant i A G σ :=
+None of these needs the own-grant requirement.  A miss is a position where `A` holds, so `SF`
+applies to the misses. -/
+
+theorem attemptGrant_of_sf (h : SF A G σ) : AttemptGrant i A G σ :=
   Pair.attemptGrant_of_sf (fun n => A (σ n)) (fun _ hm => hm.1.2) h
 
-theorem attemptGrant_of_response (h : Response i A G σ) : AttemptGrant i A G σ :=
+theorem attemptGrant_of_response (h : Response A G σ) : AttemptGrant i A G σ :=
   Pair.attemptGrant_of_response fun n ha => h n ha.2
 
-theorem sf_of_response (h : Response i A G σ) : SF i A G σ :=
+theorem sf_of_response (h : Response A G σ) : SF A G σ :=
   fun hA n =>
     let ⟨m, hm, hAm⟩ := hA n
     let ⟨k, hk, hhit⟩ := h m hAm
@@ -633,47 +675,54 @@ theorem attemptGrant_of_counter {δ : Nat → Nat} (hδ : IsCounter i A G σ δ)
   Pair.attemptGrant_of_counter hδ
 
 /-- **Soundness.**  The trusted hypothesis gives the counter. -/
-theorem counter_of_sf (h : SF i A G σ) : ∃ δ, IsCounter i A G σ δ :=
+theorem counter_of_sf (h : SF A G σ) : ∃ δ, IsCounter i A G σ δ :=
   counter_of_attemptGrant (attemptGrant_of_sf h)
 
 /-! ### The counter rules, in terms of `A` and `G`
 
-At a step from `σ n` to `σ (n + 1)`: if it is the thread's and `A` holds and `G` holds, reset; if
-it is the thread's and `A` holds and `G` fails, drop; if it is the thread's and `A` fails, stay; if
-it is another thread's, stay. -/
+At a step from `σ n` to `σ (n + 1)`: if `A` holds and `G` holds, reset; if the step is the
+thread's and `A` holds and `G` fails, drop; if `A` fails, stay; if the step is another thread's,
+stay.  The reset needs no step hypothesis, because a grant is a hit wherever it happens.  The stay
+at another thread's step is the one rule that needs the own-grant requirement.  Without it another
+thread's step could be a grant and reset the counter. -/
 
 variable {δ : Nat → Nat}
 
-theorem counter_reset (hδ : IsCounter i A G σ δ) {n : Nat} (hs : Steps i σ n) (hA : A (σ n))
+theorem counter_reset (hδ : IsCounter i A G σ δ) {n : Nat} (hA : A (σ n))
     (hG : G (σ n) (σ (n + 1))) : δ n = 0 :=
-  Pair.counter_reset hδ ⟨⟨hs, hA⟩, hG⟩
+  Pair.counter_reset hδ ⟨hA, hG⟩
 
 theorem counter_drop (hδ : IsCounter i A G σ δ) {n : Nat} (hs : Steps i σ n) (hA : A (σ n))
     (hG : ¬ G (σ n) (σ (n + 1))) : δ n = δ (n + 1) + 1 :=
   Pair.counter_drop hδ ⟨⟨hs, hA⟩, fun hh => hG hh.2⟩
 
+/-- Where `A` fails there is neither a hit nor a miss, so the counter stays. -/
 theorem counter_stay_of_not_attempt (hδ : IsCounter i A G σ δ) {n : Nat} (hA : ¬ A (σ n)) :
     δ n = δ (n + 1) :=
-  Pair.counter_stay_of_not_attempt hitsAttempt hδ fun ha => hA ha.2
+  hδ.2.2 n (fun hh => hA hh.1) (fun hm => hA hm.1.2)
 
-theorem counter_stay_of_other (hδ : IsCounter i A G σ δ) {n : Nat} (hs : ¬ Steps i σ n) :
-    δ n = δ (n + 1) :=
-  Pair.counter_stay_of_other hitsAttempt ownStep hδ hs
+/-- With the own-grant requirement, the counter stays at every step that is not the thread's. -/
+theorem counter_stay_of_other (hown : OwnGrant i G) (hδ : IsCounter i A G σ δ) {n : Nat}
+    (hs : ¬ Steps i σ n) : δ n = δ (n + 1) :=
+  Pair.counter_stay_of_other (hitsAttempt hown) ownStep hδ hs
 
 theorem counter_pos_of_miss (hδ : IsCounter i A G σ δ) {n : Nat} (h : miss i A G σ n) :
     0 < δ n :=
   Pair.counter_pos_of_miss hδ h
 
 theorem hit_of_attempt_of_counter_zero (hδ : IsCounter i A G σ δ) {n : Nat}
-    (ha : attempt i A σ n) (h0 : δ n = 0) : hit i A G σ n :=
+    (ha : attempt i A σ n) (h0 : δ n = 0) : hit A G σ n :=
   Pair.hit_of_attempt_of_counter_zero hδ ha h0
 
 theorem counter_bounds_misses (hδ : IsCounter i A G σ δ) (n : Nat) :
-    ∀ k, (∀ m, n ≤ m → m < n + k → ¬ hit i A G σ m) →
+    ∀ k, (∀ m, n ≤ m → m < n + k → ¬ hit A G σ m) →
       δ (n + k) + MissHit.countMiss (miss i A G σ) n k ≤ δ n :=
   Pair.counter_bounds_misses hδ n
 
-/-! ### Completeness: with fair scheduling and persistence, the form gives `SF` back -/
+/-! ### Completeness: with fair scheduling and persistence, the form gives `SF` back
+
+No own-grant requirement is needed here either.  Past the last grant, every step of the thread
+from a configuration where `A` holds is a miss. -/
 
 /-- `A` is stable under every other thread's step. -/
 def Stable (i : Nat) (A : Cfg → Prop) : Prop :=
@@ -716,7 +765,7 @@ theorem attempt_pending (hstab : Stable i A) {n : Nat} (hA : A (σ n)) {k : Nat}
 /-- **Completeness.**  Under fair scheduling of the thread and persistence of `A`, the
 attempt–grant form gives strong fairness of the action. -/
 theorem sf_of_attemptGrant (hsched : StepsInfOften i σ) (hper : Persists i A σ)
-    (hf : AttemptGrant i A G σ) : SF i A G σ := by
+    (hf : AttemptGrant i A G σ) : SF A G σ := by
   intro hA
   apply Classical.byContradiction
   intro hno
@@ -753,25 +802,25 @@ theorem sf_of_attemptGrant (hsched : StepsInfOften i σ) (hper : Persists i A σ
 
 /-- The two forms coincide under fair scheduling and persistence. -/
 theorem sf_iff_attemptGrant (hsched : StepsInfOften i σ) (hper : Persists i A σ) :
-    SF i A G σ ↔ AttemptGrant i A G σ :=
+    SF A G σ ↔ AttemptGrant i A G σ :=
   ⟨attemptGrant_of_sf, sf_of_attemptGrant hsched hper⟩
 
 /-! ### Weak fairness, and actions whose grant is certain
 
-Weak fairness of the action, `WF`, asks for hits only when `A` holds from some point on.  It is
+Weak fairness of the action, `WF`, asks for grants only when `A` holds from some point on.  It is
 implied by `SF`.  For an action whose grant is certain at every attempt, it follows from fair
-scheduling alone; such an action has no misses, its attempt–grant form holds trivially, and its
-counter is identically zero.  This is the shape of a device task waiting at a gate (6.5): the
-wait is on whoever opens the gate, an obligation, not on a fairness assumption. -/
+scheduling alone.  Such an action has no misses, its attempt–grant form holds trivially, and its
+counter is identically zero.  This is the shape of a device task waiting at a gate (6.5).  The
+task waits on whoever opens the gate, which is an obligation and not a fairness assumption. -/
 
-/-- Weak fairness of the action: `A` holding from some point on forces infinitely many hits. -/
-def WF (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
-  (∃ N, ∀ n, N ≤ n → A (σ n)) → MissHit.InfOften (hit i A G σ)
+/-- Weak fairness of the action: `A` holding from some point on forces infinitely many grants. -/
+def WF (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
+  (∃ N, ∀ n, N ≤ n → A (σ n)) → MissHit.InfOften (hit A G σ)
 
-theorem wf_of_sf (h : SF i A G σ) : WF i A G σ :=
+theorem wf_of_sf (h : SF A G σ) : WF A G σ :=
   fun ⟨N, hN⟩ => h fun n => ⟨n + N, Nat.le_add_right n N, hN _ (Nat.le_add_left N n)⟩
 
-/-- The grant is certain: every attempt is a hit. -/
+/-- The grant is certain: every attempt of the thread at `i` is granted. -/
 def Certain (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat → Cfg) : Prop :=
   ∀ n, attempt i A σ n → G (σ n) (σ (n + 1))
 
@@ -779,26 +828,26 @@ def Certain (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop) (σ : Nat �
 theorem attemptGrant_of_certain (h : Certain i A G σ) : AttemptGrant i A G σ := by
   intro hmiss
   obtain ⟨m, -, ha, hg⟩ := hmiss 0
-  exact absurd ⟨ha, h m ha⟩ hg
+  exact absurd ⟨ha.2, h m ha⟩ hg
 
-/-- With a certain grant the zero function is a counter: reset at every attempt, stay
-elsewhere, never a drop. -/
+/-- With a certain grant the zero function is a counter: reset at every grant, stay elsewhere,
+never a drop. -/
 theorem counter_zero_of_certain (h : Certain i A G σ) : IsCounter i A G σ (fun _ => 0) := by
   unfold IsCounter Pair.IsCounter MissHit.IsCounter
   refine ⟨fun _ _ => rfl, fun n hm => ?_, fun _ _ _ => rfl⟩
-  exact absurd ⟨hm.1, h n hm.1⟩ hm.2
+  exact absurd ⟨hm.1.2, h n hm.1⟩ hm.2
 
 /-- Weak fairness of an action with a certain grant follows from fair scheduling alone. -/
-theorem wf_of_certain (hsched : StepsInfOften i σ) (h : Certain i A G σ) : WF i A G σ := by
+theorem wf_of_certain (hsched : StepsInfOften i σ) (h : Certain i A G σ) : WF A G σ := by
   rintro ⟨N, hN⟩ n
   obtain ⟨m, hm, hs⟩ := hsched (n + N)
   have hA : A (σ m) := hN m (Nat.le_trans (Nat.le_add_left N n) hm)
-  exact ⟨m, Nat.le_trans (Nat.le_add_right n N) hm, ⟨hs, hA⟩, h m ⟨hs, hA⟩⟩
+  exact ⟨m, Nat.le_trans (Nat.le_add_right n N) hm, hA, h m ⟨hs, hA⟩⟩
 
 /-- Strong fairness of an action with a certain grant follows from fair scheduling and
 persistence. -/
 theorem sf_of_certain (hsched : StepsInfOften i σ) (hper : Persists i A σ)
-    (h : Certain i A G σ) : SF i A G σ :=
+    (h : Certain i A G σ) : SF A G σ :=
   sf_of_attemptGrant hsched hper (attemptGrant_of_certain h)
 
 end Action
@@ -991,12 +1040,13 @@ end Era
 /-! ## 6. The four instances
 
 Each instance gives its attempt condition `enabled` (the `A`) and its grant relation `grant`
-(the `G`), its trusted form `SF` and its proof form `AG`, and proves: `live`, the condition is a
-live thread's; `stable`, it survives every thread's step but the power thread's; `persists`, from
-the two; `sf_iff`, the two forms coincide under fair scheduling; `counter_of_sf`, the trusted form
-gives the counter. -/
+(the `G`), its trusted form `SF` and its proof form `AG`.  Every `grant` begins with the thread's
+step, `Step i c c'`, and then states the thread's transition.  Each instance proves: `ownGrant`,
+the grant is one of the thread's transitions; `live`, the condition is a live thread's; `stable`,
+it survives every thread's step but the power thread's; `persists`, from the two; `sf_iff`, the
+two forms coincide under fair scheduling; `counter_of_sf`, the trusted form gives the counter. -/
 
-open Action (SF AttemptGrant IsCounter Persists)
+open Action (SF AttemptGrant IsCounter OwnGrant Persists)
 open Era (liveAt StableExceptPower)
 
 /-! ### 6.1 The tick: a live hart at its cycle boundary; the restart carries the tick -/
@@ -1009,13 +1059,15 @@ variable {i j : Nat} {c c' : Cfg} {σ : Nat → Cfg}
 def enabled (i : Nat) (c : Cfg) : Prop :=
   ∃ e x, c.1[i]? = some (.hart e x (.pure ())) ∧ threadLive c.2 e
 
-/-- The grant: the hart restarts its cycle with a tick. -/
+/-- The grant: the hart steps from its cycle boundary and restarts its cycle with a tick. -/
 def grant (i : Nat) (c c' : Cfg) : Prop :=
-  ∃ e x ew, c.1[i]? = some (.hart e x (.pure ())) ∧
+  Step i c c' ∧ ∃ e x ew, c.1[i]? = some (.hart e x (.pure ())) ∧
     c'.1[i]? = some (.hart e x (riscvStep true ew))
 
+theorem ownGrant : OwnGrant i (grant i) := fun h => h.1
+
 /-- Trusted: a hart at its boundary infinitely often restarts with the tick infinitely often. -/
-abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF i (enabled i) (grant i) σ
+abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF (enabled i) (grant i) σ
 
 /-- Proof form: infinitely many tickless restarts force infinitely many ticking ones. -/
 abbrev AG (i : Nat) (σ : Nat → Cfg) : Prop := AttemptGrant i (enabled i) (grant i) σ
@@ -1054,14 +1106,17 @@ def at? {S T α : Type} : DevM S T α → Nat → Option (DevM S T α)
 def enabled (i : Nat) (d : DevId) (node : DevProg d) (c : Cfg) : Prop :=
   ∃ e, c.1[i]? = some (.dev e d rootTask node) ∧ threadLive c.2 e
 
-/-- The grant: the root takes an answer of class `b` modulo `m`. -/
+/-- The grant: the root steps from the node and takes an answer of class `b` modulo `m`. -/
 def grant (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (c c' : Cfg) : Prop :=
-  ∃ e v, v % m = b ∧ c.1[i]? = some (.dev e d rootTask node) ∧
+  Step i c c' ∧ ∃ e v, v % m = b ∧ c.1[i]? = some (.dev e d rootTask node) ∧
     c'.1[i]? = (at? node v).map (.dev e d rootTask)
+
+theorem ownGrant {d : DevId} {node : DevProg d} {m b : Nat} :
+    OwnGrant i (grant i d node m b) := fun h => h.1
 
 /-- Trusted: a root at the node infinitely often takes class `b` infinitely often. -/
 abbrev SF (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i d node) (grant i d node m b) σ
+  Action.SF (enabled i d node) (grant i d node m b) σ
 
 abbrev AG (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
   AttemptGrant i (enabled i d node) (grant i d node m b) σ
@@ -1105,15 +1160,19 @@ def atLoad (i : Nat) (a : PAddr) (c : Cfg) : Prop := ∃ e x req k,
 /-- The attempt condition: the load covers `a` and the store `t` has happened. -/
 def enabled (i : Nat) (t : Nat) (a : PAddr) (c : Cfg) : Prop := atLoad i a c ∧ t ≤ c.2.m.top
 
-/-- The grant: the load reads `a` at a view at or past `t`; afterwards the hart's coherence
-floor of `a` is. -/
+/-- The grant: the hart takes the load and moves on to its continuation, and afterwards its view of
+`a` is at or past `t`.  That view is the hart's coherence floor of `a`: its later loads of `a` read
+at that view or a later one. -/
 def grant (i t : Nat) (a : PAddr) (c c' : Cfg) : Prop :=
-  ∃ e x m, c.1[i]? = some (.hart e x m) ∧ t ≤ (c'.2.m.hr x).coh a
+  Step i c c' ∧ ∃ e x req k v, c.1[i]? = some (.hart e x (.impure (.inl (.ok (.memRead req))) k)) ∧
+    c'.1[i]? = some (.hart e x (k v)) ∧ t ≤ (c'.2.m.hr x).coh a
+
+theorem ownGrant {t : Nat} {a : PAddr} : OwnGrant i (grant i t a) := fun h => h.1
 
 /-- Trusted: a hart at a load of `a` after store `t` infinitely often sees `t` infinitely
 often (memory fairness). -/
 abbrev SF (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i t a) (grant i t a) σ
+  Action.SF (enabled i t a) (grant i t a) σ
 
 abbrev AG (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
   AttemptGrant i (enabled i t a) (grant i t a) σ
@@ -1438,19 +1497,24 @@ def blocked (i : Nat) (c : Cfg) : Prop := ∃ e x o k,
   | .memWrite req _ _ => ramBytes req.pa req.size ∧ othersReserve c.2.m.resv x req.pa req.size
   | _ => False
 
-/-- The grant: the access is served, that is, the step is not a blocked retry.  Decided by the
-configuration before the step: when the footprint is covered the only step is the retry. -/
-def grant (i : Nat) (c _c' : Cfg) : Prop := ¬ blocked i c
+/-- The grant: the hart's step answers its head event, and the hart moves on to the continuation
+with some answer.  At a pending access, that is the access served.  A blocked retry keeps the head
+event in place, so it is not a grant. -/
+def grant (i : Nat) (c c' : Cfg) : Prop :=
+  Step i c c' ∧ ∃ e x o k v, c.1[i]? = some (.hart e x (.impure (.inl (.ok o)) k)) ∧
+    c'.1[i]? = some (.hart e x (k v))
+
+theorem ownGrant : OwnGrant i (grant i) := fun h => h.1
 
 /-- Trusted: a hart with a pending access infinitely often has one served infinitely often
 (RVWMO's Progress Axiom in the model's terms). -/
-abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF i (enabled i) (grant i) σ
+abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF (enabled i) (grant i) σ
 
 /-- Proof form: infinitely many blocked retries force infinitely many served accesses. -/
 abbrev AG (i : Nat) (σ : Nat → Cfg) : Prop := AttemptGrant i (enabled i) (grant i) σ
 
 /-- The Progress Axiom in response form: every pending access is eventually served. -/
-abbrev ProgressAxiom (i : Nat) (σ : Nat → Cfg) : Prop := Action.Response i (enabled i) (grant i) σ
+abbrev ProgressAxiom (i : Nat) (σ : Nat → Cfg) : Prop := Action.Response (enabled i) (grant i) σ
 
 theorem live (h : enabled i c) : liveAt i c :=
   let ⟨e, x, _o, _k, he, hl, _⟩ := h; ⟨e, Or.inl ⟨x, _, he⟩, hl⟩
@@ -1459,20 +1523,6 @@ theorem enabled_of_blocked (h : blocked i c) : enabled i c := by
   obtain ⟨e, x, o, k, he, hl, hm⟩ := h
   refine ⟨e, x, o, k, he, hl, ?_⟩
   cases o <;> first | exact hm | exact hm.1 | exact ⟨hm.1, hm.2.1⟩
-
-/-- The miss is exactly a blocked retry. -/
-theorem miss_iff {n : Nat} : Action.miss i (enabled i) (grant i) σ n ↔ Steps i σ n ∧ blocked i (σ n) := by
-  rw [Action.miss_iff]
-  constructor
-  · rintro ⟨hs, -, hb⟩
-    exact ⟨hs, Classical.not_not.1 hb⟩
-  · rintro ⟨hs, hb⟩
-    exact ⟨hs, enabled_of_blocked hb, fun h => h hb⟩
-
-/-- The hit is exactly a served access: a step at a pending access that is not blocked. -/
-theorem hit_iff {n : Nat} :
-    Action.hit i (enabled i) (grant i) σ n ↔ Steps i σ n ∧ enabled i (σ n) ∧ ¬ blocked i (σ n) :=
-  ⟨fun ⟨⟨hs, hp⟩, hg⟩ => ⟨hs, hp, hg⟩, fun ⟨hs, hp, hg⟩ => ⟨⟨hs, hp⟩, hg⟩⟩
 
 theorem stable : StableExceptPower i (enabled i) := by
   intro j c c' hji hs hnp h
@@ -1524,17 +1574,20 @@ def enabled (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
   ∃ e, ∃ (o : DevOp (DevSt d) (DevTask d)), ∃ k, c.1[i]? = some (.dev e d tid (.op o k)) ∧
     threadLive c.2 e ∧ ¬ isDma o ∧ ¬ devBlocked d o c.2.m
 
-/-- The grant: the primitive is answered, the task continues with some answer. -/
+/-- The grant: the task steps, its primitive is answered, and the task continues with some
+answer. -/
 def grant (i : Nat) (d : DevId) (tid : TaskId) (c c' : Cfg) : Prop :=
-  ∃ e, ∃ (o : DevOp (DevSt d) (DevTask d)), ∃ k v, c.1[i]? = some (.dev e d tid (.op o k)) ∧
-    c'.1[i]? = some (.dev e d tid (k v))
+  Step i c c' ∧ ∃ e, ∃ (o : DevOp (DevSt d) (DevTask d)), ∃ k v,
+    c.1[i]? = some (.dev e d tid (.op o k)) ∧ c'.1[i]? = some (.dev e d tid (k v))
+
+theorem ownGrant {d : DevId} {tid : TaskId} : OwnGrant i (grant i d tid) := fun h => h.1
 
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i d tid) (grant i d tid) σ
+  Action.SF (enabled i d tid) (grant i d tid) σ
 abbrev AG (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   AttemptGrant i (enabled i d tid) (grant i d tid) σ
 abbrev WF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
-  Action.WF i (enabled i d tid) (grant i d tid) σ
+  Action.WF (enabled i d tid) (grant i d tid) σ
 
 variable {d : DevId} {tid : TaskId}
 
@@ -1544,6 +1597,7 @@ theorem live (h : enabled i d tid c) : liveAt i c :=
 /-- A live task at an unblocked primitive is answered when it steps: the grant is certain. -/
 theorem certain : Action.Certain i (enabled i d tid) (grant i d tid) σ := by
   intro n ⟨hs, e, o, k, he, hl, _, hnb⟩
+  refine ⟨hs, ?_⟩
   obtain ⟨ex, obs, e', efs, he', hp, hc'⟩ := hs
   rw [he] at he'
   obtain rfl := Option.some.inj he'
@@ -1577,8 +1631,8 @@ end Dev
 The third way a device primitive blocks is a DMA write whose footprint is under a blocking
 reservation.  That is memory arbitration, the same situation as a hart's blocked access, and it
 fits the model the same way: the attempt is a live task at a DMA write whose guard answers a
-faithful move into RAM, the grant is that no blocking reservation covers the footprint, the miss is
-a blocked retry.  Its `SF` is the Progress Axiom for the DMA agent.  xv6 may not need the
+faithful move into RAM, the grant is the task's step that serves the write, the miss is a blocked
+retry.  Its `SF` is the Progress Axiom for the DMA agent.  xv6 may not need the
 assumption: if no reservation ever covers a DMA buffer, a safety fact, the miss never happens. -/
 
 namespace Dma
@@ -1599,12 +1653,18 @@ def blocked (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
     (∃ s', g (c.2.m.devs.st d) = some s' ∧ devObsOk d (c.2.m.devs.st d) s' []) ∧ ramBytes pa n ∧
     anyReserve c.2.m.resv pa n
 
-/-- The grant: the write is served, that is, the step is not a blocked retry. -/
-def grant (i : Nat) (d : DevId) (tid : TaskId) (c _c' : Cfg) : Prop := ¬ blocked i d tid c
+/-- The grant: the task's step answers the DMA write, and the task moves on to the continuation
+with some answer.  At a pending DMA write, that is the write served.  A blocked retry keeps the
+write in place, so it is not a grant. -/
+def grant (i : Nat) (d : DevId) (tid : TaskId) (c c' : Cfg) : Prop :=
+  Step i c c' ∧ ∃ e g pa n w k v, c.1[i]? = some (.dev e d tid (.op (.dmaWrite g pa n w) k)) ∧
+    c'.1[i]? = some (.dev e d tid (k v))
+
+theorem ownGrant {d : DevId} {tid : TaskId} : OwnGrant i (grant i d tid) := fun h => h.1
 
 /-- Trusted: a task with a pending DMA write infinitely often has one served infinitely often. -/
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i d tid) (grant i d tid) σ
+  Action.SF (enabled i d tid) (grant i d tid) σ
 abbrev AG (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   AttemptGrant i (enabled i d tid) (grant i d tid) σ
 
@@ -1615,16 +1675,6 @@ theorem live (h : enabled i d tid c) : liveAt i c :=
 
 theorem enabled_of_blocked (h : blocked i d tid c) : enabled i d tid c :=
   let ⟨e, g, pa, n, w, k, he, hl, hg, hr, _⟩ := h; ⟨e, g, pa, n, w, k, he, hl, hg, hr⟩
-
-/-- The miss is exactly a blocked retry. -/
-theorem miss_iff {n : Nat} :
-    Action.miss i (enabled i d tid) (grant i d tid) σ n ↔ Steps i σ n ∧ blocked i d tid (σ n) := by
-  rw [Action.miss_iff]
-  constructor
-  · rintro ⟨hs, -, hb⟩
-    exact ⟨hs, Classical.not_not.1 hb⟩
-  · rintro ⟨hs, hb⟩
-    exact ⟨hs, enabled_of_blocked hb, fun h => h hb⟩
 
 theorem counter_of_sf (h : SF i d tid σ) : ∃ δ, IsCounter i (enabled i d tid) (grant i d tid) σ δ :=
   Action.counter_of_sf h
