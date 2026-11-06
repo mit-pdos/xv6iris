@@ -21,8 +21,9 @@ The file, in order:
 2. `Hart`, what a pending access's step is: the served arm of `evStep` when it is not blocked
    (`served_of_unblocked`), a blocked retry that leaves it blocked when it is
    (`pending_of_blocked`).  So the hart's step is a grant exactly when the access is not blocked
-   (`grant_iff_not_blocked`): the hit is a served access and the miss is a blocked retry
-   (`hit_iff`, `miss_iff`).
+   (`grant_iff_not_blocked`).  The action's hit is then a served access (`hit_iff`).  The hart's
+   miss, from the thread's view of the action (section 5 of `MachCSL.Liveness.Fairness`), is a
+   blocked retry (`miss_iff`).
 3. The machine closure of the choice instances.  At each attempt condition the thread has a step
    for the outcomes named here, and each grant is such a step: both restarts at a
    live boundary (`Tick.exists_grant`, `Tick.exists_not_grant`; a restarted cycle is never empty,
@@ -31,8 +32,8 @@ The file, in order:
    plain load takes the load, so `Fresh`'s grant is, under its attempt condition, the post-state
    floor alone (`Fresh.takes_load`, `Fresh.grant_iff_coh`).  Subsection 3.5 does for a DMA write
    what section 2 does for a hart's access: the task's step is a grant exactly when the write is
-   not blocked, so the hit is a served write and the miss is a blocked retry (`Dma.hit_iff`,
-   `Dma.miss_iff`).
+   not blocked, so the action's hit is a served write and the task's miss is a blocked retry
+   (`Dma.hit_iff`, `Dma.miss_iff`).
 4. `ramHist`, every RAM byte has a nonempty history, the fact the memory reads of section 3 need:
    it is not part of `mmOk` (which says the converse), it holds of a booted memory and every step
    keeps it (`ramHist_step`, `ramHist_run`).
@@ -465,16 +466,17 @@ theorem grant_iff_not_blocked (hen : enabled i c) (hs : Step i c c') :
 
 variable {σ : Nat → Cfg}
 
-/-- The hit is exactly a served access: a step at a pending access that is not blocked. -/
+/-- The action's hit is exactly a served access: the hart's step at a pending access that is not
+blocked. -/
 theorem hit_iff {n : Nat} :
     Action.hit (enabled i) (grant i) σ n ↔ Steps i σ n ∧ enabled i (σ n) ∧ ¬ blocked i (σ n) :=
   ⟨fun ⟨hen, hg⟩ => ⟨hg.1, hen, (grant_iff_not_blocked hen hg.1).1 hg⟩,
    fun ⟨hs, hen, hnb⟩ => ⟨hen, (grant_iff_not_blocked hen hs).2 hnb⟩⟩
 
-/-- The miss is exactly a blocked retry. -/
+/-- The hart's miss, a refused attempt of its own (`Thread.miss`), is exactly a blocked retry. -/
 theorem miss_iff {n : Nat} :
-    Action.miss i (enabled i) (grant i) σ n ↔ Steps i σ n ∧ blocked i (σ n) := by
-  rw [Action.miss_iff]
+    Thread.miss i (enabled i) (grant i) σ n ↔ Steps i σ n ∧ blocked i (σ n) := by
+  rw [Thread.miss_iff]
   constructor
   · rintro ⟨hs, hen, hng⟩
     exact ⟨hs, Classical.byContradiction fun hnb => hng ((grant_iff_not_blocked hen hs).2 hnb)⟩
@@ -765,7 +767,7 @@ theorem exists_served (hen : enabled i c) (hnb : ¬ blocked i c) (hh : ramHist c
 
 end Hart
 
-/-! ### 3.5 A device's DMA write: the miss is a blocked retry
+/-! ### 3.5 A device's DMA write: the task's miss is a blocked retry
 
 A live device task's step takes one of two arms of `devStep`.  The answer arm moves the task on to
 the continuation; the blocked arm (`devBlocked`) keeps its program.  At a DMA write whose guard
@@ -827,10 +829,10 @@ theorem grant_iff_not_blocked (hen : enabled i d tid c) (hs : Step i c c') :
 
 variable {σ : Nat → Cfg}
 
-/-- The miss is exactly a blocked retry. -/
+/-- The task's miss, a refused attempt of its own (`Thread.miss`), is exactly a blocked retry. -/
 theorem miss_iff {n : Nat} :
-    Action.miss i (enabled i d tid) (grant i d tid) σ n ↔ Steps i σ n ∧ blocked i d tid (σ n) := by
-  rw [Action.miss_iff]
+    Thread.miss i (enabled i d tid) (grant i d tid) σ n ↔ Steps i σ n ∧ blocked i d tid (σ n) := by
+  rw [Thread.miss_iff]
   constructor
   · rintro ⟨hs, hen, hng⟩
     exact ⟨hs, Classical.byContradiction fun hnb => hng ((grant_iff_not_blocked hen hs).2 hnb)⟩
@@ -838,7 +840,8 @@ theorem miss_iff {n : Nat} :
     have hen := enabled_of_blocked hb
     exact ⟨hs, hen, fun hg => (grant_iff_not_blocked hen hs).1 hg hb⟩
 
-/-- The hit is exactly a served write: a step at a pending DMA write that is not blocked. -/
+/-- The action's hit is exactly a served write: the task's step at a pending DMA write that is
+not blocked. -/
 theorem hit_iff {n : Nat} :
     Action.hit (enabled i d tid) (grant i d tid) σ n ↔
       Steps i σ n ∧ enabled i d tid (σ n) ∧ ¬ blocked i d tid (σ n) :=
