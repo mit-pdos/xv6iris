@@ -3,9 +3,9 @@ import MachCSL.Liveness.Fairness
 /-! # The stable gates of the device programs
 
 Milestone B2 of lane `xv6-liveness-now`: the plan's stable-gate lemma, for each gate of the three
-device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (7.5).
+device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (3.5).
 Its grant is certain at the task's own attempts, in the thread's view of the action (section 5 of
-that file).  Its strong fairness follows from fair scheduling and persistence
+`FairnessTheory.lean`).  Its strong fairness follows from fair scheduling and persistence
 (`Dev.sf_of_persists`).  The lemma says, for each gate, that once the gate is open no other
 thread's step but the power thread's closes it before the task steps through, except for named
 closing transitions.  Each gate's theorem takes a hypothesis excluding its closers while the gate
