@@ -225,7 +225,7 @@ def EventuallyLive (i : Nat) (σ : Nat → Cfg) : Prop := ∃ N, ∀ m ≥ N, li
 def EventuallyDead (i : Nat) (σ : Nat → Cfg) : Prop := ∃ N, ∀ m ≥ N, ¬ liveAt i (σ m)
 
 /-- Fair scheduling gives a thread that is live infinitely often infinitely many steps, the
-hypothesis of the instances' `sf_iff`. -/
+hypothesis of the actions' `sf_iff`. -/
 theorem stepsInfOften_of_fairSched (h : FairSched σ) (hl : ∀ n, ∃ m ≥ n, liveAt i (σ m)) :
     StepsInfOften i σ := by
   intro n
@@ -532,10 +532,10 @@ Strong fairness is the state form of an action (`FairnessTheory.lean` section 3)
 thread.  The thread is in the enabling condition, which is the thread at `i`'s, and in the grant,
 one of its transitions.  The forms the logic consumes are the attempt–grant forms, the thread's
 view of the action (`FairnessTheory.lean` section 5).  The view is derived from the state form
-under own grant, which every instance proves (`ownGrant`).  Strong fairness gives the view on
+under own grant, which every action proves (`ownGrant`).  Strong fairness gives the view on
 every run (`Thread.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The converse needs
 it: under fair scheduling and own grant the two forms coincide at every position (`sf_iff_ag`), by
-the instance's `sf_iff` where the thread is eventually live and vacuously where it is eventually
+the action's `sf_iff` where the thread is eventually live and vacuously where it is eventually
 dead. -/
 
 namespace Action
