@@ -16,14 +16,20 @@ The file, in order:
    blocked retry that keeps its expression (`hartStep_cases`, `step_descends`, `retry`).  On a
    run of the pool where the thread steps infinitely often, a hart therefore reaches its live
    boundary, dies, or retries (`boundary_or_dead_or_retry`), and the plan's form follows
-   (`boundary_of_live`).
+   (`boundary_of_live`).  Device programs (`DevM`) get the same relation, `DevM.Below`, which is
+   irreflexive too (`DevM.below_irrefl`).
 2. `Hart`, what a pending access's step is: the served arm of `evStep` when it is not blocked
    (`served_of_unblocked`), a blocked retry that leaves it blocked when it is
-   (`pending_of_blocked`).
-3. The machine closure of the choice instances: both restarts at a live boundary
-   (`Tick.exists_grant`, `Tick.exists_not_grant`; a restarted cycle is never empty,
+   (`pending_of_blocked`).  So the hart's step is a grant exactly when the access is not blocked
+   (`grant_iff_not_blocked`): the hit is a served access and the miss is a blocked retry
+   (`hit_iff`, `miss_iff`).
+3. The machine closure of the choice instances.  At each attempt condition the thread has a step
+   for every outcome the action distinguishes, and each grant is such a step: both restarts at a
+   live boundary (`Tick.exists_grant`, `Tick.exists_not_grant`; a restarted cycle is never empty,
    `Cycle.riscvStep_impure`), every answer at a `choose` node (`Arm.exists_answer`), a load at
-   the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).
+   the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).  Subsection 3.5 does
+   for a DMA write what section 2 does for a hart's access: the task's step is a grant exactly
+   when the write is not blocked, so the miss is a blocked retry (`Dma.miss_iff`).
 4. `ramHist`, every RAM byte has a nonempty history, the fact the memory reads of section 3 need:
    it is not part of `mmOk` (which says the converse), it holds of a booted memory and every step
    keeps it (`ramHist_step`, `ramHist_run`).
@@ -79,6 +85,29 @@ theorem below_irrefl (m : FreeM Eff α) : ¬ Below m m := by
   exact not_descends (fun _ => m) (fun _ => h)
 
 end Below
+
+/-! ### Device programs
+
+A device program is `DevM` (`MachCSL/Dev/DevLang.lean`), an inductive of its own, so `Below` does
+not apply to it and it gets its own one-step relation.  Only irreflexivity is used: a device
+task's step that answers its primitive never leaves the program in place. -/
+
+/-- One step down a device program: the continuation `k r` of a node `.op o k`, at any answer
+`r`, is below the node. -/
+inductive DevM.Below {S T α : Type} : DevM S T α → DevM S T α → Prop
+  | cont (o : DevOp S T) (k : o.ret → DevM S T α) (r : o.ret) : DevM.Below (k r) (.op o k)
+
+/-- Every device program is accessible: it has no infinite descent below it. -/
+theorem DevM.acc_below {S T α : Type} (m : DevM S T α) : Acc DevM.Below m := by
+  induction m with
+  | pure a => exact ⟨_, fun y h => by cases h⟩
+  | op o k ih => exact ⟨_, fun y h => by cases h; exact ih _⟩
+
+/-- No device program is below itself. -/
+theorem DevM.below_irrefl {S T α : Type} (m : DevM S T α) : ¬ DevM.Below m m := by
+  intro h
+  induction DevM.acc_below m with
+  | intro m _ ih => exact ih m h h
 
 /-! ### One step of a hart -/
 
@@ -413,6 +442,43 @@ theorem pending_of_blocked (hb : blocked i c) (hs : Step i c c') :
 theorem enabled_of_blocked_step (hb : blocked i c) (hs : Step i c c') : enabled i c' :=
   enabled_of_blocked (pending_of_blocked hb hs).2.2.2.2
 
+/-- At a pending access, the hart's own step is a grant exactly when the access is not blocked.
+An unblocked access is served (`served_of_unblocked`).  A blocked retry keeps the head event in
+place (`pending_of_blocked`), and a served step never does: the continuation is below the node
+(`Cycle.below_irrefl`). -/
+theorem grant_iff_not_blocked (hen : enabled i c) (hs : Step i c c') :
+    grant i c c' ↔ ¬ blocked i c := by
+  constructor
+  · rintro ⟨-, e, x, o, k, v, he, he'⟩ hb
+    have hsame := (pending_of_blocked hb hs).2.1
+    rw [he', he] at hsame
+    have hkv : k v = .impure (.inl (.ok o)) k := (Expr.hart.inj (Option.some.inj hsame)).2.2
+    have hbelow := Below.cont _ k v
+    rw [hkv] at hbelow
+    exact below_irrefl _ hbelow
+  · intro hnb
+    obtain ⟨e, x, o, k, v, he, he', -, -⟩ := served_of_unblocked hen hnb hs
+    exact ⟨hs, e, x, o, k, v, he, he'⟩
+
+variable {σ : Nat → Cfg}
+
+/-- The hit is exactly a served access: a step at a pending access that is not blocked. -/
+theorem hit_iff {n : Nat} :
+    Action.hit (enabled i) (grant i) σ n ↔ Steps i σ n ∧ enabled i (σ n) ∧ ¬ blocked i (σ n) :=
+  ⟨fun ⟨hen, hg⟩ => ⟨hg.1, hen, (grant_iff_not_blocked hen hg.1).1 hg⟩,
+   fun ⟨hs, hen, hnb⟩ => ⟨hen, (grant_iff_not_blocked hen hs).2 hnb⟩⟩
+
+/-- The miss is exactly a blocked retry. -/
+theorem miss_iff {n : Nat} :
+    Action.miss i (enabled i) (grant i) σ n ↔ Steps i σ n ∧ blocked i (σ n) := by
+  rw [Action.miss_iff]
+  constructor
+  · rintro ⟨hs, hen, hng⟩
+    exact ⟨hs, Classical.byContradiction fun hnb => hng ((grant_iff_not_blocked hen hs).2 hnb)⟩
+  · rintro ⟨hs, hb⟩
+    have hen := enabled_of_blocked hb
+    exact ⟨hs, hen, fun hg => (grant_iff_not_blocked hen hs).1 hg hb⟩
+
 end Hart
 
 /-! ## 3. Machine closure of the choice instances
@@ -563,14 +629,14 @@ theorem exists_restart (h : enabled i c) (tick ew : Bool) :
 /-- At a live boundary a ticking restart, a grant, exists. -/
 theorem exists_grant (h : enabled i c) : ∃ c', Step i c c' ∧ grant i c c' := by
   obtain ⟨c', hs, e, x, he, he'⟩ := exists_restart h true false
-  exact ⟨c', hs, e, x, false, he, he'⟩
+  exact ⟨c', hs, hs, e, x, false, he, he'⟩
 
 /-- At a live boundary a tickless restart, which is not a grant, exists
 (`riscvStep_false_ne_true`). -/
 theorem exists_not_grant (h : enabled i c) : ∃ c', Step i c c' ∧ ¬ grant i c c' := by
   obtain ⟨c', hs, e, x, he, he'⟩ := exists_restart h false false
   refine ⟨c', hs, ?_⟩
-  rintro ⟨e', x', ew', -, he2⟩
+  rintro ⟨-, e', x', ew', -, he2⟩
   rw [he'] at he2
   exact riscvStep_false_ne_true false ew' (Expr.hart.inj (Option.some.inj he2)).2.2
 
@@ -598,7 +664,7 @@ theorem exists_answer {k : Nat → DevProg d} (h : enabled i d (.op .choose k) c
 theorem exists_grant {k : Nat → DevProg d} (h : enabled i d (.op .choose k) c) (m v : Nat) :
     ∃ c', Step i c c' ∧ grant i d (.op .choose k) m (v % m) c c' := by
   obtain ⟨c', hs, e, he, he'⟩ := exists_answer h v
-  exact ⟨c', hs, e, v, rfl, he, he'⟩
+  exact ⟨c', hs, hs, e, v, rfl, he, he'⟩
 
 end Arm
 
@@ -611,7 +677,8 @@ open Cycle
 variable {i : Nat} {c : Cfg} {a : PAddr}
 
 /-- At a live hart's plain RAM load whose footprint's bytes have well-formed histories, a step
-reading at the top of the order exists; after it the hart's coherence floor of every byte of the
+reading at the top of the order exists.  It takes the load, and the hart moves on to the
+continuation at the value read.  After it the hart's coherence floor of every byte of the
 footprint is the top, so the load has seen every store there is: the grant holds for every
 store `t` up to the top. -/
 theorem exists_grant (h : atLoad i a c) (hmm : mmOk c.2.m) (hh : ramHist c.2.m.mem) :
@@ -622,8 +689,9 @@ theorem exists_grant (h : atLoad i a c) (hmm : mmOk c.2.m) (hh : ramHist c.2.m.m
       (c.2.m.afterLoad x req.pa req.size c.2.m.top) :=
     Or.inr (Or.inr (Or.inl ⟨hr, hp, c.2.m.top, w, (hmm.2.1 x).1, Nat.le_refl _,
       fun j' _ => ((hmm.2.1 x).2.2).2 _, hw, rfl, rfl⟩))
-  refine ⟨_, step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩)), fun t ht =>
-    ⟨e, x, _, he, ?_⟩⟩
+  have hs := step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩))
+  refine ⟨_, hs, fun t ht =>
+    ⟨hs, e, x, req, k, .ok (w, 0#req.numTag), he, getElem?_set_append he, ?_⟩⟩
   show t ≤ (updCpu c.2.m.hr x ((c.2.m.hr x).afterLoad req.pa req.size c.2.m.top) x).coh _
   simp only [updCpu, ite_true, HRead.afterLoad]
   rw [ite_eq_left ⟨j, hj, rfl⟩]
@@ -639,27 +707,107 @@ open Cycle
 
 variable {i : Nat} {c : Cfg}
 
-/-- At a pending access that is not blocked, a served step exists (the exclusive read needs the
-footprint's bytes to have histories, for the value at the top). -/
+/-- At a pending access that is not blocked, a served step exists, a grant (the exclusive read
+needs the footprint's bytes to have histories, for the value at the top).  The step is built from
+the served arm of `evStep`; that it is a grant is `grant_iff_not_blocked`. -/
 theorem exists_served (hen : enabled i c) (hnb : ¬ blocked i c) (hh : ramHist c.2.m.mem) :
-    ∃ c', Step i c c' := by
-  obtain ⟨e, x, o, k, he, hl, hm⟩ := hen
-  cases o with
-  | memRead req =>
-    obtain ⟨hx, hr⟩ := hm
-    obtain ⟨w, hw⟩ := exists_topBytes hh hr
-    have hev : evStep x (.memRead req) c.2.m (.ok (w, 0#req.numTag))
-        (c.2.m.afterExcl x req.pa req.size w (akAcq req.accessKind) (kindOf req.accessKind)) :=
-      Or.inr (Or.inr (Or.inr ⟨hr, hx, fun ho => hnb ⟨e, x, _, k, he, hl, hx, hr, ho⟩, w, hw, rfl, rfl⟩))
-    exact ⟨_, step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩))⟩
-  | memWrite req w a =>
-    have hev : evStep x (.memWrite req w a) c.2.m (.ok ())
-        (c.2.m.store x req.pa req.size w (akExcl req.accessKind)) :=
-      Or.inr ⟨hm, fun ho => hnb ⟨e, x, _, k, he, hl, hm, ho⟩, rfl, rfl⟩
-    exact ⟨_, step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩))⟩
-  | _ => exact hm.elim
+    ∃ c', Step i c c' ∧ grant i c c' := by
+  have hstep : ∃ c', Step i c c' := by
+    obtain ⟨e, x, o, k, he, hl, hm⟩ := hen
+    cases o with
+    | memRead req =>
+      obtain ⟨hx, hr⟩ := hm
+      obtain ⟨w, hw⟩ := exists_topBytes hh hr
+      have hev : evStep x (.memRead req) c.2.m (.ok (w, 0#req.numTag))
+          (c.2.m.afterExcl x req.pa req.size w (akAcq req.accessKind) (kindOf req.accessKind)) :=
+        Or.inr (Or.inr (Or.inr
+          ⟨hr, hx, fun ho => hnb ⟨e, x, _, k, he, hl, hx, hr, ho⟩, w, hw, rfl, rfl⟩))
+      exact ⟨_, step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩))⟩
+    | memWrite req w a =>
+      have hev : evStep x (.memWrite req w a) c.2.m (.ok ())
+          (c.2.m.store x req.pa req.size w (akExcl req.accessKind)) :=
+        Or.inr ⟨hm, fun ho => hnb ⟨e, x, _, k, he, hl, hm, ho⟩, rfl, rfl⟩
+      exact ⟨_, step_of_primStep he (primStep_hart_live hl (Or.inl ⟨_, rfl, hev⟩))⟩
+    | _ => exact hm.elim
+  obtain ⟨c', hs⟩ := hstep
+  exact ⟨c', hs, (grant_iff_not_blocked hen hs).2 hnb⟩
 
 end Hart
+
+/-! ### 3.5 A device's DMA write: the miss is a blocked retry
+
+A live device task's step takes one of two arms of `devStep`.  The answer arm moves the task on to
+the continuation; the blocked arm (`devBlocked`) keeps its program.  At a DMA write whose guard
+answers a faithful move into RAM, the blocked arm is exactly a blocking reservation over the
+footprint (`anyReserve`), and the answer arm needs there to be none.  So the task's step is a grant
+exactly when the write is not blocked, as for a hart's access in section 2. -/
+
+namespace Dma
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg} {d : DevId} {tid : TaskId}
+
+/-- At a pending DMA write, the task's own step is a grant exactly when the write is not blocked.
+An unblocked write is served: the no-op arm needs the guard to fail or the footprint outside RAM.
+A blocked write takes the blocked arm, which keeps the program, and a served step never does: the
+continuation is below the node (`Cycle.DevM.below_irrefl`). -/
+theorem grant_iff_not_blocked (hen : enabled i d tid c) (hs : Step i c c') :
+    grant i d tid c c' ↔ ¬ blocked i d tid c := by
+  obtain ⟨e, g, pa, n, w, k, he, hl, ⟨s', hg, hok⟩, hr⟩ := hen
+  have hbl : blocked i d tid c ↔ anyReserve c.2.m.resv pa n := by
+    constructor
+    · rintro ⟨e2, g2, pa2, n2, w2, k2, he2, -, -, -, hany⟩
+      rw [he] at he2
+      cases he2
+      exact hany
+    · intro hany
+      exact ⟨e, g, pa, n, w, k, he, hl, ⟨s', hg, hok⟩, hr, hany⟩
+  rw [hbl]
+  obtain ⟨ex, obs, e', efs, he1, hp, hc'⟩ := id hs
+  rw [he] at he1
+  obtain rfl := Option.some.inj he1
+  have hc'i : c'.1[i]? = some e' := by
+    rw [hc']
+    exact getElem?_set_append he
+  rcases hp with ⟨-, m', σ', rfl, hd, -⟩ | ⟨hnl, -⟩
+  · simp only [devStep] at hd
+    rcases hd with ⟨v, rfl, -, -, ⟨-, -, -, -, hnr, -⟩ | ⟨hno, -⟩⟩ | ⟨hb, rfl, -⟩
+    · exact ⟨fun _ => hnr, fun _ => ⟨hs, e, g, pa, n, w, k, v, he, hc'i⟩⟩
+    · rcases hno with hno | hno
+      · rw [hg] at hno
+        cases hno
+      · exact absurd hr hno
+    · obtain ⟨-, hany | ⟨-, s'', hg', hnok⟩⟩ := hb
+      · refine ⟨fun hgr => absurd hgr ?_, fun h => absurd hany h⟩
+        rintro ⟨-, e2, g2, pa2, n2, w2, k2, v, he2, he2'⟩
+        rw [he] at he2
+        cases he2
+        rw [hc'i] at he2'
+        have hkv : k v = .op (.dmaWrite g pa n w) k :=
+          (eq_of_heq (Expr.dev.inj (Option.some.inj he2')).2.2.2).symm
+        have hbelow := DevM.Below.cont (.dmaWrite g pa n w) k v
+        rw [hkv] at hbelow
+        exact absurd hbelow (DevM.below_irrefl _)
+      · rw [hg] at hg'
+        cases hg'
+        exact absurd hok hnok
+  · exact absurd hl hnl
+
+variable {σ : Nat → Cfg}
+
+/-- The miss is exactly a blocked retry. -/
+theorem miss_iff {n : Nat} :
+    Action.miss i (enabled i d tid) (grant i d tid) σ n ↔ Steps i σ n ∧ blocked i d tid (σ n) := by
+  rw [Action.miss_iff]
+  constructor
+  · rintro ⟨hs, hen, hng⟩
+    exact ⟨hs, Classical.byContradiction fun hnb => hng ((grant_iff_not_blocked hen hs).2 hnb)⟩
+  · rintro ⟨hs, hb⟩
+    have hen := enabled_of_blocked hb
+    exact ⟨hs, hen, fun hg => (grant_iff_not_blocked hen hs).1 hg hb⟩
+
+end Dma
 
 /-! ## 4. Every RAM byte keeps a history (`ramHist`)
 
@@ -952,13 +1100,13 @@ variable {i n : Nat} {σ : Nat → Cfg}
 /-- The Progress Axiom relativised to the era (`□(T → ◇(B ∨ off))`): every pending access is
 eventually served, or the hart is eventually dead (its generation ended by a power cut). -/
 def ProgressOrCut (i : Nat) (σ : Nat → Cfg) : Prop :=
-  ∀ n, enabled i (σ n) → ∃ m ≥ n, Action.hit i (enabled i) (grant i) σ m ∨ ¬ liveAt i (σ m)
+  ∀ n, enabled i (σ n) → ∃ m ≥ n, Action.hit (enabled i) (grant i) σ m ∨ ¬ liveAt i (σ m)
 
 /-- A pending access stays pending until it is served, as long as the hart is live: another
 thread's step is not a cut (the hart stays live) and keeps the access (`stable`); the hart's
 own unserved step is a blocked retry, which keeps it blocked (`pending_of_blocked`). -/
 theorem enabled_until_hit (hrun : PoolRun σ) (hen : enabled i (σ n)) {k : Nat} (hnk : n ≤ k)
-    (hno : ∀ m, n ≤ m → m < k → ¬ Action.hit i (enabled i) (grant i) σ m)
+    (hno : ∀ m, n ≤ m → m < k → ¬ Action.hit (enabled i) (grant i) σ m)
     (hlive : ∀ m, n ≤ m → m ≤ k → liveAt i (σ m)) : enabled i (σ k) := by
   induction k with
   | zero =>
@@ -987,12 +1135,13 @@ theorem enabled_until_hit (hrun : PoolRun σ) (hen : enabled i (σ n)) {k : Nat}
 /-- Strong fairness gives the era-relativised response.  On any run of the pool: if a
 pending access were never served while the hart stays live, it would stay pending for ever, and
 strong fairness would serve it.  No fair-scheduling hypothesis is needed: the hits strong
-fairness provides are the thread's own steps. -/
+fairness provides are the thread's own steps, because the grant is one of the thread's
+transitions (`Hart.ownGrant`). -/
 theorem progressOrCut_of_sf (hrun : PoolRun σ) (h : SF i σ) : ProgressOrCut i σ := by
   intro n hen
   apply Classical.byContradiction
   intro hno
-  have hno' : ∀ m, n ≤ m → ¬ Action.hit i (enabled i) (grant i) σ m ∧ liveAt i (σ m) :=
+  have hno' : ∀ m, n ≤ m → ¬ Action.hit (enabled i) (grant i) σ m ∧ liveAt i (σ m) :=
     fun m hm => ⟨fun hh => hno ⟨m, hm, Or.inl hh⟩,
       Classical.byContradiction fun hd => hno ⟨m, hm, Or.inr hd⟩⟩
   have hall : ∀ k, n ≤ k → enabled i (σ k) := fun k hk =>
@@ -1028,13 +1177,13 @@ theorem sf_of_dead {m : Nat} (hrun : PoolRun σ) (hen : enabled i (σ n)) (hnm :
 /-- The cut, second half: a pending access cut off by the hart's death before it is served is
 never served, so the unrelativised Progress Axiom fails on that run. -/
 theorem not_progressAxiom_of_cut {m : Nat} (hrun : PoolRun σ) (hen : enabled i (σ n))
-    (hnm : n ≤ m) (hno : ∀ k, n ≤ k → k < m → ¬ Action.hit i (enabled i) (grant i) σ k)
+    (hnm : n ≤ m) (hno : ∀ k, n ≤ k → k < m → ¬ Action.hit (enabled i) (grant i) σ k)
     (hd : ¬ liveAt i (σ m)) : ¬ ProgressAxiom i σ := by
   intro hp
   obtain ⟨k, hk, hhit⟩ := hp n hen
   rcases Nat.lt_or_ge k m with hkm | hkm
   · exact hno k hk hkm hhit
-  · exact Era.dead_forever hrun (live hen) hnm hd hkm (live hhit.1.2)
+  · exact Era.dead_forever hrun (live hen) hnm hd hkm (live hhit.1)
 
 /-- On a run where the thread at `i`, once live, stays live (no cut ends its generation), strong
 fairness gives the Progress Axiom in response form. -/
