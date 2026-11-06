@@ -16,7 +16,8 @@ are `local-plan/liveness/attempt-grant.md` and `fairness-base.md`; all of `local
 the repository).  It was re-layered 2026-11-06 (lane `fairness-layers`): the state form of an
 action is the base, and the thread's view is built on top of it.  The same day (lane
 `fairness-split`) the general theory moved to `FairnessTheory.lean`, generic over the pool, and
-this file kept MachCSL's instance.  Nothing in the trusted base imports this directory
+this file kept MachCSL's instance; later that day (lane `fairness-ag`) the theory's layer 0 became
+the attempt–grant pair, three layers in all.  Nothing in the trusted base imports this directory
 (`MachCSL/Liveness/`); it is built by `lake build MachCSL` and checked by CI like every module of
 the library.
 

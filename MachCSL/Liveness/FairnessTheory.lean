@@ -67,12 +67,14 @@ grant, which all six actions of `Fairness.lean` have.
 run or a relation (`Fair`, `SF`, `Response`, `WF`, `Certain`, `AttemptGrant`, `IsCounter`,
 `OwnStep`, `OwnGrant`, `Stable`, `Persists`); lower-case names are position or configuration
 predicates (`attempt`, `grant`, `hit`, `miss`, `enabled`).  The layers above layer 0 state their
-pair as abbreviations of layer 0's, so layer 0's theorems apply to them as they stand and are not
-copied.  Theorems read `conclusion_of_hypothesis` (`attemptGrant_of_sf`, `counter_of_sf`,
+pair as abbreviations of layer 0's, so layer 0's theorems apply to them as they stand; the layers
+copy none of the rules, and restate by the thread's name only the three facts the documents cite
+(`Thread.attemptGrant_iff_attempt`, `attemptGrant_of_certain`, `counter_zero_of_certain`).
+Theorems read `conclusion_of_hypothesis` (`attemptGrant_of_sf`, `counter_of_sf`,
 `sf_of_attemptGrant`) or `subject_property` (`counter_reset`, `hit_miss_exclusive`), and
 equivalences read `x_iff_y` (`sf_iff_fair`, `sf_iff_attemptGrant`).  A hypothesis has the same name
 everywhere: `hsf` for `Action.SF`, `hag` for an attempt–grant form (layer 0's `Fair` or the
-thread's `AttemptGrant`), `hown` for `OwnGrant`, `hsched` for `StepsInfOften`, `hper` for
+thread's `AttemptGrant`), `hown` for `OwnGrant`, `hos` for `OwnStep`, `hsched` for `StepsInfOften`, `hper` for
 `Persists`, `hstab` for stability, `hrun` for `PoolRun`, `hδ` for a counter, `hc` for `Certain`,
 and `ha`, `hg`, `hA`, `hs` for the facts at a position (an attempt, a grant, `A` holds, the thread
 steps).  The names every action of `Fairness.lean` has are in that file's header.
@@ -463,6 +465,15 @@ theorem fair_iff_attempt :
   · intro h hinf
     exact h (MissHit.infOften_mono (fun _ hm => hm.1) hinf)
 
+/-- A response property gives fairness: every attempt is followed by a granted attempt, at it or
+later. -/
+theorem fair_of_response (h : ∀ n, attempt n → ∃ m ≥ n, hit attempt grant m) :
+    Fair attempt grant :=
+  fun hmiss n =>
+    let ⟨m, hm, hmiss_m⟩ := hmiss n
+    let ⟨k, hk, hhit⟩ := h m hmiss_m.1
+    ⟨k, Nat.le_trans hm hk, hhit⟩
+
 /-! ### The counter and its rules
 
 Attempt–grant fairness is the existence of a counter.  At a granted attempt the counter resets, at
@@ -506,8 +517,8 @@ theorem isCounter_iff : IsCounter attempt grant δ ↔
 /-! ### What a counter bounds
 
 A refused attempt has a positive counter, so an attempt made at counter zero is granted.  Until the
-next granted attempt the counter dominates the refused attempts to come.  These are the facts a
-thread consumes from a counter. -/
+next granted attempt the counter dominates the refused attempts to come.  These are the facts the
+layers above consume from a counter. -/
 
 /-- A refused attempt has a positive counter. -/
 theorem counter_pos_of_miss (hδ : IsCounter attempt grant δ) (h : miss attempt grant n) :
@@ -515,7 +526,7 @@ theorem counter_pos_of_miss (hδ : IsCounter attempt grant δ) (h : miss attempt
   have := counter_drop hδ h.1 h.2
   omega
 
-/-- The base case of the thread's induction: an attempt made at counter zero is granted. -/
+/-- The base case of a waiter's induction: an attempt made at counter zero is granted. -/
 theorem grant_of_attempt_of_counter_zero (hδ : IsCounter attempt grant δ) (ha : attempt n)
     (h0 : δ n = 0) : grant n :=
   Classical.byContradiction fun hg => Nat.ne_of_gt (counter_pos_of_miss hδ ⟨ha, hg⟩) h0
@@ -552,7 +563,7 @@ view of section 4 is such a subset of the action's attempts when every grant is 
 step. -/
 
 /-- Fairness survives shrinking the attempts to a subset that still contains every granted
-position. -/
+attempt. -/
 theorem fair_mono {attempt' : Nat → Prop} (hatt : ∀ n, attempt' n → attempt n)
     (hgr : ∀ n, attempt n → grant n → attempt' n) (hag : Fair attempt grant) :
     Fair attempt' grant :=
@@ -700,7 +711,7 @@ end Action
 
 A pool is a type of configurations with a step relation for the thread at each position, and a
 run is a sequence of configurations.  The class `Pool` is all that the general theory takes from
-a language.  Layers 0 and 1 use no pool; layer 2 (section 4) uses a thread's step. -/
+a language.  Sections 1 and 2 use no pool; this section and section 4 use a thread's step. -/
 
 /-- A thread pool: configurations, and the step of the thread at a position.  All the general
 theory takes from a language.  MachCSL's instance is in `Fairness.lean`; Lantana's will be its
@@ -744,9 +755,9 @@ def OwnStep (i : Nat) (σ : Nat → Cfg) (attempt : Nat → Prop) : Prop :=
 
 /-- A thread's pair has a counter that never moves at another thread's step.  The one rule that
 names a thread. -/
-theorem counter_stay_of_other (h : OwnStep i σ attempt) (hδ : IsCounter attempt grant δ)
+theorem counter_stay_of_other (hos : OwnStep i σ attempt) (hδ : IsCounter attempt grant δ)
     (hs : ¬ Steps i σ n) : δ n = δ (n + 1) :=
-  counter_stay hδ fun ha => hs (h n ha)
+  counter_stay hδ fun ha => hs (hos n ha)
 
 end AttemptGrant
 
@@ -758,7 +769,9 @@ a granted attempt and a miss a refused one.  The view's attempts are the thread'
 action (`ownStep`), so its counter moves only at the thread's own steps (`counter_stay_of_other`),
 and the thread can consume it there with no help from the logic.  This is the cheap path, which
 Lantana takes for a declared action with own grant.  Like layer 1, the layer states its pair as
-abbreviations of layer 0's and copies none of its theorems.
+abbreviations of layer 0's and copies none of its rules; it restates by the thread's name the three
+facts the documents cite (`attemptGrant_iff_attempt`, `attemptGrant_of_certain`,
+`counter_zero_of_certain`).
 
 The view is sound under own grant (`OwnGrant`), which says that every grant is a step of the
 thread.  Then the thread's attempts are the positions where `A` holds, cut down to the thread's
