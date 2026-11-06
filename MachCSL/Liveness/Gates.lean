@@ -554,7 +554,7 @@ def enabled (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d
 many steps through it.  The grant is the device tasks' (`Dev.grant`). -/
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d))
     (σ : Nat → Cfg) : Prop :=
-  Action.SF i (enabled i d tid o) (Dev.grant i d tid) σ
+  Action.SF (enabled i d tid o) (Dev.grant i d tid) σ
 
 /-- Another live task of device `d`, at a position other than `i` and at a node whose primitive
 satisfies `K`, takes the step from `c` to `c'`: the shape of a closing transition. -/
@@ -2174,7 +2174,7 @@ theorem req_sf_iff {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitV
     (hR : NoBusyReset σ)
     (hK : ∀ m, Gate.dmaAt i .virtio tid (reqGuard h r) pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ completes h o) (σ m) (σ (m + 1))) :
-    Action.SF i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w) (Dma.grant i .virtio tid) σ ↔
+    Action.SF (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w) (Dma.grant i .virtio tid) σ ↔
       Action.AttemptGrant i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w)
         (Dma.grant i .virtio tid) σ :=
   Action.sf_iff_attemptGrant hsched (req_persists hrun hprog hR hK)
@@ -2234,7 +2234,7 @@ theorem snap_sf_iff {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {cf : VirtioCf
     (hprog : ∀ n, progs (σ n)) (hR : NoBusyReset σ) (hC : NoConfigWrite σ)
     (hK : ∀ m, Gate.dmaAt i .virtio tid g pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ isUsedIdx o) (σ m) (σ (m + 1))) :
-    Action.SF i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ ↔
+    Action.SF (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ ↔
       Action.AttemptGrant i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ :=
   Action.sf_iff_attemptGrant hsched (snap_persists hg hrun hprog hR hC hK)
 
