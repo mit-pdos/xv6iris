@@ -24,12 +24,15 @@ The file, in order:
    (`grant_iff_not_blocked`): the hit is a served access and the miss is a blocked retry
    (`hit_iff`, `miss_iff`).
 3. The machine closure of the choice instances.  At each attempt condition the thread has a step
-   for every outcome the action distinguishes, and each grant is such a step: both restarts at a
+   for the outcomes named here, and each grant is such a step: both restarts at a
    live boundary (`Tick.exists_grant`, `Tick.exists_not_grant`; a restarted cycle is never empty,
    `Cycle.riscvStep_impure`), every answer at a `choose` node (`Arm.exists_answer`), a load at
-   the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).  Subsection 3.5 does
-   for a DMA write what section 2 does for a hart's access: the task's step is a grant exactly
-   when the write is not blocked, so the miss is a blocked retry (`Dma.miss_iff`).
+   the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).  Every own step at a
+   plain load takes the load, so `Fresh`'s grant is, under its attempt condition, the post-state
+   floor alone (`Fresh.takes_load`, `Fresh.grant_iff_coh`).  Subsection 3.5 does for a DMA write
+   what section 2 does for a hart's access: the task's step is a grant exactly when the write is
+   not blocked, so the hit is a served write and the miss is a blocked retry (`Dma.hit_iff`,
+   `Dma.miss_iff`).
 4. `ramHist`, every RAM byte has a nonempty history, the fact the memory reads of section 3 need:
    it is not part of `mmOk` (which says the converse), it holds of a booted memory and every step
    keeps it (`ramHist_step`, `ramHist_run`).
@@ -697,6 +700,34 @@ theorem exists_grant (h : atLoad i a c) (hmm : mmOk c.2.m) (hh : ramHist c.2.m.m
   rw [ite_eq_left ⟨j, hj, rfl⟩]
   exact ht
 
+/-- Every own step of a live hart at a plain RAM load takes the load: a plain load is never
+blocked, since blocking needs an exclusive access, so the hart moves on to the continuation. -/
+theorem takes_load {c' : Cfg} (h : atLoad i a c) (hs : Step i c c') :
+    ∃ e x req k v, c.1[i]? = some (.hart e x (.impure (.inl (.ok (.memRead req))) k)) ∧
+      c'.1[i]? = some (.hart e x (k v)) := by
+  obtain ⟨e, x, req, k, he, hl, hp, -, -⟩ := h
+  obtain ⟨m', he', ⟨-, hst, -⟩ | ⟨hd, -⟩⟩ := step_hart hs he
+  · rcases hst with ⟨v, rfl, -⟩ | ⟨hb, -⟩
+    · exact ⟨e, x, req, k, v, he, he'⟩
+    · have hx : akExcl req.accessKind = true := hb.1
+      rw [Hart.not_plain_of_excl hx] at hp
+      exact absurd hp (by decide)
+  · exact absurd hl hd
+
+/-- Under the attempt condition and the hart's step, the grant is the post-state fact alone: the
+hart's coherence floor of `a` is at or past `t` afterwards.  This was the grant's statement before
+2026-11-06; the trusted hypothesis `Fresh.SF` means the same under both. -/
+theorem grant_iff_coh {c' : Cfg} {t : Nat} (h : enabled i t a c) (hs : Step i c c') :
+    grant i t a c c' ↔ ∃ e x m, c.1[i]? = some (.hart e x m) ∧ t ≤ (c'.2.m.hr x).coh a := by
+  constructor
+  · rintro ⟨-, e, x, req, k, v, he, -, ht⟩
+    exact ⟨e, x, _, he, ht⟩
+  · rintro ⟨e, x, m, he, ht⟩
+    obtain ⟨e2, x2, req, k, v, he2, he2'⟩ := takes_load h.1 hs
+    rw [he] at he2
+    cases he2
+    exact ⟨hs, e, x, req, k, v, he, he2', ht⟩
+
 end Fresh
 
 /-! ### 3.4 Harts progress: a served step exists at an unblocked access -/
@@ -806,6 +837,13 @@ theorem miss_iff {n : Nat} :
   · rintro ⟨hs, hb⟩
     have hen := enabled_of_blocked hb
     exact ⟨hs, hen, fun hg => (grant_iff_not_blocked hen hs).1 hg hb⟩
+
+/-- The hit is exactly a served write: a step at a pending DMA write that is not blocked. -/
+theorem hit_iff {n : Nat} :
+    Action.hit (enabled i d tid) (grant i d tid) σ n ↔
+      Steps i σ n ∧ enabled i d tid (σ n) ∧ ¬ blocked i d tid (σ n) :=
+  ⟨fun ⟨hen, hg⟩ => ⟨hg.1, hen, (grant_iff_not_blocked hen hg.1).1 hg⟩,
+   fun ⟨hs, hen, hnb⟩ => ⟨hen, (grant_iff_not_blocked hen hs).2 hnb⟩⟩
 
 end Dma
 
@@ -1135,8 +1173,7 @@ theorem enabled_until_hit (hrun : PoolRun σ) (hen : enabled i (σ n)) {k : Nat}
 /-- Strong fairness gives the era-relativised response.  On any run of the pool: if a
 pending access were never served while the hart stays live, it would stay pending for ever, and
 strong fairness would serve it.  No fair-scheduling hypothesis is needed: the hits strong
-fairness provides are the thread's own steps, because the grant is one of the thread's
-transitions (`Hart.ownGrant`). -/
+fairness provides are the thread's own steps, since a grant contains the step (`hit_iff`). -/
 theorem progressOrCut_of_sf (hrun : PoolRun σ) (h : SF i σ) : ProgressOrCut i σ := by
   intro n hen
   apply Classical.byContradiction

@@ -527,8 +527,8 @@ ends.  Every attempt condition is a live thread's, so on a run where the thread 
 point on there are finitely many attempts and the strong fairness holds vacuously
 (`sf_of_dead_from`; a thread that dies stays dead, `eventuallyDead_of_dead`).  Strong fairness
 itself names no thread: the thread is in the attempt condition, which is the thread at `i`'s, and
-in the grant, one of its transitions (`Fairness.lean` section 4).  The forms the
-logic consumes are the attempt–grant forms; strong fairness gives them on every run
+in the grant, one of its transitions (`Fairness.lean` section 4).  The forms the logic consumes
+are the attempt–grant forms; strong fairness gives them on every run
 (`Action.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The case split is what the
 converse needs: under fair scheduling the two forms coincide at every position (`sf_iff_ag`),
 by the instance's `sf_iff` where the thread is eventually live and vacuously where it is

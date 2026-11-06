@@ -43,6 +43,9 @@ Fairness.Arm.exists_answer
 Fairness.Arm.exists_grant
 Fairness.Fresh.exists_grant
 Fairness.Hart.exists_served
+Fairness.Fresh.grant_iff_coh
+Fairness.Hart.grant_iff_not_blocked
+Fairness.Dma.grant_iff_not_blocked
 Fairness.ramHist_run
 Fairness.Hart.sf_iff_progressOrCut
 Fairness.Hart.sf_iff_response

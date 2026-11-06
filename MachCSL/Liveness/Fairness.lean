@@ -560,9 +560,9 @@ is a position where `A` holds and the step taken is a grant.  A miss is an attem
 hit.
 
 The two bridges between `SF` and the attempt–grant form need no requirement, because a miss and a
-hit are both positions where `A` holds.  The counter rules need `OwnGrant` where layer 1 needed R1.
-With it a hit is an attempt (`hitsAttempt`), and the counter stays at every other thread's step
-(`counter_stay_of_other`).  Without it a grant could happen at another thread's step, and the
+hit are both positions where `A` holds.  Of the counter rules, only the stay rule at other threads'
+steps needs `OwnGrant`, through R1: with it a hit is an attempt (`hitsAttempt`), and the counter
+stays at every other thread's step (`counter_stay_of_other`).  Without it a grant could happen at another thread's step, and the
 counter would reset there.  That is the loss the requirement prevents. -/
 
 namespace Action
