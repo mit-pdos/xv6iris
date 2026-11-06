@@ -525,7 +525,9 @@ end Hyps
 An assumption about the thread at position `i` constrains only runs in which `i`'s era never
 ends.  Every attempt condition is a live thread's, so on a run where the thread is dead from some
 point on there are finitely many attempts and the strong fairness holds vacuously
-(`sf_of_dead_from`; a thread that dies stays dead, `eventuallyDead_of_dead`).  The forms the
+(`sf_of_dead_from`; a thread that dies stays dead, `eventuallyDead_of_dead`).  Strong fairness
+itself names no thread: the thread is in the attempt condition, which is the thread at `i`'s, and
+in the grant, one of its transitions (`Fairness.lean` section 4).  The forms the
 logic consumes are the attempt–grant forms; strong fairness gives them on every run
 (`Action.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The case split is what the
 converse needs: under fair scheduling the two forms coincide at every position (`sf_iff_ag`),
@@ -537,7 +539,7 @@ namespace Action
 /-- Strong fairness of an action whose attempt condition is a live thread's holds vacuously on a
 run where the thread is eventually dead. -/
 theorem sf_of_dead_from {A : Cfg → Prop} {G : Cfg → Cfg → Prop} (hlive : ∀ c, A c → liveAt i c)
-    (hd : EventuallyDead i σ) : Action.SF i A G σ := by
+    (hd : EventuallyDead i σ) : Action.SF A G σ := by
   intro hA
   obtain ⟨N, hN⟩ := hd
   obtain ⟨m, hm, hAm⟩ := hA N
@@ -548,7 +550,7 @@ thread's, and persists while the thread is eventually live, is its attempt–gra
 theorem sf_iff_ag {A : Cfg → Prop} {G : Cfg → Cfg → Prop} (hrun : PoolRun σ)
     (hsched : FairSched σ) (hlive : ∀ c, A c → liveAt i c)
     (hper : EventuallyLive i σ → Fairness.Action.Persists i A σ) :
-    Action.SF i A G σ ↔ Fairness.Action.AttemptGrant i A G σ := by
+    Action.SF A G σ ↔ Fairness.Action.AttemptGrant i A G σ := by
   rcases live_or_dead hrun with hl | hd
   · exact Action.sf_iff_attemptGrant (stepsInfOften_of_eventuallyLive hsched hl) (hper hl)
   · exact ⟨Action.attemptGrant_of_sf, fun _ => sf_of_dead_from hlive hd⟩
