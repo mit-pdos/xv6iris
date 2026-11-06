@@ -23,7 +23,6 @@ import Xv6.LinkBeginOp
 import Xv6.LinkNamei
 import Xv6.LinkEndOp
 import Xv6.LinkCopyout
-import Xv6.LinkIdup
 
 namespace Xv6
 
