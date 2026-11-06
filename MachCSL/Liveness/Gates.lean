@@ -3,8 +3,9 @@ import MachCSL.Liveness.Fairness
 /-! # The stable gates of the device programs
 
 Milestone B2 of lane `xv6-liveness-now`: the plan's stable-gate lemma, for each gate of the three
-device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (6.5),
-whose grant is certain; its strong fairness follows from fair scheduling and persistence
+device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (7.5).
+Its grant is certain at the task's own attempts, in the thread's view of the action (section 5 of
+that file).  Its strong fairness follows from fair scheduling and persistence
 (`Dev.sf_of_persists`).  The lemma says, for each gate, that once the gate is open no other
 thread's step but the power thread's closes it before the task steps through, except for named
 closing transitions.  Each gate's theorem takes a hypothesis excluding its closers while the gate
@@ -60,7 +61,7 @@ a closer is named by the program node it steps at. -/
 namespace Fairness
 
 open MachCSL Sail Sail.ArchSem LeanRV64D
-open Action (Persists)
+open Thread (Persists)
 open Era (liveAt StableExceptPower StableExceptPowerUnder)
 
 namespace Gate
@@ -582,15 +583,16 @@ theorem live (h : enabled i d tid o c) : liveAt i c := taskAt_live h.1
 theorem dev_enabled (hdma : ¬ Dev.isDma o) (h : enabled i d tid o c) : Dev.enabled i d tid c :=
   let ⟨⟨e, k, he, hl⟩, hnb⟩ := h; ⟨e, o, k, he, hl, hdma, hnb⟩
 
-/-- Stepping through an open gate is certain. -/
+/-- Stepping through an open gate is certain: every attempt of the task at the open gate is
+granted. -/
 theorem certain (hdma : ¬ Dev.isDma o) :
-    Action.Certain i (enabled i d tid o) (Dev.grant i d tid) σ :=
+    Thread.Certain i (enabled i d tid o) (Dev.grant i d tid) σ :=
   fun n ⟨hs, hA⟩ => Dev.certain n ⟨hs, dev_enabled hdma hA⟩
 
 /-- Strong fairness of a gate follows from fair scheduling and its persistence. -/
 theorem sf_of_persists (hdma : ¬ Dev.isDma o) (hsched : StepsInfOften i σ)
     (hper : Persists i (enabled i d tid o) σ) : SF i d tid o σ :=
-  Action.sf_of_certain hsched hper (certain hdma)
+  Thread.sf_of_certain hsched hper (certain hdma)
 
 /-- Strong fairness of a gate that is stable under the steps meeting a side condition, on a run
 whose every step meets it. -/
@@ -2175,9 +2177,9 @@ theorem req_sf_iff {h : BitVec 16} {r : VioReq} {pa : PAddr} {n : Nat} {w : BitV
     (hK : ∀ m, Gate.dmaAt i .virtio tid (reqGuard h r) pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ completes h o) (σ m) (σ (m + 1))) :
     Action.SF (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w) (Dma.grant i .virtio tid) σ ↔
-      Action.AttemptGrant i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w)
+      Thread.AttemptGrant i (Gate.dmaAt i .virtio tid (reqGuard h r) pa n w)
         (Dma.grant i .virtio tid) σ :=
-  Action.sf_iff_attemptGrant hsched (req_persists hrun hprog hR hK)
+  Thread.sf_iff_attemptGrant Dma.ownGrant hsched (req_persists hrun hprog hR hK)
 
 /-- **The used element's and the used index's guard is stable except for five closers.**  Once a
 DMA write guarded on the snapshot (`snapOk`: the request is still `r`, the used index is still
@@ -2235,8 +2237,8 @@ theorem snap_sf_iff {h : BitVec 16} {r : VioReq} {ui : BitVec 16} {cf : VirtioCf
     (hK : ∀ m, Gate.dmaAt i .virtio tid g pa n w (σ m) → ¬ Gate.stepBy i .virtio
       (fun o => servesHead h o ∨ pushesHead h o ∨ isUsedIdx o) (σ m) (σ (m + 1))) :
     Action.SF (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ ↔
-      Action.AttemptGrant i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ :=
-  Action.sf_iff_attemptGrant hsched (snap_persists hg hrun hprog hR hC hK)
+      Thread.AttemptGrant i (Gate.dmaAt i .virtio tid g pa n w) (Dma.grant i .virtio tid) σ :=
+  Thread.sf_iff_attemptGrant Dma.ownGrant hsched (snap_persists hg hrun hprog hR hC hK)
 
 end Disk
 end Fairness
