@@ -34,17 +34,18 @@ Fairness.Thread.counter_of_sf
 Fairness.Thread.sf_iff_attemptGrant
 Fairness.Thread.counter_stay_of_other
 
-# MachCSL/Liveness/Fairness.lean: MachCSL's pool as an instance, eras, the six
-# actions
+# MachCSL/Liveness/Fairness.lean: MachCSL's pool as an instance, eras, the
+# coherence floors, the six actions
 Fairness.Era.persists_of_liveStable
 Fairness.Era.persists_of_liveStableUnder
+Fairness.Mem.coh_mono
 Fairness.Tick.sf_iff
 Fairness.Arm.sf_iff
 Fairness.Fresh.sf_iff
 Fairness.Hart.sf_iff
+Fairness.Dev.answered
 Fairness.Dev.wf
 Fairness.Dma.sf_iff
-Fairness.Fresh.coh_mono
 
 # MachCSL/Liveness/Cycle.lean: a hart's cycle, the closure of the choice
 # instances, ramHist along a run, harts' progress in response form
@@ -59,9 +60,7 @@ Fairness.Arm.exists_answer
 Fairness.Arm.exists_grant
 Fairness.Fresh.exists_grant
 Fairness.Hart.exists_served
-Fairness.Fresh.grant_iff_coh
-Fairness.Hart.grant_iff_not_blocked
-Fairness.Dma.grant_iff_not_blocked
+Fairness.Dma.served_of_unblocked
 Fairness.ramHist_run
 Fairness.Hart.sf_iff_progressOrCut
 Fairness.Hart.sf_iff_response
@@ -89,7 +88,7 @@ Fairness.Spec.live_of_eraLive
 Fairness.Spec.EraLive.trans
 Fairness.Spec.step_of_boot
 Fairness.Spec.progs_of_boot
-Fairness.Spec.stepsInfOften_of_fairSched
+Fairness.Spec.stepsInfOften_of_sched
 Fairness.Spec.live_or_dead
 Fairness.Spec.armFair_iff
 Fairness.Spec.declaredArms_classes
@@ -155,3 +154,23 @@ Fairness.Disk.push_hK
 Fairness.Disk.pop_hK
 Fairness.Disk.req_hK
 Fairness.Disk.snap_hK
+# FairnessTheory.lean section 4 and 6: the scheduling action, the schedule as a proof instrument
+Fairness.Sched.stepsInfOften_of_sf
+Fairness.Sched.certain
+Fairness.Action.sf_iff_wf_of_convex
+Fairness.labelledView_of_sf
+Fairness.exists_fair_schedule
+Fairness.Sched.exists_counter_of_fair_schedule
+Fairness.Sched.stable
+Fairness.Sched.persists
+# Fairness.lean 5.7 and Cycle.lean: MachCSL's scheduling instance, the sole owners
+Fairness.Sched.not_liveAt_power
+Fairness.Sched.convex
+Fairness.Sched.sf_iff_wf
+Fairness.soleOwner_of_changes
+Fairness.Tick.soleOwner
+Fairness.Arm.soleOwner
+Fairness.Fresh.soleOwner
+Fairness.Hart.soleOwner
+Fairness.Dev.soleOwner
+Fairness.Dma.soleOwner
