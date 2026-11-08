@@ -38,8 +38,8 @@ The file, in order:
    era (`Hart.sf_iff_progressOrCut`), and the Progress Axiom itself on a run where the hart, once
    live, stays live (`Hart.sf_iff_response`).  A pending access stays pending until its hit while
    the hart is live: the hart's own step that is not a hit is a step at a blocked access, which
-   keeps it pending (`Hart.enabled_until_hit`).  The era rank (`Era.rank`) makes liveness convex
-   along a run.
+   keeps it pending (`Hart.enabled_until_hit`).  The proofs use that liveness is convex along a
+   run (`Era.liveAt_between`, in `Fairness.lean`).
 -/
 
 namespace Fairness
@@ -952,89 +952,7 @@ once live, stays live. -/
 
 namespace Era
 
-variable {i j n m k : Nat} {c c' : Cfg} {σ : Nat → Cfg}
-
-/-- The era rank of a global state: twice the generation, plus one while the power is on.  It
-never goes down, and a generation `e` is live exactly at rank `2 e + 1`. -/
-def rank (g : GState) : Nat := 2 * g.gen + (if g.pow then 1 else 0)
-
-theorem threadLive_iff_rank (g : GState) (e : Nat) : threadLive g e ↔ rank g = 2 * e + 1 := by
-  unfold threadLive rank
-  cases g.pow <;> simp <;> omega
-
-/-- Every step keeps or raises the era rank: a cut raises it by one (generation up, power off),
-a power-on by one (power on), every other step keeps the generation and the power bit. -/
-theorem rank_mono (hs : Step j c c') : rank c.2 ≤ rank c'.2 := by
-  rcases c with ⟨p, g⟩
-  rcases c' with ⟨p', g'⟩
-  obtain ⟨e, obs, e', efs, he, hp, -⟩ := hs
-  cases e with
-  | hart gen cpu m =>
-    rcases hp with ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩⟩ <;> exact Nat.le_refl _
-  | dev gen d tid m =>
-    rcases hp with ⟨-, m', σ', -, -, rfl⟩ | ⟨-, -, -, -, rfl⟩ <;> exact Nat.le_refl _
-  | power =>
-    rcases hp with ⟨-, ⟨hon, -, -, rfl⟩ | ⟨hoff, -, -, hb⟩⟩
-    · have hon' : g.pow = true := hon
-      show rank g ≤ rank { g with gen := g.gen + 1, pow := false }
-      simp only [rank, hon', ite_true, Bool.false_eq_true, ite_false]
-      omega
-    · have hoff' : g.pow = false := hoff
-      have hb' : bootShape g g' := hb
-      show rank g ≤ rank g'
-      simp only [rank, hoff', hb'.1, hb'.2.1, ite_true, Bool.false_eq_true, ite_false]
-      omega
-
-theorem rank_mono_run (hrun : PoolRun σ) (hnm : n ≤ m) : rank (σ n).2 ≤ rank (σ m).2 := by
-  induction m with
-  | zero =>
-    have h0 : n = 0 := Nat.le_zero.1 hnm
-    subst h0
-    exact Nat.le_refl _
-  | succ m ih =>
-    rcases Nat.lt_or_eq_of_le hnm with hlt | heq
-    · obtain ⟨j, hs⟩ := hrun m
-      exact Nat.le_trans (ih (Nat.le_of_lt_succ hlt)) (rank_mono hs)
-    · subst heq
-      exact Nat.le_refl _
-
-theorem liveAt_of_genAt {e : Nat} (hg : genAt i c = some e) (hl : threadLive c.2 e) :
-    liveAt i c := by
-  unfold genAt at hg
-  cases hc : c.1[i]? with
-  | none => simp [hc] at hg
-  | some ex =>
-    rw [hc] at hg
-    cases ex with
-    | hart gen cpu m =>
-      simp only [Option.bind_some, Expr.gen?, Option.some.injEq] at hg
-      subst hg
-      exact ⟨gen, Or.inl ⟨cpu, m, hc⟩, hl⟩
-    | dev gen d tid m =>
-      simp only [Option.bind_some, Expr.gen?, Option.some.injEq] at hg
-      subst hg
-      exact ⟨gen, Or.inr ⟨d, tid, m, hc⟩, hl⟩
-    | power => simp [Expr.gen?] at hg
-
-/-- Liveness is convex along a run: a thread live at `n` and at `k ≥ n` is live at every
-position in between (its era rank cannot leave `2 e + 1` and come back). -/
-theorem liveAt_between (hrun : PoolRun σ) (hn : liveAt i (σ n)) (hk : liveAt i (σ k))
-    (hnm : n ≤ m) (hmk : m ≤ k) : liveAt i (σ m) := by
-  obtain ⟨e, hg, hp, hgen⟩ := liveAt_gen hn
-  obtain ⟨e', hg', hp', hgen'⟩ := liveAt_gen hk
-  have hgk := genAt_run hrun (Nat.le_trans hnm hmk) hg
-  rw [hg'] at hgk
-  have hee : e' = e := Option.some.inj hgk
-  have r1 := (threadLive_iff_rank _ e).1 ⟨hp, hgen⟩
-  have r2 := (threadLive_iff_rank _ e').1 ⟨hp', hgen'⟩
-  have h1 := rank_mono_run hrun hnm
-  have h2 := rank_mono_run hrun hmk
-  exact liveAt_of_genAt (genAt_run hrun hnm hg) ((threadLive_iff_rank _ e).2 (by omega))
-
-/-- A thread live at `n` and dead at `m ≥ n` is dead at every position from `m` on. -/
-theorem dead_forever (hrun : PoolRun σ) (hn : liveAt i (σ n)) (hnm : n ≤ m)
-    (hm : ¬ liveAt i (σ m)) (hmk : m ≤ k) : ¬ liveAt i (σ k) :=
-  fun hk => hm (liveAt_between hrun hn hk hnm hmk)
+variable {i j : Nat} {c c' : Cfg}
 
 /-- A step that keeps the thread at `i` live is not a cut: if it is the power thread's, the
 thread at `i` was not live before it. -/

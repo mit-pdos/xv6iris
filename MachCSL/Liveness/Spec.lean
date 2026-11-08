@@ -23,9 +23,10 @@ integration removes the stutters of a behaviour before it applies this bundle.
    `MissHit.InfOften` (`infOften_iff`).
 2. The initial configuration (`boot`), the hypotheses of the closed adequacy theorem; what the
    first step of a run from it is (`step_of_boot`).
-3. Fair scheduling of every thread but the power thread (`FairSched`), and what it gives a thread
-   that is live infinitely often (`stepsInfOften_of_fairSched`).  A thread is live from some
-   point on or dead from some point on (`live_or_dead`).
+3. Fair scheduling, the strong fairness of the scheduling action with liveness as the activity
+   (`Sched.SF liveAt`), and what it gives a thread that is live infinitely often
+   (`stepsInfOften_of_sched`).  A thread is live from some point on or dead from some point on
+   (`live_or_dead`).
 4. The declared arms of the devices' `choose` nodes (`ArmDecl`, `declaredArms`, `ArmFair`), each
    node checked against its program, and the theorem that each declared node is a choice whose
    continuation depends only on the class of the answer (`declaredArms_classes`).
@@ -210,13 +211,19 @@ theorem progs_of_boot {img : Nat → BitVec 8} (hb : boot img c) : Disk.progs c 
   | zero => simp at h
   | succ j => simp at h
 
-/-! ## 3. Fair scheduling of every thread but the power thread -/
+/-! ## 3. Fair scheduling of the live threads
 
-/-- A live thread is eventually scheduled.  The power thread is exempt without saying so: it sits
-at position 0 and is never live (`Era.liveAt` holds of harts and device tasks only).  A thread
-that was live and has died since is still scheduled once more, as a corpse; its step changes
-nothing. -/
-def FairSched (σ : Nat → Cfg) : Prop := ∀ i n, liveAt i (σ n) → ∃ m ≥ n, Steps i σ m
+The scheduling hypothesis is the strong fairness of the scheduling action (`Fairness.lean` 5.7),
+`Sched.SF liveAt i σ` for every position `i`.  The action's enabling condition is that the thread
+at `i` is live, and its grant is the thread's step.  So a thread live infinitely often steps
+infinitely often (`stepsInfOften_of_sched`).  Liveness is convex along a run, so the hypothesis is
+weak fairness as well (`Sched.sf_iff_wf`).
+
+The hypothesis ranges over every position, and liveness exempts two kinds of thread from it.  The
+power thread is never live (`Sched.not_liveAt_power`).  A corpse, a thread whose era has ended,
+is not live either, by the definition of `Era.liveAt`.  Neither is demanded a step.  The
+hypothesis this one replaced, `FairSched` (until lane `fairness-sched`), also demanded a step from
+a thread about to die; nothing needed that. -/
 
 /-- From some position on, the thread at `i` is live. -/
 def EventuallyLive (i : Nat) (σ : Nat → Cfg) : Prop := ∃ N, ∀ m ≥ N, liveAt i (σ m)
@@ -225,13 +232,10 @@ def EventuallyLive (i : Nat) (σ : Nat → Cfg) : Prop := ∃ N, ∀ m ≥ N, li
 def EventuallyDead (i : Nat) (σ : Nat → Cfg) : Prop := ∃ N, ∀ m ≥ N, ¬ liveAt i (σ m)
 
 /-- Fair scheduling gives a thread that is live infinitely often infinitely many steps, the
-hypothesis of the actions' `sf_iff`. -/
-theorem stepsInfOften_of_fairSched (h : FairSched σ) (hl : ∀ n, ∃ m ≥ n, liveAt i (σ m)) :
-    StepsInfOften i σ := by
-  intro n
-  obtain ⟨m, hm, hlm⟩ := hl n
-  obtain ⟨k, hk, hs⟩ := h i m hlm
-  exact ⟨k, Nat.le_trans hm hk, hs⟩
+hypothesis of the actions' `sf_iff` (`Sched.stepsInfOften_of_sf`). -/
+theorem stepsInfOften_of_sched (hsched : ∀ i, Sched.SF liveAt i σ)
+    (hl : ∀ n, ∃ m ≥ n, liveAt i (σ m)) : StepsInfOften i σ :=
+  Sched.stepsInfOften_of_sf (hsched i) hl
 
 /-- A thread live infinitely often is live at every position from its first live position on:
 liveness is convex along a run (`Era.liveAt_between`). -/
@@ -259,10 +263,10 @@ theorem live_or_dead (hrun : PoolRun σ) : EventuallyLive i σ ∨ EventuallyDea
   · exact Or.inr (MissHit.eventually_not_of_not_infOften h)
 
 /-- An eventually live thread is scheduled infinitely often. -/
-theorem stepsInfOften_of_eventuallyLive (h : FairSched σ) (hl : EventuallyLive i σ) :
-    StepsInfOften i σ := by
+theorem stepsInfOften_of_eventuallyLive (hsched : ∀ i, Sched.SF liveAt i σ)
+    (hl : EventuallyLive i σ) : StepsInfOften i σ := by
   obtain ⟨N, hN⟩ := hl
-  exact stepsInfOften_of_fairSched h fun n =>
+  exact stepsInfOften_of_sched hsched fun n =>
     ⟨n + N, Nat.le_add_right n N, hN _ (Nat.le_add_left N n)⟩
 
 /-! ## 4. The declared arms
@@ -472,7 +476,7 @@ flight. -/
 structure Hyps (img : Nat → BitVec 8) (σ : Nat → Cfg) : Prop where
   run : PoolRun σ
   boot : boot img (σ 0)
-  sched : FairSched σ
+  sched : ∀ i, Sched.SF liveAt i σ
   tick : ∀ i, Tick.SF i σ
   arm : ∀ i, ArmFair i σ
   fresh : ∀ i t a, Fresh.SF i t a σ
@@ -517,7 +521,7 @@ theorem ramHist_of_liveAt {n : Nat} (hl : liveAt i (σ n)) : Fairness.ramHist (�
 
 /-- A thread live infinitely often is scheduled infinitely often. -/
 theorem stepsInfOften (hl : ∀ n, ∃ m ≥ n, liveAt i (σ m)) : StepsInfOften i σ :=
-  stepsInfOften_of_fairSched h.sched hl
+  stepsInfOften_of_sched h.sched hl
 
 end Hyps
 
@@ -553,8 +557,8 @@ theorem sf_of_dead_from {A : Cfg → Prop} {G : Cfg → Cfg → Prop} (hlive : �
 when the enabling condition is a live thread's and persists while the thread is eventually
 live. -/
 theorem sf_iff_ag {A : Cfg → Prop} {G : Cfg → Cfg → Prop} (hrun : PoolRun σ)
-    (hsched : FairSched σ) (hown : Fairness.Thread.OwnGrant i G) (hlive : ∀ c, A c → liveAt i c)
-    (hper : EventuallyLive i σ → Fairness.Thread.Persists i A σ) :
+    (hsched : ∀ i, Sched.SF liveAt i σ) (hown : Fairness.Thread.OwnGrant i G)
+    (hlive : ∀ c, A c → liveAt i c) (hper : EventuallyLive i σ → Fairness.Thread.Persists i A σ) :
     Action.SF A G σ ↔ Fairness.Thread.AttemptGrant i A G σ := by
   rcases live_or_dead hrun with hl | hd
   · exact Thread.sf_iff_attemptGrant hown (stepsInfOften_of_eventuallyLive hsched hl) (hper hl)
@@ -570,7 +574,8 @@ theorem sf_of_dead_from (hd : EventuallyDead i σ) : Tick.SF i σ :=
 theorem ag_of_hyps {img : Nat → BitVec 8} (h : Hyps img σ) : Tick.AG i σ :=
   Fairness.Thread.attemptGrant_of_sf Fairness.Tick.ownGrant (h.tick i)
 
-theorem sf_iff_ag (hrun : PoolRun σ) (hsched : FairSched σ) : Tick.SF i σ ↔ Tick.AG i σ :=
+theorem sf_iff_ag (hrun : PoolRun σ) (hsched : ∀ i, Sched.SF liveAt i σ) :
+    Tick.SF i σ ↔ Tick.AG i σ :=
   Action.sf_iff_ag hrun hsched Fairness.Tick.ownGrant (fun _ => Fairness.Tick.live)
     fun _ => Fairness.Tick.persists hrun
 
@@ -587,7 +592,7 @@ theorem ag_of_hyps {img : Nat → BitVec 8} (h : Hyps img σ) {a : ArmDecl} (ha 
   Fairness.Thread.attemptGrant_of_sf Fairness.Arm.ownGrant (h.arm i a ha)
 
 theorem sf_iff_ag {d : DevId} {node : DevProg d} {m b : Nat} (hrun : PoolRun σ)
-    (hsched : FairSched σ) : Arm.SF i d node m b σ ↔ Arm.AG i d node m b σ :=
+    (hsched : ∀ i, Sched.SF liveAt i σ) : Arm.SF i d node m b σ ↔ Arm.AG i d node m b σ :=
   Action.sf_iff_ag hrun hsched Fairness.Arm.ownGrant (fun _ => Fairness.Arm.live)
     fun _ => Fairness.Arm.persists hrun
 
@@ -602,8 +607,8 @@ theorem ag_of_hyps {img : Nat → BitVec 8} (h : Hyps img σ) {t : Nat} {a : PAd
     Fresh.AG i t a σ :=
   Fairness.Thread.attemptGrant_of_sf Fairness.Fresh.ownGrant (h.fresh i t a)
 
-theorem sf_iff_ag {t : Nat} {a : PAddr} (hrun : PoolRun σ) (hsched : FairSched σ) :
-    Fresh.SF i t a σ ↔ Fresh.AG i t a σ :=
+theorem sf_iff_ag {t : Nat} {a : PAddr} (hrun : PoolRun σ)
+    (hsched : ∀ i, Sched.SF liveAt i σ) : Fresh.SF i t a σ ↔ Fresh.AG i t a σ :=
   Action.sf_iff_ag hrun hsched Fairness.Fresh.ownGrant (fun _ => Fairness.Fresh.live)
     fun _ => Fairness.Fresh.persists hrun
 
@@ -617,7 +622,8 @@ theorem sf_of_dead_from (hd : EventuallyDead i σ) : Hart.SF i σ :=
 theorem ag_of_hyps {img : Nat → BitVec 8} (h : Hyps img σ) : Hart.AG i σ :=
   Fairness.Thread.attemptGrant_of_sf Fairness.Hart.ownGrant (h.hart i)
 
-theorem sf_iff_ag (hrun : PoolRun σ) (hsched : FairSched σ) : Hart.SF i σ ↔ Hart.AG i σ :=
+theorem sf_iff_ag (hrun : PoolRun σ) (hsched : ∀ i, Sched.SF liveAt i σ) :
+    Hart.SF i σ ↔ Hart.AG i σ :=
   Action.sf_iff_ag hrun hsched Fairness.Hart.ownGrant (fun _ => Fairness.Hart.live)
     fun _ => Fairness.Hart.persists hrun
 
@@ -640,7 +646,8 @@ theorem ag_of_hyps {img : Nat → BitVec 8} (h : Hyps img σ) {tid : TaskId} :
 
 /-- The DMA write's enabling condition reads the disk's shared state, so its persistence is a
 protocol property and stays a hypothesis (`Fairness.Dma.sf_iff`). -/
-theorem sf_iff_ag {d : DevId} {tid : TaskId} (hrun : PoolRun σ) (hsched : FairSched σ)
+theorem sf_iff_ag {d : DevId} {tid : TaskId} (hrun : PoolRun σ)
+    (hsched : ∀ i, Sched.SF liveAt i σ)
     (hper : EventuallyLive i σ → Fairness.Thread.Persists i (Fairness.Dma.enabled i d tid) σ) :
     Dma.SF i d tid σ ↔ Dma.AG i d tid σ :=
   Action.sf_iff_ag hrun hsched Fairness.Dma.ownGrant (fun _ => Fairness.Dma.live) hper
