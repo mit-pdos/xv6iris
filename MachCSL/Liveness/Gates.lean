@@ -3,9 +3,9 @@ import MachCSL.Liveness.Fairness
 /-! # The stable gates of the device programs
 
 Milestone B2 of lane `xv6-liveness-now`: the plan's stable-gate lemma, for each gate of the three
-device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (3.5).
-Its grant is certain at the task's own attempts, in the thread's view of the action (section 4 of
-`FairnessTheory.lean`).  Its strong fairness follows from fair scheduling and persistence
+device programs.  A device task waiting at a gate is the action `Dev` of `Fairness.lean` (5.5).
+Its grant is the task's step, so it is certain at the task's own attempts, in the thread's view of
+the action (section 4 of `FairnessTheory.lean`).  Its strong fairness follows from fair scheduling and persistence
 (`Dev.sf_of_persists`).  The lemma says, for each gate, that once the gate is open no other
 thread's step but the power thread's closes it before the task steps through, except for named
 closing transitions.  Each gate's theorem takes a hypothesis excluding its closers while the gate
@@ -18,11 +18,12 @@ is open, and gives persistence through `Era.persists_of_liveStableUnder` (a gene
    one of the device's tasks at a guarded update or a DMA write, or a hart's MMIO read or write
    decoded to the device); the record of finished tasks only grows (`done_mono`).  The program
    invariant: a device's tasks run programs whose primitives are all in a set (`PrimsIn`,
-   `Progs`, kept by every step, `progs_step`).  The gate of one node (`enabled`: a live task at a
-   node with primitive `o`, and `o` not blocked), its strong fairness (`SF`, `sf_of_persists`).
-   The primitives that never block (`neverBlocks`), whose gate is stable outright; the join, whose
-   gate is stable outright because finished tasks stay finished (`stable_join`).  The node form
-   of `Dma`'s enabling condition (`dmaAt`).
+   `Progs`, kept by every step, `progs_step`).  A live task at a node with primitive `o`
+   (`taskAt`, the thread's shape of `Fairness.lean` section 4 at such a node).  The gate of one
+   node (`enabled`: the task there, and `o` not blocked), its strong fairness (`SF`,
+   `sf_of_persists`).  The primitives that never block (`neverBlocks`), whose gate is stable
+   outright; the join, whose gate is stable outright because finished tasks stay finished
+   (`stable_join`).  The node form of `Dma`'s pending write (`dmaAt`, on `Dma.atWrite`).
 2. `Port`, the UART: the transmit and receive arms answer faithfully and never block.
 3. `Disk`, the virtio disk.  Its primitives (`Prim`) and the proof that its programs reach only
    those (`prims_serve`, `prims_body`, so `progs` holds along every run that starts with it,
@@ -540,10 +541,11 @@ theorem progs_run {σ : Nat → Cfg} {d : DevId} {P : DevOp (DevSt d) (DevTask d
 
 /-! ### A task at a node, and its gate -/
 
-/-- The thread at `i` is a live task `tid` of device `d` whose head primitive is `o`. -/
+/-- The thread at `i` is a live task `tid` of device `d` whose head primitive is `o`: section 4's
+shape of `Fairness.lean` at a node with primitive `o`. -/
 def taskAt (i : Nat) (d : DevId) (tid : TaskId) (o : DevOp (DevSt d) (DevTask d)) (c : Cfg) :
     Prop :=
-  ∃ e k, c.1[i]? = some (.dev e d tid (.op o k)) ∧ threadLive c.2 e
+  ∃ k, Fairness.taskAt i d tid (.op o k) c
 
 /-- The enabling condition of a gate: the thread at `i` is a live task `tid` of device `d` at a
 node whose primitive is `o`, and `o` is not blocked (the gate is open). -/
@@ -567,58 +569,56 @@ variable {d : DevId} {tid : TaskId} {o : DevOp (DevSt d) (DevTask d)} {σ : Nat 
 
 /-- A task at a node is a live thread. -/
 theorem taskAt_live (h : taskAt i d tid o c) : liveAt i c :=
-  let ⟨e, _, he, hl⟩ := h; ⟨e, Or.inr ⟨d, tid, _, he⟩, hl⟩
+  let ⟨_, h⟩ := h; Fairness.taskAt_live h
 
 /-- A task's place in its program, and its liveness, survive every other thread's step but the
 power thread's. -/
-theorem taskAt_stable : StableExceptPower i (taskAt i d tid o) := by
-  intro j c c' hji hs hnp h
-  obtain ⟨e, k, he, hl⟩ := h
-  exact ⟨e, k, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl⟩
+theorem taskAt_stable : StableExceptPower i (taskAt i d tid o) :=
+  fun hji hs hnp ⟨k, h⟩ => ⟨k, Fairness.taskAt_stable h hs hji hnp⟩
 
 /-- An open gate is a live thread's. -/
 theorem live (h : enabled i d tid o c) : liveAt i c := taskAt_live h.1
 
 /-- An open gate at a primitive other than a DMA write is the device tasks' enabling condition. -/
 theorem dev_enabled (hdma : ¬ Dev.isDma o) (h : enabled i d tid o c) : Dev.enabled i d tid c :=
-  let ⟨⟨e, k, he, hl⟩, hnb⟩ := h; ⟨e, o, k, he, hl, hdma, hnb⟩
+  let ⟨⟨k, h⟩, hnb⟩ := h; ⟨o, k, h, hdma, hnb⟩
 
-/-- Stepping through an open gate is certain: every attempt of the task at the open gate is
-granted. -/
-theorem certain (hdma : ¬ Dev.isDma o) :
-    Thread.Certain i (enabled i d tid o) (Dev.grant i d tid) σ :=
-  fun n ⟨hs, hA⟩ => Dev.certain n ⟨hs, dev_enabled hdma hA⟩
+/-- Stepping through an open gate is certain: the grant is the task's step, so every attempt of
+the task at the open gate is granted. -/
+theorem certain : Thread.Certain i (enabled i d tid o) (Dev.grant i d tid) σ := fun _ ha => ha.1
 
 /-- Strong fairness of a gate follows from fair scheduling and its persistence. -/
-theorem sf_of_persists (hdma : ¬ Dev.isDma o) (hsched : StepsInfOften i σ)
-    (hper : Persists i (enabled i d tid o) σ) : SF i d tid o σ :=
-  Thread.sf_of_certain hsched hper (certain hdma)
+theorem sf_of_persists (hsched : StepsInfOften i σ) (hper : Persists i (enabled i d tid o) σ) :
+    SF i d tid o σ :=
+  Thread.sf_of_certain hsched hper certain
 
 /-- Strong fairness of a gate that is stable under the steps meeting a side condition, on a run
 whose every step meets it. -/
-theorem sf_of_stableUnder {P : Cfg → Cfg → Prop} (hdma : ¬ Dev.isDma o) (hrun : PoolRun σ)
-    (hsched : StepsInfOften i σ) (hstab : StableExceptPowerUnder i P (enabled i d tid o))
-    (hP : ∀ n, P (σ n) (σ (n + 1))) : SF i d tid o σ :=
-  sf_of_persists hdma hsched (Era.persists_of_liveStableUnder hrun (fun _ => live) hstab hP)
+theorem sf_of_stableUnder {P : Cfg → Cfg → Prop} (hrun : PoolRun σ) (hsched : StepsInfOften i σ)
+    (hstab : StableExceptPowerUnder i P (enabled i d tid o)) (hP : ∀ n, P (σ n) (σ (n + 1))) :
+    SF i d tid o σ :=
+  sf_of_persists hsched (Era.persists_of_liveStableUnder hrun (fun _ => live) hstab hP)
 
 /-! ### A task at a DMA write -/
 
 /-- The enabling condition of `Dma` at one node: the thread at `i` is a live task `tid` of device
-`d` at a DMA write with guard `g` into RAM at `pa`, and the guard answers a faithful move. -/
+`d` at a DMA write with guard `g` into RAM at `pa`, and the guard answers a faithful move: `Dma`'s
+pending write with the guard and the word named. -/
 def dmaAt (i : Nat) (d : DevId) (tid : TaskId) (g : DevSt d → Option (DevSt d)) (pa : PAddr)
     (n : Nat) (w : BitVec (8 * n)) (c : Cfg) : Prop :=
-  taskAt i d tid (.dmaWrite g pa n w) c ∧
+  Dma.atWrite i d tid g pa n w c ∧
     (∃ s', g (c.2.m.devs.st d) = some s' ∧ devObsOk d (c.2.m.devs.st d) s' []) ∧ ramBytes pa n
 
 /-- A task at a DMA-write node is a live thread. -/
 theorem dmaAt_live {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (h : dmaAt i d tid g pa n w c) : liveAt i c :=
-  taskAt_live h.1
+  let ⟨⟨_, h⟩, _⟩ := h; Fairness.taskAt_live h
 
-/-- A task at one DMA-write node with its guard answering is the enabling condition of `Dma`. -/
+/-- A task at one DMA-write node with its guard answering is the enabling condition of `Dma`, with
+the node's footprint. -/
 theorem dma_enabled {g : DevSt d → Option (DevSt d)} {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (h : dmaAt i d tid g pa n w c) : Dma.enabled i d tid c :=
-  let ⟨⟨e, k, he, hl⟩, hg, hr⟩ := h; ⟨e, g, pa, n, w, k, he, hl, hg, hr⟩
+  ⟨pa, n, g, w, h⟩
 
 /-! ### Primitives that never block -/
 
@@ -678,11 +678,11 @@ theorem persists_of_neverBlocks (hnb : neverBlocks d o) (hrun : PoolRun σ) :
     Persists i (enabled i d tid o) σ :=
   Era.persists_of_liveStable hrun (fun _ => live) (stable_of_neverBlocks hnb)
 
-/-- A task at a primitive that never blocks (and is not a DMA write) steps through it infinitely
-often if it sits there infinitely often: no assumption beyond fair scheduling. -/
-theorem sf_of_neverBlocks (hnb : neverBlocks d o) (hdma : ¬ Dev.isDma o) (hrun : PoolRun σ)
-    (hsched : StepsInfOften i σ) : SF i d tid o σ :=
-  sf_of_persists hdma hsched (persists_of_neverBlocks hnb hrun)
+/-- A task at a primitive that never blocks steps through it infinitely often if it sits there
+infinitely often: no assumption beyond fair scheduling. -/
+theorem sf_of_neverBlocks (hnb : neverBlocks d o) (hrun : PoolRun σ) (hsched : StepsInfOften i σ) :
+    SF i d tid o σ :=
+  sf_of_persists hsched (persists_of_neverBlocks hnb hrun)
 
 /-! ### The join -/
 
@@ -706,7 +706,7 @@ theorem persists_join {t : TaskId} (hrun : PoolRun σ) : Persists i (enabled i d
 /-- Strong fairness of a join gate follows from fair scheduling alone. -/
 theorem sf_join {t : TaskId} (hrun : PoolRun σ) (hsched : StepsInfOften i σ) :
     SF i d tid (.join t) σ :=
-  sf_of_persists (fun h => h) hsched (persists_join hrun)
+  sf_of_persists hsched (persists_join hrun)
 
 end Gate
 
@@ -1321,10 +1321,10 @@ theorem stable_of {o : DevOp VirtioState VTask} {tid : TaskId} {Q : VirtioState 
       writeN (disk c) off req.size w = some (disk c') → M c c' → Q (disk c) → Q (disk c')) :
     StableExceptPowerUnder i
       (fun c c' => progs c ∧ M c c' ∧
-        (taskAt i .virtio tid o c ∧ Q (disk c) → ¬ Gate.stepBy i .virtio K c c'))
-      (fun c => taskAt i .virtio tid o c ∧ Q (disk c)) := by
+        (Gate.taskAt i .virtio tid o c ∧ Q (disk c) → ¬ Gate.stepBy i .virtio K c c'))
+      (fun c => Gate.taskAt i .virtio tid o c ∧ Q (disk c)) := by
   intro j c c' hji hs hnp ⟨hp, hM, hK⟩ ⟨ht, hq⟩
-  refine ⟨taskAt_stable hji hs hnp ht, ?_⟩
+  refine ⟨Gate.taskAt_stable hji hs hnp ht, ?_⟩
   rcases step_cases hs hnp hp with h | ⟨e, tid', o', k, he, hl, hP, hm⟩ |
     ⟨e, cpu, req, w, tags, k, off, he, hl, hdec, hw⟩
   · rw [h]
@@ -1343,10 +1343,10 @@ theorem persists_of {o : DevOp VirtioState VTask} {tid : TaskId} {Q : VirtioStat
       threadLive c.2 e → devDecode req.pa = some (.virtio, off) →
       writeN (disk c) off req.size w = some (disk c') → M c c' → Q (disk c) → Q (disk c'))
     (hrun : PoolRun σ) (hprog : ∀ n, progs (σ n)) (hM : ∀ n, M (σ n) (σ (n + 1)))
-    (hK : ∀ n, taskAt i .virtio tid o (σ n) ∧ Q (disk (σ n)) →
+    (hK : ∀ n, Gate.taskAt i .virtio tid o (σ n) ∧ Q (disk (σ n)) →
       ¬ Gate.stepBy i .virtio K (σ n) (σ (n + 1))) :
-    Persists i (fun c => taskAt i .virtio tid o c ∧ Q (disk c)) σ :=
-  Era.persists_of_liveStableUnder hrun (fun _ h => taskAt_live h.1) (stable_of htask hmmio)
+    Persists i (fun c => Gate.taskAt i .virtio tid o c ∧ Q (disk c)) σ :=
+  Era.persists_of_liveStableUnder hrun (fun _ h => Gate.taskAt_live h.1) (stable_of htask hmmio)
     fun n => ⟨hprog n, hM n, hK n⟩
 
 /-! ### The nodes and the closing classes -/
@@ -1453,7 +1453,7 @@ variable {tid : TaskId}
 /-- The capture-latch gate is open exactly when the latch is free. -/
 theorem enabled_latch_iff {h : BitVec 16} :
     Gate.enabled i .virtio tid (latchOp h) c ↔
-      taskAt i .virtio tid (latchOp h) c ∧ (disk c).taken = none := by
+      Gate.taskAt i .virtio tid (latchOp h) c ∧ (disk c).taken = none := by
   unfold Gate.enabled
   rw [notBlocked_guard, captureGuard_isSome]
 
@@ -1487,7 +1487,7 @@ theorem latch_sf {h : BitVec 16} (hrun : PoolRun σ) (hsched : StepsInfOften i �
     (hK : ∀ n, Gate.enabled i .virtio tid (latchOp h) (σ n) →
       ¬ Gate.stepBy i .virtio isLatch (σ n) (σ (n + 1))) :
     Gate.SF i .virtio tid (latchOp h) σ :=
-  Gate.sf_of_persists (fun h => h) hsched (latch_persists hrun hprog hK)
+  Gate.sf_of_persists hsched (latch_persists hrun hprog hK)
 
 /-! ### The hypotheses on the harts' MMIO writes -/
 
@@ -1671,7 +1671,7 @@ theorem popGuard_isSome {h : BitVec 16} {v : VirtioState} :
 /-- The pop gate is open exactly when the head is not in flight. -/
 theorem enabled_pop_iff {h : BitVec 16} :
     Gate.enabled i .virtio tid (popOp h) c ↔
-      taskAt i .virtio tid (popOp h) c ∧ (phase (disk c) h).isSome = false := by
+      Gate.taskAt i .virtio tid (popOp h) c ∧ (phase (disk c) h).isSome = false := by
   unfold Gate.enabled
   rw [notBlocked_guard, popGuard_isSome]
 
@@ -1799,7 +1799,7 @@ theorem pop_sf {h : BitVec 16} (hrun : PoolRun σ) (hsched : StepsInfOften i σ)
     (hK : ∀ n, Gate.enabled i .virtio tid (popOp h) (σ n) →
       ¬ Gate.stepBy i .virtio (fun o => servesHead h o ∨ popsHead h o) (σ n) (σ (n + 1))) :
     Gate.SF i .virtio tid (popOp h) σ :=
-  Gate.sf_of_persists (fun h => h) hsched (pop_persists hrun hprog hK)
+  Gate.sf_of_persists hsched (pop_persists hrun hprog hK)
 
 /-! ### The completion-and-push gate -/
 
@@ -1911,7 +1911,7 @@ theorem pushGuard_isSome {h : BitVec 16} {r : VioReq} {v : VirtioState} :
 /-- The completion-and-push gate is open exactly when its condition holds. -/
 theorem enabled_push_iff {h : BitVec 16} {r : VioReq} :
     Gate.enabled i .virtio tid (pushOp h r) c ↔
-      taskAt i .virtio tid (pushOp h r) c ∧ pushOpen h r (disk c) := by
+      Gate.taskAt i .virtio tid (pushOp h r) c ∧ pushOpen h r (disk c) := by
   unfold Gate.enabled
   rw [notBlocked_guard, pushGuard_isSome]
 
@@ -1958,7 +1958,7 @@ theorem push_sf {h : BitVec 16} {r : VioReq} (hrun : PoolRun σ) (hsched : Steps
     (hK : ∀ n, Gate.enabled i .virtio tid (pushOp h r) (σ n) → ¬ Gate.stepBy i .virtio
       (fun o => isCapture o ∨ isPush o ∨ completes h o) (σ n) (σ (n + 1))) :
     Gate.SF i .virtio tid (pushOp h r) σ :=
-  Gate.sf_of_persists (fun h => h) hsched (push_persists hrun hprog hR hW hK)
+  Gate.sf_of_persists hsched (push_persists hrun hprog hR hW hK)
 
 /-! ### The DMA-write guards -/
 
@@ -2124,7 +2124,8 @@ guard answering, and the footprint in RAM. -/
 theorem dmaAt_iff {g : VirtioState → Option VirtioState} {pa : PAddr} {n : Nat}
     {w : BitVec (8 * n)} :
     Gate.dmaAt i .virtio tid g pa n w c ↔
-      taskAt i .virtio tid (.dmaWrite g pa n w) c ∧ (g (disk c)).isSome = true ∧ ramBytes pa n := by
+      Gate.taskAt i .virtio tid (.dmaWrite g pa n w) c ∧ (g (disk c)).isSome = true ∧
+        ramBytes pa n := by
   unfold Gate.dmaAt
   constructor
   · rintro ⟨ht, ⟨s', hs', -⟩, hr⟩

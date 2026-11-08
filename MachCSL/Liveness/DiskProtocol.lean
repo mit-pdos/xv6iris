@@ -2236,7 +2236,7 @@ theorem push_closers (ht : tasksOk c) (ho : ownersOk c) {tid : TaskId} {h : BitV
   · exact hfree j h0 hji hs ⟨e, tid', o, k, hj, Or.inl hK⟩
   · exact hfree j h0 hji hs ⟨e, tid', o, k, hj, Or.inr hK⟩
   · obtain rfl := snode_head hn (Or.inr ⟨r', ui, cf, pa, n, w, rfl⟩) dma_not_hf
-    obtain ⟨⟨e', k', hi, hli⟩, -⟩ := hen
+    obtain ⟨⟨k', e', hi, hli⟩, -⟩ := hen
     have hr : tid ≠ rootTask := not_root_of_node ht hi (h := h0) (Or.inr (Or.inr (Or.inl ⟨h0, r, rfl⟩)))
     have hsi := servingAt_of_node ht hi hli hr (Or.inl (ServePrim.push r)) push_not_hf
     exact hji (ho.1 _ _ _ (Or.inl hs) (Or.inl hsi))
@@ -2248,7 +2248,7 @@ theorem pop_closers (ht : tasksOk c) (ho : ownersOk c) (hr : rootsOk c) {tid : T
     {h : BitVec 16} (hen : Gate.enabled i .virtio tid (popOp h) c) :
     ¬ Gate.stepBy i .virtio (fun o => servesHead h o ∨ popsHead h o) c c' := by
   rw [enabled_pop_iff] at hen
-  obtain ⟨⟨e, k, hi, hli⟩, hnot⟩ := hen
+  obtain ⟨⟨k, e, hi, hli⟩, hnot⟩ := hen
   -- a serving task of `h` would put `h` in flight
   have noServe : ∀ {j'}, ¬ servingAt j' h c := fun hs => by
     rw [ho.2 _ _ (Or.inl hs)] at hnot
@@ -2282,7 +2282,7 @@ theorem req_closers (ht : tasksOk c) (ho : ownersOk c) {tid : TaskId} {h : BitVe
     {pa : PAddr} {n : Nat} {w : BitVec (8 * n)}
     (hen : Gate.dmaAt i .virtio tid (reqGuard h r) pa n w c) :
     ¬ Gate.stepBy i .virtio (fun o => servesHead h o ∨ pushesHead h o ∨ completes h o) c c' := by
-  obtain ⟨⟨e, k, hi, hli⟩, -⟩ := hen
+  obtain ⟨⟨k, e, hi, hli⟩, -⟩ := hen
   have hsi := servingAt_of_node ht hi hli (not_root_of_dma ht hi)
     (Or.inl (ServePrim.fill r pa n w)) dma_not_hf
   rintro ⟨j, e', tid', o, k', hji, -, hj, hl, hK⟩
@@ -2311,7 +2311,7 @@ theorem snap_closers (ht : tasksOk c) (ho : ownersOk c) {tid : TaskId} {h : BitV
     (hgo : SNode h (.dmaWrite g pa n w)) (hen : Gate.dmaAt i .virtio tid g pa n w c)
     (hfree : ∀ j h', j ≠ i → servingAt j h' c → ¬ atNode j isUsedIdx c) :
     ¬ Gate.stepBy i .virtio (fun o => servesHead h o ∨ pushesHead h o ∨ isUsedIdx o) c c' := by
-  obtain ⟨⟨e, k, hi, hli⟩, -⟩ := hen
+  obtain ⟨⟨k, e, hi, hli⟩, -⟩ := hen
   have hsi := servingAt_of_node ht hi hli (not_root_of_dma ht hi) hgo dma_not_hf
   rintro ⟨j, e', tid', o, k', hji, -, hj, hl, hK⟩
   rcases hK with hK | hK | hK
