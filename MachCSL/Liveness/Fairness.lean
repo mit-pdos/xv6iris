@@ -4,16 +4,18 @@ import MachCSL.Liveness.FairnessTheory
 /-! # The attempt–grant model of fairness: MachCSL's instance
 
 MachCSL's runs as an instance of the general theory of `MachCSL/Liveness/FairnessTheory.lean`
-(layers 0 to 2, generic over a thread pool).  This file gives MachCSL's pool, its eras and the six
-actions the liveness proof uses.  Five of the actions are assumptions: they are the `SF`
-hypotheses of `Spec.Hyps` (`Tick`, `Arm`, `Fresh`, `Hart`, `Dma`).  The sixth, `Dev`, is derived:
-its grant is certain at the task's attempts, and its forms are theorems.  The theory file is a
-stopgap that Lantana's extension deletes; this file stays, retargeted to Lantana's traces.
+(layers 0 to 2, generic over a thread pool).  This file gives MachCSL's pool, its eras and the
+seven actions the liveness proof uses.  Six of the actions are assumptions, the `SF` hypotheses of
+`Spec.Hyps`: fair scheduling (`Sched`), `Tick`, `Arm`, `Fresh`, `Hart` and `Dma`.  The other,
+`Dev`, is derived: its grant is certain at the task's attempts, and its forms are theorems.  The
+theory file is a stopgap that Lantana's extension deletes; this file stays, retargeted to
+Lantana's traces.
 
-Every enabling condition states the thread's shape through the two shared relations of section 4.
-Every grant is the thread's own step plus the decision the environment makes at it: a condition
-on the machine state before the step for an arbitration (`Hart`, `Dma`), nothing beyond the
-enabling condition for a gate (`Dev`), and the value chosen for a choice (`Fresh`: the view, read
+Every enabling condition but scheduling's states the thread's shape through the two shared
+relations of section 4.  Scheduling's is liveness itself.  Every grant is the thread's own step
+plus the decision the environment makes at it: a condition on the machine state before the step
+for an arbitration (`Hart`, `Dma`), nothing beyond the enabling condition for a gate (`Dev`) and
+for scheduling (`Sched`), and the value chosen for a choice (`Fresh`: the view, read
 off the floor afterwards; `Tick`, `Arm`: the tick or the answer, which the model records only in
 the restarted program, so `restart` and `answer` name that program).  What the step does to the
 thread is a lemma (`Cycle.lean`), never part of a grant.
@@ -27,18 +29,22 @@ action is the base, and the thread's view is built on top of it.  The same day (
 this file kept MachCSL's instance; later that day (lane `fairness-ag`) the theory's layer 0 became
 the attempt–grant pair, three layers in all.  On 2026-11-08 (lane `fairness-shape`) the thread's
 shape was stated once and every grant became the thread's step plus the condition that decides
-it.  Nothing in the trusted base imports this directory (`MachCSL/Liveness/`); it is built by
-`lake build MachCSL` and checked by CI like every module of the library.
+it.  Later that day (lane `fairness-sched`) fair scheduling became the seventh action (5.7), and
+the convexity of liveness moved here from `Cycle.lean`.  Nothing in the trusted base imports this
+directory (`MachCSL/Liveness/`); it is built by `lake build MachCSL` and checked by CI like every
+module of the library.
 
 **Map of the file.**
 
 1. MachCSL's pool: configurations and a thread's primitive step (`Cfg`, `Step`), which make a
    pool of the general theory (the instance of `Pool`), and a step of one thread leaves the
-   others in place (`step_get?_ne`).
+   others in place (`step_get?_ne`).  So a grant of the thread's own that changes its entry has
+   no other owner (`soleOwner_of_changes`).
 2. `Era`, MachCSL's runs: liveness, generations, the power thread; persistence for an enabling
    condition that is a live thread's and is stable under every thread but the power thread
    (`persists_of_liveStable`), or under the steps that meet a side condition
-   (`persists_of_liveStableUnder`, for a gate another thread can close).
+   (`persists_of_liveStableUnder`, for a gate another thread can close).  Liveness is convex
+   along a run, because the era rank never goes down (`liveAt_between`, `dead_forever`).
 3. `Mem`, the store order and the coherence floors: no step but a power-on lowers the top of the
    store order (`Mem.top_mono`) or a coherence floor (`Mem.coh_mono`).
 4. The thread's shape: a live hart running a program (`hartAt`) and a live device task running a
@@ -52,9 +58,12 @@ it.  Nothing in the trusted base imports this directory (`MachCSL/Liveness/`); i
    reservation, an action like `Hart` whose persistence is a protocol property.  What a hit and a
    miss of `Hart` are in machine terms, an access served and a blocked retry that keeps the head,
    and what a hit of `Dma` is, a write served, is proved in `MachCSL/Liveness/Cycle.lean`.
+   Last, `Sched`, fair scheduling with liveness as the activity: the power thread is never live
+   (`not_liveAt_power`), and liveness is stable, persists and is convex (`stable`, `persists`,
+   `convex`), so fair scheduling is the same in the strong and in the weak form (`sf_iff_wf`).
 
 **Names.**  The file follows the naming policy of `FairnessTheory.lean`'s header.  Every action
-uses the same names: `enabled`, `grant`, `ownGrant`, `SF`, `AG`, `live`; the four strong
+but `Sched` uses the same names: `enabled`, `grant`, `ownGrant`, `SF`, `AG`, `live`; the four strong
 assumptions (`Tick`, `Arm`, `Fresh`, `Hart`) add `stable`, `persists`, `sf_iff` and
 `counter_of_sf`; `Dma` has `counter_of_sf` and an `sf_iff` that takes persistence as a
 hypothesis; `Dev`, whose grant is certain, has `certain`, `ag`, `counter_zero`, `wf` and
@@ -63,7 +72,9 @@ hypothesis; `Dev`, whose grant is certain, has `certain`, `ag`, `counter_zero`, 
 to an answer).  The others name the shape their condition is about: `Fresh.atLoad` (a hart at a
 plain load), `Hart.pending` (a hart at a pending access), `Dma.atWrite` and `Dma.pending` (a task
 at a DMA write, and at a pending one).  The two arbitrations, `Hart` and `Dma`, name their
-condition `blocked`.
+condition `blocked`.  `Sched` reopens the theory's namespace, whose `grant`, `SF`, `AG` and
+`ownGrant` take the activity as a parameter, and adds `not_liveAt_power`, `stable`, `persists`,
+`convex` and `sf_iff_wf`.
 -/
 
 namespace Fairness
@@ -99,6 +110,15 @@ theorem step_get?_ne {e : Expr} (hs : Step j c c') (hji : j ≠ i) (he : c.1[i]?
   have hi : i < c.1.length := (List.getElem?_eq_some_iff.1 he).1
   rw [hc', List.getElem?_append_left (by simpa using hi), List.getElem?_set_ne hji, he]
 
+/-- A grant of the thread's own that changes its entry has no other owner: another thread's step
+leaves the entry in place (`step_get?_ne`). -/
+theorem soleOwner_of_changes {G : Cfg → Cfg → Prop} (hown : Thread.OwnGrant i G)
+    (h : ∀ c c', G c c' → c.1[i]? ≠ c'.1[i]?) : SoleOwner i G := by
+  intro c c' hg j hs
+  obtain ⟨e, _, _, _, he, -, -⟩ := hown hg
+  refine Classical.byContradiction fun hji => h c c' hg ?_
+  exact he.trans (step_get?_ne hs hji he).symm
+
 end Pool
 
 /-! ## 2. MachCSL's runs: liveness, generations, the power thread (`Era`)
@@ -107,8 +127,9 @@ MachCSL has no values: a thread never finishes, and what ends its attempts is th
 Every enabling condition of the actions is a live thread's, and is stable under the steps of
 every thread but the power thread.  The power thread breaks stability only by a cut, which bumps
 the generation and so falsifies the condition for ever.  That gives persistence, the hypothesis
-of layer 2's completeness (`Thread.Persists`).  The section is MachCSL's own; Lantana takes nothing
-from it. -/
+of layer 2's completeness (`Thread.Persists`).  Liveness itself is convex along a run: a thread
+live at two positions is live in between (`liveAt_between`), the fact that makes fair scheduling
+weak fairness (5.7).  The section is MachCSL's own; Lantana takes nothing from it. -/
 
 namespace Era
 
@@ -288,6 +309,99 @@ theorem persists_of_liveStable (hrun : PoolRun σ) {A : Cfg → Prop}
     (hlive : ∀ c, A c → liveAt i c) (hstab : StableExceptPower i A) : Thread.Persists i A σ :=
   persists_of_liveStableUnder hrun hlive (stableExceptPowerUnder_of_stable (fun _ _ => True) hstab)
     fun _ => trivial
+
+/-! ### Liveness is convex along a run
+
+The era rank, twice the generation plus one while the power is on, never goes down, and a
+generation is live at one rank only.  So a thread live at two positions is live in between
+(`liveAt_between`), and a thread that dies stays dead (`dead_forever`). -/
+
+variable {n m k : Nat}
+
+/-- The era rank of a global state: twice the generation, plus one while the power is on.  It
+never goes down, and a generation `e` is live exactly at rank `2 e + 1`. -/
+def rank (g : GState) : Nat := 2 * g.gen + (if g.pow then 1 else 0)
+
+/-- A generation `e` is live exactly at era rank `2 e + 1`. -/
+theorem threadLive_iff_rank (g : GState) (e : Nat) : threadLive g e ↔ rank g = 2 * e + 1 := by
+  unfold threadLive rank
+  cases g.pow <;> simp <;> omega
+
+/-- Every step keeps or raises the era rank: a cut raises it by one (generation up, power off),
+a power-on by one (power on), every other step keeps the generation and the power bit. -/
+theorem rank_mono (hs : Step j c c') : rank c.2 ≤ rank c'.2 := by
+  rcases c with ⟨p, g⟩
+  rcases c' with ⟨p', g'⟩
+  obtain ⟨e, obs, e', efs, he, hp, -⟩ := hs
+  cases e with
+  | hart gen cpu m =>
+    rcases hp with ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩⟩ <;> exact Nat.le_refl _
+  | dev gen d tid m =>
+    rcases hp with ⟨-, m', σ', -, -, rfl⟩ | ⟨-, -, -, -, rfl⟩ <;> exact Nat.le_refl _
+  | power =>
+    rcases hp with ⟨-, ⟨hon, -, -, rfl⟩ | ⟨hoff, -, -, hb⟩⟩
+    · have hon' : g.pow = true := hon
+      show rank g ≤ rank { g with gen := g.gen + 1, pow := false }
+      simp only [rank, hon', ite_true, Bool.false_eq_true, ite_false]
+      omega
+    · have hoff' : g.pow = false := hoff
+      have hb' : bootShape g g' := hb
+      show rank g ≤ rank g'
+      simp only [rank, hoff', hb'.1, hb'.2.1, ite_true, Bool.false_eq_true, ite_false]
+      omega
+
+/-- The era rank never goes down along a run of the pool. -/
+theorem rank_mono_run (hrun : PoolRun σ) (hnm : n ≤ m) : rank (σ n).2 ≤ rank (σ m).2 := by
+  induction m with
+  | zero =>
+    have h0 : n = 0 := Nat.le_zero.1 hnm
+    subst h0
+    exact Nat.le_refl _
+  | succ m ih =>
+    rcases Nat.lt_or_eq_of_le hnm with hlt | heq
+    · obtain ⟨j, hs⟩ := hrun m
+      exact Nat.le_trans (ih (Nat.le_of_lt_succ hlt)) (rank_mono hs)
+    · subst heq
+      exact Nat.le_refl _
+
+/-- A thread whose recorded generation is live is a live thread. -/
+theorem liveAt_of_genAt {e : Nat} (hg : genAt i c = some e) (hl : threadLive c.2 e) :
+    liveAt i c := by
+  unfold genAt at hg
+  cases hc : c.1[i]? with
+  | none => simp [hc] at hg
+  | some ex =>
+    rw [hc] at hg
+    cases ex with
+    | hart gen cpu m =>
+      simp only [Option.bind_some, Expr.gen?, Option.some.injEq] at hg
+      subst hg
+      exact ⟨gen, Or.inl ⟨cpu, m, hc⟩, hl⟩
+    | dev gen d tid m =>
+      simp only [Option.bind_some, Expr.gen?, Option.some.injEq] at hg
+      subst hg
+      exact ⟨gen, Or.inr ⟨d, tid, m, hc⟩, hl⟩
+    | power => simp [Expr.gen?] at hg
+
+/-- Liveness is convex along a run: a thread live at `n` and at `k ≥ n` is live at every
+position in between (its era rank cannot leave `2 e + 1` and come back). -/
+theorem liveAt_between (hrun : PoolRun σ) (hn : liveAt i (σ n)) (hk : liveAt i (σ k))
+    (hnm : n ≤ m) (hmk : m ≤ k) : liveAt i (σ m) := by
+  obtain ⟨e, hg, hp, hgen⟩ := liveAt_gen hn
+  obtain ⟨e', hg', hp', hgen'⟩ := liveAt_gen hk
+  have hgk := genAt_run hrun (Nat.le_trans hnm hmk) hg
+  rw [hg'] at hgk
+  have hee : e' = e := Option.some.inj hgk
+  have r1 := (threadLive_iff_rank _ e).1 ⟨hp, hgen⟩
+  have r2 := (threadLive_iff_rank _ e').1 ⟨hp', hgen'⟩
+  have h1 := rank_mono_run hrun hnm
+  have h2 := rank_mono_run hrun hmk
+  exact liveAt_of_genAt (genAt_run hrun hnm hg) ((threadLive_iff_rank _ e).2 (by omega))
+
+/-- A thread live at `n` and dead at `m ≥ n` is dead at every position from `m` on. -/
+theorem dead_forever (hrun : PoolRun σ) (hn : liveAt i (σ n)) (hnm : n ≤ m)
+    (hm : ¬ liveAt i (σ m)) (hmk : m ≤ k) : ¬ liveAt i (σ k) :=
+  fun hk => hm (liveAt_between hrun hn hk hnm hmk)
 
 end Era
 
@@ -632,17 +746,20 @@ theorem taskAt_stable {m : DevProg d} (h : taskAt i d tid m c) (hs : Step j c c'
 
 end Shape
 
-/-! ## 5. The six actions
+/-! ## 5. The seven actions
 
-Each action gives its enabling condition `enabled` (the `A`) and its grant relation `grant` (the
-`G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 2).  Every `enabled` is a
-line on section 4's relations.  Every `grant` is the thread's step, `Step i c c'`, and the
-condition that decides it, so every action has own grant and takes the cheap path of layer 2.  The
-first four actions prove: `ownGrant`, the grant is one of the thread's transitions; `live`, the
-condition is a live thread's; `stable`, it survives every thread's step but the power thread's;
-`persists`, from the two; `sf_iff`, the two forms coincide under fair scheduling;
-`counter_of_sf`, the trusted form gives the thread's counter.  The two device tasks (5.5, 5.6)
-prove what their persistence allows. -/
+Each of the first six actions gives its enabling condition `enabled` (the `A`) and its grant
+relation `grant` (the `G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 2).
+Every `enabled` is a line on section 4's relations.  Every `grant` is the thread's step,
+`Step i c c'`, and the condition that decides it, so each of the six has own grant and takes the
+cheap path of layer 2.  The first four actions prove: `ownGrant`, the grant is one of the thread's
+transitions; `live`, the condition is a live thread's; `stable`, it survives every thread's step
+but the power thread's; `persists`, from the two; `sf_iff`, the two forms coincide under fair
+scheduling; `counter_of_sf`, the trusted form gives the thread's counter.  The two device tasks
+(5.5, 5.6) prove what their persistence allows.  The seventh action, fair scheduling (5.7), is
+the theory's scheduling action with liveness as the activity.  Its grant is the thread's step as
+well, but the thread's view of it is certain and tells the thread nothing, so the logic consumes
+it on the general path only. -/
 
 /-! ### 5.1 The tick: a live hart at its cycle boundary; the restart carries the tick -/
 
@@ -1054,5 +1171,54 @@ theorem sf_iff (hsched : StepsInfOften i σ) (hper : Thread.Persists i (enabled 
   Thread.sf_iff_attemptGrant ownGrant hsched hper
 
 end Dma
+
+/-! ### 5.7 Fair scheduling: a live thread steps
+
+Fair scheduling is the theory's scheduling action (`FairnessTheory.lean` section 4) with
+liveness as the activity: the enabling condition is that the thread is live, and the grant is the
+thread's step.  Its strong fairness `Sched.SF liveAt i σ` is the scheduling hypothesis of
+`Spec.Hyps`.  The theory gives the generic facts: own grant, a thread live infinitely often steps
+infinitely often, and the thread's view of its scheduling is certain.  This subsection adds what
+MachCSL's activity makes true.  The power thread is never live, so the hypothesis exempts it
+without a parameter (`not_liveAt_power`); a corpse is not live either, so no step is demanded of
+it.  Liveness survives every other thread's step but the power thread's (`stable`), so it
+persists (`persists`), and it is convex along a run (`convex`).  For a convex activity strong and
+weak fairness coincide, so fair scheduling is the usual justice requirement (`sf_iff_wf`). -/
+
+namespace Sched
+
+variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+
+/-- The activity predicate of MachCSL's threads is liveness: a hart or device task of a live
+generation.  The power thread is never live, so it is exempt from fair scheduling without a
+parameter; a corpse is not live either, so no step is demanded of it, although it takes self-loop
+steps in the pool. -/
+theorem not_liveAt_power (h : c.1[i]? = some .power) : ¬ liveAt i c := by
+  rintro ⟨e, ⟨x, m, hx⟩ | ⟨d, tid, m, hd⟩, -⟩
+  · rw [h] at hx
+    cases hx
+  · rw [h] at hd
+    cases hd
+
+/-- Liveness survives every other thread's step but the power thread's. -/
+theorem stable : StableExceptPower i (liveAt i) := by
+  rintro j c c' hji hs hnp ⟨e, ⟨x, m, hx⟩ | ⟨d, tid, m, hd⟩, hl⟩
+  · exact ⟨e, Or.inl ⟨x, m, step_get?_ne hs hji hx⟩, (Era.threadLive_of_step hs hnp e).2 hl⟩
+  · exact ⟨e, Or.inr ⟨d, tid, m, step_get?_ne hs hji hd⟩, (Era.threadLive_of_step hs hnp e).2 hl⟩
+
+/-- Liveness persists on every run of the pool. -/
+theorem persists (hrun : PoolRun σ) : Thread.Persists i (liveAt i) σ :=
+  Era.persists_of_liveStable hrun (fun _ h => h) stable
+
+/-- Liveness is convex along a run: live at `n` and at `k ≥ n` means live in between. -/
+theorem convex (hrun : PoolRun σ) : Action.Convex (liveAt i) σ :=
+  fun _ _ _ hnm hmk hn hk => Era.liveAt_between hrun hn hk hnm hmk
+
+/-- Fair scheduling of a MachCSL thread is the same in the strong and in the weak form. -/
+theorem sf_iff_wf (hrun : PoolRun σ) :
+    Sched.SF liveAt i σ ↔ Action.WF (liveAt i) (Sched.grant i) σ :=
+  Action.sf_iff_wf_of_convex (convex hrun)
+
+end Sched
 
 end Fairness
