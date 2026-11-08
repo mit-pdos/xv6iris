@@ -31,6 +31,10 @@ transitions (*own grant*).  It loses nothing when `A` persists and the thread is
 The thread's counter stays at every other thread's step, because its attempts are the thread's
 steps.  That makes the thread's view the cheap path for the logic.
 
+Fair scheduling is one more action: its enabling condition is that the thread is active, and its
+grant is the thread's step.  Labels are proof instruments: no run and no assumption names the
+stepping thread, and the adequacy proof chooses a schedule that does.
+
 **Map of the file.**
 
 1. `AttemptGrant`, layer 0: the attempt–grant pair over two position predicates (`hit`, `miss`,
@@ -47,7 +51,15 @@ steps.  That makes the thread's view the cheap path for the logic.
    a thread's step on a run, a run, fair scheduling (`Steps`, `PoolRun`, `StepsInfOften`).  A pair
    of layer 0 is one thread's when its attempts are that thread's steps (`AttemptGrant.OwnStep`),
    and its counter then stays at the other threads' steps (`AttemptGrant.counter_stay_of_other`).
-4. `Thread`, layer 2: the thread's view of an action, layer 0 at the thread's attempts (`attempt`,
+4. `Sched`, the scheduling action: enabled where the thread is active, a predicate the language
+   supplies, and granted at the thread's step (`grant`, `SF`).  A thread active infinitely often
+   steps infinitely often (`stepsInfOften_of_sf`), and the thread's view of its scheduling
+   (`attempt`, `AG`) is certain, with counter zero (`certain`, `ag`, `counter_zero`).  For a
+   convex condition `SF` and `WF` coincide (`Action.sf_iff_wf_of_convex`).  The schedule names the
+   stepping thread at each position, a proof instrument (`Schedule`).  Under it a grant that only
+   its thread can take (`SoleOwner`) turns `SF` into the thread's labelled view
+   (`labelledView_of_sf`).
+5. `Thread`, layer 2: the thread's view of an action, layer 0 at the thread's attempts (`attempt`,
    `hit`, `miss`, `AttemptGrant`, `IsCounter`, `Certain`), a pair that is the thread's by
    construction (`ownStep`), and own grant (`OwnGrant`).
    * Soundness: under own grant, `SF` gives the attempt–grant form (`attemptGrant_of_sf`, a
@@ -57,6 +69,7 @@ steps.  That makes the thread's view the cheap path for the logic.
      `sf_iff_attemptGrant`.
    * A grant certain at the thread's attempts (`Certain`): no misses, counter zero, `WF` from fair
      scheduling alone (`wf_of_certain`), `SF` with persistence as well (`sf_of_certain`).
+6. `exists_fair_schedule`: a run with fair scheduling of every thread admits a fair schedule.
 
 Lantana takes one thing from each layer.  Its witness kind is stated against layer 0.  Its trace
 side implements layer 1, one counter per declared action updated at every step (the owner's
@@ -559,7 +572,7 @@ theorem counter_bounds_misses (hδ : IsCounter attempt grant δ) (n : Nat) :
 
 Shrinking the attempts to a subset that still contains every granted attempt keeps the granted
 attempts and can only remove refused ones.  So it keeps fairness (`fair_mono`).  The thread's
-view of section 4 is such a subset of the action's attempts when every grant is the thread's
+view of section 5 is such a subset of the action's attempts when every grant is the thread's
 step. -/
 
 /-- Fairness survives shrinking the attempts to a subset that still contains every granted
@@ -610,7 +623,7 @@ theorems apply to them as they stand, and the layer copies none of them.  For ex
 
 Lantana's trace side implements exactly this layer: one counter per declared action, updated at
 every step (the owner's decision of 2026-11-06).  How a thread learns of an update of the counter
-at another thread's step is the program logic's business.  Layer 2 (section 4) avoids the question
+at another thread's step is the program logic's business.  Layer 2 (section 5) avoids the question
 for the actions whose grant is one of the thread's own transitions. -/
 
 namespace Action
@@ -711,7 +724,7 @@ end Action
 
 A pool is a type of configurations with a step relation for the thread at each position, and a
 run is a sequence of configurations.  The class `Pool` is all that the general theory takes from
-a language.  Sections 1 and 2 use no pool; this section and section 4 use a thread's step. -/
+a language.  Sections 1 and 2 use no pool; this section and the later ones use a thread's step. -/
 
 /-- A thread pool: configurations, and the step of the thread at a position.  All the general
 theory takes from a language.  MachCSL's instance is in `Fairness.lean`; Lantana's will be its
@@ -741,7 +754,7 @@ end Run
 A pair of layer 0 is the thread's at `i` when its attempts are steps of that thread
 (`AttemptGrant.OwnStep`).  Then its counter never moves at another thread's step
 (`AttemptGrant.counter_stay_of_other`), and the thread can consume it at its own steps alone.  The
-thread's view of section 4 is such a pair for every action (`Thread.ownStep`).  The action's pair
+thread's view of section 5 is such a pair for every action (`Thread.ownStep`).  The action's pair
 of layer 1 need not be one, because the step at a position where `A` holds may be any thread's. -/
 
 namespace AttemptGrant
@@ -761,7 +774,158 @@ theorem counter_stay_of_other (hos : OwnStep i σ attempt) (hδ : IsCounter atte
 
 end AttemptGrant
 
-/-! ## 4. Layer 2: the thread's view of an action (`Thread`)
+/-! ## 4. The scheduling action, and the schedule as a proof instrument (`Sched`, `Schedule`)
+
+Fair scheduling is an action of the attempt–grant model, stated like every other fairness
+assumption.  The language supplies an activity predicate `active`: the thread at `i` exists and
+can step.  The enabling condition is that the thread is active, and the grant is the thread's step
+(`Sched.grant`).  Strong fairness of this action is fair scheduling (`Sched.SF`).  It gives a
+thread active infinitely often infinitely many steps (`Sched.stepsInfOften_of_sf`), which is the
+hypothesis of every completeness theorem of section 5.  The thread's view of its scheduling has no
+misses, because each attempt of the thread is one of its steps and so a grant (`Sched.certain`).
+The view holds outright and its counter is zero (`Sched.ag`, `Sched.counter_zero`), so it tells
+the thread nothing.  Scheduling has no cheap path; the logic consumes it on the general path only.
+
+Fair scheduling is strong fairness, yet where activity is convex it is no stronger than weak
+fairness, the usual justice requirement.  A condition is convex along a run when it holds at every
+position between two where it holds (`Action.Convex`).  A convex condition that holds infinitely
+often holds from some position on, so for it `SF` and `WF` coincide (`Action.sf_iff_wf_of_convex`).
+A thread's activity is convex in both worlds: a MachCSL thread is live from its birth to its cut,
+and a Lantana thread is active from its fork until it becomes a value.
+
+A run carries no thread.  It is a sequence of configurations whose every transition is a step of
+some thread (`PoolRun`), and no assumption names the thread that steps.  At a transition that
+changes the configuration the stepping thread is determined.  At a no-op transition several
+threads' step relations may hold: a corpse's self-loop, a blocked retry with nothing to drop, a
+task at a closed gate.  Nothing observable depends on who took a no-op step.  The adequacy proof
+still needs one owner per step: the owner's fuel pays for the step, and the scheduling counters of
+the other active threads drop.  So the adequacy proof chooses a schedule, the stepping thread at
+each position (`Schedule`), as a proof instrument.  Two facts carry the relational assumptions
+over to the schedule's bookkeeping, and they are the bridge.  Under any schedule, an action whose
+grant only its thread can take (`SoleOwner`) gives that thread its labelled view
+(`labelledView_of_sf`).  Section 6 chooses a schedule under which a thread active infinitely
+often is named infinitely often while active (`exists_fair_schedule`).
+
+Section 5 comes after this one, so the thread's view of scheduling is stated here over layer 0.
+`Sched.AG`, `Sched.certain` and `Sched.counter_zero` are section 5's `Thread.AttemptGrant`,
+`Thread.Certain` and `Thread.IsCounter` at the scheduling action, by abbreviation, and section 5's
+theorems apply to them as they stand. -/
+
+/-! ### The scheduling action (`Sched`) -/
+
+namespace Sched
+
+variable {Cfg : Type} [Pool Cfg]
+
+/-- Fair scheduling as an action of the attempt–grant model.  The language supplies `active`:
+the thread at `i` exists and can step (MachCSL: a live hart or task; Lantana: not a value).  The
+grant is the thread's step.  Its strong fairness is fair scheduling: a thread active infinitely
+often steps infinitely often. -/
+abbrev grant (i : Nat) (c c' : Cfg) : Prop := Pool.Step i c c'
+
+/-- Fair scheduling of the thread at `i`, for the activity predicate `active`. -/
+abbrev SF (active : Nat → Cfg → Prop) (i : Nat) (σ : Nat → Cfg) : Prop :=
+  Action.SF (active i) (grant i) σ
+
+/-- The thread at `i` attempts at `n`, in its view of its scheduling: it steps there while active.
+Section 5's `Thread.attempt i (active i) σ`, restated because section 5 comes later. -/
+abbrev attempt (active : Nat → Cfg → Prop) (i : Nat) (σ : Nat → Cfg) (n : Nat) : Prop :=
+  Steps i σ n ∧ active i (σ n)
+
+/-- The thread's own view of its scheduling: section 5's
+`Thread.AttemptGrant i (active i) (grant i) σ`. -/
+abbrev AG (active : Nat → Cfg → Prop) (i : Nat) (σ : Nat → Cfg) : Prop :=
+  AttemptGrant.Fair (attempt active i σ) (Action.grant (grant i) σ)
+
+variable {active : Nat → Cfg → Prop} {i : Nat} {σ : Nat → Cfg}
+
+/-- Own grant: the grant is the thread's step.  Section 5's `Thread.OwnGrant i (grant i)`. -/
+theorem ownGrant : ∀ {c c' : Cfg}, grant i c c' → Pool.Step i c c' := fun hg => hg
+
+/-- What every completeness theorem needs: a thread active infinitely often and fairly scheduled
+steps infinitely often. -/
+theorem stepsInfOften_of_sf (hsf : SF active i σ)
+    (hinf : MissHit.InfOften (fun n => active i (σ n))) : StepsInfOften i σ :=
+  fun n => let ⟨m, hm, _, hs⟩ := hsf hinf n; ⟨m, hm, hs⟩
+
+/-- The thread's view of its own scheduling has no misses: every attempt is a step, so every
+attempt is granted.  Scheduling has no cheap path; it is consumed on the general path only.
+Section 5's `Thread.Certain i (active i) (grant i) σ`. -/
+theorem certain : AttemptGrant.Certain (attempt active i σ) (Action.grant (grant i) σ) :=
+  fun _ ha => ha.1
+
+/-- The thread's view of its scheduling holds outright. -/
+theorem ag : AG active i σ := AttemptGrant.fair_of_certain certain
+
+/-- The counter of the thread's view of its scheduling is zero.  Section 5's
+`Thread.IsCounter i (active i) (grant i) σ (fun _ => 0)`. -/
+theorem counter_zero :
+    AttemptGrant.IsCounter (attempt active i σ) (Action.grant (grant i) σ) (fun _ => 0) :=
+  AttemptGrant.counter_zero_of_certain certain
+
+end Sched
+
+/-! ### Weak and strong fairness coincide for a convex condition -/
+
+namespace Action
+
+variable {Cfg : Type}
+
+/-- `A` is convex along the run: true at `n` and at `k ≥ n` makes it true in between.  A thread's
+activity is convex in both worlds: a MachCSL thread is live from its birth to its cut, a Lantana
+thread from its fork until it becomes a value. -/
+def Convex (A : Cfg → Prop) (σ : Nat → Cfg) : Prop :=
+  ∀ n m k, n ≤ m → m ≤ k → A (σ n) → A (σ k) → A (σ m)
+
+variable {A : Cfg → Prop} {G : Cfg → Cfg → Prop} {σ : Nat → Cfg}
+
+/-- A convex condition that holds infinitely often holds from some position on. -/
+theorem eventually_always_of_infOften_of_convex (hconv : Convex A σ)
+    (hinf : MissHit.InfOften (fun n => A (σ n))) : ∃ N, ∀ n, N ≤ n → A (σ n) :=
+  let ⟨N, _, hAN⟩ := hinf 0
+  ⟨N, fun n hn => let ⟨k, hk, hAk⟩ := hinf n; hconv N n k hn hk hAN hAk⟩
+
+/-- For a convex condition, strong and weak fairness of the action coincide. -/
+theorem sf_iff_wf_of_convex (hconv : Convex A σ) : SF A G σ ↔ WF A G σ :=
+  ⟨wf_of_sf, fun hwf hinf => hwf (eventually_always_of_infOften_of_convex hconv hinf)⟩
+
+end Action
+
+/-! ### The schedule, a proof instrument -/
+
+section Schedule
+
+variable {Cfg : Type} [Pool Cfg]
+
+/-- A schedule of a run: the thread stepping at each position.  Not part of any assumption; the
+adequacy proof picks one (`exists_fair_schedule`, section 6) to do its per-thread bookkeeping. -/
+def Schedule (σ : Nat → Cfg) (sched : Nat → Nat) : Prop :=
+  ∀ n, Pool.Step (sched n) (σ n) (σ (n + 1))
+
+/-- A grant that only its thread can take: whenever `G c c'` holds, the only thread whose step
+relation accepts the transition is `i`.  Every served transition of MachCSL's actions has it. -/
+def SoleOwner (i : Nat) (G : Cfg → Cfg → Prop) : Prop :=
+  ∀ c c', G c c' → ∀ j, Pool.Step j c c' → j = i
+
+/-- The thread's view under a schedule: attempts are the positions where the schedule names the
+thread and `A` holds. -/
+abbrev labelledView (sched : Nat → Nat) (i : Nat) (A : Cfg → Prop) (G : Cfg → Cfg → Prop)
+    (σ : Nat → Cfg) : Prop :=
+  AttemptGrant.Fair (fun n => sched n = i ∧ A (σ n)) (Action.grant G σ)
+
+variable {σ : Nat → Cfg} {sched : Nat → Nat} {i : Nat} {A : Cfg → Prop} {G : Cfg → Cfg → Prop}
+
+/-- Under a schedule, a sole-owner grant's relational `SF` gives the thread's labelled view.  A
+relational hit is a labelled hit, because the schedule must name the owner, and a labelled miss is
+a relational miss.  It is layer 0's restriction (`AttemptGrant.fair_mono`). -/
+theorem labelledView_of_sf (hs : Schedule σ sched) (hso : SoleOwner i G)
+    (hsf : Action.SF A G σ) : labelledView sched i A G σ :=
+  AttemptGrant.fair_mono (fun _ ha => ha.2) (fun n hA hg => ⟨hso _ _ hg (sched n) (hs n), hA⟩)
+    (Action.sf_iff_fair.1 hsf)
+
+end Schedule
+
+/-! ## 5. Layer 2: the thread's view of an action (`Thread`)
 
 The thread's view is layer 0 with the thread's own attempts.  An attempt is a step of the thread at
 `i` from a configuration where `A` holds, and a grant is a step in `G`, as at layer 1.  A hit is
