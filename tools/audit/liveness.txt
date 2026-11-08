@@ -34,17 +34,18 @@ Fairness.Thread.counter_of_sf
 Fairness.Thread.sf_iff_attemptGrant
 Fairness.Thread.counter_stay_of_other
 
-# MachCSL/Liveness/Fairness.lean: MachCSL's pool as an instance, eras, the six
-# actions
+# MachCSL/Liveness/Fairness.lean: MachCSL's pool as an instance, eras, the
+# coherence floors, the six actions
 Fairness.Era.persists_of_liveStable
 Fairness.Era.persists_of_liveStableUnder
+Fairness.Mem.coh_mono
 Fairness.Tick.sf_iff
 Fairness.Arm.sf_iff
 Fairness.Fresh.sf_iff
 Fairness.Hart.sf_iff
+Fairness.Dev.answered
 Fairness.Dev.wf
 Fairness.Dma.sf_iff
-Fairness.Fresh.coh_mono
 
 # MachCSL/Liveness/Cycle.lean: a hart's cycle, the closure of the choice
 # instances, ramHist along a run, harts' progress in response form
@@ -59,9 +60,7 @@ Fairness.Arm.exists_answer
 Fairness.Arm.exists_grant
 Fairness.Fresh.exists_grant
 Fairness.Hart.exists_served
-Fairness.Fresh.grant_iff_coh
-Fairness.Hart.grant_iff_not_blocked
-Fairness.Dma.grant_iff_not_blocked
+Fairness.Dma.served_of_unblocked
 Fairness.ramHist_run
 Fairness.Hart.sf_iff_progressOrCut
 Fairness.Hart.sf_iff_response

@@ -271,7 +271,7 @@ Each device's root program begins with a `choose` node, and so do the PLIC's two
 and its pin choice.  `chooseLt n` answers `k % n` and `chooseBool` answers `k % 2 = 1`, so the
 class of an answer `k` modulo `n` decides the continuation.  An arm is a node with a modulus and
 a class; the arm assumption says a root that stands at the node infinitely often takes the class
-infinitely often (`Arm.SF`, `Fairness.lean` 3.2).  The list below is `fairness-formulas.md` §3.4.
+infinitely often (`Arm.SF`, `Fairness.lean` 5.2).  The list below is `fairness-formulas.md` §3.4.
 The classes left free are the UART's receive and idle arms, the PLIC's unwired sources and its
 machine-mode pin, the disk's idle arm, and which cached sector the disk's drain arm writes. -/
 
@@ -817,7 +817,7 @@ theorem atSpinLoad_live (h : atSpinLoad x c) : ∃ i, liveAt i c :=
 pair `Fresh`. -/
 theorem atSpinLoad_atLoad (h : atSpinLoad x c) : ∃ i, Fresh.atLoad i startedAddr c := by
   obtain ⟨i, gen, req, k, he, hl, hpa, hsz, hpl, -⟩ := h
-  refine ⟨i, gen, x, req, k, he, hl, hpl, ?_, 0, ?_, ?_⟩
+  refine ⟨i, x, req, k, ⟨gen, he, hl⟩, hpl, ?_, 0, ?_, ?_⟩
   · rw [hpa, hsz]
     exact startedAddr_ram
   · rw [hsz]
