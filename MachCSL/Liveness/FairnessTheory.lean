@@ -87,7 +87,7 @@ Theorems read `conclusion_of_hypothesis` (`attemptGrant_of_sf`, `counter_of_sf`,
 `sf_of_attemptGrant`) or `subject_property` (`counter_reset`, `hit_miss_exclusive`), and
 equivalences read `x_iff_y` (`sf_iff_fair`, `sf_iff_attemptGrant`).  A hypothesis has the same name
 everywhere: `hsf` for `Action.SF`, `hag` for an attempt–grant form (layer 0's `Fair` or the
-thread's `AttemptGrant`), `hown` for `OwnGrant`, `hos` for `OwnStep`, `hsched` for `StepsInfOften`, `hper` for
+thread's `AttemptGrant`), `hown` for `OwnGrant`, `hos` for `OwnStep`, `hso` for `SoleOwner`, `hconv` for `Convex`, `hsched` for `StepsInfOften`, `hper` for
 `Persists`, `hstab` for stability, `hrun` for `PoolRun`, `hδ` for a counter, `hc` for `Certain`,
 and `ha`, `hg`, `hA`, `hs` for the facts at a position (an attempt, a grant, `A` holds, the thread
 steps).  The names every action of `Fairness.lean` has are in that file's header.
@@ -1355,5 +1355,14 @@ theorem exists_fair_schedule {Cfg : Type} [Pool Cfg] {active : Nat → Cfg → P
   intro i hA N
   obtain ⟨k, n, hk, hN, ht⟩ := FairLabel.exists_takes_ge (hsf i hA) N
   exact ⟨n, hN, hk ▸ ht.2.1.1, (FairLabel.sched_of_takes hrun ht).trans hk⟩
+
+/-- The fair-labelling theorem in the vocabulary of section 4: fair scheduling of every thread
+(`Sched.SF`) gives a fair `Schedule`. -/
+theorem Sched.exists_fair_schedule {Cfg : Type} [Pool Cfg] {active : Nat → Cfg → Prop}
+    {σ : Nat → Cfg} (hrun : PoolRun σ) (hsf : ∀ i, Sched.SF active i σ) :
+    ∃ sched : Nat → Nat, Schedule σ sched ∧
+      ∀ i, MissHit.InfOften (fun n => active i (σ n)) →
+        MissHit.InfOften (fun n => active i (σ n) ∧ sched n = i) :=
+  Fairness.exists_fair_schedule hrun hsf
 
 end Fairness
