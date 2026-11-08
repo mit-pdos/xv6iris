@@ -10,6 +10,12 @@ hypotheses of `Spec.Hyps` (`Tick`, `Arm`, `Fresh`, `Hart`, `Dma`).  The sixth, `
 its grant is certain at the task's attempts, and its forms are theorems.  The theory file is a
 stopgap that Lantana's extension deletes; this file stays, retargeted to Lantana's traces.
 
+Every enabling condition states the thread's shape through the two shared relations of section 4.
+Every grant is the thread's own step plus the condition that decides it, never the program the
+thread moves on to: a condition on the machine state before the step for an arbitration (`Hart`,
+`Dma`), the enabling condition itself for a gate (`Dev`), and the value chosen for a choice
+(`Tick`, `Arm`, `Fresh`).
+
 The file was the probe `local-plan/liveness/probes/Fairness.lean` until 2026-11-05 (lane
 `xv6-liveness-now`, milestone B1; the design documents that cite it by section and theorem name
 are `local-plan/liveness/attempt-grant.md` and `fairness-base.md`; all of `local-plan/` is outside
@@ -17,9 +23,10 @@ the repository).  It was re-layered 2026-11-06 (lane `fairness-layers`): the sta
 action is the base, and the thread's view is built on top of it.  The same day (lane
 `fairness-split`) the general theory moved to `FairnessTheory.lean`, generic over the pool, and
 this file kept MachCSL's instance; later that day (lane `fairness-ag`) the theory's layer 0 became
-the attempt–grant pair, three layers in all.  Nothing in the trusted base imports this directory
-(`MachCSL/Liveness/`); it is built by `lake build MachCSL` and checked by CI like every module of
-the library.
+the attempt–grant pair, three layers in all.  On 2026-11-08 (lane `fairness-shape`) the thread's
+shape was stated once and every grant became the thread's step plus the condition that decides
+it.  Nothing in the trusted base imports this directory (`MachCSL/Liveness/`); it is built by
+`lake build MachCSL` and checked by CI like every module of the library.
 
 **Map of the file.**
 
@@ -30,24 +37,30 @@ the library.
    condition that is a live thread's and is stable under every thread but the power thread
    (`persists_of_liveStable`), or under the steps that meet a side condition
    (`persists_of_liveStableUnder`, for a gate another thread can close).
-3. The actions `Tick`, `Arm`, `Fresh`, `Hart`: each gives `enabled` (the `A`) and `grant` (the
-   `G`, a step of the thread that states its transition), its `SF` (layer 1) and `AG` (layer 2)
-   forms, and proves `ownGrant`, `live`, `stable`, `persists`, `sf_iff` and `counter_of_sf`.  Then
-   the device tasks: `Dev`, a task at a gate, whose grant is certain at its attempts (`certain`,
-   `counter_zero`, `wf`); and `Dma`, a DMA write under a reservation, an action like `Hart`
-   whose persistence is a protocol property.  `Fresh` (3.3) also proves that no step but a
-   power-on lowers a coherence floor (`coh_mono`), the fact behind the logic's floor receipts
-   (`MachCSL.floorLbAt`), in which its grant is consumed.  What a hit and a miss of `Hart` and a
-   miss of `Dma` are in machine terms (`Hart.hit_iff`, `Hart.miss_iff`, `Dma.miss_iff`) is proved
-   in `MachCSL/Liveness/Cycle.lean`.  It needs two machine facts: a blocked retry keeps the head,
-   and an unblocked access is served.
+3. `Mem`, the store order and the coherence floors: no step but a power-on lowers the top of the
+   store order (`Mem.top_mono`) or a coherence floor (`Mem.coh_mono`).
+4. The thread's shape: a live hart running a program (`hartAt`) and a live device task running a
+   program (`taskAt`), each a live thread's and stable under every other thread's step but the
+   power thread's.
+5. The actions `Tick`, `Arm`, `Fresh`, `Hart`: each gives `enabled` (the `A`) and `grant` (the
+   `G`, the thread's step and the condition that decides it), its `SF` (layer 1) and `AG`
+   (layer 2) forms, and proves `ownGrant`, `live`, `stable`, `persists`, `sf_iff` and
+   `counter_of_sf`.  Then the device tasks: `Dev`, a task at a gate, whose grant is certain at its
+   attempts (`answered`, `certain`, `counter_zero`, `wf`); and `Dma`, a DMA write under a
+   reservation, an action like `Hart` whose persistence is a protocol property.  What a hit and a
+   miss of `Hart` and `Dma` are in machine terms, an access served and a blocked retry that keeps
+   the head, is proved in `MachCSL/Liveness/Cycle.lean`.
 
 **Names.**  The file follows the naming policy of `FairnessTheory.lean`'s header.  Every action
 uses the same names: `enabled`, `grant`, `ownGrant`, `SF`, `AG`, `live`; the four strong
 assumptions (`Tick`, `Arm`, `Fresh`, `Hart`) add `stable`, `persists`, `sf_iff` and
 `counter_of_sf`; `Dma` has `counter_of_sf` and an `sf_iff` that takes persistence as a
 hypothesis; `Dev`, whose grant is certain, has `certain`, `ag`, `counter_zero`, `wf` and
-`sf_of_persists`.
+`sf_of_persists`.  Each action but `Dev` also names the shape its condition is about:
+`Tick.restart` (the hart's step from its boundary), `Arm.answer` (the root's step to an answer),
+`Fresh.atLoad` (a hart at a plain load), `Hart.pending` (a hart at a pending access),
+`Dma.atWrite` and `Dma.pending` (a task at a DMA write, and at a pending one).  The two
+arbitrations, `Hart` and `Dma`, name their condition `blocked`.
 -/
 
 namespace Fairness
@@ -275,171 +288,19 @@ theorem persists_of_liveStable (hrun : PoolRun σ) {A : Cfg → Prop}
 
 end Era
 
-/-! ## 3. The six actions
+/-! ## 3. The store order and the coherence floors never go down, except at a power-on
 
-Each action gives its enabling condition `enabled` (the `A`) and its grant relation `grant` (the
-`G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 2).  Every `grant` begins
-with the thread's step, `Step i c c'`, and then states the thread's transition, so every action
-has own grant and takes the cheap path of layer 2.  The first four actions prove: `ownGrant`,
-the grant is one of the thread's transitions; `live`, the condition is a live thread's; `stable`,
-it survives every thread's step but the power thread's; `persists`, from the two; `sf_iff`, the
-two forms coincide under fair scheduling; `counter_of_sf`, the trusted form gives the thread's
-counter.  The two device tasks (3.5, 3.6) prove what their persistence allows. -/
+Two facts about the memory model, each for every step of a thread that is not the power thread (a
+power-on resets the memory).  The top of the store order never goes down (`top_mono`); that keeps
+`Fresh`'s enabling condition stable (`Fresh.stable`).  No coherence floor of any hart goes down,
+while every floor is at or below the top (`coh_mono`); that is the fact behind the logic's floor
+receipts (`MachCSL.floorLbAt`), in which `Fresh`'s grant is consumed. -/
 
-open Era (liveAt StableExceptPower)
+namespace Mem
 
-/-! ### 3.1 The tick: a live hart at its cycle boundary; the restart carries the tick -/
+variable {j : Nat} {c c' : Cfg}
 
-namespace Tick
-
-variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
-
-/-- The enabling condition: the thread at `i` is a live hart at its cycle boundary. -/
-def enabled (i : Nat) (c : Cfg) : Prop :=
-  ∃ e x, c.1[i]? = some (.hart e x (.pure ())) ∧ threadLive c.2 e
-
-/-- The grant: the hart steps from its cycle boundary and restarts its cycle with a tick. -/
-def grant (i : Nat) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e x ew, c.1[i]? = some (.hart e x (.pure ())) ∧
-    c'.1[i]? = some (.hart e x (riscvStep true ew))
-
-/-- The grant is one of the hart's transitions. -/
-theorem ownGrant : Thread.OwnGrant i (grant i) := fun h => h.1
-
-/-- Trusted: a hart at its boundary infinitely often restarts with the tick infinitely often. -/
-abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF (enabled i) (grant i) σ
-
-/-- Proof form: infinitely many tickless restarts force infinitely many ticking ones. -/
-abbrev AG (i : Nat) (σ : Nat → Cfg) : Prop := Thread.AttemptGrant i (enabled i) (grant i) σ
-
-/-- The enabling condition is a live thread's. -/
-theorem live (h : enabled i c) : liveAt i c :=
-  let ⟨e, x, he, hl⟩ := h; ⟨e, Or.inl ⟨x, _, he⟩, hl⟩
-
-/-- The enabling condition survives every other thread's step but the power thread's. -/
-theorem stable : StableExceptPower i (enabled i) := by
-  intro j c c' hji hs hnp h
-  obtain ⟨e, x, he, hl⟩ := h
-  exact ⟨e, x, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl⟩
-
-/-- The enabling condition persists on every run of the pool. -/
-theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i) σ :=
-  Era.persists_of_liveStable hrun (fun _ => live) stable
-
-/-- Under fair scheduling of the hart, the trusted form and the proof form coincide. -/
-theorem sf_iff (hrun : PoolRun σ) (hsched : StepsInfOften i σ) : SF i σ ↔ AG i σ :=
-  Thread.sf_iff_attemptGrant ownGrant hsched (persists hrun)
-
-/-- The trusted form gives the hart's counter. -/
-theorem counter_of_sf (hsf : SF i σ) : ∃ δ, Thread.IsCounter i (enabled i) (grant i) σ δ :=
-  Thread.counter_of_sf ownGrant hsf
-
-end Tick
-
-/-! ### 3.2 A device's `choose` arm: the live root at the node; class `b` chosen -/
-
-namespace Arm
-
-variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
-
-/-- The continuation of a `choose` node at the answer `v`. -/
-def at? {S T α : Type} : DevM S T α → Nat → Option (DevM S T α)
-  | .op .choose k, v => some (k v)
-  | _, _ => none
-
-/-- The enabling condition: the thread at `i` is the live root of device `d` at the node. -/
-def enabled (i : Nat) (d : DevId) (node : DevProg d) (c : Cfg) : Prop :=
-  ∃ e, c.1[i]? = some (.dev e d rootTask node) ∧ threadLive c.2 e
-
-/-- The grant: the root steps from the node and takes an answer of class `b` modulo `m`. -/
-def grant (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e v, v % m = b ∧ c.1[i]? = some (.dev e d rootTask node) ∧
-    c'.1[i]? = (at? node v).map (.dev e d rootTask)
-
-/-- The grant is one of the root's transitions. -/
-theorem ownGrant {d : DevId} {node : DevProg d} {m b : Nat} :
-    Thread.OwnGrant i (grant i d node m b) := fun h => h.1
-
-/-- Trusted: a root at the node infinitely often takes class `b` infinitely often. -/
-abbrev SF (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
-  Action.SF (enabled i d node) (grant i d node m b) σ
-
-/-- Proof form: infinitely many steps of the root at the node that take another class force
-infinitely many that take class `b`. -/
-abbrev AG (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
-  Thread.AttemptGrant i (enabled i d node) (grant i d node m b) σ
-
-variable {d : DevId} {node : DevProg d} {m b : Nat}
-
-/-- The enabling condition is a live thread's. -/
-theorem live (h : enabled i d node c) : liveAt i c :=
-  let ⟨e, he, hl⟩ := h; ⟨e, Or.inr ⟨d, _, _, he⟩, hl⟩
-
-/-- The enabling condition survives every other thread's step but the power thread's. -/
-theorem stable : StableExceptPower i (enabled i d node) := by
-  intro j c c' hji hs hnp h
-  obtain ⟨e, he, hl⟩ := h
-  exact ⟨e, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl⟩
-
-/-- The enabling condition persists on every run of the pool. -/
-theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i d node) σ :=
-  Era.persists_of_liveStable hrun (fun _ => live) stable
-
-/-- Under fair scheduling of the root, the trusted form and the proof form coincide. -/
-theorem sf_iff (hrun : PoolRun σ) (hsched : StepsInfOften i σ) :
-    SF i d node m b σ ↔ AG i d node m b σ :=
-  Thread.sf_iff_attemptGrant ownGrant hsched (persists hrun)
-
-/-- The trusted form gives the root's counter. -/
-theorem counter_of_sf (hsf : SF i d node m b σ) :
-    ∃ δ, Thread.IsCounter i (enabled i d node) (grant i d node m b) σ δ :=
-  Thread.counter_of_sf ownGrant hsf
-
-end Arm
-
-/-! ### 3.3 The visibility of a store: a live hart at a plain load of `a` once store `t` exists;
-the load sees `t` -/
-
-namespace Fresh
-
-variable {i j : Nat} {c c' : Cfg} {σ : Nat → Cfg}
-
-/-- The thread at `i` is a live hart whose head event is a plain RAM load covering `a`. -/
-def atLoad (i : Nat) (a : PAddr) (c : Cfg) : Prop := ∃ e x req k,
-  c.1[i]? = some (.hart e x (.impure (.inl (.ok (.memRead req))) k)) ∧ threadLive c.2 e ∧
-  akPlain req.accessKind = true ∧ ramBytes req.pa req.size ∧
-  ∃ j, j < req.size ∧ a = req.pa + BitVec.ofNat 64 j
-
-/-- The enabling condition: the load covers `a` and the store `t` has happened. -/
-def enabled (i : Nat) (t : Nat) (a : PAddr) (c : Cfg) : Prop := atLoad i a c ∧ t ≤ c.2.m.top
-
-/-- The grant: the hart takes the load and moves on to its continuation, and afterwards its view of
-`a` is at or past `t`.  That view is the hart's coherence floor of `a`: its later loads of `a` read
-at that view or a later one. -/
-def grant (i t : Nat) (a : PAddr) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e x req k v, c.1[i]? = some (.hart e x (.impure (.inl (.ok (.memRead req))) k)) ∧
-    c'.1[i]? = some (.hart e x (k v)) ∧ t ≤ (c'.2.m.hr x).coh a
-
-/-- The grant is one of the hart's transitions. -/
-theorem ownGrant {t : Nat} {a : PAddr} : Thread.OwnGrant i (grant i t a) := fun h => h.1
-
-/-- Trusted: a hart at a load of `a` after store `t` infinitely often sees `t` infinitely
-often (memory fairness). -/
-abbrev SF (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
-  Action.SF (enabled i t a) (grant i t a) σ
-
-/-- Proof form: infinitely many loads of `a` after store `t` that do not see it force infinitely
-many that do. -/
-abbrev AG (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
-  Thread.AttemptGrant i (enabled i t a) (grant i t a) σ
-
-variable {t : Nat} {a : PAddr}
-
-/-- The enabling condition is a live thread's. -/
-theorem live (h : enabled i t a c) : liveAt i c :=
-  let ⟨⟨e, x, _req, _k, he, hl, _⟩, _⟩ := h; ⟨e, Or.inl ⟨x, _, he⟩, hl⟩
-
-/-! #### The top of the store order never goes down, except at a power-on -/
+/-! ### The top of the store order -/
 
 /-- Dropping a hart's store window keeps the store log. -/
 theorem dropWindow_log (σ : MState) (cpu : CPU) : (σ.dropWindow cpu).log = σ.log := by
@@ -560,7 +421,7 @@ theorem top_mono (hs : Step j c c') (hnp : ∀ e, c.1[j]? = some e → e ≠ .po
     · exact Nat.le_refl _
   | power => exact absurd rfl (hnp _ he)
 
-/-! #### The coherence floors never go down, except at a power-on
+/-! ### The coherence floors
 
 The floors of the hart that steps move at its loads only: a plain load reads at a view at or
 above the footprint's floors (`HRead.cohOk`), an exclusive read at the top of the order, which
@@ -725,17 +586,213 @@ theorem coh_mono (hs : Step j c c') (hnp : ∀ e, c.1[j]? = some e → e ≠ .po
     · exact cohLe_refl _
   | power => exact absurd rfl (hnp _ he)
 
-/-- A live hart at a load of `a` stays there across every other thread's step but the power
-thread's. -/
-theorem atLoad_stable (h : atLoad i a c) (hs : Step j c c') (hji : j ≠ i)
-    (hnp : ∀ e, c.1[j]? = some e → e ≠ .power) : atLoad i a c' := by
-  obtain ⟨e, x, req, k, he, hl, hrest⟩ := h
-  exact ⟨e, x, req, k, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl, hrest⟩
+end Mem
+
+/-! ## 4. The thread's shape: a live hart or task running a program
+
+Every enabling condition is about the thread at a position: a live hart running a program, or a
+live task of a device running a program.  The two relations below state that shape once.  Each is
+a live thread's and survives every other thread's step but the power thread's, so every action's
+`live` and `stable` is one line. -/
+
+open Era (liveAt StableExceptPower)
+
+section Shape
+
+variable {i j : Nat} {c c' : Cfg} {x : CPU} {d : DevId} {tid : TaskId}
+
+/-- The thread at `i` is a live hart `x` running the program `m`. -/
+def hartAt (i : Nat) (c : Cfg) (x : CPU) (m : SailM Unit) : Prop :=
+  ∃ e, c.1[i]? = some (.hart e x m) ∧ threadLive c.2 e
+
+/-- The thread at `i` is a live task `tid` of device `d` running the program `m`. -/
+def taskAt (i : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (c : Cfg) : Prop :=
+  ∃ e, c.1[i]? = some (.dev e d tid m) ∧ threadLive c.2 e
+
+/-- A hart running a program is a live thread. -/
+theorem hartAt_live {m : SailM Unit} (h : hartAt i c x m) : liveAt i c :=
+  let ⟨e, he, hl⟩ := h; ⟨e, Or.inl ⟨x, m, he⟩, hl⟩
+
+/-- A task running a program is a live thread. -/
+theorem taskAt_live {m : DevProg d} (h : taskAt i d tid m c) : liveAt i c :=
+  let ⟨e, he, hl⟩ := h; ⟨e, Or.inr ⟨d, tid, m, he⟩, hl⟩
+
+/-- A hart's program and liveness survive every other thread's step but the power thread's. -/
+theorem hartAt_stable {m : SailM Unit} (h : hartAt i c x m) (hs : Step j c c') (hji : j ≠ i)
+    (hnp : ∀ e, c.1[j]? = some e → e ≠ .power) : hartAt i c' x m :=
+  let ⟨e, he, hl⟩ := h; ⟨e, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl⟩
+
+/-- A task's program and liveness survive every other thread's step but the power thread's. -/
+theorem taskAt_stable {m : DevProg d} (h : taskAt i d tid m c) (hs : Step j c c') (hji : j ≠ i)
+    (hnp : ∀ e, c.1[j]? = some e → e ≠ .power) : taskAt i d tid m c' :=
+  let ⟨e, he, hl⟩ := h; ⟨e, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl⟩
+
+end Shape
+
+/-! ## 5. The six actions
+
+Each action gives its enabling condition `enabled` (the `A`) and its grant relation `grant` (the
+`G`), its trusted form `SF` (layer 1) and its proof form `AG` (layer 2).  Every `enabled` is a
+line on section 4's relations.  Every `grant` is the thread's step, `Step i c c'`, and the
+condition that decides it, so every action has own grant and takes the cheap path of layer 2.  The
+first four actions prove: `ownGrant`, the grant is one of the thread's transitions; `live`, the
+condition is a live thread's; `stable`, it survives every thread's step but the power thread's;
+`persists`, from the two; `sf_iff`, the two forms coincide under fair scheduling;
+`counter_of_sf`, the trusted form gives the thread's counter.  The two device tasks (5.5, 5.6)
+prove what their persistence allows. -/
+
+/-! ### 5.1 The tick: a live hart at its cycle boundary; the restart carries the tick -/
+
+namespace Tick
+
+variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+
+/-- The enabling condition: the thread at `i` is a live hart at its cycle boundary. -/
+def enabled (i : Nat) (c : Cfg) : Prop := ∃ x, hartAt i c x (.pure ())
+
+/-- The hart's step from its boundary that restarts its cycle with `tick`. -/
+def restart (i : Nat) (tick : Bool) (c c' : Cfg) : Prop :=
+  Step i c c' ∧ ∃ e x ew, c.1[i]? = some (.hart e x (.pure ())) ∧
+    c'.1[i]? = some (.hart e x (riscvStep tick ew))
+
+/-- The grant: the restart carries the tick. -/
+abbrev grant (i : Nat) : Cfg → Cfg → Prop := restart i true
+
+/-- The grant is one of the hart's transitions. -/
+theorem ownGrant : Thread.OwnGrant i (grant i) := fun h => h.1
+
+/-- Trusted: a hart at its boundary infinitely often restarts with the tick infinitely often. -/
+abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF (enabled i) (grant i) σ
+
+/-- Proof form: infinitely many tickless restarts force infinitely many ticking ones. -/
+abbrev AG (i : Nat) (σ : Nat → Cfg) : Prop := Thread.AttemptGrant i (enabled i) (grant i) σ
+
+/-- The enabling condition is a live thread's. -/
+theorem live (h : enabled i c) : liveAt i c := let ⟨_, h⟩ := h; hartAt_live h
+
+/-- The enabling condition survives every other thread's step but the power thread's. -/
+theorem stable : StableExceptPower i (enabled i) :=
+  fun hji hs hnp ⟨x, h⟩ => ⟨x, hartAt_stable h hs hji hnp⟩
+
+/-- The enabling condition persists on every run of the pool. -/
+theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i) σ :=
+  Era.persists_of_liveStable hrun (fun _ => live) stable
+
+/-- Under fair scheduling of the hart, the trusted form and the proof form coincide. -/
+theorem sf_iff (hrun : PoolRun σ) (hsched : StepsInfOften i σ) : SF i σ ↔ AG i σ :=
+  Thread.sf_iff_attemptGrant ownGrant hsched (persists hrun)
+
+/-- The trusted form gives the hart's counter. -/
+theorem counter_of_sf (hsf : SF i σ) : ∃ δ, Thread.IsCounter i (enabled i) (grant i) σ δ :=
+  Thread.counter_of_sf ownGrant hsf
+
+end Tick
+
+/-! ### 5.2 A device's `choose` arm: the live root at the node; class `b` chosen -/
+
+namespace Arm
+
+variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+
+/-- The continuation of a `choose` node at the answer `v`. -/
+def at? {S T α : Type} : DevM S T α → Nat → Option (DevM S T α)
+  | .op .choose k, v => some (k v)
+  | _, _ => none
+
+/-- The enabling condition: the thread at `i` is the live root of device `d` at the node. -/
+def enabled (i : Nat) (d : DevId) (node : DevProg d) (c : Cfg) : Prop :=
+  taskAt i d rootTask node c
+
+/-- The root's step from the node to its continuation at the answer `v`. -/
+def answer (i : Nat) (d : DevId) (node : DevProg d) (v : Nat) (c c' : Cfg) : Prop :=
+  Step i c c' ∧ ∃ e, c.1[i]? = some (.dev e d rootTask node) ∧
+    c'.1[i]? = (at? node v).map (.dev e d rootTask)
+
+/-- The grant: an answer of class `b` modulo `m`. -/
+def grant (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (c c' : Cfg) : Prop :=
+  ∃ v, v % m = b ∧ answer i d node v c c'
+
+/-- The grant is one of the root's transitions. -/
+theorem ownGrant {d : DevId} {node : DevProg d} {m b : Nat} :
+    Thread.OwnGrant i (grant i d node m b) := fun ⟨_, _, h⟩ => h.1
+
+/-- Trusted: a root at the node infinitely often takes class `b` infinitely often. -/
+abbrev SF (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
+  Action.SF (enabled i d node) (grant i d node m b) σ
+
+/-- Proof form: infinitely many steps of the root at the node that take another class force
+infinitely many that take class `b`. -/
+abbrev AG (i : Nat) (d : DevId) (node : DevProg d) (m b : Nat) (σ : Nat → Cfg) : Prop :=
+  Thread.AttemptGrant i (enabled i d node) (grant i d node m b) σ
+
+variable {d : DevId} {node : DevProg d} {m b : Nat}
+
+/-- The enabling condition is a live thread's. -/
+theorem live (h : enabled i d node c) : liveAt i c := taskAt_live h
+
+/-- The enabling condition survives every other thread's step but the power thread's. -/
+theorem stable : StableExceptPower i (enabled i d node) :=
+  fun hji hs hnp h => taskAt_stable h hs hji hnp
+
+/-- The enabling condition persists on every run of the pool. -/
+theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i d node) σ :=
+  Era.persists_of_liveStable hrun (fun _ => live) stable
+
+/-- Under fair scheduling of the root, the trusted form and the proof form coincide. -/
+theorem sf_iff (hrun : PoolRun σ) (hsched : StepsInfOften i σ) :
+    SF i d node m b σ ↔ AG i d node m b σ :=
+  Thread.sf_iff_attemptGrant ownGrant hsched (persists hrun)
+
+/-- The trusted form gives the root's counter. -/
+theorem counter_of_sf (hsf : SF i d node m b σ) :
+    ∃ δ, Thread.IsCounter i (enabled i d node) (grant i d node m b) σ δ :=
+  Thread.counter_of_sf ownGrant hsf
+
+end Arm
+
+/-! ### 5.3 The visibility of a store: a live hart at a plain load of `a` once store `t` exists;
+the load sees `t` -/
+
+namespace Fresh
+
+variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+
+/-- The thread at `i` is a live hart whose head event is a plain RAM load covering `a`. -/
+def atLoad (i : Nat) (a : PAddr) (c : Cfg) : Prop := ∃ x req k,
+  hartAt i c x (.impure (.inl (.ok (.memRead req))) k) ∧ akPlain req.accessKind = true ∧
+  ramBytes req.pa req.size ∧ ∃ j, j < req.size ∧ a = req.pa + BitVec.ofNat 64 j
+
+/-- The enabling condition: the load covers `a` and the store `t` has happened. -/
+def enabled (i : Nat) (t : Nat) (a : PAddr) (c : Cfg) : Prop := atLoad i a c ∧ t ≤ c.2.m.top
+
+/-- The grant: the hart's own step, after which its view of `a`, its coherence floor, is at or
+past `t`: the load read at a view that includes store `t`. -/
+def grant (i t : Nat) (a : PAddr) (c c' : Cfg) : Prop :=
+  Step i c c' ∧ ∀ x m, hartAt i c x m → t ≤ (c'.2.m.hr x).coh a
+
+/-- The grant is one of the hart's transitions. -/
+theorem ownGrant {t : Nat} {a : PAddr} : Thread.OwnGrant i (grant i t a) := fun h => h.1
+
+/-- Trusted: a hart at a load of `a` after store `t` infinitely often sees `t` infinitely
+often (memory fairness). -/
+abbrev SF (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
+  Action.SF (enabled i t a) (grant i t a) σ
+
+/-- Proof form: infinitely many loads of `a` after store `t` that do not see it force infinitely
+many that do. -/
+abbrev AG (i t : Nat) (a : PAddr) (σ : Nat → Cfg) : Prop :=
+  Thread.AttemptGrant i (enabled i t a) (grant i t a) σ
+
+variable {t : Nat} {a : PAddr}
+
+/-- The enabling condition is a live thread's. -/
+theorem live (h : enabled i t a c) : liveAt i c := let ⟨⟨_, _, _, h, _⟩, _⟩ := h; hartAt_live h
 
 /-- The enabling condition survives every other thread's step but the power thread's: the load
 stays, and the top of the store order does not go down. -/
 theorem stable : StableExceptPower i (enabled i t a) :=
-  fun hji hs hnp h => ⟨atLoad_stable h.1 hs hji hnp, Nat.le_trans h.2 (top_mono hs hnp)⟩
+  fun hji hs hnp ⟨⟨x, req, k, h, hr⟩, ht⟩ =>
+    ⟨⟨x, req, k, hartAt_stable h hs hji hnp, hr⟩, Nat.le_trans ht (Mem.top_mono hs hnp)⟩
 
 /-- The enabling condition persists on every run of the pool. -/
 theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i t a) σ :=
@@ -752,67 +809,69 @@ theorem counter_of_sf (hsf : SF i t a σ) :
 
 end Fresh
 
-/-! ### 3.4 Harts progress: a live hart at a pending RAM access; the access is served -/
+/-! ### 5.4 Harts progress: a live hart at a pending RAM access; the access is not blocked -/
 
 namespace Hart
 
-variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+variable {i : Nat} {c : Cfg} {σ : Nat → Cfg} {x x' : CPU} {pa pa' : PAddr} {n n' : Nat}
 
-/-- The enabling condition: a live hart whose head event is a RAM store or an exclusive RAM read,
-blocked or not (a pending access). -/
-def enabled (i : Nat) (c : Cfg) : Prop := ∃ e x o k,
-  c.1[i]? = some (.hart e x (.impure (.inl (.ok o)) k)) ∧ threadLive c.2 e ∧
+/-- The thread at `i` is a live hart `x` whose head event is a RAM store or an exclusive RAM read
+with footprint `(pa, n)`: a pending access. -/
+def pending (i : Nat) (c : Cfg) (x : CPU) (pa : PAddr) (n : Nat) : Prop := ∃ o k,
+  hartAt i c x (.impure (.inl (.ok o)) k) ∧ ramBytes pa n ∧
   match o with
-  | .memRead req => akExcl req.accessKind = true ∧ ramBytes req.pa req.size
-  | .memWrite req _ _ => ramBytes req.pa req.size
+  | .memRead req => akExcl req.accessKind = true ∧ pa = req.pa ∧ n = req.size
+  | .memWrite req _ _ => pa = req.pa ∧ n = req.size
   | _ => False
 
-/-- The pending access is blocked: its footprint is covered by another hart's blocking
-reservation (`othersReserve`; an LR's reservation blocks nobody since lane `lr-nonblock`,
-2026-11-04). -/
-def blocked (i : Nat) (c : Cfg) : Prop := ∃ e x o k,
-  c.1[i]? = some (.hart e x (.impure (.inl (.ok o)) k)) ∧ threadLive c.2 e ∧
-  match o with
-  | .memRead req => akExcl req.accessKind = true ∧ ramBytes req.pa req.size ∧
-      othersReserve c.2.m.resv x req.pa req.size
-  | .memWrite req _ _ => ramBytes req.pa req.size ∧ othersReserve c.2.m.resv x req.pa req.size
-  | _ => False
+/-- The enabling condition: the hart has a pending access, blocked or not. -/
+def enabled (i : Nat) (c : Cfg) : Prop := ∃ x pa n, pending i c x pa n
 
-/-- The grant: the hart's step answers its head event, and the hart moves on to the continuation
-with some answer.  At a pending access, that is the access served.  A blocked retry keeps the head
-event in place, so it is not a grant. -/
+/-- The arbitration condition: another hart's blocking reservation covers the footprint
+(`othersReserve`; an LR's reservation blocks nobody since lane `lr-nonblock`, 2026-11-04). -/
+def blocked (m : MState) (x : CPU) (pa : PAddr) (n : Nat) : Prop := othersReserve m.resv x pa n
+
+/-- The grant: the hart's own step, at which its pending access is not blocked. -/
 def grant (i : Nat) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e x o k v, c.1[i]? = some (.hart e x (.impure (.inl (.ok o)) k)) ∧
-    c'.1[i]? = some (.hart e x (k v))
+  Step i c c' ∧ ∀ x pa n, pending i c x pa n → ¬ blocked c.2.m x pa n
 
 /-- The grant is one of the hart's transitions. -/
 theorem ownGrant : Thread.OwnGrant i (grant i) := fun h => h.1
 
-/-- Trusted: a hart with a pending access infinitely often has one served infinitely often
-(RVWMO's Progress Axiom in the model's terms). -/
+/-- Trusted: a hart with a pending access infinitely often steps with it unblocked infinitely
+often (RVWMO's Progress Axiom in the model's terms). -/
 abbrev SF (i : Nat) (σ : Nat → Cfg) : Prop := Action.SF (enabled i) (grant i) σ
 
-/-- Proof form: infinitely many blocked retries force infinitely many served accesses. -/
+/-- Proof form: infinitely many steps at a blocked access force infinitely many at an unblocked
+one. -/
 abbrev AG (i : Nat) (σ : Nat → Cfg) : Prop := Thread.AttemptGrant i (enabled i) (grant i) σ
 
-/-- The Progress Axiom in response form: every pending access is eventually served. -/
+/-- The Progress Axiom in response form: every pending access eventually steps unblocked. -/
 abbrev ProgressAxiom (i : Nat) (σ : Nat → Cfg) : Prop := Action.Response (enabled i) (grant i) σ
 
-/-- The enabling condition is a live thread's. -/
-theorem live (h : enabled i c) : liveAt i c :=
-  let ⟨e, x, _o, _k, he, hl, _⟩ := h; ⟨e, Or.inl ⟨x, _, he⟩, hl⟩
+/-- A hart has at most one pending access: the hart and the footprint are its head event's. -/
+theorem pending_unique (h : pending i c x pa n) (h' : pending i c x' pa' n') :
+    x = x' ∧ pa = pa' ∧ n = n' := by
+  obtain ⟨o, k, ⟨e, he, -⟩, -, hm⟩ := h
+  obtain ⟨o', k', ⟨e', he', -⟩, -, hm'⟩ := h'
+  rw [he] at he'
+  obtain ⟨-, rfl, hmk⟩ := Expr.hart.inj (Option.some.inj he')
+  injection hmk with ho
+  injection ho with ho
+  injection ho with ho
+  subst ho
+  refine ⟨rfl, ?_⟩
+  cases o with
+  | memRead req => exact ⟨hm.2.1.trans hm'.2.1.symm, hm.2.2.trans hm'.2.2.symm⟩
+  | memWrite req w a => exact ⟨hm.1.trans hm'.1.symm, hm.2.trans hm'.2.symm⟩
+  | _ => exact hm.elim
 
-/-- A blocked access is pending. -/
-theorem enabled_of_blocked (h : blocked i c) : enabled i c := by
-  obtain ⟨e, x, o, k, he, hl, hm⟩ := h
-  refine ⟨e, x, o, k, he, hl, ?_⟩
-  cases o <;> first | exact hm | exact hm.1 | exact ⟨hm.1, hm.2.1⟩
+/-- The enabling condition is a live thread's. -/
+theorem live (h : enabled i c) : liveAt i c := let ⟨_, _, _, _, _, h, _⟩ := h; hartAt_live h
 
 /-- The enabling condition survives every other thread's step but the power thread's. -/
-theorem stable : StableExceptPower i (enabled i) := by
-  intro j c c' hji hs hnp h
-  obtain ⟨e, x, o, k, he, hl, hrest⟩ := h
-  exact ⟨e, x, o, k, step_get?_ne hs hji he, (Era.threadLive_of_step hs hnp e).2 hl, hrest⟩
+theorem stable : StableExceptPower i (enabled i) :=
+  fun hji hs hnp ⟨x, pa, n, o, k, h, hr⟩ => ⟨x, pa, n, o, k, hartAt_stable h hs hji hnp, hr⟩
 
 /-- The enabling condition persists on every run of the pool. -/
 theorem persists (hrun : PoolRun σ) : Thread.Persists i (enabled i) σ :=
@@ -832,26 +891,26 @@ theorem ag_of_progressAxiom (h : ProgressAxiom i σ) : AG i σ :=
 
 end Hart
 
-/-! ### 3.5 A device task at a gate: the grant is certain, no fairness assumption
+/-! ### 5.5 A device task at a gate: the grant is certain, no fairness assumption
 
 A device task's head primitive is blocked (`devBlocked`) in three cases: a guard that does not
 answer (or answers an unfaithful move), a join on an unfinished task, and a DMA write whose
-footprint is under a blocking reservation (3.6, excluded here by `isDma`).  The first two are
+footprint is under a blocking reservation (5.6, excluded here by `isDma`).  The first two are
 *gates*.  What opens a gate is a change of shared state by another thread: the device state the
-guard reads, or the joined task's end.  Once the gate is open, the task's step through it is
-certain (`certain`, a grant certain at the thread's attempts in the sense of layer 2).  So the
-action "a live task at an unblocked primitive; the primitive is answered" has no misses, its
-counter is zero (`counter_zero`), and its weak fairness follows from fair scheduling (`wf`).  What
-the task waits on is the opener's obligation.  Whether an open gate stays open until the task's
-step (persistence) is a property of the protocol, the stable-gate lemma of the plan (`HANDOFF.md`
-§6 task 5), proved gate by gate in `MachCSL/Liveness/Gates.lean`; with it the action's strong
+guard reads, or the joined task's end.  Once the gate is open, the task's step through it answers
+the primitive (`answered`).  The grant is the task's step, so it is certain at the task's attempts
+(`certain`, in the sense of layer 2): the action has no misses, its counter is zero
+(`counter_zero`), and its weak fairness follows from fair scheduling (`wf`).  What the task waits
+on is the opener's obligation.  Whether an open gate stays open until the task's step
+(persistence) is a property of the protocol, the stable-gate lemma of the plan (`HANDOFF.md` §6
+task 5), proved gate by gate in `MachCSL/Liveness/Gates.lean`; with it the action's strong
 fairness follows too (`sf_of_persists`). -/
 
 namespace Dev
 
-variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
+variable {i : Nat} {c c' : Cfg} {σ : Nat → Cfg}
 
-/-- A DMA write, the one primitive a hart's reservation can block; handled by `Dma` (3.6). -/
+/-- A DMA write, the one primitive a hart's reservation can block; handled by `Dma` (5.6). -/
 def isDma {S T : Type} : DevOp S T → Prop
   | .dmaWrite _ _ _ _ => True
   | _ => False
@@ -860,24 +919,21 @@ def isDma {S T : Type} : DevOp S T → Prop
 than a DMA write that is not blocked, that is, at an open gate (a guard that answers faithfully,
 or a join on a finished task) or at a primitive that never blocks. -/
 def enabled (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
-  ∃ e, ∃ (o : DevOp (DevSt d) (DevTask d)), ∃ k, c.1[i]? = some (.dev e d tid (.op o k)) ∧
-    threadLive c.2 e ∧ ¬ isDma o ∧ ¬ devBlocked d o c.2.m
+  ∃ o k, taskAt i d tid (.op o k) c ∧ ¬ isDma o ∧ ¬ devBlocked d o c.2.m
 
-/-- The grant: the task steps, its primitive is answered, and the task continues with some
-answer. -/
-def grant (i : Nat) (d : DevId) (tid : TaskId) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e, ∃ (o : DevOp (DevSt d) (DevTask d)), ∃ k v,
-    c.1[i]? = some (.dev e d tid (.op o k)) ∧ c'.1[i]? = some (.dev e d tid (k v))
+/-- The grant: the task's own step.  At an open gate the step answers the primitive
+(`answered`). -/
+def grant (i : Nat) (d : DevId) (tid : TaskId) (c c' : Cfg) : Prop := Step i c c'
 
 /-- The grant is one of the task's transitions. -/
-theorem ownGrant {d : DevId} {tid : TaskId} : Thread.OwnGrant i (grant i d tid) := fun h => h.1
+theorem ownGrant {d : DevId} {tid : TaskId} : Thread.OwnGrant i (grant i d tid) := fun h => h
 
-/-- Strong fairness of a task at an unblocked primitive: answered infinitely often. -/
+/-- Strong fairness of a task at an unblocked primitive: it steps infinitely often. -/
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   Action.SF (enabled i d tid) (grant i d tid) σ
 
-/-- Proof form: infinitely many unanswered steps at an unblocked primitive force infinitely many
-answered ones.  It holds outright (`ag`). -/
+/-- Proof form: every step of the task at an unblocked primitive is a grant, so it holds outright
+(`ag`). -/
 abbrev AG (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   Thread.AttemptGrant i (enabled i d tid) (grant i d tid) σ
 
@@ -888,19 +944,18 @@ abbrev WF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
 variable {d : DevId} {tid : TaskId}
 
 /-- The enabling condition is a live thread's. -/
-theorem live (h : enabled i d tid c) : liveAt i c :=
-  let ⟨e, _, _, he, hl, _, _⟩ := h; ⟨e, Or.inr ⟨d, tid, _, he⟩, hl⟩
+theorem live (h : enabled i d tid c) : liveAt i c := let ⟨_, _, h, _⟩ := h; taskAt_live h
 
-/-- A live task at an unblocked primitive is answered when it steps: the grant is certain at the
-task's attempts. -/
-theorem certain : Thread.Certain i (enabled i d tid) (grant i d tid) σ := by
-  intro n ⟨hs, e, o, k, he, hl, _, hnb⟩
-  refine ⟨hs, ?_⟩
+/-- A live task at an unblocked primitive is answered when it steps: it moves on to the
+continuation at some answer. -/
+theorem answered (h : enabled i d tid c) (hs : Step i c c') :
+    ∃ e o k v, c.1[i]? = some (.dev e d tid (.op o k)) ∧ c'.1[i]? = some (.dev e d tid (k v)) := by
+  obtain ⟨o, k, ⟨e, he, hl⟩, -, hnb⟩ := h
   obtain ⟨ex, obs, e', efs, he', hp, hc'⟩ := hs
   rw [he] at he'
   obtain rfl := Option.some.inj he'
-  have hi : i < (σ n).1.length := (List.getElem?_eq_some_iff.1 he).1
-  have hc'i : (σ (n + 1)).1[i]? = some e' := by
+  have hi : i < c.1.length := (List.getElem?_eq_some_iff.1 he).1
+  have hc'i : c'.1[i]? = some e' := by
     rw [hc', List.getElem?_append_left (by simpa using hi), List.getElem?_set_self hi]
   rcases hp with ⟨-, m', σ', rfl, hd, -⟩ | ⟨hnl, -⟩
   · simp only [devStep] at hd
@@ -908,6 +963,9 @@ theorem certain : Thread.Certain i (enabled i d tid) (grant i d tid) σ := by
     · exact ⟨e, o, k, v, he, hc'i⟩
     · exact absurd hb hnb
   · exact absurd hl hnl
+
+/-- The grant is certain at the task's attempts: an attempt is a step. -/
+theorem certain : Thread.Certain i (enabled i d tid) (grant i d tid) σ := fun _ ha => ha.1
 
 /-- The proof form holds outright: the task's view has no misses. -/
 theorem ag : AG i d tid σ := Thread.attemptGrant_of_certain certain
@@ -926,49 +984,52 @@ theorem sf_of_persists (hsched : StepsInfOften i σ)
 
 end Dev
 
-/-! ### 3.6 A device's DMA write under a reservation: memory arbitration, as for harts
+/-! ### 5.6 A device's DMA write under a reservation: memory arbitration, as for harts
 
 The third way a device primitive blocks is a DMA write whose footprint is under a blocking
 reservation.  That is memory arbitration, the same situation as a hart's blocked access, and it
-fits the model the same way.  The attempt is a live task's step at a DMA write whose guard answers
-a faithful move into RAM; the grant is the task's step that serves the write; the miss is a
-blocked retry.  Its `SF` is the Progress Axiom for the DMA agent.  xv6 may not need the
-assumption: if no reservation ever covers a DMA buffer, a safety fact, the miss never happens. -/
+fits the model the same way.  The attempt is a live task's step at a pending DMA write, one whose
+guard answers a faithful move into RAM; the grant is the task's step at which the write is not
+blocked; the miss is a step at which it is, a blocked retry.  Its `SF` is the Progress Axiom for
+the DMA agent.  xv6 may not need the assumption: if no reservation ever covers a DMA buffer, a
+safety fact, the miss never happens. -/
 
 namespace Dma
 
 variable {i : Nat} {c : Cfg} {σ : Nat → Cfg}
 
-/-- The enabling condition: a live task of `d` at a DMA write whose guard answers a faithful move
-and whose footprint is RAM; blocked or not. -/
-def enabled (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
-  ∃ e g pa n w k, c.1[i]? = some (.dev e d tid (.op (.dmaWrite g pa n w) k)) ∧
-    threadLive c.2 e ∧
+/-- The thread at `i` is a live task `tid` of `d` at the DMA write with guard `g`, footprint
+`(pa, n)` and word `w`. -/
+def atWrite (i : Nat) (d : DevId) (tid : TaskId) (g : DevSt d → Option (DevSt d)) (pa : PAddr)
+    (n : Nat) (w : BitVec (8 * n)) (c : Cfg) : Prop :=
+  ∃ k, taskAt i d tid (.op (.dmaWrite g pa n w) k) c
+
+/-- A pending DMA write: at a DMA write whose guard answers a faithful move, into RAM. -/
+def pending (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) (pa : PAddr) (n : Nat) : Prop :=
+  ∃ g w, atWrite i d tid g pa n w c ∧
     (∃ s', g (c.2.m.devs.st d) = some s' ∧ devObsOk d (c.2.m.devs.st d) s' []) ∧ ramBytes pa n
 
-/-- The DMA write is blocked: some hart holds a blocking reservation over its footprint. -/
-def blocked (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
-  ∃ e g pa n w k, c.1[i]? = some (.dev e d tid (.op (.dmaWrite g pa n w) k)) ∧
-    threadLive c.2 e ∧
-    (∃ s', g (c.2.m.devs.st d) = some s' ∧ devObsOk d (c.2.m.devs.st d) s' []) ∧ ramBytes pa n ∧
-    anyReserve c.2.m.resv pa n
+/-- The enabling condition: the task has a pending DMA write, blocked or not. -/
+def enabled (i : Nat) (d : DevId) (tid : TaskId) (c : Cfg) : Prop :=
+  ∃ pa n, pending i d tid c pa n
 
-/-- The grant: the task's step answers the DMA write, and the task moves on to the continuation
-with some answer.  At a pending DMA write, that is the write served.  A blocked retry keeps the
-write in place, so it is not a grant. -/
+/-- The arbitration condition: some hart's blocking reservation covers the footprint. -/
+def blocked (m : MState) (pa : PAddr) (n : Nat) : Prop := anyReserve m.resv pa n
+
+/-- The grant: the task's own step, at which its pending DMA write is not blocked. -/
 def grant (i : Nat) (d : DevId) (tid : TaskId) (c c' : Cfg) : Prop :=
-  Step i c c' ∧ ∃ e g pa n w k v, c.1[i]? = some (.dev e d tid (.op (.dmaWrite g pa n w) k)) ∧
-    c'.1[i]? = some (.dev e d tid (k v))
+  Step i c c' ∧ ∀ pa n, pending i d tid c pa n → ¬ blocked c.2.m pa n
 
 /-- The grant is one of the task's transitions. -/
 theorem ownGrant {d : DevId} {tid : TaskId} : Thread.OwnGrant i (grant i d tid) := fun h => h.1
 
-/-- Trusted: a task with a pending DMA write infinitely often has one served infinitely often. -/
+/-- Trusted: a task with a pending DMA write infinitely often steps with it unblocked infinitely
+often. -/
 abbrev SF (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   Action.SF (enabled i d tid) (grant i d tid) σ
 
-/-- Proof form: infinitely many blocked retries of a DMA write force infinitely many served
-ones. -/
+/-- Proof form: infinitely many steps at a blocked DMA write force infinitely many at an
+unblocked one. -/
 abbrev AG (i : Nat) (d : DevId) (tid : TaskId) (σ : Nat → Cfg) : Prop :=
   Thread.AttemptGrant i (enabled i d tid) (grant i d tid) σ
 
@@ -976,11 +1037,7 @@ variable {d : DevId} {tid : TaskId}
 
 /-- The enabling condition is a live thread's. -/
 theorem live (h : enabled i d tid c) : liveAt i c :=
-  let ⟨e, _, _, _, _, _, he, hl, _⟩ := h; ⟨e, Or.inr ⟨d, tid, _, he⟩, hl⟩
-
-/-- A blocked DMA write is pending. -/
-theorem enabled_of_blocked (h : blocked i d tid c) : enabled i d tid c :=
-  let ⟨e, g, pa, n, w, k, he, hl, hg, hr, _⟩ := h; ⟨e, g, pa, n, w, k, he, hl, hg, hr⟩
+  let ⟨_, _, _, _, ⟨_, h⟩, _⟩ := h; taskAt_live h
 
 /-- The trusted form gives the task's counter. -/
 theorem counter_of_sf (hsf : SF i d tid σ) :
