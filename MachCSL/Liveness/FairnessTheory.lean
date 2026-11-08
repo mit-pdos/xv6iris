@@ -902,8 +902,11 @@ adequacy proof picks one (`exists_fair_schedule`, section 6) to do its per-threa
 def Schedule (σ : Nat → Cfg) (sched : Nat → Nat) : Prop :=
   ∀ n, Pool.Step (sched n) (σ n) (σ (n + 1))
 
-/-- A grant that only its thread can take: whenever `G c c'` holds, the only thread whose step
-relation accepts the transition is `i`.  Every served transition of MachCSL's actions has it. -/
+/-- A relation that only its thread can take: whenever `G c c'` holds, the only thread whose step
+relation accepts the transition is `i`.  The six actions of MachCSL have it for `A c ∧ G c c'`, the
+hit: a served transition changes the thread's entry, which another thread's step leaves in place.
+Not for `G` alone, since a dead thread's self-loop satisfies a grant vacuously
+(`Cycle.lean`, the `soleOwner` lemmas). -/
 def SoleOwner (i : Nat) (G : Cfg → Cfg → Prop) : Prop :=
   ∀ c c', G c c' → ∀ j, Pool.Step j c c' → j = i
 
@@ -915,13 +918,14 @@ abbrev labelledView (sched : Nat → Nat) (i : Nat) (A : Cfg → Prop) (G : Cfg 
 
 variable {σ : Nat → Cfg} {sched : Nat → Nat} {i : Nat} {A : Cfg → Prop} {G : Cfg → Cfg → Prop}
 
-/-- Under a schedule, a sole-owner grant's relational `SF` gives the thread's labelled view.  A
-relational hit is a labelled hit, because the schedule must name the owner, and a labelled miss is
-a relational miss.  It is layer 0's restriction (`AttemptGrant.fair_mono`). -/
-theorem labelledView_of_sf (hs : Schedule σ sched) (hso : SoleOwner i G)
+/-- Under a schedule, the relational `SF` of an action whose hits have a sole owner gives the
+thread's labelled view.  A relational hit is a labelled hit, because the schedule must name the
+owner, and a labelled miss is a relational miss.  It is layer 0's restriction
+(`AttemptGrant.fair_mono`). -/
+theorem labelledView_of_sf (hs : Schedule σ sched) (hso : SoleOwner i (fun c c' => A c ∧ G c c'))
     (hsf : Action.SF A G σ) : labelledView sched i A G σ :=
-  AttemptGrant.fair_mono (fun _ ha => ha.2) (fun n hA hg => ⟨hso _ _ hg (sched n) (hs n), hA⟩)
-    (Action.sf_iff_fair.1 hsf)
+  AttemptGrant.fair_mono (fun _ ha => ha.2)
+    (fun n hA hg => ⟨hso _ _ ⟨hA, hg⟩ (sched n) (hs n), hA⟩) (Action.sf_iff_fair.1 hsf)
 
 end Schedule
 
