@@ -16,7 +16,8 @@ The file, in order:
    blocked retry that keeps its expression (`hartStep_cases`, `step_descends`, `retry`).  On a
    run of the pool where the thread steps infinitely often, a hart therefore reaches its live
    boundary, dies, or retries (`boundary_or_dead_or_retry`), and the plan's form follows
-   (`boundary_of_live`).
+   (`boundary_of_live`).  Device programs (`DevM`) get the same relation, `DevM.Below`, which is
+   irreflexive too (`DevM.below_irrefl`); section 3 uses it for the device actions' sole owners.
 2. `Hart`, what the hart's step at a pending access is: the served arm of `evStep` when the
    access is not blocked (`served_of_unblocked`), and a blocked retry that leaves the access
    pending and blocked when it is (`pending_of_blocked`).  By definition the action's hit is the
@@ -30,7 +31,10 @@ The file, in order:
    the top (`Fresh.exists_grant`), a served access (`Hart.exists_served`).  Subsection 3.5 does
    for a DMA write what section 2 does for a hart's access: the task's step at an unblocked write
    is served (`Dma.served_of_unblocked`), and the action's hit and the task's miss are its step at
-   an unblocked and at a blocked write (`Dma.hit_iff`, `Dma.miss_iff`).
+   an unblocked and at a blocked write (`Dma.hit_iff`, `Dma.miss_iff`).  Subsection 3.6 gives
+   every grant a sole owner, the fact the adequacy proof's schedule needs (`SoleOwner`).  A grant
+   changes the thread's own entry (`X.changes`; for `Fresh`, `Hart`, `Dev` and `Dma` under the
+   enabling condition), and another thread's step leaves that entry in place (`X.soleOwner`).
 4. `ramHist`, every RAM byte has a nonempty history, the fact the memory reads of section 3 need:
    it is not part of `mmOk` (which says the converse), it holds of a booted memory and every step
    keeps it (`ramHist_step`, `ramHist_run`).
@@ -88,6 +92,30 @@ theorem below_irrefl (m : FreeM Eff α) : ¬ Below m m := by
   exact not_descends (fun _ => m) (fun _ => h)
 
 end Below
+
+/-! ### Device programs
+
+A device program is `DevM` (`MachCSL/Dev/DevLang.lean`), an inductive of its own, so `Below` does
+not apply to it and it gets its own one-step relation.  Only irreflexivity is used: a device
+task's step that answers its primitive changes the task's program, so a device action's grant
+has the task as its sole owner (subsection 3.6). -/
+
+/-- One step down a device program: the continuation `k r` of a node `.op o k`, at any answer
+`r`, is below the node. -/
+inductive DevM.Below {S T α : Type} : DevM S T α → DevM S T α → Prop
+  | cont (o : DevOp S T) (k : o.ret → DevM S T α) (r : o.ret) : DevM.Below (k r) (.op o k)
+
+/-- Every device program is accessible: it has no infinite descent below it. -/
+theorem DevM.acc_below {S T α : Type} (m : DevM S T α) : Acc DevM.Below m := by
+  induction m with
+  | pure a => exact ⟨_, fun y h => by cases h⟩
+  | op o k ih => exact ⟨_, fun y h => by cases h; exact ih _⟩
+
+/-- No device program is below itself. -/
+theorem DevM.below_irrefl {S T α : Type} (m : DevM S T α) : ¬ DevM.Below m m := by
+  intro h
+  induction DevM.acc_below m with
+  | intro m _ ih => exact ih m h h
 
 /-! ### One step of a hart -/
 
@@ -453,7 +481,8 @@ Each instance's enabling condition admits a step of the thread for every outcome
 distinguishes.  The memory reads need the footprint's bytes to have histories: `ramHist`, every
 RAM byte has a nonempty history.  It is not part of `mmOk`, which says the converse (every
 history sits at a RAM byte) and that every history is well formed; it holds of a booted memory
-and every step keeps it (`ramHist_step`, section 4). -/
+and every step keeps it (`ramHist_step`, section 4).  Subsection 3.6 shows that every grant has
+the thread as its sole owner. -/
 
 /-- Every RAM byte has a nonempty history. -/
 def ramHist (m : FlatMem) : Prop :=
@@ -766,6 +795,182 @@ theorem hit_iff {n : Nat} :
     Action.hit (enabled i d tid) (grant i d tid) σ n ↔ Steps i σ n ∧ enabled i d tid (σ n) ∧
       ∀ pa n', pending i d tid (σ n) pa n' → ¬ blocked (σ n).2.m pa n' :=
   ⟨fun ⟨hen, hs, hnb⟩ => ⟨hs, hen, hnb⟩, fun ⟨hs, hen, hnb⟩ => ⟨hen, hs, hnb⟩⟩
+
+end Dma
+
+/-! ### 3.6 Every grant has a sole owner
+
+A grant of each action changes the thread's own entry in the pool.  At a hart's or a task's
+node, the program moves on to a continuation, and a continuation is never its node
+(`Cycle.below_irrefl`, `Cycle.DevM.below_irrefl`).  At the boundary, the hart restarts with a
+cycle that is not empty (`Cycle.riscvStep_impure`).  Another thread's step leaves the entry in
+place (`step_get?_ne`), so no other thread's step is a grant: the thread is the grant's sole owner
+(`SoleOwner`, section 4 of `MachCSL.Liveness.FairnessTheory`).
+
+The grants of `Tick` and `Arm` name the node, so they change the entry outright.  The other four
+grants are the thread's step and a condition on the configuration, and such a step may keep the
+entry where the action is not enabled: a corpse's self-loop, or a hart's blocked retry at another
+event.  Their grants change the entry, and have a sole owner, under the enabling condition.  The
+thread's labelled view needs sole ownership only there. -/
+
+namespace Cycle
+
+variable {e : Nat} {x : CPU} {d : DevId} {tid : TaskId}
+
+/-- A hart's entry changes when its program descends. -/
+theorem hart_ne_of_below {m m' : SailM Unit} (hb : Below m' m) :
+    (some (.hart e x m) : Option Expr) ≠ some (.hart e x m') := by
+  intro heq
+  cases heq
+  exact below_irrefl _ hb
+
+/-- A device task's entry changes when its program descends. -/
+theorem dev_ne_of_below {m m' : DevProg d} (hb : DevM.Below m' m) :
+    (some (.dev e d tid m) : Option Expr) ≠ some (.dev e d tid m') := by
+  intro heq
+  cases heq
+  exact DevM.below_irrefl _ hb
+
+end Cycle
+
+namespace Tick
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg}
+
+/-- A ticking restart changes the hart's entry: the restarted cycle is not empty
+(`riscvStep_impure`). -/
+theorem changes (h : grant i c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨-, e, x, ew, he, he'⟩ := h
+  obtain ⟨k, hk⟩ := riscvStep_impure true ew
+  rw [he, he', hk]
+  intro heq
+  cases heq
+
+/-- The ticking restart has the hart as its sole owner. -/
+theorem soleOwner : SoleOwner i (grant i) := fun _ _ hg j hs =>
+  Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := hg.1
+    changes hg (he.trans (step_get?_ne hs hji he).symm)
+
+end Tick
+
+namespace Arm
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg} {d : DevId} {node : DevProg d} {m b : Nat}
+
+/-- An answer changes the root's entry: at a `choose` node the continuation is below the node
+(`DevM.below_irrefl`), and at any other node there is no answer. -/
+theorem changes (h : grant i d node m b c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨v, -, -, e, he, he'⟩ := h
+  rw [he, he']
+  cases node with
+  | pure _ => simp [at?]
+  | op o k =>
+    cases o
+    case choose => exact dev_ne_of_below (DevM.Below.cont .choose k v)
+    all_goals simp [at?]
+
+/-- An answer has the root as its sole owner. -/
+theorem soleOwner : SoleOwner i (grant i d node m b) := fun _ _ hg j hs =>
+  Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := ownGrant hg
+    changes hg (he.trans (step_get?_ne hs hji he).symm)
+
+end Arm
+
+namespace Fresh
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg} {t : Nat} {a : PAddr}
+
+/-- At a plain load, the hart's step changes its entry.  The step takes the load, because a
+blocked retry needs an exclusive read, and the continuation is below the load
+(`Cycle.below_irrefl`). -/
+theorem changes (h : enabled i t a c) (hg : grant i t a c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨⟨x, req, k, ⟨e, he, hl⟩, hp, -⟩, -⟩ := h
+  obtain ⟨m', he', ⟨-, hst, -⟩ | ⟨hd, -⟩⟩ := step_hart hg.1 he
+  · rcases hst with ⟨v, rfl, -⟩ | ⟨hb, -⟩
+    · rw [he, he']
+      exact hart_ne_of_below (Below.cont _ k v)
+    · rw [Hart.not_plain_of_excl hb.1] at hp
+      exact absurd hp (by decide)
+  · exact absurd hl hd
+
+/-- Under its enabling condition, the grant has the hart as its sole owner. -/
+theorem soleOwner : SoleOwner i (fun c c' => enabled i t a c ∧ grant i t a c c') :=
+  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := hg.1
+    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+
+end Fresh
+
+namespace Hart
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg}
+
+/-- At a pending access, the grant changes the hart's entry: the step is served
+(`served_of_unblocked`), and the continuation is below the access (`Cycle.below_irrefl`). -/
+theorem changes (h : enabled i c) (hg : grant i c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨x, pa, n, hp⟩ := h
+  obtain ⟨e, o, k, v, he, he', -⟩ := served_of_unblocked hp (hg.2 x pa n hp) hg.1
+  rw [he, he']
+  exact hart_ne_of_below (Below.cont _ k v)
+
+/-- Under its enabling condition, the grant has the hart as its sole owner. -/
+theorem soleOwner : SoleOwner i (fun c c' => enabled i c ∧ grant i c c') :=
+  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := hg.1
+    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+
+end Hart
+
+namespace Dev
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg} {d : DevId} {tid : TaskId}
+
+/-- At an unblocked primitive, the task's step changes its entry: the step answers the primitive
+(`answered`), and the continuation is below it (`Cycle.DevM.below_irrefl`). -/
+theorem changes (h : enabled i d tid c) (hg : grant i d tid c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨e, o, k, v, he, he'⟩ := answered h hg
+  rw [he, he']
+  exact dev_ne_of_below (DevM.Below.cont o k v)
+
+/-- Under its enabling condition, the grant has the task as its sole owner. -/
+theorem soleOwner : SoleOwner i (fun c c' => enabled i d tid c ∧ grant i d tid c c') :=
+  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := hg
+    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+
+end Dev
+
+namespace Dma
+
+open Cycle
+
+variable {i : Nat} {c c' : Cfg} {d : DevId} {tid : TaskId}
+
+/-- At a pending DMA write, the grant changes the task's entry: the step serves the write
+(`served_of_unblocked`), and the continuation is below it (`Cycle.DevM.below_irrefl`). -/
+theorem changes (h : enabled i d tid c) (hg : grant i d tid c c') : c.1[i]? ≠ c'.1[i]? := by
+  obtain ⟨pa, n, hp⟩ := h
+  obtain ⟨e, g, w, k, v, -, he, he', -⟩ := served_of_unblocked hp (hg.2 pa n hp) hg.1
+  rw [he, he']
+  exact dev_ne_of_below (DevM.Below.cont _ k v)
+
+/-- Under its enabling condition, the grant has the task as its sole owner. -/
+theorem soleOwner : SoleOwner i (fun c c' => enabled i d tid c ∧ grant i d tid c c') :=
+  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
+    let ⟨_, _, _, _, he, _⟩ := hg.1
+    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
 
 end Dma
 
