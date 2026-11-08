@@ -160,7 +160,9 @@ Fairness.Sched.certain
 Fairness.Action.sf_iff_wf_of_convex
 Fairness.labelledView_of_sf
 Fairness.exists_fair_schedule
-Fairness.Sched.exists_fair_schedule
+Fairness.Sched.exists_counter_of_fair_schedule
+Fairness.Sched.stable
+Fairness.Sched.persists
 # Fairness.lean 5.7 and Cycle.lean: MachCSL's scheduling instance, the sole owners
 Fairness.Sched.not_liveAt_power
 Fairness.Sched.convex

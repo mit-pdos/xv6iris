@@ -469,7 +469,7 @@ theorem noConfigWrite_of_kernelStores (h : KernelStores σ) : Disk.NoConfigWrite
 /-! ## 6. The bundle -/
 
 /-- The hypotheses of xv6's liveness theorem on a run `σ` from the disk image `img`: the run
-starts at boot; every thread but the power thread is fairly scheduled; the five strong
+starts at boot; every live thread is fairly scheduled; the five strong
 assumptions hold at every position (the tick, the arms, the visibility of stores, harts progress
 and the disk's DMA writes); the kernel keeps its MMIO discipline while a disk request is in
 flight. -/
@@ -535,7 +535,7 @@ point on the condition holds at finitely many positions and the strong fairness 
 Strong fairness is the state form of an action (`FairnessTheory.lean` section 2), and it names no
 thread.  The thread is in the enabling condition, which is the thread at `i`'s, and in the grant,
 one of its transitions.  The forms the logic consumes are the attempt–grant forms, the thread's
-view of the action (`FairnessTheory.lean` section 4).  The view is derived from the state form
+view of the action (`FairnessTheory.lean` section 5).  The view is derived from the state form
 under own grant, which every action proves (`ownGrant`).  Strong fairness gives the view on
 every run (`Thread.attemptGrant_of_sf`), so `ag_of_hyps` needs no case split.  The converse needs
 it: under fair scheduling and own grant the two forms coincide at every position (`sf_iff_ag`), by

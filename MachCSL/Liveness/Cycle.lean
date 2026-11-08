@@ -22,7 +22,7 @@ The file, in order:
    access is not blocked (`served_of_unblocked`), and a blocked retry that leaves the access
    pending and blocked when it is (`pending_of_blocked`).  By definition the action's hit is the
    hart's step at an unblocked access (`hit_iff`).  The hart's miss, from the thread's view of the
-   action (section 4 of `MachCSL.Liveness.FairnessTheory`), is its step at a blocked one
+   action (section 5 of `MachCSL.Liveness.FairnessTheory`), is its step at a blocked one
    (`miss_iff`).  The two lemmas before say what these steps do to the machine.
 3. The machine closure of the choice instances.  At each enabling condition the thread has a step
    for the outcomes named here, and each grant is such a step: both restarts at a
@@ -849,10 +849,8 @@ theorem changes (h : grant i c c') : c.1[i]? ≠ c'.1[i]? := by
   cases heq
 
 /-- The ticking restart has the hart as its sole owner. -/
-theorem soleOwner : SoleOwner i (grant i) := fun _ _ hg j hs =>
-  Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := hg.1
-    changes hg (he.trans (step_get?_ne hs hji he).symm)
+theorem soleOwner : SoleOwner i (grant i) :=
+  soleOwner_of_changes ownGrant fun _ _ hg => changes hg
 
 end Tick
 
@@ -875,10 +873,8 @@ theorem changes (h : grant i d node m b c c') : c.1[i]? ≠ c'.1[i]? := by
     all_goals simp [at?]
 
 /-- An answer has the root as its sole owner. -/
-theorem soleOwner : SoleOwner i (grant i d node m b) := fun _ _ hg j hs =>
-  Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := ownGrant hg
-    changes hg (he.trans (step_get?_ne hs hji he).symm)
+theorem soleOwner : SoleOwner i (grant i d node m b) :=
+  soleOwner_of_changes ownGrant fun _ _ hg => changes hg
 
 end Arm
 
@@ -903,9 +899,7 @@ theorem changes (h : enabled i t a c) (hg : grant i t a c c') : c.1[i]? ≠ c'.1
 
 /-- Under its enabling condition, the grant has the hart as its sole owner. -/
 theorem soleOwner : SoleOwner i (fun c c' => enabled i t a c ∧ grant i t a c c') :=
-  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := hg.1
-    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+  soleOwner_of_changes (fun h => ownGrant h.2) fun _ _ ⟨hen, hg⟩ => changes hen hg
 
 end Fresh
 
@@ -925,9 +919,7 @@ theorem changes (h : enabled i c) (hg : grant i c c') : c.1[i]? ≠ c'.1[i]? := 
 
 /-- Under its enabling condition, the grant has the hart as its sole owner. -/
 theorem soleOwner : SoleOwner i (fun c c' => enabled i c ∧ grant i c c') :=
-  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := hg.1
-    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+  soleOwner_of_changes (fun h => ownGrant h.2) fun _ _ ⟨hen, hg⟩ => changes hen hg
 
 end Hart
 
@@ -946,9 +938,7 @@ theorem changes (h : enabled i d tid c) (hg : grant i d tid c c') : c.1[i]? ≠ 
 
 /-- Under its enabling condition, the grant has the task as its sole owner. -/
 theorem soleOwner : SoleOwner i (fun c c' => enabled i d tid c ∧ grant i d tid c c') :=
-  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := hg
-    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+  soleOwner_of_changes (fun h => ownGrant h.2) fun _ _ ⟨hen, hg⟩ => changes hen hg
 
 end Dev
 
@@ -968,9 +958,7 @@ theorem changes (h : enabled i d tid c) (hg : grant i d tid c c') : c.1[i]? ≠ 
 
 /-- Under its enabling condition, the grant has the task as its sole owner. -/
 theorem soleOwner : SoleOwner i (fun c c' => enabled i d tid c ∧ grant i d tid c c') :=
-  fun _ _ ⟨hen, hg⟩ j hs => Classical.byContradiction fun hji =>
-    let ⟨_, _, _, _, he, _⟩ := hg.1
-    changes hen hg (he.trans (step_get?_ne hs hji he).symm)
+  soleOwner_of_changes (fun h => ownGrant h.2) fun _ _ ⟨hen, hg⟩ => changes hen hg
 
 end Dma
 

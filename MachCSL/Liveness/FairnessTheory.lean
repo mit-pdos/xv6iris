@@ -87,8 +87,10 @@ Theorems read `conclusion_of_hypothesis` (`attemptGrant_of_sf`, `counter_of_sf`,
 `sf_of_attemptGrant`) or `subject_property` (`counter_reset`, `hit_miss_exclusive`), and
 equivalences read `x_iff_y` (`sf_iff_fair`, `sf_iff_attemptGrant`).  A hypothesis has the same name
 everywhere: `hsf` for `Action.SF`, `hag` for an attempt–grant form (layer 0's `Fair` or the
-thread's `AttemptGrant`), `hown` for `OwnGrant`, `hos` for `OwnStep`, `hso` for `SoleOwner`, `hconv` for `Convex`, `hsched` for `StepsInfOften`, `hper` for
-`Persists`, `hstab` for stability, `hrun` for `PoolRun`, `hδ` for a counter, `hc` for `Certain`,
+thread's `AttemptGrant`), `hown` for `OwnGrant`, `hos` for `OwnStep`, `hso` for `SoleOwner`,
+`hconv` for `Convex`, `hsched` for fair scheduling (`StepsInfOften`, or `∀ i, Sched.SF`), `hsch`
+for a `Schedule`, `hper` for `Persists`, `hstab` for stability, `hrun` for `PoolRun`, `hδ` for a
+counter, `hc` for `Certain`,
 and `ha`, `hg`, `hA`, `hs` for the facts at a position (an attempt, a grant, `A` holds, the thread
 steps).  The names every action of `Fairness.lean` has are in that file's header.
 -/
@@ -922,10 +924,11 @@ variable {σ : Nat → Cfg} {sched : Nat → Nat} {i : Nat} {A : Cfg → Prop} {
 thread's labelled view.  A relational hit is a labelled hit, because the schedule must name the
 owner, and a labelled miss is a relational miss.  It is layer 0's restriction
 (`AttemptGrant.fair_mono`). -/
-theorem labelledView_of_sf (hs : Schedule σ sched) (hso : SoleOwner i (fun c c' => A c ∧ G c c'))
-    (hsf : Action.SF A G σ) : labelledView sched i A G σ :=
+theorem labelledView_of_sf (hsch : Schedule σ sched)
+    (hso : SoleOwner i (fun c c' => A c ∧ G c c')) (hsf : Action.SF A G σ) :
+    labelledView sched i A G σ :=
   AttemptGrant.fair_mono (fun _ ha => ha.2)
-    (fun n hA hg => ⟨hso _ _ ⟨hA, hg⟩ (sched n) (hs n), hA⟩) (Action.sf_iff_fair.1 hsf)
+    (fun n hA hg => ⟨hso _ _ ⟨hA, hg⟩ (sched n) (hsch n), hA⟩) (Action.sf_iff_fair.1 hsf)
 
 end Schedule
 
@@ -1350,9 +1353,8 @@ often) admits a schedule, one stepping thread per position, under which every th
 infinitely often is named infinitely often while active.  The adequacy proof uses the schedule for
 its per-thread bookkeeping; no assumption mentions it. -/
 theorem exists_fair_schedule {Cfg : Type} [Pool Cfg] {active : Nat → Cfg → Prop} {σ : Nat → Cfg}
-    (hrun : PoolRun σ)
-    (hsf : ∀ i, Action.SF (active i) (fun c c' => Pool.Step i c c') σ) :
-    ∃ sched : Nat → Nat, (∀ n, Pool.Step (sched n) (σ n) (σ (n + 1))) ∧
+    (hrun : PoolRun σ) (hsf : ∀ i, Sched.SF active i σ) :
+    ∃ sched : Nat → Nat, Schedule σ sched ∧
       ∀ i, MissHit.InfOften (fun n => active i (σ n)) →
         MissHit.InfOften (fun n => active i (σ n) ∧ sched n = i) := by
   refine ⟨FairLabel.sched (active := active) hrun, FairLabel.sched_step hrun, ?_⟩
@@ -1360,13 +1362,14 @@ theorem exists_fair_schedule {Cfg : Type} [Pool Cfg] {active : Nat → Cfg → P
   obtain ⟨k, n, hk, hN, ht⟩ := FairLabel.exists_takes_ge (hsf i hA) N
   exact ⟨n, hN, hk ▸ ht.2.1.1, (FairLabel.sched_of_takes hrun ht).trans hk⟩
 
-/-- The fair-labelling theorem in the vocabulary of section 4: fair scheduling of every thread
-(`Sched.SF`) gives a fair `Schedule`. -/
-theorem Sched.exists_fair_schedule {Cfg : Type} [Pool Cfg] {active : Nat → Cfg → Prop}
-    {σ : Nat → Cfg} (hrun : PoolRun σ) (hsf : ∀ i, Sched.SF active i σ) :
-    ∃ sched : Nat → Nat, Schedule σ sched ∧
-      ∀ i, MissHit.InfOften (fun n => active i (σ n)) →
-        MissHit.InfOften (fun n => active i (σ n) ∧ sched n = i) :=
-  Fairness.exists_fair_schedule hrun hsf
+/-- Under a fair schedule the thread's scheduling counter exists: it resets where the schedule
+names the thread, drops where the thread is active and not named, and stays where it is inactive.
+Normalised, this is Lantana's `BehFscnt`. -/
+theorem Sched.exists_counter_of_fair_schedule {Cfg : Type} {active : Nat → Cfg → Prop}
+    {σ : Nat → Cfg} {sched : Nat → Nat} {i : Nat}
+    (hfair : MissHit.InfOften (fun n => active i (σ n)) →
+      MissHit.InfOften (fun n => active i (σ n) ∧ sched n = i)) :
+    ∃ δ, AttemptGrant.IsCounter (fun n => active i (σ n)) (fun n => sched n = i) δ :=
+  AttemptGrant.fair_iff_counter.1 (AttemptGrant.fair_iff_attempt.2 hfair)
 
 end Fairness
