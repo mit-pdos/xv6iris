@@ -786,7 +786,7 @@ The two layers' certain grants differ.  At layer 1 a certain grant covers every 
 holds, whoever steps, and gives `SF` outright (`Action.sf_of_certain`).  At layer 2 it covers the
 thread's own attempts only (`Certain`); it gives the attempt–grant form outright, and `SF` only
 with persistence and fair scheduling (`sf_of_certain`).  A device task at a gate
-(`Fairness.lean` 3.5) is the layer-2 case. -/
+(`Fairness.lean` 5.5) is the layer-2 case. -/
 
 namespace Thread
 
@@ -973,7 +973,7 @@ theorem sf_iff_attemptGrant (hown : OwnGrant i G) (hsched : StepsInfOften i σ)
 When every attempt of the thread is granted, the thread's view has no misses.  Its attempt–grant
 form holds outright and its counter is identically zero.  Weak fairness follows from fair
 scheduling alone, and `SF` from fair scheduling and persistence.  The device task at a gate
-(`Fairness.lean` 3.5) waits on whoever opens the gate, which is an obligation and not a fairness
+(`Fairness.lean` 5.5) waits on whoever opens the gate, which is an obligation and not a fairness
 assumption. -/
 
 /-- With a grant certain at the thread's attempts there are no misses, so the attempt–grant form

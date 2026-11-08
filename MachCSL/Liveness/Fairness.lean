@@ -11,10 +11,12 @@ its grant is certain at the task's attempts, and its forms are theorems.  The th
 stopgap that Lantana's extension deletes; this file stays, retargeted to Lantana's traces.
 
 Every enabling condition states the thread's shape through the two shared relations of section 4.
-Every grant is the thread's own step plus the condition that decides it, never the program the
-thread moves on to: a condition on the machine state before the step for an arbitration (`Hart`,
-`Dma`), the enabling condition itself for a gate (`Dev`), and the value chosen for a choice
-(`Tick`, `Arm`, `Fresh`).
+Every grant is the thread's own step plus the decision the environment makes at it: a condition
+on the machine state before the step for an arbitration (`Hart`, `Dma`), nothing beyond the
+enabling condition for a gate (`Dev`), and the value chosen for a choice (`Fresh`: the view, read
+off the floor afterwards; `Tick`, `Arm`: the tick or the answer, which the model records only in
+the restarted program, so `restart` and `answer` name that program).  What the step does to the
+thread is a lemma (`Cycle.lean`), never part of a grant.
 
 The file was the probe `local-plan/liveness/probes/Fairness.lean` until 2026-11-05 (lane
 `xv6-liveness-now`, milestone B1; the design documents that cite it by section and theorem name
@@ -48,19 +50,20 @@ it.  Nothing in the trusted base imports this directory (`MachCSL/Liveness/`); i
    `counter_of_sf`.  Then the device tasks: `Dev`, a task at a gate, whose grant is certain at its
    attempts (`answered`, `certain`, `counter_zero`, `wf`); and `Dma`, a DMA write under a
    reservation, an action like `Hart` whose persistence is a protocol property.  What a hit and a
-   miss of `Hart` and `Dma` are in machine terms, an access served and a blocked retry that keeps
-   the head, is proved in `MachCSL/Liveness/Cycle.lean`.
+   miss of `Hart` are in machine terms, an access served and a blocked retry that keeps the head,
+   and what a hit of `Dma` is, a write served, is proved in `MachCSL/Liveness/Cycle.lean`.
 
 **Names.**  The file follows the naming policy of `FairnessTheory.lean`'s header.  Every action
 uses the same names: `enabled`, `grant`, `ownGrant`, `SF`, `AG`, `live`; the four strong
 assumptions (`Tick`, `Arm`, `Fresh`, `Hart`) add `stable`, `persists`, `sf_iff` and
 `counter_of_sf`; `Dma` has `counter_of_sf` and an `sf_iff` that takes persistence as a
 hypothesis; `Dev`, whose grant is certain, has `certain`, `ag`, `counter_zero`, `wf` and
-`sf_of_persists`.  Each action but `Dev` also names the shape its condition is about:
-`Tick.restart` (the hart's step from its boundary), `Arm.answer` (the root's step to an answer),
-`Fresh.atLoad` (a hart at a plain load), `Hart.pending` (a hart at a pending access),
-`Dma.atWrite` and `Dma.pending` (a task at a DMA write, and at a pending one).  The two
-arbitrations, `Hart` and `Dma`, name their condition `blocked`.
+`sf_of_persists` and the machine fact `answered`.  The choices name their transition:
+`Tick.restart` (the hart's step from its boundary with a tick) and `Arm.answer` (the root's step
+to an answer).  The others name the shape their condition is about: `Fresh.atLoad` (a hart at a
+plain load), `Hart.pending` (a hart at a pending access), `Dma.atWrite` and `Dma.pending` (a task
+at a DMA write, and at a pending one).  The two arbitrations, `Hart` and `Dma`, name their
+condition `blocked`.
 -/
 
 namespace Fairness
@@ -990,7 +993,7 @@ The third way a device primitive blocks is a DMA write whose footprint is under 
 reservation.  That is memory arbitration, the same situation as a hart's blocked access, and it
 fits the model the same way.  The attempt is a live task's step at a pending DMA write, one whose
 guard answers a faithful move into RAM; the grant is the task's step at which the write is not
-blocked; the miss is a step at which it is, a blocked retry.  Its `SF` is the Progress Axiom for
+blocked; the miss is a step at which it is.  Its `SF` is the Progress Axiom for
 the DMA agent.  xv6 may not need the assumption: if no reservation ever covers a DMA buffer, a
 safety fact, the miss never happens. -/
 
