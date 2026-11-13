@@ -997,6 +997,8 @@ import Weak.Prom.OwnBE4H0
 import Weak.Prom.OwnBE4
 import Weak.Prom.OwnBE4Check
 import Weak.Prom.CoreLitLoop
+import Weak.Prom.CoreLitLoopInc
+import Weak.Prom.CoreLitLoopIncH
 import Weak.Prom.OwnAE2Defs
 import Weak.Prom.OwnAE2Lock
 import Weak.Prom.OwnAE2CS
