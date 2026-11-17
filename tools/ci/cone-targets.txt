@@ -1,0 +1,6 @@
+# <Module> <Decl> <limit on Weak.Mini lines>   (mini plan rev 4 §0, K5; headlines 600, mini_adequacy 750)
+# Filled in as the mini headlines land (P2/P3):
+# Weak.Mini.Lbdd Weak.Mini.mini_forbidden_lbdd 600
+# Weak.Mini.MpFF Weak.Mini.mini_forbidden_mpFF 600
+# Weak.Mini.InfLoop Weak.Mini.mini_inf_mpLoop 600
+# Weak.Mini.Adeq Weak.Mini.mini_adequacy 750
