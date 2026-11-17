@@ -342,12 +342,21 @@ def MI.regOk : MI → Prop
   | .br _ rs1 rs2 _ => rs1 < 32 ∧ rs2 < 32
   | _ => True
 
+/-- [MiniP3 (0)] Every ALU immediate is a 64-bit value (real RISC-V immediates are 12-bit sign-extended, so this is
+a scope bound, not a fidelity point).  Needed by L4 (`mini_complete`): on `slti`/`sltiu` the reference compares
+`imm % 2^64` (`exec` above) and the machine the raw `imm` (Mach.lean `instrNext`, as machine v2's MachCert); for
+`imm ≥ 2^64` they disagree (PROGRESS-MiniP2D.md finding 1; mini plan rev 4 §6). -/
+def MI.immOk : MI → Prop
+  | .alui _ _ _ imm => imm < two64
+  | _ => True
+
 /-- A WELL-FORMED F PROGRAM: the access size is a RISC-V one (1, 2, 4 or 8 bytes: `lb`/`lh`/`lw`/`ld`), the image is
-`sz`-aligned, branch and jump targets lie inside the texts, and every register named is `< 32`.  E1 is stated for these
-programs; E2 needs only the first two (`Mach.progWf`, implied: `MProg.wf_progWf`, Wf.lean). -/
+`sz`-aligned, branch and jump targets lie inside the texts, every register named is `< 32`, and every ALU immediate is
+`< 2^64` ([MiniP3 (0)]: `MI.immOk`).  E1 is stated for these programs; E2 needs only the first two (`Mach.progWf`,
+implied: `MProg.wf_progWf`, Wf.lean). -/
 def MProg.wf (P : MProg) : Prop :=
   (P.sz = 1 ∨ P.sz = 2 ∨ P.sz = 4 ∨ P.sz = 8) ∧ (∀ p ∈ P.img, p.1 % P.sz = 0) ∧
-    ∀ h, ∀ i ∈ P.prog h, i.tgtOk (P.prog h).length ∧ i.regOk
+    ∀ h, ∀ i ∈ P.prog h, i.tgtOk (P.prog h).length ∧ i.regOk ∧ i.immOk
 
 theorem MProg.wf.sz_pos {P : MProg} (hwf : P.wf) : 0 < P.sz := by
   rcases hwf.1 with h | h | h | h <;> omega

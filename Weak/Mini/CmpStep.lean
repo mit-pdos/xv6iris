@@ -23,6 +23,12 @@ MachCert `instrNext`); for `imm ≥ 2^64` they disagree. -/
 def _root_.Weak.Mini.MProg.immOk (P : MProg) : Prop :=
   ∀ h, ∀ i ∈ P.prog h, ∀ op rd rs1 imm, i = MI.alui op rd rs1 imm → imm < two64
 
+/-- [MiniP3 (0)] `immOk` is part of `MProg.wf` (`MI.immOk`, Ref.lean §5). -/
+theorem _root_.Weak.Mini.MProg.wf.immOk {P : MProg} (hwf : P.wf) : P.immOk := by
+  intro h i hi op rd rs1 imm he
+  have := (hwf.2.2 h i hi).2.2
+  subst he; exact this
+
 variable {P : MProg} {C : MCut}
 
 /-- What the reference run says about one step `s → s'` of hart `h` of the cut. -/
@@ -105,7 +111,7 @@ theorem step_br (hwf : P.wf) {s : Weak.Mini.MSt} {H : MHart} (hI : Inv P C h s H
     StepOk P C h s (exec P.sz h C.V s (.br c rs1 rs2 tgt)) H := by
   have hmem := List.mem_of_getElem? hi
   have htgt : tgt ≤ (P.prog h).length := (hwf.2.2 h _ hmem).1
-  have hreg : rs1 < 32 ∧ rs2 < 32 := (hwf.2.2 h _ hmem).2
+  have hreg : rs1 < 32 ∧ rs2 < 32 := (hwf.2.2 h _ hmem).2.1  -- [MiniP3 (0)]
   rcases h1 : s.rd rs1 with ⟨v1, t1⟩
   rcases h2 : s.rd rs2 with ⟨v2, t2⟩
   have hex : exec P.sz h C.V s (.br c rs1 rs2 tgt) =

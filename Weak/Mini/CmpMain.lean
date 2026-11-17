@@ -3,7 +3,7 @@ Weak/Mini: **L4 MiniCmp — COMPLETENESS of MiniMach for MiniRef's finite execut
 "every finite MiniRef execution (cut) of an F program is a mini valid run (Pulte AtoP: promises first in gmo order,
 replay along the hart's actual path), with equal load observations").
 
-`mini_complete`: for a well-formed F program whose ALU immediates are 64-bit values (`MProg.immOk`, CmpStep.lean:
+`mini_complete`: for a well-formed F program (its ALU immediates are 64-bit values, `MI.immOk` in `MProg.wf`; CmpStep.lean:
 without it the machine's `slti`/`sltiu` and the reference's disagree) and a finite execution `C` (`miniCut`), a
 valid run of MiniMach ending with memory `cutMem P C` (the cut's stores in gmo order) in which
 * every hart's load values, in order, are the cut's (`cutLoads`), and
@@ -63,7 +63,7 @@ theorem step_any (hwf : P.wf) (himm : P.immOk) (hC : miniCut P C) {h k : Nat} (h
     cases ins with
     | alui op rd rs1 imm =>
       have himm' := himm h _ hmem op rd rs1 imm rfl
-      have hreg : rd < 32 ∧ rs1 < 32 := (hwf.2.2 h _ hmem).2
+      have hreg : rd < 32 ∧ rs1 < 32 := (hwf.2.2 h _ hmem).2.1  -- [MiniP3 (0)]
       rcases h1 : s.rd rs1 with ⟨v1, t1⟩
       simp only [exec, h1]
       have hr1 : H.fr.rd rs1 = v1 := by rw [hI.regs, h1]
@@ -72,7 +72,7 @@ theorem step_any (hwf : P.wf) (himm : P.immOk) (hC : miniCut P C) {h k : Nat} (h
       · rw [hr1, Nat.mod_eq_of_lt himm', Nat.mod_eq_of_lt (aluOp_lt op hv1 himm')]
       · have := dom_srcR hI.regv hreg.2; rw [h1] at this; exact this
     | alu op rd rs1 rs2 =>
-      have hreg := (hwf.2.2 h _ hmem).2
+      have hreg := (hwf.2.2 h _ hmem).2.1  -- [MiniP3 (0)]
       rcases h1 : s.rd rs1 with ⟨v1, t1⟩
       rcases h2 : s.rd rs2 with ⟨v2, t2⟩
       simp only [exec, h1, h2]
@@ -249,14 +249,14 @@ theorem Cmp.completeRun (P : MProg) (hwf : P.wf) (himm : P.immOk) (C : MCut) (hC
     · rename_i hh
       simp [cutLoads, ldVals, MCut.st, mrun_out P C.V (Nat.le_of_not_lt hh)]
 
-/-- **L4 — COMPLETENESS (mini plan rev 4 §2 L4).**  Every finite execution `C` of a well-formed F program `P` whose
-ALU immediates are 64-bit values is a valid run of MiniMach: the run's memory is the cut's stores in gmo order,
+/-- **L4 — COMPLETENESS (mini plan rev 4 §2 L4).**  Every finite execution `C` of a well-formed F program `P` (whose
+ALU immediates are 64-bit values: part of `wf`, [MiniP3 (0)]) is a valid run of MiniMach: the run's memory is the cut's stores in gmo order,
 every hart's load values are the cut's in program order, and every hart ends at the cut's pc with the cut's
 register values (the run follows each hart's path through the program's own text: no unrolling). -/
-theorem mini_complete (P : MProg) (hwf : P.wf) (himm : P.immOk) (C : MCut) (hC : miniCut P C) :
+theorem mini_complete (P : MProg) (hwf : P.wf) (C : MCut) (hC : miniCut P C) :
     ∃ r : MRun, miniValidRun P (cutMem P C) r ∧ (∀ h, loadVals (r.trace h) = cutLoads P C h) ∧
       ∃ c, mSteps P (mInit P) r.evs c ∧ ∀ h < P.harts.length, ∃ H, c.hs[h]? = some H ∧
         H.fr.pc = (C.st P h).pc ∧ ∀ reg, H.fr.rd reg = ((C.st P h).rd reg).1 :=
-  Cmp.completeRun P hwf himm C hC
+  Cmp.completeRun P hwf hwf.immOk C hC  -- [MiniP3 (0)]: `immOk` is now part of `wf`
 
 end Weak.Mini

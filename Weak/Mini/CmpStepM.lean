@@ -41,7 +41,7 @@ theorem step_load (hwf : P.wf) {s : Weak.Mini.MSt} {H : MHart} (hI : Inv P C h s
     (hX : SC P C h s (exec P.sz h C.V s (.load sgn rd rs1 off))) :
     StepOk P C h s (exec P.sz h C.V s (.load sgn rd rs1 off)) H := by
   have hmem := List.mem_of_getElem? hi
-  have hreg : rd < 32 ∧ rs1 < 32 := (hwf.2.2 h _ hmem).2
+  have hreg : rd < 32 ∧ rs1 < 32 := (hwf.2.2 h _ hmem).2.1  -- [MiniP3 (0)]
   have hsz : P.sz ≤ 8 := by rcases hwf.1 with h | h | h | h <;> omega
   have hg := hgmo hC
   rcases h1 : s.rd rs1 with ⟨v1, t1⟩
@@ -291,7 +291,7 @@ theorem step_store (hwf : P.wf) {s : Weak.Mini.MSt} {H : MHart} (hI : Inv P C h 
     (hX : SC P C h s (exec P.sz h C.V s (.store rs2 rs1 off))) :
     StepOk P C h s (exec P.sz h C.V s (.store rs2 rs1 off)) H := by
   have hmem := List.mem_of_getElem? hi
-  have hreg : rs1 < 32 ∧ rs2 < 32 := (hwf.2.2 h _ hmem).2
+  have hreg : rs1 < 32 ∧ rs2 < 32 := (hwf.2.2 h _ hmem).2.1  -- [MiniP3 (0)]
   have hg := hgmo hC
   rcases h1 : s.rd rs1 with ⟨v1, t1⟩
   rcases h2 : s.rd rs2 with ⟨v2, t2⟩

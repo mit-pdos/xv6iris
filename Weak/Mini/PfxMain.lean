@@ -176,7 +176,7 @@ theorem Pfx.infCompleteRun (P : MProg) (hwf : P.wf) (himm : P.immOk) (X : MExec)
       ∃ c, mSteps P (mInit P) r.evs c ∧ ∀ h < P.harts.length, ∃ H, c.hs[h]? = some H ∧
         H.fr.pc = (mrun P X.V h (ks h)).pc := by
   obtain ⟨C, hC, hag, hst⟩ := mini_prefix P X hX O hO
-  obtain ⟨r, hr, hld, c, hc, hpc⟩ := mini_complete P hwf himm C hC
+  obtain ⟨r, hr, hld, c, hc, hpc⟩ := mini_complete P hwf C hC  -- [MiniP3 (0)]
   refine ⟨C.ks, _, r, hr, fun o ho => ?_, c, hc, fun h hh => ?_⟩
   · rw [hld o.1]
     unfold cutLoads rowX ldVals
@@ -198,12 +198,12 @@ theorem Pfx.infCompleteRun (P : MProg) (hwf : P.wf) (himm : P.immOk) (X : MExec)
 infinite execution `X` and a finite list `O` of its memory operations: a valid run of MiniMach in which every
 observed hart's load values extend `X`'s load values up to the observed event, and every hart ends where `X`'s hart
 is after `ks h` steps.  The run executes `P`'s own texts (`mInit P`; the front end loops): no unrolling. -/
-theorem mini_inf_complete (P : MProg) (hwf : P.wf) (himm : P.immOk) (X : MExec) (hX : miniExec P X)
+theorem mini_inf_complete (P : MProg) (hwf : P.wf) (X : MExec) (hX : miniExec P X)
     (O : List EvId) (hO : ∀ e ∈ O, (X.evs P).isMem e) :
     ∃ (ks : Nat → Nat) (Mm : List MMsg) (r : MRun), miniValidRun P Mm r ∧
       (∀ o ∈ O, rowX P X o.1 (o.2 + 1) <+: loadVals (r.trace o.1)) ∧
       ∃ c, mSteps P (mInit P) r.evs c ∧ ∀ h < P.harts.length, ∃ H, c.hs[h]? = some H ∧
         H.fr.pc = (mrun P X.V h (ks h)).pc :=
-  Pfx.infCompleteRun P hwf himm X hX O hO
+  Pfx.infCompleteRun P hwf hwf.immOk X hX O hO  -- [MiniP3 (0)]: `immOk` is now part of `wf`
 
 end Weak.Mini

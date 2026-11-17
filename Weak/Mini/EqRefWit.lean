@@ -28,8 +28,8 @@ theorem lbddM_wf : lbddM.wf := by
   refine ⟨by decide, by simp [lbddM], fun h i hi => ?_⟩
   simp only [MProg.prog, lbddM] at hi
   match h, hi with
-  | 0, hi => simp at hi; rcases hi with rfl | rfl <;> exact ⟨trivial, by simp [MI.regOk]⟩
-  | 1, hi => simp at hi; rcases hi with rfl | rfl <;> exact ⟨trivial, by simp [MI.regOk]⟩
+  | 0, hi => simp at hi; rcases hi with rfl | rfl <;> exact ⟨trivial, by simp [MI.regOk], trivial⟩  -- [MiniP3 (0)]
+  | 1, hi => simp at hi; rcases hi with rfl | rfl <;> exact ⟨trivial, by simp [MI.regOk], trivial⟩  -- [MiniP3 (0)]
   | n + 2, hi => simp at hi
 
 /-- **K4**: lbdd has a MiniRef finite execution. -/
