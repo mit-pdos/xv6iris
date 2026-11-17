@@ -46,6 +46,11 @@ def report (root : Name) : CoreM Unit := do
   let mut rows : Array (Name × Nat × Name × Nat) := #[]
   for n in (coneOf env [root]).toList do
     if n.isInternal then continue
+    -- Generated declarations live inside their inductive's source range: count the inductive once.
+    if isAuxRecursor env n || isNoConfusion env n then continue
+    match env.find? n with
+    | some (.ctorInfo _) | some (.recInfo _) => continue
+    | _ => pure ()
     let some idx := env.getModuleIdxFor? n | continue
     let m := env.header.moduleNames[idx.toNat]!
     let (line, lines) ← match ← findDeclarationRanges? n with
