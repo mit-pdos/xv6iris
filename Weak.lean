@@ -1005,6 +1005,7 @@ import Weak.Prom.InfLoopBridge
 import Weak.Prom.InfLoopMach
 import Weak.Prom.InfLoop
 import Weak.Prom.InfLoopWit
+import Weak.Prom.MachTornWit
 import Weak.Prom.OwnAE2Defs
 import Weak.Prom.OwnAE2Lock
 import Weak.Prom.OwnAE2CS
