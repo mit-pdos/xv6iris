@@ -107,10 +107,10 @@ theorem regWL_emb (P : MProg) (rd : Nat) (srcs : List Mach.MSrc) :
     (Weak.Mini.Mach.regWL rd srcs).map (embL P) = Weak.Prom.Mach.regWL rd (embSs srcs) := by
   unfold Weak.Mini.Mach.regWL Weak.Prom.Mach.regWL; split <;> rfl
 
-theorem aluOp_eq (op : MAlu) (a b : Nat) : Mach.aluOp op a b = Weak.Prom.Ref.aluOp op.toAlu a b := by
+theorem aluOp_eq (op : MAlu) (a b : Nat) : op.eval a b = Weak.Prom.Ref.aluOp op.toAlu a b := by
   cases op <;> rfl
 
-theorem brEval_eq (c : MBrC) (a b : Nat) : Mach.brEval c a b = Weak.Prom.Ref.brEval c.toBrC a b := by
+theorem brEval_eq (c : MBrC) (a b : Nat) : c.eval a b = Weak.Prom.Ref.brEval c.toBrC a b := by
   cases c <;> rfl
 
 theorem go1_emb (P : MProg) (hsz : 0 < P.sz) (i : Nat) (f : Mach.MFront) (regs' : List Nat) (pc' : Nat)
@@ -190,7 +190,7 @@ theorem xNext_nil (P : MProg) {i : Nat} (hi : i < P.harts.length) (f : Mach.MFro
 
 /-! ## 4. The front-end equation -/
 
-theorem two64_eq : Weak.Prom.Ref.two64 = Mach.two64 := rfl
+theorem two64_eq : Weak.Prom.Ref.two64 = Weak.Mini.two64 := rfl
 
 theorem aligned_iff {P : MProg} (hsz : 0 < P.sz) (x : Nat) : aligned x P.sz = decide (x % P.sz = 0) := by
   simp only [aligned, Bool.or_eq_decide, beq_iff_eq]
@@ -276,7 +276,7 @@ theorem xNext_emb (P : MProg) (hwf : Mach.progWf P) {i : Nat} (hi : i < P.harts.
         simp only [MI.toInstr, instrNext, Mach.instrNext, aligned_iff hsz, two64_eq]
         have hrd : (embF P i f).rd rs1 = f.rd rs1 := rfl
         rw [hrd]
-        by_cases ha : (f.rd rs1 + off) % Mach.two64 % P.sz = 0
+        by_cases ha : (f.rd rs1 + off) % Weak.Mini.two64 % P.sz = 0
         · simp only [ha, decide_true, Bool.not_true, Bool.false_eq_true, if_false, ne_eq, not_true_eq_false]
           cases ml with
           | load b t v asrc =>
@@ -305,7 +305,7 @@ theorem xNext_emb (P : MProg) (hwf : Mach.progWf P) {i : Nat} (hi : i < P.harts.
         simp only [MI.toInstr, instrNext, Mach.instrNext, aligned_iff hsz, two64_eq]
         have hrd : ∀ r, (embF P i f).rd r = f.rd r := fun _ => rfl
         rw [hrd, hrd]
-        by_cases ha : (f.rd rs1 + off) % Mach.two64 % P.sz = 0
+        by_cases ha : (f.rd rs1 + off) % Weak.Mini.two64 % P.sz = 0
         · simp only [ha, decide_true, Bool.not_true, Bool.false_eq_true, if_false, ne_eq, not_true_eq_false]
           cases ml with
           | store b v asrc vsrc =>
@@ -389,7 +389,7 @@ theorem xNext_image (P : MProg) (hwf : Mach.progWf P) {i : Nat} (hi : i < P.hart
             have hl2 : (tvs.map Prod.snd).length = P.sz := by rw [List.length_map, hlen]
             have hv : ofBytes (tvs.map Prod.snd) < Mach.wordW P := by
               have := ofBytes_lt (tvs.map Prod.snd); rw [hl2] at this; exact this
-            refine ⟨.load ((f.rd rs1 + off) % Mach.two64) (tvs[0]'hne).1 (ofBytes (tvs.map Prod.snd))
+            refine ⟨.load ((f.rd rs1 + off) % Weak.Mini.two64) (tvs[0]'hne).1 (ofBytes (tvs.map Prod.snd))
               (Weak.Mini.Mach.srcR rs1), ?_⟩
             simp only [embL, srcR_emb]
             rw [wordB_lt hv, ← hl2, toBytes_ofBytes, untorn_map hut]
@@ -405,7 +405,7 @@ theorem xNext_image (P : MProg) (hwf : Mach.progWf P) {i : Nat} (hi : i < P.hart
           split at h
           · next hc =>
             obtain ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩ := hc
-            refine ⟨.store ((f.rd rs1 + off) % Mach.two64) (f.rd rs2 % Mach.wordW P) (Weak.Mini.Mach.srcR rs1)
+            refine ⟨.store ((f.rd rs1 + off) % Weak.Mini.two64) (f.rd rs2 % Mach.wordW P) (Weak.Mini.Mach.srcR rs1)
               (Weak.Mini.Mach.srcR rs2), ?_⟩
             simp only [embL, srcR_emb, wordB_mod]
             rfl

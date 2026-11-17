@@ -284,13 +284,30 @@ theorem relWs_instr {P : MProg} {ms : Mach.MSt} {ws : PState} (hR : RelWs P ms w
 
 /-! ## 5. The read rule -/
 
+/-- Is the answer `t` at word `a` the hart's own latest store (Machine.lean `fwdHit`, :294, on a word)?  Only the
+proof of `loadOk_iff` needs it: the mini `loadOk` has no forwarding case (`writesIn_window`). -/
+def fwdHitW (ws : Mach.MSt) (a t : Nat) : Bool :=
+  match ws.fwd a with
+  | some (tf, _) => t == tf
+  | none => false
+
 theorem fwdHit_emb {P : MProg} {ms : Mach.MSt} {ws : PState} (hR : RelWs P ms ws) {a k : Nat} (ha : a % P.sz = 0)
-    (hk : k < P.sz) (t : Nat) : fwdHit ws ((a + k : Nat) : Int) t = Mach.fwdHit ms a t := by
-  unfold fwdHit Mach.fwdHit
+    (hk : k < P.sz) (t : Nat) : fwdHit ws ((a + k : Nat) : Int) t = fwdHitW ms a t := by
+  unfold fwdHit fwdHitW
   rw [(hR.word a ha k hk).2]
   cases ms.fwd a with
   | none => rfl
   | some p => cases p; rfl
+
+/-- THE SAME WINDOW (P1 gate fix 6): on one word, Machine.lean's forwarded floor `vpre ⊔ coh` and its common floor
+`(vpre ⊔ t) ⊔ coh` give the same window `(t, _]`, so the mini `loadOk` writes neither case. -/
+theorem writesIn_window (log : List Mach.MMsg) (b : Bool) (a t vpre c : Nat) :
+    Mach.writesIn log a t (max (if b then vpre else max vpre t) c) ↔ Mach.writesIn log a t (max vpre c) := by
+  cases b
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    unfold Mach.writesIn
+    constructor <;> rintro ⟨u, h1, h2, h3⟩ <;> exact ⟨u, h1, by omega, h3⟩
+  · simp only [↓reduceIte]
 
 /-- THE READ RULE ON A WORD: machine v2's `loadOk` of an untorn word answer is the mini `loadOk`. -/
 theorem loadOk_iff (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) {mlog : List Mach.MMsg}
@@ -301,12 +318,12 @@ theorem loadOk_iff (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) {
   have hsz := hwf.1
   have hlen : (wordB P v).length = P.sz := wordB_len.2 hv
   have hne : wordB P v ≠ [] := wordB_ne_nil hsz v
-  have hnf : nonFwdMax ws (a : Int) ((wordB P v).map (fun x => (t, x))) = if Mach.fwdHit ms a t then 0 else t :=
+  have hnf : nonFwdMax ws (a : Int) ((wordB P v).map (fun x => (t, x))) = if fwdHitW ms a t then 0 else t :=
     bytesMax_uni _ t _ (wordB P v) a hne (fun k hk => by rw [fwdHit_emb hR ha (by omega)])
   have hfl : ∀ k, k < P.sz →
       max (if fwdHit ws ((a + k : Nat) : Int) t then vpre
         else max vpre (nonFwdMax ws (a : Int) ((wordB P v).map (fun x => (t, x))))) (coh ws ((a + k : Nat) : Int)) =
-      max (if Mach.fwdHit ms a t then vpre else max vpre t) (ms.coh a) := by
+      max (if fwdHitW ms a t then vpre else max vpre t) (ms.coh a) := by
     intro k hk
     rw [fwdHit_emb hR ha hk, hnf, (hR.word a ha k hk).1]
     split <;> simp
@@ -316,13 +333,13 @@ theorem loadOk_iff (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) {
   · intro h
     have hk : ∀ k (hk : k < P.sz), (Mach.memv P mlog t a).bind (fun w => (toBytes w P.sz)[k]?) =
         some ((wordB P v)[k]'(by omega)) ∧
-        ¬ Mach.writesIn mlog a t (max (if Mach.fwdHit ms a t then vpre else max vpre t) (ms.coh a)) := by
+        ¬ Mach.writesIn mlog a t (max vpre (ms.coh a)) := by
       intro k hk
       obtain ⟨h1, h2⟩ := h k (by omega)
       rw [memByte_word P hwf cond hg ha hk] at h1
       refine ⟨h1, ?_⟩
       rcases h2 with h2 | h2
-      · rw [hfl k hk, writesIn_word P hg ha hk] at h2; exact h2
+      · rw [hfl k hk, writesIn_word P hg ha hk, writesIn_window] at h2; exact h2
       · obtain ⟨ti, hti, -⟩ := h2; exact absurd hti (noInval_emb P mlog ti _)
     refine ⟨?_, (hk 0 hsz).2⟩
     cases hm : Mach.memv P mlog t a with
@@ -341,7 +358,7 @@ theorem loadOk_iff (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) {
     rw [hlen] at hk
     refine ⟨?_, .inl ?_⟩
     · rw [memByte_word P hwf cond hg ha hk, h1, Option.bind_some, ← wordB_lt hv, List.getElem?_eq_getElem]
-    · rw [hfl k hk, writesIn_word P hg ha hk]; exact h2
+    · rw [hfl k hk, writesIn_word P hg ha hk, writesIn_window]; exact h2
 
 /-! ## 6. The memory halves -/
 

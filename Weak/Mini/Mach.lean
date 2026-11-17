@@ -24,47 +24,17 @@ namespace Weak.Mini.Mach
 
 open Weak.Mini
 
-/-! ## 0. Values (transliterated from RefProg.lean:72–122) -/
+/-! ## 0. Values
 
-/-- `2^64` (RefProg.lean:72). -/
-def two64 : Nat := 18446744073709551616
-
-/-- Signed less-than on `n`-bit values (RefProg.lean:75). -/
-def sltN (n a b : Nat) : Bool := decide ((a ^^^ 2 ^ (n - 1)) < (b ^^^ 2 ^ (n - 1)))
-
-/-- The ALU (RefProg.lean:77–89). -/
-def aluOp : MAlu → Nat → Nat → Nat
-  | .add, a, b => (a + b) % two64
-  | .sub, a, b => (a + (two64 - b % two64)) % two64
-  | .xor, a, b => a ^^^ b
-  | .or, a, b => a ||| b
-  | .and, a, b => a &&& b
-  | .sll, a, b => (a <<< (b % 64)) % two64
-  | .srl, a, b => a >>> (b % 64)
-  | .sra, a, b =>
-      if a < 2 ^ 63 then a >>> (b % 64) else (a >>> (b % 64)) ||| (two64 - 2 ^ (64 - b % 64))
-  | .slt, a, b => if sltN 64 a b then 1 else 0
-  | .sltu, a, b => if a < b then 1 else 0
-  | .mul, a, b => (a * b) % two64
-
-/-- Branch conditions (RefProg.lean:91–97). -/
-def brEval : MBrC → Nat → Nat → Bool
-  | .eq, a, b => a == b
-  | .ne, a, b => a != b
-  | .lt, a, b => sltN 64 a b
-  | .ge, a, b => !sltN 64 a b
-  | .ltu, a, b => decide (a < b)
-  | .geu, a, b => !decide (a < b)
-
-/-- Sign extension of an `sz`-byte value to 64 bits (RefProg.lean:121). -/
-def sext (sz v : Nat) : Nat :=
-  if sz < 8 ∧ 2 ^ (8 * sz - 1) ≤ v then v + (two64 - 2 ^ (8 * sz)) else v
+`two64`, the ALU `MAlu.eval`, the branch conditions `MBrC.eval` and `sext` are the reference's, `Weak/Mini/Val.lean`
+(ONE copy, P1 gate fix 2). -/
 
 /-- `2^(8·sz)`: the values of an `sz`-byte word are `< wordW P`. -/
 def wordW (P : MProg) : Nat := 2 ^ (8 * P.sz)
 
 /-- WELL-FORMED PROGRAM (Prog.lean: "one value per `sz`-aligned word"): a positive access size and an image whose
-entries are at aligned addresses.  E2 is stated for these programs. -/
+entries are at aligned addresses.  E2 is stated for these programs.  E2 needs neither the register bound nor the four
+RISC-V sizes of the reference's `MProg.wf` (Ref.lean §5), which implies this (`MProg.wf_progWf`, Wf.lean). -/
 def progWf (P : MProg) : Prop := 0 < P.sz ∧ ∀ p ∈ P.img, p.1 % P.sz = 0
 
 /-! ## 1. Labels and messages -/
@@ -149,12 +119,6 @@ def ldPre (ws : MSt) (va : Nat) : Nat := max va ws.vrNew
 views (rules 9, 10), the capture view (rules 11, 13), the store floor `vwNew` (rule 4).  FAITHFUL. -/
 def stPre (ws : MSt) (va vd : Nat) : Nat := max va (max vd (max ws.vcap ws.vwNew))
 
-/-- Is the answer `t` at word `a` the hart's own latest store (Machine.lean `fwdHit`, :294)? -/
-def fwdHit (ws : MSt) (a t : Nat) : Bool :=
-  match ws.fwd a with
-  | some (tf, _) => t == tf
-  | none => false
-
 /-- The forwarded view of an answer (Machine.lean `fwdView`, :308): the store's forward view if forwarded (rule 12),
 else the timestamp. -/
 def fwdView (ws : MSt) (a t : Nat) : Nat :=
@@ -162,15 +126,15 @@ def fwdView (ws : MSt) (a t : Nat) : Nat :=
   | some (tf, vf) => if t = tf then vf else t
   | none => t
 
-/-- THE READ ADMISSIBILITY of a word load at pre-view `vpre` (Machine.lean `loadOk`, :325–333, word form): the word
-the answer `t` holds is `v`, and no write to the word lies in `(t, floor]`, where the floor is `vpre ⊔ coh` for an
-answer FORWARDED from the hart's own latest store (the forwarding exemption, word form), and the common read point
-`vpre ⊔ t` raised by `coh` otherwise (M9; for one word `nonFwdMax = t`).  [Both floors give the same window, since
-`(t, t]` is empty; the form mirrors Machine.lean.]  The invalidate disjunct `invalRead` is dropped (no CMO on F).
-FAITHFUL on untorn reads (E2; a TORN read — bytes from different stores — has no word form: plan §2 L2 F3). -/
+/-- THE READ ADMISSIBILITY of a word load at pre-view `vpre` (Machine.lean `loadOk`, :325–333, word form; Pulte's
+plain read rule): the word the answer `t` holds is `v`, and no write to the word lies in `(t, vpre ⊔ coh a]`.
+Machine.lean's floor is `vpre ⊔ coh` for an answer FORWARDED from the hart's own latest store (the forwarding
+exemption) and `(vpre ⊔ t) ⊔ coh` otherwise (M9; for one word `nonFwdMax = t`); on ONE word both floors give the SAME
+WINDOW `(t, _]`, since raising the upper end to `t` adds nothing (`writesIn_window`, EqMachMem.lean), so the exemption
+is a no-op here and is not written.  The invalidate disjunct `invalRead` is dropped (no CMO on F).  FAITHFUL on
+untorn reads (E2; a TORN read — bytes from different stores — has no word form: plan §2 L2 F3). -/
 def loadOk (P : MProg) (log : List MMsg) (ws : MSt) (vpre a t v : Nat) : Prop :=
-  memv P log t a = some v ∧
-    ¬ writesIn log a t (max (if fwdHit ws a t then vpre else max vpre t) (ws.coh a))
+  memv P log t a = some v ∧ ¬ writesIn log a t (max vpre (ws.coh a))
 
 /-- THE LOAD POST (Machine.lean `loadRunV … 0` = `loadRun` (`loadRunV_zero`, MachInval.lean), :363, `aq = rl =
 false`): coherence takes `max vpost t`, `vrOld` and the load-result view take the post-view `vpost = vpre ⊔
@@ -264,9 +228,9 @@ branch/jump arms are `xNext`'s, OwnAFront.lean:66–70: ANY target `≤ n`).  A 
 `v` an `sz`-byte word (machine v2: `tvs.length = sz`); the memory half decides admissibility.  FAITHFUL. -/
 def instrNext (P : MProg) (n : Nat) (f : MFront) : MI → MLab → Option MFront
   | .alui op rd rs1 imm, l =>
-      go1 f (f.wr rd (aluOp op (f.rd rs1) imm)) (f.pc + 1) (regWL rd (srcR rs1) ++ [.instr]) l
+      go1 f (f.wr rd (op.eval (f.rd rs1) imm)) (f.pc + 1) (regWL rd (srcR rs1) ++ [.instr]) l
   | .alu op rd rs1 rs2, l =>
-      go1 f (f.wr rd (aluOp op (f.rd rs1) (f.rd rs2))) (f.pc + 1) (regWL rd (srcR rs1 ++ srcR rs2) ++ [.instr]) l
+      go1 f (f.wr rd (op.eval (f.rd rs1) (f.rd rs2))) (f.pc + 1) (regWL rd (srcR rs1 ++ srcR rs2) ++ [.instr]) l
   | .load sgn rd rs1 off, l =>
       let a := (f.rd rs1 + off) % two64
       if a % P.sz ≠ 0 then none else
@@ -288,7 +252,7 @@ def instrNext (P : MProg) (n : Nat) (f : MFront) : MI → MLab → Option MFront
   | .fence fs, l => go1 f f.regs (f.pc + 1) [.fence fs.pr fs.pw fs.sr fs.sw, .instr] l
   | .br c rs1 rs2 tgt, l =>
       if n < tgt then none else
-      go1 f f.regs (if brEval c (f.rd rs1) (f.rd rs2) then tgt else f.pc + 1) [.ctrl (srcR rs1 ++ srcR rs2), .instr] l
+      go1 f f.regs (if c.eval (f.rd rs1) (f.rd rs2) then tgt else f.pc + 1) [.ctrl (srcR rs1 ++ srcR rs2), .instr] l
   | .jmp tgt, l => if n < tgt then none else go1 f f.regs tgt [.instr] l
   | .nop, l => go1 f f.regs (f.pc + 1) [.instr] l
 

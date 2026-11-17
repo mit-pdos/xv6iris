@@ -6,7 +6,7 @@ configuration is the one the embedded events reach), for every well-formed F pro
 * `e2a : miniValidRun P Mm r ↔ PF.validRun (xStep P.xs) (testImg (P.toTest cond)) () (progs (P.toTest cond))
     (embM P Mm) (embRun P cond r)`;
 * `e2b : PF.validRun (xStep P.xs) … M run → untorn run → ∃ Mm r, M = embM P Mm ∧ miniValidRun P Mm r ∧
-    ∀ h, run.trace h = (r.trace h).map (embTr P)` — `untorn` exactly as plan §2 L2 (CoreDefs.lean:52, :66–71): the
+    run.evs = r.evs.map (embEv P) ∧ ∀ h, run.trace h = (r.trace h).map (embTr P)` — `untorn` exactly as plan §2 L2 (CoreDefs.lean:52, :66–71): the
   mini machine is STRONGER than machine v2 exactly on torn runs (finding F3, Weak/Prom/MachTornWit.lean; owner
   ruling [OWN.P19]);
 * corollaries `e2a_obsLoad`, `e2b_obsLoad`: equal load observations.
@@ -97,7 +97,7 @@ theorem hart_of {P : MProg} {cond : Weak.Prom.Ref.OC} {c : Mach.MCfg} {C : PCfg 
   exact hR.ags i _ ag (List.getElem?_eq_getElem _) hag
 
 theorem progs_get (P : MProg) (cond : Weak.Prom.Ref.OC) {i : Nat} (hi : i < P.harts.length) :
-    (progs (P.toTest cond))[i]? = some (embF P i ⟨0, (List.range 32).map (fun r => P.reg0 i r % Mach.two64), []⟩) := by
+    (progs (P.toTest cond))[i]? = some (embF P i ⟨0, (List.range 32).map (fun r => P.reg0 i r % two64), []⟩) := by
   have hi' : i < (P.toTest cond).harts.length := by simpa [MProg.toTest] using hi
   simp only [progs, List.getElem?_map, List.getElem?_range hi', Option.map_some, embF, progF_eq, List.map_nil]
   rfl
@@ -106,7 +106,7 @@ theorem progs_len (P : MProg) (cond : Weak.Prom.Ref.OC) : (progs (P.toTest cond)
   simp [progs, MProg.toTest]
 
 theorem minit_get (P : MProg) {i : Nat} {h : Mach.MHart} (hh : (Mach.mInit P).hs[i]? = some h) :
-    i < P.harts.length ∧ h = ⟨⟨0, (List.range 32).map (fun r => P.reg0 i r % Mach.two64), []⟩, Mach.msInit, []⟩ := by
+    i < P.harts.length ∧ h = ⟨⟨0, (List.range 32).map (fun r => P.reg0 i r % two64), []⟩, Mach.msInit, []⟩ := by
   simp only [Mach.mInit, List.getElem?_map] at hh
   by_cases hi : i < P.harts.length
   · rw [List.getElem?_range hi] at hh; cases hh; exact ⟨hi, rfl⟩
@@ -114,7 +114,7 @@ theorem minit_get (P : MProg) {i : Nat} {h : Mach.MHart} (hh : (Mach.mInit P).hs
 
 theorem finit_get (P : MProg) (cond : Weak.Prom.Ref.OC) {i : Nat} {ag : PAgent LP}
     (hag : (fInit P cond).pcAgs[i]? = some ag) :
-    i < P.harts.length ∧ ag = ⟨embF P i ⟨0, (List.range 32).map (fun r => P.reg0 i r % Mach.two64), []⟩, psInit, ∅⟩ := by
+    i < P.harts.length ∧ ag = ⟨embF P i ⟨0, (List.range 32).map (fun r => P.reg0 i r % two64), []⟩, psInit, ∅⟩ := by
   simp only [fInit, pmInit, List.getElem?_map] at hag
   by_cases hi : i < P.harts.length
   · rw [progs_get P cond hi] at hag; cases hag; exact ⟨hi, rfl⟩
@@ -480,14 +480,16 @@ theorem e2a (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) (Mm : Li
     exact map_inj (fun _ _ h => embMsg_inj h) this
 
 /-- **E2b** (mini plan rev 4 §2 L2): every UNTORN valid run of machine v2 with the loop front end on an F program is
-the embedding of a valid mini run, with the same final memory and the same traces. -/
+the embedding of a valid mini run, with the same final memory, the same events (so the same interleaving of
+promises across harts) and the same traces. -/
 theorem e2b (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) (M : List PMsg) (run : PF.PFRun LP Unit)
     (hv : PF.validRun (xStep P.xs) (testImg (P.toTest cond)) () (progs (P.toTest cond)) M run) (hu : untorn run) :
-    ∃ Mm r, M = embM P Mm ∧ Mach.miniValidRun P Mm r ∧ ∀ h, run.trace h = (r.trace h).map (embTr P) := by
+    ∃ Mm r, M = embM P Mm ∧ Mach.miniValidRun P Mm r ∧ run.evs = r.evs.map (embEv P) ∧
+      ∀ h, run.trace h = (r.trace h).map (embTr P) := by
   have hue := untorn_evs hu
   have hg := pass1 P hwf cond hv.1 hue
   obtain ⟨mes, c, he, hms, hR⟩ := run_bwd P hwf cond hv.1.1 hg hue (rel_init P cond)
-  refine ⟨c.log, ⟨mes⟩, by rw [← hv.2, hR.log]; rfl, ⟨c, hms, noProm_of_rel hR hv.1.2, rfl⟩, fun h => ?_⟩
+  refine ⟨c.log, ⟨mes⟩, by rw [← hv.2, hR.log]; rfl, ⟨c, hms, noProm_of_rel hR hv.1.2, rfl⟩, he, fun h => ?_⟩
   show traceOf h run.evs = _
   rw [he, traceOf_emb]
   rfl
@@ -528,7 +530,7 @@ theorem e2b_obsLoad (P : MProg) (hwf : Mach.progWf P) (cond : Weak.Prom.Ref.OC) 
     (run : PF.PFRun LP Unit)
     (hv : PF.validRun (xStep P.xs) (testImg (P.toTest cond)) () (progs (P.toTest cond)) M run) (hu : untorn run) :
     ∃ Mm r, M = embM P Mm ∧ Mach.miniValidRun P Mm r ∧ ∀ h k, run.obsLoad h k = r.obsLoad h k := by
-  obtain ⟨Mm, r, h1, h2, h3⟩ := e2b P hwf cond M run hv hu
+  obtain ⟨Mm, r, h1, h2, -, h3⟩ := e2b P hwf cond M run hv hu
   exact ⟨Mm, r, h1, h2, obsLoad_of_trace h3⟩
 
 end MiniEq

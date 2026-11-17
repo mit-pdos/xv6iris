@@ -2,15 +2,19 @@
 Weak/Mini: **MiniRef — the RVWMO memory model for the fragment F** (mini plan rev 4 §2 L1; owner ruling [OWN.P18]
 "I still want the semantics and the logic. Just want them minimial").
 
-Quotes: the RISC-V ISA manual `rvwmo.adoc` @ `e17d92a1` (copy `~/dev/weak-orch/promising/spec/rvwmo.adoc`), and the
-base-ISA FENCE text `unpriv_rv32.adoc`.  Equal to the full reference on F: `Weak/Mini/EqRef*.lean` (E1).
+Quotes: the RISC-V ISA manual @ `e17d92a1`: the memory model `rvwmo.adoc` (copy `promising/spec/rvwmo.adoc`, i.e.
+`~/dev/weak-orch/promising/spec/rvwmo.adoc`) and the base-ISA FENCE text `unpriv_rv32.adoc` (copy
+`promising/spec/unpriv_rv32.adoc`, same directory).  Equal to the full reference on F: `Weak/Mini/EqRef*.lean` (E1).
 
 ## What an execution is
 
 * EVENTS are WORD-valued: the program has ONE access size `sz` and every access is naturally aligned, so two memory
   operations access overlapping bytes iff they have the same address, and a load reads ONE value (the bytes of one
-  store, or of the initial memory).  An event id `(h, i)` is "the `i`-th load, store or fence of hart `h`" in program
-  order (ALU instructions, branches, jumps and `nop` create no event).
+  store, or of the initial memory).  Why one store: the load value axiom picks, PER BYTE, the gmo-latest candidate
+  store writing that byte; on F every store that writes one byte of the word writes ALL `sz` bytes of it (it is an
+  aligned access of the same size at the same address), so every byte of the load has the same candidate set, hence
+  the same latest store (or none: the initial memory for every byte).  An event id `(h, i)` is "the `i`-th load,
+  store or fence of hart `h`" in program order (ALU instructions, branches, jumps and `nop` create no event).
 * THE HARTS (§3) run CONCRETELY: registers hold values, a load takes the value the execution assigns to it (`V`),
   and every register carries its TAINT, the list of this hart's loads it syntactically depends on (rvwmo.adoc:
   156–246; the lists are built exactly as the full reference's `stepI` builds them).  Branches and jumps go anywhere
@@ -43,7 +47,8 @@ inductive MK where
 
 /-- An event: kind, dynamic instruction index (program order), address, the value read (a load: the `sz` bytes it
 returns) or written (a store: the `sz` bytes it writes), and its syntactic address, data and control dependencies as
-indices of this hart's events (rvwmo.adoc:232–246). -/
+indices of this hart's events (rvwmo.adoc:232–246).  A FENCE event's `pa` and `v` are dummies (`0`, `exec` §3): a
+fence is never `isMem`, and only rule 4 looks at it, through its `kind` and `ii`. -/
 structure MEv where
   kind : MK
   ii : Nat
@@ -99,22 +104,26 @@ def rule1 (a b : EvId) : Prop := A.isSt b ∧ (A.ev a).pa = (A.ev b).pa
 
 /-- Rule 2 (rvwmo.adoc:279–281): "_a_ and _b_ are loads, _x_ is a byte read by both _a_ and _b_, there is no store
 to _x_ between _a_ and _b_ in program order, and _a_ and _b_ return values for _x_ written by different memory
-operations" (the initial memory counts as one writer, `none`).  FAITHFUL (a byte read by both = same address). -/
+operations".  FAITHFUL (a byte read by both = same address).  The writers are `rf`'s answers: `some w` (the store
+`w`) or `none` (the INITIAL MEMORY as writer, the standard herd reading of "different memory operations").  `rf` is
+functional under `gmoOk` (gmo is irreflexive and transitive, so two gmo-latest candidates coincide; `some` and
+`none` exclude each other), so inside the axiom block `ax` the existential `∃ oa ob` names THE writers of `a` and
+`b`. -/
 def rule2 (a b : EvId) : Prop :=
   A.isLd a ∧ A.isLd b ∧ (A.ev a).pa = (A.ev b).pa ∧
     (∀ m, A.has m → A.po a m → A.po m b → ¬ (A.isSt m ∧ (A.ev m).pa = (A.ev a).pa)) ∧
     ∃ oa ob, A.rf a oa ∧ A.rf b ob ∧ oa ≠ ob
 
-/-- FENCE predecessor set (unpriv_rv32.adoc:770–776): memory reads (R) and writes (W); F has no I/O access, so the
-I and O bits order nothing. -/
+/-- FENCE predecessor set (`promising/spec/unpriv_rv32.adoc`:770–776): memory reads (R) and writes (W); F has no I/O
+access, so the I and O bits order nothing. -/
 def inPred (f : MFence) (e : EvId) : Prop := (A.isLd e ∧ f.pr = true) ∨ (A.isSt e ∧ f.pw = true)
 
 /-- FENCE successor set. -/
 def inSucc (f : MFence) (e : EvId) : Prop := (A.isLd e ∧ f.sr = true) ∨ (A.isSt e ∧ f.sw = true)
 
-/-- Rule 4 (rvwmo.adoc:286): "There is a FENCE instruction that orders _a_ before _b_"; unpriv_rv32.adoc:818–819 "A
-FENCE (with fm=0000) orders all memory operations in its predecessor set before all memory operations in its
-successor set".  FAITHFUL. -/
+/-- Rule 4 (rvwmo.adoc:286): "There is a FENCE instruction that orders _a_ before _b_";
+`promising/spec/unpriv_rv32.adoc`:818–819 "A FENCE (with fm=0000) orders all memory operations in its predecessor
+set before all memory operations in its successor set".  FAITHFUL. -/
 def rule4 (a b : EvId) : Prop :=
   ∃ m f, A.has m ∧ (A.ev m).kind = .fence f ∧ A.po a m ∧ A.po m b ∧ A.inPred f a ∧ A.inSucc f b
 
@@ -136,7 +145,9 @@ def rule12 (a b : EvId) : Prop :=
 
 /-- Rule 13 (rvwmo.adoc:301–302): "_b_ is a store, and there exists some instruction _m_ between _a_ and _b_ in
 program order such that _m_ has an address dependency on _a_"; `m` ranges over memory operations (the manual's
-formal reading `[R];addr;[M];po;[W]`, owner ruling [OWN.P6]).  FAITHFUL (to that reading). -/
+formal reading `[R];addr;[M];po;[W]`, owner ruling [OWN.P6]).  FAITHFUL to [OWN.P6]'s `[R];addr;[M];po;[W]`; it
+would be STRONGER than the letter only if a non-memory instruction `m` could carry an address dependency on `a`, and
+on F none can (only loads and stores have an address operand). -/
 def rule13 (a b : EvId) : Prop :=
   A.isSt b ∧ ∃ m, A.isMem m ∧ A.po a m ∧ A.po m b ∧ a.2 ∈ (A.ev m).adep
 
@@ -187,39 +198,7 @@ end MEvs
 
 /-! ## 3. The harts (concrete, with loops) -/
 
-/-- `2^64`. -/
-def two64 : Nat := 18446744073709551616
-
-/-- Signed less-than on `n`-bit values (flip the sign bit, compare unsigned). -/
-def sltN (n a b : Nat) : Bool := decide ((a ^^^ 2 ^ (n - 1)) < (b ^^^ 2 ^ (n - 1)))
-
-/-- RV64 integer ALU operations on 64-bit values. -/
-def MAlu.eval : MAlu → Nat → Nat → Nat
-  | .add, a, b => (a + b) % two64
-  | .sub, a, b => (a + (two64 - b % two64)) % two64
-  | .xor, a, b => a ^^^ b
-  | .or, a, b => a ||| b
-  | .and, a, b => a &&& b
-  | .sll, a, b => (a <<< (b % 64)) % two64
-  | .srl, a, b => a >>> (b % 64)
-  | .sra, a, b =>
-      if a < 2 ^ 63 then a >>> (b % 64) else (a >>> (b % 64)) ||| (two64 - 2 ^ (64 - b % 64))
-  | .slt, a, b => if sltN 64 a b then 1 else 0
-  | .sltu, a, b => if a < b then 1 else 0
-  | .mul, a, b => (a * b) % two64
-
-/-- Branch conditions on 64-bit values. -/
-def MBrC.eval : MBrC → Nat → Nat → Bool
-  | .eq, a, b => a == b
-  | .ne, a, b => a != b
-  | .lt, a, b => sltN 64 a b
-  | .ge, a, b => !sltN 64 a b
-  | .ltu, a, b => decide (a < b)
-  | .geu, a, b => !decide (a < b)
-
-/-- Sign extension of an `sz`-byte value to 64 bits. -/
-def sext (sz v : Nat) : Nat :=
-  if sz < 8 ∧ 2 ^ (8 * sz - 1) ≤ v then v + (two64 - 2 ^ (8 * sz)) else v
+/-! The values (`two64`, `MAlu.eval`, `MBrC.eval`, `sext`) are in `Weak/Mini/Val.lean`. -/
 
 /-- The register value of a load returning the `sz`-byte value `w` (`sgn`: sign-extending). -/
 def ldExt (sz : Nat) (sgn : Bool) (w : Nat) : Nat := if sgn then sext sz w else w
@@ -353,9 +332,25 @@ def MI.tgtOk (n : Nat) : MI → Prop
   | .jmp t => t ≤ n
   | _ => True
 
-/-- A well-formed F program: a positive access size, a `sz`-aligned image, targets inside the texts. -/
+/-- Every register the instruction names is one of `x0 … x31` (Prog.lean; rvwmo.adoc's dependencies are through these
+registers). -/
+def MI.regOk : MI → Prop
+  | .alui _ rd rs1 _ => rd < 32 ∧ rs1 < 32
+  | .alu _ rd rs1 rs2 => rd < 32 ∧ rs1 < 32 ∧ rs2 < 32
+  | .load _ rd rs1 _ => rd < 32 ∧ rs1 < 32
+  | .store rs2 rs1 _ => rs1 < 32 ∧ rs2 < 32
+  | .br _ rs1 rs2 _ => rs1 < 32 ∧ rs2 < 32
+  | _ => True
+
+/-- A WELL-FORMED F PROGRAM: the access size is a RISC-V one (1, 2, 4 or 8 bytes: `lb`/`lh`/`lw`/`ld`), the image is
+`sz`-aligned, branch and jump targets lie inside the texts, and every register named is `< 32`.  E1 is stated for these
+programs; E2 needs only the first two (`Mach.progWf`, implied: `MProg.wf_progWf`, Wf.lean). -/
 def MProg.wf (P : MProg) : Prop :=
-  0 < P.sz ∧ (∀ p ∈ P.img, p.1 % P.sz = 0) ∧ ∀ h, ∀ i ∈ P.prog h, i.tgtOk (P.prog h).length
+  (P.sz = 1 ∨ P.sz = 2 ∨ P.sz = 4 ∨ P.sz = 8) ∧ (∀ p ∈ P.img, p.1 % P.sz = 0) ∧
+    ∀ h, ∀ i ∈ P.prog h, i.tgtOk (P.prog h).length ∧ i.regOk
+
+theorem MProg.wf.sz_pos {P : MProg} (hwf : P.wf) : 0 < P.sz := by
+  rcases hwf.1 with h | h | h | h <;> omega
 
 /-- Loop-free: every branch and jump goes forward. -/
 def MProg.fwd (P : MProg) : Prop :=

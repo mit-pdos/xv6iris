@@ -10,21 +10,14 @@ mixed-size accesses.
 Registers are numbered `0 … 31`; `x0` reads as 0 and ignores writes (the semantics' business, not the syntax's).
 Values are natural numbers below `2^64`.  The access size `sz` (bytes: 1, 2, 4 or 8) is a property of the PROGRAM:
 every load and store of it has that size (NA-6, single-size).  The image is WORD-valued: `(address, value)` pairs, one
-per `sz`-aligned word; absent words are 0.
+per `sz`-aligned word; absent words are 0.  The syntax does not enforce the register bound, the four sizes or the
+alignment of the image: the well-formedness predicate `MProg.wf` (Ref.lean §5) requires all three.
+The ALU operations `MAlu` and branch conditions `MBrC` (and their evaluators) are in `Weak/Mini/Val.lean`.
 No `sorry`, no axiom, no `native_decide`.
 -/
+import Weak.Mini.Val
 
 namespace Weak.Mini
-
-/-- ALU operations (the full reference's `Ref.Alu`, RefProg.lean:57). -/
-inductive MAlu where
-  | add | sub | xor | or | and | sll | srl | sra | slt | sltu | mul
-  deriving DecidableEq, Repr, Inhabited
-
-/-- Branch conditions (`Ref.BrC`, RefProg.lean:62). -/
-inductive MBrC where
-  | eq | ne | lt | ge | ltu | geu
-  deriving DecidableEq, Repr, Inhabited
 
 /-- A FENCE's predecessor and successor sets (rvwmo.adoc: `fence pred, succ`; the full reference's `FenceSet`,
 Ref.lean:69, has the same eight bits: device input/output and memory read/write, for each side). -/

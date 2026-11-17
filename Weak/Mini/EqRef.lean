@@ -8,7 +8,7 @@ a/b pair).
 * `e1b` — every full execution `E` of `P.toTest cond` is `toFull` of a mini execution: the same events, the same
   events' contents, the same gmo (`E.ev` is compared on existing events only: `IExec.ev` of a non-event is
   unconstrained, review-R2 F1).
-Both for well-formed F programs (`MProg.wf`: positive size, aligned image, targets inside the texts).
+Both for well-formed F programs (`MProg.wf`: a RISC-V size, aligned image, targets inside the texts, registers < 32).
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Mini.EqRefSim
@@ -70,7 +70,7 @@ theorem agree_nuOf (sz : Nat) (V : EvId → Nat) : Agree sz V (nuOf sz V) := by
 theorem harts_toTest (P : MProg) (cond : OC) : (P.toTest cond).harts.length = P.harts.length := by
   simp [MProg.toTest]
 
-theorem tgtOk_of_wf {P : MProg} (hwf : P.wf) (h : Nat) : TgtOk P h := hwf.2.2 h
+theorem tgtOk_of_wf {P : MProg} (hwf : P.wf) (h : Nat) : TgtOk P h := fun i hi => (hwf.2.2 h i hi).1
 
 /-! ## 3. A simulated full execution is the mini event set -/
 
@@ -181,7 +181,7 @@ theorem SimE.toA (H : SimE P cond X E) : SimA P cond (X.evs P) X.V E :=
 /-- **The correspondence** for a simulated full execution. -/
 theorem SimA.corr {A : MEvs} {V : EvId → Nat} (hwf : P.wf) (H : SimA P cond A V E) (hal : A.aligned P.sz)
     (hl : ∀ e, A.has e → (A.ev e).kind = .ld → E.ν e = byteList (V e) P.sz) : Corr P.sz P.ini A E := by
-  refine ⟨hwf.1, by rw [H.T]; rfl, H.has, fun e he => ?_, H.gmo, hal, ?_, ini_lt P,
+  refine ⟨hwf.sz_pos, by rw [H.T]; rfl, H.has, fun e he => ?_, H.gmo, hal, ?_, ini_lt P,
     fun a k ha hk => by rw [H.T]; exact imgF_toTest P cond hwf.2.1 a k ha hk⟩
   · have hS := H.sev e he
     unfold IExec.ev
