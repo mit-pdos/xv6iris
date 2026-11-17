@@ -3,7 +3,8 @@
 Owner ruling [OWN.P18]: "For the reference program proofs, can we minimize the machinery to work for those? … I still
 want the semantics and the logic. Just want them minimial."  Plan: `~/dev/weak-orch/promising/mini/plan.md` rev 4.
 You vet DEFINITIONS and four THEOREM STATEMENTS; Lean checks every proof (no `sorry`/axiom/`native_decide`; every
-statement below depends only on `propext`, `Classical.choice`, `Quot.sound`: `Weak/Mini/HeadCheck.lean`).
+statement below depends only on `propext`, `Classical.choice`, `Quot.sound`: `Weak/Mini/HeadCheck.lean` for the
+headlines, witnesses and corollaries; `Weak/Mini/LogicCheck.lean:7` for `mini_adequacy`).
 
 ## 1. What to read, in order
 
@@ -44,7 +45,7 @@ bodies (never proofs), with its line span.  Weak/Mini line counts (gate K5: 600;
 | `mini_forbidden_lbdd` | 339 | Ref 230, Prog 56, Val 37, Head 10, LitLbdd 6 | Lean core only |
 | `mini_forbidden_mpFF` | 344 | Ref 230, Prog 56, Val 37, Head 11, LitMpFF 10 | Lean core only |
 | `mini_inf_mpLoop` | 339 | Ref 224, Prog 54, Val 37, Head 13, LitLoop 9, LitMpFF 2 | Lean core only |
-| `mini_adequacy` | 482 | Mach 265, Logic 62, Prog 54, Adeq 51, Val 37, Run 13 | Lean core, Std, iris-lean (by name) |
+| `mini_adequacy` | 482 (≈447 without its proof) | Mach 265, Logic 62, Prog 54, Adeq 51, Val 37, Run 13 | Lean core, Std, iris-lean (by name) |
 
 No declaration outside Weak/Mini ∪ Lean core ∪ iris-lean (and Batteries/Qq) is reached (no ALIEN line).  The tool
 counts a structure's fields and an inductive's recursor as their own lines, and a declaration's docstring; it counts
@@ -75,7 +76,13 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
 * Alignment is part of `miniExec`/`miniCut`: a misaligned program has NO execution, so a verdict over it would be
   vacuous.  The K4 witnesses guard this (`Weak/Mini/HeadWit.lean`): `mini_lbdd_witness` (a finite execution of lbdd in
   which both first loads exist), `mini_mpFF_witness`, `mini_infExec_witness`, and `mini_inf_mpLoop_exercised` (an
-  infinite execution of `loopP` meeting EVERY premise of `mini_inf_mpLoop` at once).
+  infinite execution of `loopP` meeting EVERY premise of `mini_inf_mpLoop` at once); for the machine and the logic,
+  `mini_lb_valid` (`Weak/Mini/MachLb.lean:71`, the plan's `mini_lb_allowed`): a hand-built valid MiniMach run of LB
+  with both loads returning 1, so `miniValidRun` / `mini_adequacy`'s premise is satisfiable.
+* NON-EVENTS.  `MExec.ev e` of an id `e` that is NOT an event of the execution is `default` (kind `.ld`, `pa = 0`,
+  `v = 0`): every use in the axiom block and the headlines is guarded by `has`/`isMem` (checked in
+  `promising/mini/final-review.md` §1).  `MExec.ev` is well defined because `exec` (Ref.lean §3) only APPENDS to a
+  hart's event list, so every state that has event `e` has the same `e`.
 
 ## 6. Known STRONGER / WEAKER points
 
@@ -87,6 +94,12 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
   Weak/Prom/MachTornWit.lean); MiniMach cannot tear (one message per word), so it is STRONGER than machine v2
   exactly on torn runs, which the reference excludes.  E2b carries `untorn run`; Machine.lean is unchanged until S3c.
 
+* `mini_forbidden_lbdd` / `mini_forbidden_mpFF` are STRONGER than the full stack's `ref_lbdd` / `ref_mpFF`: they
+  cover EVERY finite partial execution (any number of steps per hart, no halting, no `wf` premise), not only complete
+  runs (`forbiddenRef`/`progExec`); `ref_lbdd`/`ref_mpFF` are recovered from them (§8).
+* `mini_adequacy` omits A0's exports (iv) `Valid` and (vi) `adExact`: the protocol is trivial and F has no A/D
+  class, so both are vacuous (Adeq.lean header).
+
 ## 7. Two notes from P2-D
 
 * THE CUT RE-SOURCES LATE LOADS.  `mini_prefix` keeps every event of the infinite execution up to each observed
@@ -97,7 +110,19 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
   `slti`/`sltiu` with `imm ≥ 2^64` they differ, so L4 needs `imm < 2^64`.  Real RISC-V immediates are 12-bit: a scope
   artefact, now part of `MProg.wf` ([MiniP3 (0)]).
 
-## 8. Cross-checks with the full stack (EqHead.lean)
+## 8. Which layers are PROVED EQUAL to the full stack (your ruling: "Proved equal on the fragment")
+
+| layer | mini theorem(s) | full counterpart | equality with the full stack |
+|---|---|---|---|
+| L1 reference | `miniExec`, `miniCut` (Ref.lean) | `infExec`, `partExec`, `progExec` | **yes**: E1 both directions — `e1a`/`e1b` EqRef.lean:275/:303, `e1aCut`/`e1bCut` EqRefCut.lean:285/:313, `e1aLF`/`e1bLF` EqRefLF.lean:235/:261 |
+| L2 machine | `miniValidRun` (Mach.lean) | `PF.validRun (xStep …)` | **yes**: E2 both directions — `e2a`/`e2b` EqMach.lean:454/:485 (`e2b` on UNTORN runs, [OWN.P19]) |
+| L3 logic | `mini_adequacy` (Adeq.lean:123) | `PF.adequacy` (CoreAdeq.lean:140) | **no equality theorem**: proved afresh in A0 shape |
+| L4 completeness | `mini_complete` (CmpMain.lean:256) | `rvwmo_complete` (loop-free only) | **no equality theorem**: proved afresh (with loops); the plan's loop-free corollary L4(a) was NOT built |
+| L5 prefix lemma | `mini_prefix` (PfxMain.lean:155) | `rvwmo_prefix` | **no equality theorem**: proved afresh |
+
+The only tie of L3–L5 to the full stack is the recovery of the full-stack VERDICTS below.
+
+## 9. Cross-checks with the full stack (EqHead.lean)
 
 `lbddP.toTest Lit.lbdd.cond = Lit.lbdd`, `mpFFP.toTest Lit.mpFF.cond = Lit.mpFF`, `loopP.toTest tLoop.cond = tLoop`,
 `loopP.xs = xsLoop`, `lbddP = lbddM` (all `rfl`).  From the mini headlines via E1: `ref_lbdd_of_mini : forbiddenRef
