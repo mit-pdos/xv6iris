@@ -116,11 +116,12 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
 |---|---|---|---|
 | L1 reference | `miniExec`, `miniCut` (Ref.lean) | `infExec`, `partExec`, `progExec` | **yes**: E1 both directions — `e1a`/`e1b` EqRef.lean:275/:303, `e1aCut`/`e1bCut` EqRefCut.lean:285/:313, `e1aLF`/`e1bLF` EqRefLF.lean:235/:261 |
 | L2 machine | `miniValidRun` (Mach.lean) | `PF.validRun (xStep …)` | **yes**: E2 both directions — `e2a`/`e2b` EqMach.lean:454/:485 (`e2b` on UNTORN runs, [OWN.P19]) |
-| L3 logic | `mini_adequacy` (Adeq.lean:123) | `PF.adequacy` (CoreAdeq.lean:140) | **no equality theorem**: proved afresh in A0 shape |
-| L4 completeness | `mini_complete` (CmpMain.lean:256) | `rvwmo_complete` (loop-free only) | **no equality theorem**: proved afresh (with loops); the plan's loop-free corollary L4(a) was NOT built |
-| L5 prefix lemma | `mini_prefix` (PfxMain.lean:155) | `rvwmo_prefix` | **no equality theorem**: proved afresh |
+| L3 logic | `mini_adequacy` (Adeq.lean:123) | `PF.adequacy` (CoreAdeq.lean:140) | a THEOREM, re-proved in Mini (A0 shape); its full-machine reading = `mini_adequacy` + E2 (not written out) |
+| L4 completeness | `mini_complete` (CmpMain.lean:256) | `rvwmo_complete` (loop-free only) | a THEOREM, re-proved in Mini (with loops); its full reading = `mini_complete` + E1 + E2 (the plan's loop-free corollary L4(a), not written out) |
+| L5 prefix lemma | `mini_prefix` (PfxMain.lean:155) | `rvwmo_prefix` | a THEOREM, re-proved in Mini; its full reading = `mini_prefix` + E1 (not written out) |
 
-The only tie of L3–L5 to the full stack is the recovery of the full-stack VERDICTS below.
+Only DEFINITIONS need equality theorems (they are what you trust): L1 and L2, by E1/E2. L3–L5 are theorems Lean
+checks; their full-stack readings follow from E1/E2 and are exercised end to end by the recovered VERDICTS below.
 
 ## 9. Cross-checks with the full stack (EqHead.lean)
 
