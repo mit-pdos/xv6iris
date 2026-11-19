@@ -64,6 +64,8 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
 * `Run.lean` (beyond the 13 lines above), `Rules.lean` (leaf rules), `LitBase`/`LitLbdd`/`LitMpFF`/`LitLoop`
   (machine-level lemmas `mini_lit_*`, proved in MiniLogic), `HeadAlt.lean` (hart 1 of `loopP` alternates
   flag/data loads, machine and reference), `MachLb.lean`, `Wf.lean`, `*Check.lean`.
+* `AdeqPoweroff.lean` — `mini_adequacy_poweroff`, the power-off corollary (Ψ at every prefix of every hart's trace
+  of a run prefix that some continuation extends to a run with no outstanding promise).
 
 ## 5. Scope
 

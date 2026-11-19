@@ -3,8 +3,10 @@ Weak/Mini: axiom check of the P2-C deliverables (MiniLogic `mini_adequacy`, the 
 example lemmas).  Expected: `[propext, Classical.choice, Quot.sound]` or fewer.
 -/
 import Weak.Mini.LitLoop
+import Weak.Mini.AdeqPoweroff
 
 #print axioms Weak.Mini.Logic.mini_adequacy
+#print axioms Weak.Mini.Logic.mini_adequacy_poweroff
 #print axioms Weak.Mini.Logic.wp_alui
 #print axioms Weak.Mini.Logic.wp_alu
 #print axioms Weak.Mini.Logic.wp_load

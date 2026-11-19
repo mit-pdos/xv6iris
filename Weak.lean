@@ -1009,6 +1009,7 @@ import Weak.Prom.InfLoop
 import Weak.Prom.InfLoopWit
 import Weak.Prom.MachTornWit
 import Weak.Mini.Adeq
+import Weak.Mini.AdeqPoweroff
 import Weak.Mini.CmpBase
 import Weak.Mini.CmpCheck
 import Weak.Mini.CmpHart
