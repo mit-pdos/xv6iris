@@ -1052,6 +1052,7 @@ import Weak.Mini.PfxMain
 import Weak.Mini.PfxRank
 import Weak.Mini.PfxTaint
 import Weak.Mini.PfxVal
+import Weak.Mini.PoweroffWit
 import Weak.Mini.Prog
 import Weak.Mini.Ref
 import Weak.Mini.Rules

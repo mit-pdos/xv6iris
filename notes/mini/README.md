@@ -66,6 +66,8 @@ wrappers of `Head.forbiddenLbdd`/`Head.forbiddenMpFF`/`Head.infMpLoop`, so their
   flag/data loads, machine and reference), `MachLb.lean`, `Wf.lean`, `*Check.lean`.
 * `AdeqPoweroff.lean` — `mini_adequacy_poweroff`, the power-off corollary (Ψ at every prefix of every hart's trace
   of a run prefix that some continuation extends to a run with no outstanding promise).
+* `PoweroffWit.lean` — the power-off witness pair (A: LB prefix with an outstanding promise that a continuation
+  fulfils; B: LB + `fence r,w`, same prefix, no continuation).
 
 ## 5. Scope
 
