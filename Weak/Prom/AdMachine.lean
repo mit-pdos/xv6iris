@@ -33,9 +33,9 @@ stays off in the mainline.  This variant exists to test whether track (b)'s reor
   class is ENCODED as `.cmo .clean 0` with a NON-EMPTY data list: no v2 arm fulfils such a message (the only arm
   taking a `.cmo` class, `memStep.cmo`, needs `data = []`), and `cmoAt` never sees it (length 0 covers no byte).
   So `.ad` is fixed at the promise and matched only by the A/D arm, which fulfils nothing else: INERT, as M20 (5).
-* FETCH: v2's fetch arm exempts an "own already-fulfilled store (a po-earlier store of the hart)" from the fetch
-  view (Machine.lean `fetchView`).  An A/D write is "a gmo store outside po and ppo" (plan M20, Reference), so it is
-  no such store: `ownDoneV` excludes the `.ad` class.  FAITHFUL to the reading recorded at `fetchView`.
+* FETCH: [MachZiccid] the variant's fetch arm IS v2's Ziccid arm (fetch view `vf`, the latest write at or below
+  `vf` per byte, post `Nfr.F.fetchPost vf`).  The former own-store exemption (`ownDoneV`, which excluded the `.ad`
+  class from v2's `ownDone`) is gone with v2's: an A/D write at `t ≤ vf` is a gmo store like any other.
 
 The variant's runs (`pmStepV`, `validRunV`) are machine v2's with this label alphabet (`VLabel`) and events
 (`VEvt`).  No `sorry`, no axiom, no `native_decide`.
@@ -61,23 +61,9 @@ inductive VLabel where
 /-- Timestamp `t` of `M` is an A/D message. -/
 def adAt (M : List PMsg) (t : Nat) : Prop := ∃ m, M[t - 1]? = some m ∧ m.cls = PClass.ad
 
-/-- The fetch view's own-store exemption WITHOUT A/D writes (an A/D write is not a po-earlier store). -/
-def ownDoneV (log : List PMsg) (i : Nat) (prom : GSet Nat) (t : Nat) : Bool :=
-  ownDone log i prom t &&
-    (match log[t - 1]? with
-     | some m => !(decide (m.cls = PClass.ad))
-     | none => false)
-
-/-- The variant's fetch view (Machine.lean `fetchView` with `ownDoneV`). -/
-def fetchViewV (log : List PMsg) (i : Nat) (prom : GSet Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
-  bytesMax (fun _ t => if ownDoneV log i prom t then 0 else t) base tvs
-
-/-- The variant's fetch post (Machine.lean arm `fetch` with `fetchViewV`), against log `L` and promises `prom`. -/
-def fetchPostV (L : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (base : Int)
-    (tvs : List (Nat × BitVec 8)) : PState :=
-  { ws with
-    wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
-    wIfv := max ws.wIfv (fetchViewV L i prom base tvs) }
+/-- [MachZiccid] The variant's fetch post: v2's (`Nfr.F.fetchPost`).  (`ownDoneV`/`fetchViewV` removed.) -/
+abbrev fetchPostV (vf : Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) : PState :=
+  Nfr.F.fetchPost vf ws base tvs
 
 /-- THE A/D READ of one byte for an update at `ts` (supervisor.adoc:1622–1624; M20 (2)): the byte holds `v` at `t`,
 `t < ts` (the write's only pre-view), and no write by ANY agent to the byte lies in `(t, ts)`. -/
@@ -88,15 +74,16 @@ section memstep
 
 variable (img : Image) (log : List PMsg) (i : Nat)
 
-/-- THE VARIANT'S MEMORY HALF: v2's arms except the fetch, the fetch with `fetchViewV`, and the A/D arm. -/
+/-- THE VARIANT'S MEMORY HALF: v2's arms except the fetch, the fetch ([MachZiccid] v2's Ziccid arm), and the A/D
+arm. -/
 inductive memStepV : GSet Nat → PState → VLabel → Option Nat → PState → GSet Nat → Prop
   /-- Every non-fetch arm of machine v2, unchanged. -/
   | v2 (prom : GSet Nat) (ws : PState) (l : PLabel) (ots : Option Nat) (ws' : PState) (prom' : GSet Nat) :
       memStep img log i prom ws l ots ws' prom' → ¬ Nfr.F.isFetch l → memStepV prom ws (.v l) ots ws' prom'
-  /-- Machine v2's fetch arm, the own-store exemption without A/D writes. -/
-  | fetch (prom : GSet Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) :
-      bytesAll (fetchByteOk img log ws) base tvs →
-      memStepV prom ws (.v (LIFetch base tvs)) none (fetchPostV log i prom ws base tvs) prom
+  /-- Machine v2's fetch arm ([MachZiccid] the Ziccid arm, premises `Nfr.F.fetchAt`). -/
+  | fetch (prom : GSet Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (vf : Nat) :
+      Nfr.F.fetchAt img log ws vf base tvs →
+      memStepV prom ws (.v (LIFetch base tvs)) none (fetchPostV vf ws base tvs) prom
   /-- THE A/D UPDATE (`WPAd`/`WPAspec`, M20 (2), (3), (5)): fulfils its `.ad` promise `ts`; atomic against every
   write (`adReadOk`); NO view effect, NO COH; post: the promise is consumed, nothing else. -/
   | ad (prom : GSet Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (data : List (BitVec 8))

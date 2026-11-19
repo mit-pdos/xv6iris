@@ -277,22 +277,17 @@ theorem nf_simT {w : OW P V} {N : Nat} :   -- [retype Own.nf_simF]
         rw [e2]
         exact tr_st _ i l _ σ.tr (fun h => by rw [tr_prom]; exact htr h) h)
     exact ⟨1 + k, tp', σ'', nsteps_transT (nsteps_oneT hstep) h1, by simpa using h2⟩
-  | fet c i ag b tvs st' d' es c2 hag hp hok hrest ih =>
+  | fet c i ag b tvs st' d' vf es c2 hag hp hok hrest ih =>   -- [MachZiccid] `vf`
     intro hpre tp σ es0 hs
     obtain ⟨himg, hlog, hle, hlen, htp, hagN, hprN, hh, htr⟩ := hs
     have hiN : i < N := by rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hag).1
     obtain ⟨ag', a1, a2, a3⟩ := hh i hiN
     rw [hag] at a1; cases a1
-    have hws : fetchPost c.pcLog i ag.paProm ag.paWs b tvs =
-        { ag.paWs with
-          wIfr := max ag.paWs.wIfr (bytesMax (fun _ t => t) b tvs)
-          wIfv := max ag.paWs.wIfv (fetchView (w.M.take σ.o.n) i (σ.o.pr i) b tvs) } := by
-      unfold fetchPost; rw [hlog, a3]
     have hf : hstepO w i σ.o ag.paSt ag.paWs (LIFetch b tvs) none st'
-        (fetchPost c.pcLog i ag.paProm ag.paWs b tvs) σ.o := by
-      rw [hws]; exact .fetch σ.o _ _ b tvs st' hp (himg ▸ hok)
+        (fetchPost vf ag.paWs b tvs) σ.o :=
+      .fetch σ.o _ _ b tvs st' vf hp hok.1 hok.2.1 (himg ▸ hok.2.2)   -- [MachZiccid]
     let σ' : TSt V := ⟨σ.o, upd σ.tr i (recE (σ.tr i) (LIFetch b tvs, none))⟩
-    have hstep : Step (tp, σ) [] (tp.set i (.hart w i st' (fetchPost c.pcLog i ag.paProm ag.paWs b tvs)), σ') := by
+    have hstep : Step (tp, σ) [] (tp.set i (.hart w i st' (fetchPost vf ag.paWs b tvs)), σ') := by
       have := step_update_of_getElem? (Λ := (inferInstance : Language (TExpr P V) (TSt V) Unit V))
         (obs := []) (efs := []) σ σ' a2
         (tstep.hst w i ag.paSt ag.paWs σ (LIFetch b tvs) none st' _ σ.o hf)
@@ -300,7 +295,7 @@ theorem nf_simT {w : OW P V} {N : Nat} :   -- [retype Own.nf_simF]
       exact this
     have hiN' : i ≠ N := by omega
     obtain ⟨k, tp', σ'', h1, h2⟩ := ih hpre
-      (tp.set i (.hart w i st' (fetchPost c.pcLog i ag.paProm ag.paWs b tvs))) σ'
+      (tp.set i (.hart w i st' (fetchPost vf ag.paWs b tvs))) σ'
         (es0 ++ [.st i (LIFetch b tvs) none]) (by
       refine ⟨himg, hlog, hle, by rw [List.length_set]; exact hlen, by rw [List.length_set]; exact htp, ?_,
         hprN, fun h hN => ?_, fun h => tr_st es0 i _ _ σ.tr htr h⟩

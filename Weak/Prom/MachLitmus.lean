@@ -31,8 +31,15 @@ drops the run and is COUNTED (`Res.oos`), the scope of RefProg's `condsOk`.  Ref
 (`loadAqPc`/`storeRlPc`) are out of scope (no v2 label).
 
 **Where this differs from going through Sail (`Weak/Prom/Emit.lean`; the gap milestone 3 closes):**
-1. No `LIFetch`: every fetch reads the image at timestamp 0 in a litmus program (code is never written), and a
-   timestamp-0 fetch has no view effect (`fetchView` = 0, `wIfr` stays 0); `LFenceI` is still emitted.
+1. No `LIFetch`: every fetch reads the image at timestamp 0 in a litmus program (code is never written).
+   [MachZiccid] Under the Ziccid fetch arm a fetch DOES have a view effect: it sets the monotone fetch view
+   `wIfv := vf ≥ max wIfv wIfl`, and every later access is above it; after a FENCE.I (`wIfl ⊔= vrOld ⊔ vwOld`) the
+   next fetch orders every older access before every younger one (Machine.lean `fenceIPost`, FAITHFUL (Ziccid),
+   STRONGER than Zifencei).  The fetch-free level does not see this: `LFenceI` is still emitted and raises only
+   `wIfl`, which nothing here reads.  So for programs with `fence.i` this level is WEAKER than the Sail level (it
+   allows outcomes the Sail-level machine forbids); without `fence.i` the two agree on the fetch (`vf = 0` is
+   always admissible for an image fetch from a state with `wIfv = wIfl = 0`, MachZiccidCyc.lean
+   `fetch_image_vf0`).
 2. AMOs are the FUSED `LRmw`; Sail emits the split pair `LAmoLd`/`LAmoSt` through the `wRmw` slot (M10; the
    equivalence is S1M-proof's `amoSplitFused`, M10 (4)).
 3. Silent labels (announce, register reads) are omitted; `LCtrl []` (Sail's `nextPC` write of a non-branch) is

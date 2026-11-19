@@ -457,24 +457,26 @@ def succAmoSt (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (rl : 
       ⟨LAmoSt rl base data asrc vsrc, some ts,
         { amoPost (storeRun ws rl va ts base data.length ts) R.rmAq ts with wRmw := none }, prom \ {ts}⟩)
 
-/-- `memStep.fetch`: every byte from every timestamp it is admissible at (`fetchByteOk`), complete by brute
-force (a byte's timestamp is at most `|log|`). -/
+/-- `memStep.fetch` ([MachZiccid] the Ziccid arm): every fetch view `vf ∈ [max wIfv wIfl, |log|]` and, per `vf`,
+every byte admissible at it (`fetchByteOk … vf`: the latest write at or below `vf`), complete by brute force (a
+byte's timestamp is at most `vf`).  Was: every byte above the FENCE.I floor `wIfl`, any view. -/
 def succFetch (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (base : Int) (sz : Nat) :
     List Succ :=
-  let opts := (List.range sz).map (fun k : Nat =>
+  let opts := fun vf : Nat => (List.range sz).map (fun k : Nat =>
     let a := base + (k : Int)
-    (List.range (log.length + 1)).filterMap (fun t =>
+    (List.range (vf + 1)).filterMap (fun t =>
       match memByte img log t a with
-      | some v => if !writesInB log a t ws.wIfl then some (t, v) else none
+      | some v => if !writesInB log a t vf then some (t, v) else none
       | none => none))
   let rec prod : List (List (Nat × BitVec 8)) → List (List (Nat × BitVec 8))
     | [] => [[]]
     | os :: rest => (prod rest).flatMap (fun tl => os.map (· :: tl))
-  (prod opts).map (fun tvs =>
-    ⟨LIFetch base tvs, none,
-      { ws with
-        wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
-        wIfv := max ws.wIfv (fetchView log i prom base tvs) }, prom⟩)
+  ((List.range (log.length + 1)).filter (fun vf => decide (max ws.wIfv ws.wIfl ≤ vf))).flatMap (fun vf =>
+    (prod (opts vf)).map (fun tvs =>
+      ⟨LIFetch base tvs, none,
+        { ws with
+          wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
+          wIfv := vf }, prom⟩))
 
 def rdSuccs (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) :
     RdK → Int → Nat → List Succ

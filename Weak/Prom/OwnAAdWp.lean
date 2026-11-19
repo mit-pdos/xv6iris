@@ -33,15 +33,7 @@ variable {P D V : Type} {hlc : HasLC}
 
 /-! ## 1. Pure lemmas -/
 
-/-- The variant's fetch view is below the fetch sources (CoreFwd.lean `fetchView_le`). -/
-theorem fetchViewV_le (log : List PMsg) (i : Nat) (prom : GSet Nat) :
-    ∀ (base : Int) (tvs : List (Nat × BitVec 8)), Ad.fetchViewV log i prom base tvs ≤ bytesMax (fun _ t => t) base tvs
-  | _, [] => Nat.le_refl _
-  | a, (t, _) :: r => by
-    have ih := fetchViewV_le log i prom (a + 1) r
-    unfold Ad.fetchViewV at ih ⊢
-    simp only [bytesMax]
-    split <;> omega
+-- [MachZiccid] `fetchViewV_le` removed with `fetchViewV`; the fetch sources are below `vf` (`fetch_srcs_le`).
 
 /-- `stage ≥ WF ⊢ Valid(WF)` over the variant (plan §3 second rule, `ValidInduction` bounded at `WF`). -/
 theorem valid_frontV {π : Proto} {img : Image} {M : List PMsg} {Ψ : Nat → Trace → Prop} {n : Nat} {σ : CSt}
@@ -56,7 +48,7 @@ theorem valid_frontV {π : Proto} {img : Image} {M : List PMsg} {Ψ : Nat → Tr
       rw [hout k (by omega)] at he; cases he
     exact (hf.2 k hk).2.1 e he t het
 
-/-- `cFacts` survive a v2-label step of the variant (the fetch arm with `fetchViewV`). -/
+/-- `cFacts` survive a v2-label step of the variant ([MachZiccid] the fetch arm is v2's Ziccid arm). -/
 theorem cFactsV_step {π : Proto} {img : Image} {M : List PMsg} {Ψ : Nat → Trace → Prop} {n : Nat} {σ : CSt}
     {h : Nat} {l : PLabel} {ots : Option Nat} {ws' : PState} {pr' : GSet Nat}
     (hf : cFacts π img M Ψ n σ) (hh : h < n)
@@ -65,13 +57,14 @@ theorem cFactsV_step {π : Proto} {img : Image} {M : List PMsg} {Ψ : Nat → Tr
     cFacts π img M Ψ n (updS σ h (ws', pr', (σ h).2.2 ++ [(l, ots)])) := by
   by_cases hfe : Nfr.F.isFetch l
   · obtain ⟨b, tvs, rfl⟩ := hfe
-    obtain ⟨_, rfl, rfl, rfl⟩ := Ad.memStepV_fetch_inv hm
+    obtain ⟨vf, hokf, rfl, rfl, rfl⟩ := Ad.memStepV_fetch_inv hm   -- [MachZiccid]
     refine ⟨hf.1, fun k hk => ?_⟩
     by_cases e : k = h
     · subst e
       rw [updS_self]
       obtain ⟨hΨ, hp, hfi, hfk⟩ := hf.2 k hk
-      have hv := fetchViewV_le M k (σ k).2.1 b tvs
+      have hv := fetch_srcs_le b tvs hokf.2.2
+      have hv1 := hokf.1
       refine ⟨fun j => ?_, fun e he t het => ?_, ?_, ?_⟩
       · by_cases hj : j ≤ (σ k).2.2.length
         · rw [List.take_append_of_le_length hj]; exact hΨ j
@@ -79,8 +72,9 @@ theorem cFactsV_step {π : Proto} {img : Image} {M : List PMsg} {Ψ : Nat → Tr
       · rcases List.mem_append.1 he with he | he
         · exact hp e he t het
         · rw [List.mem_singleton] at he; subst he; cases het
-      · unfold fetchInv at hfi ⊢; simp only [Ad.fetchPostV]; omega
-      · exact fwdKnow_keep (ws := (σ k).1) rfl (plainFloor_of (Nat.le_refl _) (by simp only [Ad.fetchPostV]; omega)) hfk
+      · unfold fetchInv at hfi ⊢; simp only [Ad.fetchPostV, Nfr.F.fetchPost]; omega
+      · exact fwdKnow_keep (ws := (σ k).1) rfl (plainFloor_of (Nat.le_refl _)
+          (by simp only [Ad.fetchPostV, Nfr.F.fetchPost]; omega)) hfk
     · rw [updS_ne σ _ e]; exact hf.2 k hk
   · exact cFacts_step hf hh (Ad.memStepV_v_inv hm hfe) hok
 

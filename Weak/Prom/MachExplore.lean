@@ -82,6 +82,10 @@ def bytesAllB (P : Int → Nat → BitVec 8 → Bool) : Int → List (Nat × Bit
   | _, [] => true
   | a, (t, v) :: r => P a t v && bytesAllB P (a + 1) r
 
+/-- [MachZiccid] `bytesAll (fetchByteOk img log vf)` (the Ziccid fetch arm's byte premise) as a Bool. -/
+def fetchOkB (img : Image) (log : List PMsg) (vf : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Bool :=
+  bytesAllB (fun a t v => memByte img log t a == some v && decide (t ≤ vf) && !writesInB log a t vf) base tvs
+
 /-- `loadOk` as a Bool. -/
 def loadOkB (img : Image) (log : List PMsg) (ws : PState) (vpre : Nat) (base : Int)
     (tvs : List (Nat × BitVec 8)) : Bool :=
@@ -212,7 +216,7 @@ def fixPost (ws : PState) : PLabel → Option PState
   | LDev _ _ _ _ _ => some ws
   | LRegW rd srcs => some { ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }
   | LCtrl srcs => some { ws with wVcap := max (srcsView ws srcs) ws.wVcap }
-  | LInstr => some { ws with wLdv := 0, wRmw := none, wIfv := 0 }
+  | LInstr => some { ws with wLdv := 0, wRmw := none }   -- [MachZiccid] `wIfv` kept
   | LExFail => some { ws with wRes := none }
   | _ => none
 

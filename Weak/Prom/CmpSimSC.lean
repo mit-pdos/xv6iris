@@ -88,7 +88,7 @@ theorem sim_storeRl (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp w
   rw [hws2] at f7 f10
   refine ⟨simInv_mk hwf' hfut (by simp [hinv.prog]) (by simp [hinv.pc]) rfl hinv.lpLen (fun r => hinv.regEq r)
     (fun r => hinv.regLt r) (fun r h0 h32 => ?_) ?_ (by show (instrE _).wLdv = 0; rfl)
-    (by show (instrE _).wIfv = 0; rfl), ?_⟩
+    (by show (instrE _).wIfv = 0; rw [← hws2]; exact f9.trans hinv.ifv), ?_⟩   -- [MachZiccid]
   · have : regv ([LInstr].foldl afEff ws2) r = regv ws r := by
       unfold regv; show (get? ws2.wRegv r).getD 0 = _; rw [f7]
     rw [this]; exact hinv.regv r h0 h32
@@ -284,7 +284,7 @@ theorem sim_scOk (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
   obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12⟩ :=
     regWE_sc_fields { ws2 with wLdv := max 0 ts, wRes := none } rd [.DLdRes]
   refine ⟨simInv_mk hwf' hfut (by simp [hinv.prog]) (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen])
-    ?_ ?_ ?_ ?_ g10 g11, ?_⟩
+    ?_ ?_ ?_ ?_ g10 (g11.trans (by rw [← hws2]; exact f9.trans hinv.ifv)), ?_⟩   -- [MachZiccid]
   · intro r
     rw [SSt.adv_rd]
     exact regs_wr (s := s.emit _) hinv.lpLen hinv.wf.len (fun r => by rw [SSt.emit_rd]; exact hinv.regEq r) rd 0 _
@@ -345,7 +345,7 @@ theorem sim_scFail (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws
     have : j = s.evs.length := by omega
     subst this; rw [hsk]; rfl
   refine ⟨inv_nomem hinv hwf' hfut (by rw [hn1]; omega) (by rw [hn1]; exact hnm) (by simp [hinv.prog])
-    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ g1 g2 ?_ ?_ ?_ g6 g7 g10 g11, ?_⟩
+    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ g1 g2 ?_ ?_ ?_ g6 g7 g10 (g11.trans hinv.ifv), ?_⟩   -- [MachZiccid]
   · intro r
     rw [SSt.adv_rd]
     exact regs_wr (s := s.emit _) hinv.lpLen hinv.wf.len (fun r => by rw [SSt.emit_rd]; exact hinv.regEq r) rd 1 _

@@ -19,3 +19,4 @@ Weak/Prom/PfxAxioms.lean       # audit printer: `#print axioms` only, no declara
 Weak/Prom/AmoTightCex.lean     # executable counterexample to amoTightV2 (failed amocas, run with lake env lean --run); evidence only
 Weak/Prom/EbCheck.lean         # audit printer: `#print axioms` only, no declarations (G4 experiment E-b)
 Weak/Prom/EcCheck.lean         # audit printer: `#print axioms` only, no declarations (G4 experiment E-c)
+Weak/Prom/SailS0Check.lean     # [MachZiccid] spike S-0 `#eval` checks only (assembled mpFF words, boot facts), no declarations a theorem uses

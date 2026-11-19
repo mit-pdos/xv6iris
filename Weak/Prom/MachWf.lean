@@ -321,7 +321,7 @@ theorem memStep_bnd {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
     refine ⟨?_, hw⟩
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr h6 (Nat.zero_le _) hR (fun R hR' => by cases hR') h8 h9
-      (Nat.zero_le _)
+      h10   -- [MachZiccid] `LInstr` keeps `wIfv`
   | lr aq rl base tvs asrc hok vi hvi =>
     refine ⟨?_, hw⟩
     have hrv := readViewV_le (aq := aq) (rl := rl) hb (hsv asrc) (invalCite_le hvi) (loadOk_ts hok)
@@ -344,19 +344,14 @@ theorem memStep_bnd {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} 
     refine ⟨?_, hw⟩
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 (fun R hR' => by cases hR') hM h8 h9 h10
-  | fetch base tvs hok =>
+  | fetch base tvs vf _ hvl hok =>   -- [MachZiccid] `wIfv := vf ≤ |log|` directly
     refine ⟨?_, hw⟩
     have hts : bytesAll (fun _ t _ => t ≤ log.length) base tvs :=
       bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) base tvs hok
     have e1 : bytesMax (fun _ t => t) base tvs ≤ log.length := bytesMax_le base tvs hts
-    have e2 : fetchView log i prom base tvs ≤ log.length := by
-      unfold fetchView
-      refine bytesMax_le base tvs (bytesAll_mono (fun _ t _ ht => ?_) base tvs hts)
-      split <;> omega
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := hb
-    refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 hR hM h8 ?_ ?_
-    · simp only; omega
-    · simp only; omega
+    refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 hR hM h8 ?_ hvl
+    simp only; omega
   | cmo k base len asrc ts hts hm hcoh hpre =>
     have hts' := (hw ts hts).2.1
     exact ⟨cmoPost_bnd hb (hsv _) hts', promWf_diff ts hw⟩

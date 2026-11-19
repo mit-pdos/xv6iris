@@ -164,7 +164,7 @@ def afOk : PLabel → Bool
 /-- Their memory half, as a function (Machine.lean `memStep`'s `regW`, `instr`, `fence`, `ctrl`, `fenceI`). -/
 def afEff (ws : PState) : PLabel → PState
   | LRegW rd srcs => { ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }
-  | LInstr => { ws with wLdv := 0, wRmw := none, wIfv := 0 }
+  | LInstr => { ws with wLdv := 0, wRmw := none }   -- [MachZiccid] keeps `wIfv`
   | LFence pr pw sr sw => fencePost ws pr pw sr sw
   | LCtrl srcs => { ws with wVcap := max (srcsView ws srcs) ws.wVcap }
   | LFenceI => fenceIPost ws

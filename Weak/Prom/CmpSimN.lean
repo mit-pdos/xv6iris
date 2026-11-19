@@ -118,7 +118,8 @@ theorem sim_alui (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd (srcR rs1)
   refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
-    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
+    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl
+    ((instrE_regWE_ifv _ _ _).trans hinv.ifv)   -- [MachZiccid] `LInstr` keeps `wIfv`
   · intro r
     rw [LP.rd_set, SSt.adv_rd]
     exact regs_wr hinv.lpLen hinv.wf.len hinv.regEq rd _ _ (by rw [hv, hev1, Nat.mod_eq_of_lt (hev1 ▸ hvlt)]) r
@@ -156,7 +157,8 @@ theorem sim_alu (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws pr
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd (srcR rs1 ++ srcR rs2)
   refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
-    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
+    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl
+    ((instrE_regWE_ifv _ _ _).trans hinv.ifv)   -- [MachZiccid] `LInstr` keeps `wIfv`
   · intro r
     rw [LP.rd_set, SSt.adv_rd]
     exact regs_wr hinv.lpLen hinv.wf.len hinv.regEq rd _ _
@@ -189,7 +191,8 @@ theorem sim_csrr (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws p
   obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := regWE_fields ws rd []
   refine ⟨_, _, _, _, hsolo, by rw [machRow_af _ (regWL_af _ _)]; simp [rowSeg_self], ?_, keepRR_regWE _ _ _⟩  -- S3b
   refine inv_nomem hinv hwf' hfut (by simp) (fun j h1 h2 => by simp at h2; omega) (by rw [lp_after, hinv.prog])
-    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl rfl
+    (by simp [hinv.pc]) rfl (by simp [LP.wr_len, hinv.lpLen]) ?_ ?_ ?_ f1 f2 ?_ ?_ ?_ (fun x => f7 x) f6 rfl
+    ((instrE_regWE_ifv _ _ _).trans hinv.ifv)   -- [MachZiccid] `LInstr` keeps `wIfv`
   · intro r
     rw [LP.rd_set, SSt.adv_rd]
     exact regs_wr hinv.lpLen hinv.wf.len hinv.regEq rd _ _ rfl r
@@ -240,7 +243,7 @@ theorem sim_jmp (hinv : SimInv T X ν h sf s lp ws prom) {tgt : Nat}
     simp only [Ref.StepR.next.injEq] at hs
     subst hs
     refine sim_plain hinv hi hwf' hfut rfl rfl tgt rfl [LInstr] (by simp) (fun l => ?_) (by simp [afOk])
-      ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, rfl⟩
+      ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, hinv.ifv⟩
       (fun j h1 h2 h3 => hinv.vcap j h1 h2 h3)
     simp only [instrNext, hinv.pc, hinv.prog]
     rw [if_neg hc]
@@ -253,7 +256,7 @@ theorem sim_nop (hinv : SimInv T X ν h sf s lp ws prom) (hi : (T.prog h)[s.pc]?
   simp only [stepI, Ref.StepR.next.injEq] at hs
   subst hs
   exact sim_plain hinv hi hwf' hfut rfl rfl (lp.pc + 1) (by simp [hinv.pc]) [LInstr] (by simp) (fun l => rfl)
-    (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, rfl⟩
+    (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, hinv.ifv⟩
     (fun j h1 h2 h3 => hinv.vcap j h1 h2 h3)
 
 /-- `fence.i` (no data-memory ordering; its fetch floor `wIfl` is not in the invariant). -/
@@ -264,7 +267,7 @@ theorem sim_fencei (hinv : SimInv T X ν h sf s lp ws prom) (hi : (T.prog h)[s.p
   simp only [stepI, Ref.StepR.next.injEq] at hs
   subst hs
   exact sim_plain hinv hi hwf' hfut rfl rfl (lp.pc + 1) (by simp [hinv.pc]) [LFenceI, LInstr] (by simp)
-    (fun l => rfl) (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, rfl⟩
+    (fun l => rfl) (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, hinv.ifv⟩
     (fun j h1 h2 h3 => hinv.vcap j h1 h2 h3)
 
 /-- A conditional branch, given the successor's shape: `vcap` captures the sources (rule 11). -/
@@ -280,7 +283,7 @@ theorem sim_brCore (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws
   have hpc' : (if brEval cc (lp.rd rs1) (lp.rd rs2) then tgt else lp.pc + 1) = s'.pc := by
     rw [hev1, hev2, hinv.pc, hpc]
   refine sim_plain hinv hi hwf' hfut hevs hregs _ hpc' [LCtrl (srcR rs1 ++ srcR rs2), LInstr] (by simp)
-    (fun l => ?_) (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, rfl⟩ ?_
+    (fun l => ?_) (by simp [afOk]) ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, hinv.ifv⟩ ?_
   · simp only [instrNext, hinv.pc, hinv.prog]
     rw [if_neg hc]
   · intro j h1 h2 h3

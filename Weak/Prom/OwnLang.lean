@@ -71,15 +71,16 @@ inductive hstepO (w : OW P V) (h : Nat) : OSt V → P → PState → PLabel → 
       memStep w.img (w.M.take (σ.n + 1)) h ({σ.n + 1} ∪ σ.pr h) ws l (some (σ.n + 1)) ws' pr' →
       hstepO w h σ s ws l (some (σ.n + 1)) s' ws' { σ with n := σ.n + 1, pr := upd σ.pr h pr' }
   /-- [E-b] THE PROPHECY-FED FETCH (G4 experiment E-b, NfrFetch.lean): an instruction fetch whose bytes are admissible
-  against the FINAL memory `M` (`fetchByteOk w.img w.M`: value and FENCE.I window read in `M`), not the prefix; the
-  post is Machine.lean's fetch post with the fetch view computed against the prefix and the hart's promise set
-  (equal to the machine's, NfrFetch.lean `fetchView_cut`).  No language-state change. -/
-  | fetch (σ : OSt V) (s : P) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (s' : P) :
-      w.pstep s () (LIFetch base tvs) s' () → bytesAll (fetchByteOk w.img w.M ws) base tvs →
+  against the FINAL memory `M` (`fetchByteOk w.img w.M vf`: value and window `(t, vf]` read in `M`), not the prefix;
+  [MachZiccid] the Ziccid arm's fetch view `vf` (`max wIfv wIfl ≤ vf ≤ |M|`) and post `wIfv := vf` (was: the
+  fetch view computed against the prefix and the hart's promise set, `fetchView_cut`).  No language-state change. -/
+  | fetch (σ : OSt V) (s : P) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (s' : P) (vf : Nat) :
+      w.pstep s () (LIFetch base tvs) s' () →
+      max ws.wIfv ws.wIfl ≤ vf → vf ≤ w.M.length → bytesAll (fetchByteOk w.img w.M vf) base tvs →   -- [MachZiccid]
       hstepO w h σ s ws (LIFetch base tvs) none s'
         { ws with
           wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
-          wIfv := max ws.wIfv (fetchView (w.M.take σ.n) h (σ.pr h) base tvs) } σ
+          wIfv := vf } σ
 
 /-- THE AGENT STEP: append `M[n]` as a promise of its author. -/
 def agentStep (w : OW P V) (σ σ' : OSt V) : Prop :=

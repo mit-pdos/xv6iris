@@ -460,7 +460,7 @@ theorem sim_amo (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws pr
       · rfl
       · exact absurd ((hrange x).2 ht) hout
   · rfl
-  · rfl
+  · rw [instrE_regWE_ifv]; exact a9.trans (i8.trans hinv.ifv)   -- [MachZiccid] `LInstr` keeps `wIfv`
   · -- prom
     intro tt
     rw [elemOfDifference, elemOfSingleton, hinv.prom tt, hn1]

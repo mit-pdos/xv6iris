@@ -125,8 +125,8 @@ def ΨK (M : List PMsg) (Q : Trace → Prop) (τ : Trace) : Prop := Q (memEv τ)
 def regWP (ws : PState) (rd : Nat) (srcs : List Dsrc) : PState :=
   { ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }
 
-/-- `LInstr`'s post (resets `wLdv`, the AMO slot and the fetch view). -/
-def instrR (ws : PState) : PState := { ws with wLdv := 0, wRmw := none, wIfv := 0 }
+/-- `LInstr`'s post (resets `wLdv` and the AMO slot; [MachZiccid] keeps the monotone fetch view `wIfv`). -/
+def instrR (ws : PState) : PState := { ws with wLdv := 0, wRmw := none }
 
 /-- `LCtrl srcs`'s post (rule 11). -/
 def ctrlP (ws : PState) (srcs : List Dsrc) : PState := { ws with wVcap := max (srcsView ws srcs) ws.wVcap }

@@ -211,7 +211,11 @@ theorem domF_srcR {X : Exec} {h : Nat} {s : SSt} {ws : PState}
 def regWE (ws : PState) (rd : Nat) (srcs : List Dsrc) : PState :=
   if rd = 0 then ws else { ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }
 
-def instrE (ws : PState) : PState := { ws with wLdv := 0, wRmw := none, wIfv := 0 }
+def instrE (ws : PState) : PState := { ws with wLdv := 0, wRmw := none }   -- [MachZiccid] keeps `wIfv`
+
+/-- [MachZiccid] `LInstr` keeps the fetch view (so `SimInv.ifv` is carried, not re-established). -/
+theorem instrE_regWE_ifv (ws : PState) (rd : Nat) (srcs : List Dsrc) : (instrE (regWE ws rd srcs)).wIfv = ws.wIfv := by
+  unfold instrE regWE; split <;> rfl
 
 theorem foldl_regWL (ws : PState) (rd : Nat) (srcs : List Dsrc) :
     (regWL rd srcs ++ [LInstr]).foldl afEff ws = instrE (regWE ws rd srcs) := by

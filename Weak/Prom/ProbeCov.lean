@@ -146,19 +146,17 @@ def amoStG (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (rl : Boo
        ("C-A.amoSt.p6", exclOkB log i base R.rmTs ts), ("C-A.amoSt.p7", cohBelowB ws base data.length ts),
        ("C-A.amoSt.p8", decide (pre < ts))])
 
-/-- `memStep.fetch` premise p1 and the fetch-view branches (Sail level). -/
+/-- `memStep.fetch` premises p1–p3 ([MachZiccid] the Ziccid arm: `max wIfv wIfl ≤ vf`, `vf ≤ |log|`, the bytes at
+`vf`), per fetch view `vf ≤ |log| + 1` and raw candidate (Sail level).  The `fetchView`/`ownDone` branches are gone. -/
 def fetchG (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (base : Int) (sz : Nat) :
     List (String × Bool) :=
+  let _ := (i, prom)
   let addrs := (List.range sz).map (fun k : Nat => base + (k : Int))
   let cands := (List.range (log.length + 1)).filterMap (fun t =>
     addrs.mapM (fun a => (memByte img log t a).map (fun v => (t, v))))
-  cands.flatMap (fun tvs =>
-    ("C-A.fetch.p1", bytesAllB (fun a t v => (memByte img log t a == some v) && !writesInB log a t ws.wIfl) base tvs) ::
-    tvs.flatMap (fun (t, _) =>
-      [("C-A.br.fetchView.if1", ownDone log i prom t)] ++
-      (match log[t - 1]? with
-       | some _ => [("C-A.br.ownDone.m1.some", true)]
-       | none => [("C-A.br.ownDone.m1.none", true)])))
+  (List.range (log.length + 2)).flatMap (fun vf =>
+    ("C-A.fetch.p1", decide (max ws.wIfv ws.wIfl ≤ vf)) :: ("C-A.fetch.p2", decide (vf ≤ log.length)) ::
+    cands.map (fun tvs => ("C-A.fetch.p3", fetchOkB img log vf base tvs)))
 
 /-- `memStep.cmo` premises p1–p4 (Sail level). -/
 def cmoG (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : PState) (k : CmoKind) (base : Int) (len : Nat)

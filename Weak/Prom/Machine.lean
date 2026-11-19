@@ -5,7 +5,9 @@ Plan: `~/dev/weak-orch/promising/plan.md` §1 (M0–M21) and §8 S1M; owner ruli
 permissive sentence allows), [OWN.P2] (instruction fetch and FENCE.I faithful to Zifencei), [OWN.P3] (OQ-1 punted:
 this increment covers programs that never enable address translation).  Quotes are from the RISC-V ISA manual
 `riscv/riscv-isa-manual` @ `e17d92a1` (copies in `~/dev/weak-orch/promising/spec/`): `rvwmo.adoc` (§rvwmo),
-`zalrsc.adoc`, `zaamo.adoc`, `zifencei.adoc`.
+`zalrsc.adoc`, `zaamo.adoc`, `zifencei.adoc`.  [MachZiccid] [OWN.P22] ("Ziccid rule now", context.md item 30)
+supersedes [OWN.P2] for instruction fetch and FENCE.I: `ziccid.adoc` (manual 418bdc49, unpriv/ziccid.adoc; copy in
+`~/dev/weak-orch/promising/herdcheck/manual/src/unpriv/`; ratified, optional, in no profile).
 
 A NEW machine: nothing here changes `Weak/WeakPromise.lean` (today's machine) or `Weak/WeakMem.lean`; only the
 vocabulary `Image`/`Dsrc` is shared.  Marks (plan §0): FAITHFUL = same behaviours as the reference; WEAKER = more
@@ -24,12 +26,18 @@ behaviours (sound); STRONGER = fewer (unsound for (T-cmp)); INERT = bookkeeping 
 
 ## Invariants the definitions are written to keep ([R7.s1])
 
-* Every arm is APPEND-STABLE: a premise reads the log only inside windows `(lo, hi]` whose upper end is a view or a
-  fulfilled timestamp (never the log length), so appending promised messages at the end never changes a state
-  step's admissibility.  No arm has a "latest message present" floor (`LLoad` has no `lat` field, SR-31).
-* Every arm is OWN-PROMISE-MONOTONE: the only premise that reads the promise set besides the fulfil membership is
-  `ownDone` ("this own message is already fulfilled"), which a NEW promise (a fresh timestamp) never changes.
+* Every arm is APPEND-STABLE (admissible against `log` ⇒ admissible against `log ++ ms`): a premise reads the log
+  only inside windows `(lo, hi]` whose upper end is a view or a fulfilled timestamp, so appending promised messages
+  at the end never changes a state step's admissibility.  [MachZiccid] The one premise mentioning the log length is
+  the fetch view bound `vf ≤ |log|` (arm `fetch`), monotone under append, required so that `(t, vf]` lies in the
+  current log.  No arm has a "latest message present" floor (`LLoad` has no `lat` field, SR-31).
+* Every arm is OWN-PROMISE-MONOTONE: [MachZiccid] no premise reads the promise set besides the fulfil membership
+  (the fetch arm's former own-store exemption `ownDone` is gone, ziccid.adoc "fetches do not observe the local
+  hart's stores before other harts' fetches can observe them").
 * `cfgWf` bounds every view, `wRes`, `wRmw` and the fetch views by the log length.
+* [MachZiccid] INSTRUCTION FETCH IS ZICCID'S ([OWN.P22], `memStep.fetch`, `fenceIPost`): FAITHFUL (Ziccid), STRONGER
+  than the Zifencei-only letter.  Every theorem over this machine is about a platform implementing Ziccid for
+  instruction fetch (coherent, cacheable RAM).
 
 ## Extension points left by [OWN.P3] (translation deferred; see PROGRESS-S1Mdef.md)
 
@@ -94,13 +102,6 @@ def writesIn (log : List PMsg) (a : Int) (lo hi : Nat) : Prop :=
 /-- `writesIn` restricted to authors satisfying `Q`. -/
 def writesInBy (log : List PMsg) (Q : Option Nat → Prop) (a : Int) (lo hi : Nat) : Prop :=
   ∃ t : Nat, lo < t ∧ t ≤ hi ∧ ∃ m, log[t - 1]? = some m ∧ (m.byteAt a).isSome = true ∧ Q m.tid
-
-/-- `ownDone log i prom t`: timestamp `t` is a message of agent `i` that `i` has already fulfilled, i.e. (in the
-state phase) a po-earlier store of `i`.  Used by the own-store exemption of PA-1f (`LIFetch`). -/
-def ownDone (log : List PMsg) (i : Nat) (prom : GSet Nat) (t : Nat) : Bool :=
-  match log[t - 1]? with
-  | some m => decide (1 ≤ t) && decide (m.tid = some i) && !(decide (t ∈ prom))
-  | none => false
 
 /-- Timestamp `t` is a cache-block operation covering byte `a` whose kind satisfies `p`. -/
 def cmoAt (log : List PMsg) (p : CmoKind → Bool) (t : Nat) (a : Int) : Prop :=
@@ -199,8 +200,10 @@ structure PRmw where
   current instruction's load-result view (`DLdRes`);
 * `wRes` — the LR reservation (M16; survives loads, stores, fences, AMOs and instruction boundaries);
 * `wRmw` — the AMO slot (M10 (1));
-* `wIfl` — the FETCH FLOOR raised by FENCE.I ([OWN.P2]); `wIfr` — the maximum source timestamp of every fetch so far
-  (FENCE.I orders earlier fetches before later ones); `wIfv` — the current instruction's fetch view (PA-1f).
+* `wIfl` — the FETCH FLOOR raised by FENCE.I ([OWN.P2]; [MachZiccid] Ziccid_fence-i_op); `wIfr` — the maximum
+  source timestamp of every fetch so far ([MachZiccid] INERT: no arm reads it any more; it is below `wIfv`); `wIfv` —
+  [MachZiccid] the hart's MONOTONE FETCH VIEW: the global-memory-order position of its latest fetch
+  (Ziccid_fetch_global_order), never reset.
 Dropped from today's `Wstate` (WeakMem.lean:320–334): `wPub`/`wRelp` (INERT: "no view effect reads `wPub`/`wRelp`
 except to compute them", WbPrimed.lean:17) and `wTbank` (M14: the W-TV bank is STRONGER; walks are deferred). -/
 structure PState where
@@ -266,14 +269,21 @@ rl set has both acquire-RCsc and release-RCsc annotations"; unpriv_zalasr.adoc:6
 acquire-RCsc annotation, and if the bit rl is set the instruction has a release-RCsc annotation".  Rule 7 with the
 release load as `b` adds nothing (rule 6 already orders every earlier operation).  The read half of an AMO passes
 `rl = false`: the AMO's release is its write half's (`stPre`), and the single op is one access at `ts` (M0).
-Mark: FAITHFUL. -/
+Mark: FAITHFUL.
+[MachZiccid] `wIfv` is now the hart's monotone fetch view (the position of its LATEST fetch), and the term is
+ziccid.adoc's Ziccid_fetch_before_access: "Instruction fetches appear in the global memory order before any explicit
+memory accesses to which they give rise."  Since `wIfv` is never reset, every later explicit access is above every
+earlier fetch of the hart: a CONSEQUENCE of Ziccid_fetch_global_order ("in program order with respect to other
+instruction fetches from the same hart") with before_access (F1 ≤gmo F2 <gmo access of F2's instruction), not a
+stronger rule.  Mark: FAITHFUL (Ziccid). -/
 def ldPre (ws : PState) (aq rl : Bool) (va : Nat) : Nat :=
   max va (max ws.wIfv (max ws.wVrNew (max (if aq then ws.wVRel else 0)
     (if rl then max ws.wVrOld ws.wVwOld else 0))))
 
 /-- THE STORE PRE-VIEW (PARM `writable`'s `view_pre`): address and data views `va`, `vd` (rules 9, 10), the fetch
 view (PA-1f), the capture view `vcap` (rules 11, 13), the store floor `vwNew` (fences, acquire), and for a release
-`vrOld ⊔ vwOld` (rule 6: "b has a release annotation"). -/
+`vrOld ⊔ vwOld` (rule 6: "b has a release annotation").  [MachZiccid] The fetch-view term is Ziccid_fetch_before_access
+with the monotone fetch view (see `ldPre`): every later store is above every earlier fetch of the hart. -/
 def stPre (ws : PState) (rl : Bool) (va vd : Nat) : Nat :=
   max va (max vd (max ws.wIfv (max ws.wVcap (max ws.wVwNew (if rl then max ws.wVrOld ws.wVwOld else 0)))))
 
@@ -463,44 +473,47 @@ def fencePost (ws : PState) (pr pw sr sw : Bool) : PState :=
     wVrNew := if sr then max ws.wVrNew v else ws.wVrNew
     wVwNew := if sw then max ws.wVwNew v else ws.wVwNew }
 
-/-- THE FETCH ADMISSIBILITY of one byte ([OWN.P2]): the byte returns what some write (or the image) holds there
-(PA-0: zifencei.adoc:70 "will see any previous data stores already visible", which presupposes fetched values are
-values the location held), and no write to that byte lies in `(t, wIfl]` — the floor FENCE.I raised.  Nothing else:
-a fetch may be STALE ("RISC-V does not guarantee that stores to instruction memory will be made visible to
-instruction fetches on a RISC-V hart until that hart executes a FENCE.I instruction", zifencei.adoc:67–69), bytes
-of one fetch need no common point, and a fetch moves no coherence or load view.  FAITHFUL under the reading of
-`wIfl` given at `fenceIPost`. -/
-def fetchByteOk (img : Image) (log : List PMsg) (ws : PState) (a : Int) (t : Nat) (v : BitVec 8) : Prop :=
-  memByte img log t a = some v ∧ ¬ writesIn log a t ws.wIfl
+/-- THE FETCH ADMISSIBILITY of one byte at the fetch view `vf` ([OWN.P22] Ziccid; [MachZiccid], was [OWN.P2]'s
+"any byte above the FENCE.I floor").  ziccid.adoc, Ziccid_fetch_value: "For each instruction byte fetched from
+memory, memory supplies the value written by the most recent store that precedes the read in global memory order."
+Rendering: the fetch is a read at gmo position `vf` (Ziccid_fetch_global_order, arm `fetch`); the byte returns what
+the write (or the image) at `t` holds, `t ≤ vf`, and no write to that byte lies in `(t, vf]` — the latest write at
+or below `vf`.  `t ≤ vf` is load-bearing (with `t > vf` the window is empty).  One `vf` for all bytes of a fetch is
+"a memory read operation" (Ziccid_fetch_global_order; Ziccif's atomicity falls out).  A cache-block operation's
+message writes no byte (`data = []`), so it is not a store here; the cmo.adoc invalidate clause (`invalRead`) names
+LOADS only ("If an invalidate operation i precedes a load r …"), so it does not apply to fetches: "memory supplies"
+the latest store.  NO OWN-STORE SPECIAL CASE (Ziccid_fetch_value's NOTE: "fetches do not observe the local hart's
+stores before other harts' fetches can observe them"): an own fulfilled store at `ts` is visible iff `vf ≥ ts`.
+Mark: FAITHFUL (Ziccid), STRONGER than the Zifencei-only letter (zifencei.adoc:67–69 allows any stale value; the
+RVWMO letter is silent on fetch, rvwmo.adoc:28–32). -/
+def fetchByteOk (img : Image) (log : List PMsg) (vf : Nat) (a : Int) (t : Nat) (v : BitVec 8) : Prop :=
+  memByte img log t a = some v ∧ t ≤ vf ∧ ¬ writesIn log a t vf
 
-/-- The fetch's contribution to the current instruction's fetch view (PA-1f, zifencei.adoc:107–108): every source
-timestamp, except an own already-fulfilled store (a po-earlier store of the hart), which contributes nothing — the
-analogue of PA-1's own-store exemption (plan M14/M18).  The exemption is the WEAKER-or-FAITHFUL side of a reading
-the text does not settle (fetch forwarding from the store buffer); PROGRESS-S1Mdef.md records it. -/
-def fetchView (log : List PMsg) (i : Nat) (prom : GSet Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Nat :=
-  bytesMax (fun _ t => if ownDone log i prom t then 0 else t) base tvs
-
-/-- FENCE.I ([OWN.P2]).  zifencei.adoc:69–71: "A FENCE.I instruction ensures that a subsequent instruction fetch on
-a RISC-V hart will see any previous data stores already visible to the same RISC-V hart."  zifencei.adoc:77–80: "A
-FENCE.I instruction orders all explicit memory accesses and instruction fetches that precede the FENCE.I in program
-order before all instruction fetches that follow the FENCE.I in program order."
-Rendering: the fetch floor rises to `vrOld ⊔ vwOld ⊔ wIfr`.
-* "already visible to the same hart" is read as PA-3's execution-level definition (plan M18, Table S §14): a
-  po-earlier store of the hart, or a write gmo-before some memory operation of the hart that is po-before the fence
-  (the multi-copy-atomic reading, mm-explanatory.adoc:189–195).  Every timestamp below `vwOld` is gmo-before (or
-  is) a po-earlier own store; every timestamp below `vrOld` is gmo-before a po-earlier load (or below a view built
-  from such timestamps).  So every write the floor excludes is co-before an already-visible store: the machine floor
-  is at or below the reference floor (machine ⊇ reference).  `coh a ≤ vrOld ⊔ vwOld` on v2 (loads raise `coh` by
-  at most their post-view or an own forwarded timestamp), so a per-byte term would add nothing.
-* "orders … instruction fetches that precede the FENCE.I … before all instruction fetches that follow": an earlier
-  fetch that returned a write `w` is ordered after `w`, so a later fetch may not return a write co-before `w`;
-  `wIfr` (every earlier fetch's source timestamp) is that bound.
-* Nothing is drained and nothing else is ordered: FENCE.I is not a data fence (EX-FENCEI-1, [OWN.143]), and
-  "FENCE.I does not ensure that other RISC-V harts' instruction fetches will observe the local hart's stores"
+/-- FENCE.I ([OWN.P2]; [MachZiccid] Ziccid's FENCE.I, [OWN.P22]).  ziccid.adoc, Ziccid_fence-i_op: "The FENCE.I
+instruction performs the following operations sequentially: All of the hart's older explicit memory accesses become
+globally visible.  The instruction buffer is flushed."
+Rendering: the fetch floor rises to `vrOld ⊔ vwOld` (every older explicit access is at or below it), and every later
+fetch has `vf ≥ wIfl` (arm `fetch`): the flushed buffer is refilled by fetches after the older accesses in gmo.
+* CONSEQUENCE (stated, [MachZiccid]): FENCE.I orders ALL older explicit accesses before ALL explicit accesses of
+  subsequently fetched instructions (older access ≤ `wIfl` ≤ `vf` = `wIfv` ≤ the later access's pre-view, `ldPre`/
+  `stPre`).  FAITHFUL (Ziccid, ziccid.adoc:123–137: FENCE.I makes the older accesses globally visible before the
+  buffer refill), STRONGER than Zifencei, whose FENCE.I is not a data fence (EX-FENCEI-1, [OWN.143]: "Zifencei
+  letter only").  Fetch-free `litStep` runs (MachLitmus.lean) never fetch, so they do not see this: there FENCE.I
+  only raises `wIfl`, which nothing reads but a fetch.
+* The former `wIfr` term (every earlier fetch's source) is subsumed: `wIfv ≥` every earlier `vf ≥` every earlier
+  source, and the next fetch has `vf ≥ wIfv` (Ziccid_fetch_global_order).  `wIfr` is kept as an INERT field.
+* zifencei.adoc:69–71 ("ensures that a subsequent instruction fetch on a RISC-V hart will see any previous data
+  stores already visible to the same RISC-V hart") and :77–80 (orders older accesses and fetches before younger
+  fetches) are implied: Ziccid's NOTE "the combination of making older stores globally visible and flushing the
+  instruction buffer on FENCE.I suffices to implement FENCE.I's pre-Ziccid semantics".
+* "FENCE.I does not ensure that other RISC-V harts' instruction fetches will observe the local hart's stores"
   (zifencei.adoc:71–73) — the floor is the fencing hart's own.
-Mark: FAITHFUL under the multi-copy-atomic reading of "visible" (as PA-3); quoted; formal form pending S0. -/
+* NOT MODELLED (WEAKER, sound): Ziccid's liveness, "stores eventually become visible to all harts' instruction
+  fetches" (ziccid.adoc:109–114, Ziccid_dequeue_order's NOTE) and the bounded instruction buffer — a finite run may
+  keep fetching stale bytes.
+Mark: FAITHFUL (Ziccid). -/
 def fenceIPost (ws : PState) : PState :=
-  { ws with wIfl := max ws.wIfl (max ws.wVrOld (max ws.wVwOld ws.wIfr)) }
+  { ws with wIfl := max ws.wIfl (max ws.wVrOld ws.wVwOld) }   -- [MachZiccid] was `… ⊔ wIfr`
 
 /-! ## 7. Labels -/
 
@@ -641,9 +654,10 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   /-- CONTROL: `vcap ⊔= view(srcs)` (rule 11). -/
   | ctrl (prom : GSet Nat) (ws : PState) (srcs : List Dsrc) :
       memStep prom ws (LCtrl srcs) none { ws with wVcap := max (srcsView ws srcs) ws.wVcap } prom
-  /-- INSTRUCTION BOUNDARY: resets `wLdv`, the AMO slot and the fetch view; NOT the reservation (M16 [R3.s5]). -/
+  /-- INSTRUCTION BOUNDARY: resets `wLdv` and the AMO slot; NOT the reservation (M16 [R3.s5]).  [MachZiccid] NOT the
+  fetch view either (was `wIfv := 0`): `wIfv` is the hart's monotone fetch position (Ziccid_fetch_global_order). -/
   | instr (prom : GSet Nat) (ws : PState) :
-      memStep prom ws LInstr none { ws with wLdv := 0, wRmw := none, wIfv := 0 } prom
+      memStep prom ws LInstr none { ws with wLdv := 0, wRmw := none } prom
   /-- LR (M3: the address view is in the pre-view; M16: the reservation records the LR's own bytes and its
   post-view, M5).  `lr.aqrl` (FIX S0P2-D3): the release bit's rule 6 pre-view and rule 7 `wVRel` raise
   (`ldPre`, `loadRun`). -/
@@ -685,14 +699,43 @@ inductive memStep : GSet Nat → PState → PLabel → Option Nat → PState →
   /-- SC FAILURE / END OF SC (M16 (c1), (c2)): clears the reservation, nothing else. -/
   | scFail (prom : GSet Nat) (ws : PState) :
       memStep prom ws LExFail none { ws with wRes := none } prom
-  /-- INSTRUCTION FETCH ([OWN.P2]): every byte admissible above the fetch floor; post: `wIfr` takes every source,
-  `wIfv` the non-own-done ones (PA-1f). -/
-  | fetch (prom : GSet Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) :
-      bytesAll (fetchByteOk img log ws) base tvs →
+  /-- INSTRUCTION FETCH — ZICCID ([OWN.P22]; [MachZiccid], was [OWN.P2]'s Zifencei-only arm).  The fetch is a read
+  at the FETCH VIEW `vf`, a constructor argument (as the load arm's `vi`; the label and `PEvt` are unchanged, and `vf`
+  is recoverable as the post-state's `wIfv`).  ziccid.adoc:
+  * Ziccid_fetch_global_order: "An instruction fetch is a memory read operation that appears in the global memory
+    order, in program order with respect to other instruction fetches from the same hart" — `vf ≥ wIfv` (the
+    hart's previous fetch) and the post `wIfv := vf`: MONOTONE, never reset (`memStep.instr`).  Two fetches at one
+    `vf` sit in one inter-write gap (a read occupies no timestamp), so `≤` is exact.
+  * Ziccid_fetch_value: "For each instruction byte fetched from memory, memory supplies the value written by the
+    most recent store that precedes the read in global memory order" — `fetchByteOk … vf` per byte, no own-store
+    exemption (its NOTE: "fetches do not observe the local hart's stores before other harts' fetches can observe
+    them").  An outstanding promise at `t ≤ vf` IS a gmo store and may be returned (LB through code with an
+    independent store is allowed by Ziccid); fulfilling it later is impossible for the fetching hart
+    (MachZiccidCyc.lean `no_fetch_own_then_fulfil`).
+  * Ziccid_fetch_before_access: "Instruction fetches appear in the global memory order before any explicit memory
+    accesses to which they give rise" — `wIfv` in `ldPre`/`stPre`; with the monotone view every later explicit
+    access is above every earlier fetch (a consequence, not a stronger rule).
+  * The NOTE at :98–106 ("Absent the execution of a FENCE.I instruction, there is no requirement that younger
+    instruction fetches appear in the global memory order later than older explicit memory accesses"): no lower
+    bound from `vrOld`/`vwOld`/`coh` except through `wIfl` (FENCE.I, `fenceIPost`, Ziccid_fence-i_op).
+  * `vf ≤ |log|`: the one premise mentioning the log length (header), monotone under append; it keeps the window
+    `(t, vf]` inside the current log, so a later promise cannot land in it (append-stability).
+  * Ziccid_model_scope ("This model only applies to instruction fetches to memory regions with the cacheability and
+    coherence PMAs"): PLATFORM PREMISE — every `LIFetch` is a main-RAM read (Emit.lean `ramRead`), main RAM taken
+    as coherent and cacheable; a fetch from a device address is emitted as `LDev` (M12, any answer, no view: WEAKER)
+    and never reaches this arm, so no second case is needed.
+  * NOT MODELLED (WEAKER, sound): "stores eventually become visible to all harts' instruction fetches"
+    (ziccid.adoc:109–114, liveness) and the bounded instruction buffer (Ziccid_fetch_order).
+  `wIfr` (INERT) still records the maximum source; it is below `vf`.  Mark: FAITHFUL (Ziccid), STRONGER than the
+  Zifencei-only letter [OWN.P22]. -/
+  | fetch (prom : GSet Nat) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (vf : Nat) :
+      max ws.wIfv ws.wIfl ≤ vf →   -- [MachZiccid]
+      vf ≤ log.length →   -- [MachZiccid]
+      bytesAll (fetchByteOk img log vf) base tvs →
       memStep prom ws (LIFetch base tvs) none
         { ws with
           wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
-          wIfv := max ws.wIfv (fetchView log i prom base tvs) }
+          wIfv := vf }   -- [MachZiccid] was `max wIfv (fetchView …)`, reset at `LInstr`
         prom
 
   /-- CACHE-BLOCK OPERATION (Zicbom; [OWN.P1]): fulfils its (byte-free) message like a plain store (COH on the

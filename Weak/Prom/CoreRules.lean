@@ -110,8 +110,8 @@ theorem regv_regW_ne (ws : PState) {rd r : Nat} (x : Nat) (h : rd ≠ r) :
     regv { ws with wRegv := insert ws.wRegv rd x } r = regv ws r := by
   unfold regv; simp only; rw [lookupInsertNe h]
 
-/-- (X5): `LInstr` keeps every register view (it resets `wLdv`, the AMO slot and the fetch view only). -/
-theorem regv_instr (ws : PState) (r : Nat) : regv { ws with wLdv := 0, wRmw := none, wIfv := 0 } r = regv ws r := rfl
+/-- (X5): `LInstr` keeps every register view (it resets `wLdv` and the AMO slot only; [MachZiccid] not `wIfv`). -/
+theorem regv_instr (ws : PState) (r : Nat) : regv { ws with wLdv := 0, wRmw := none } r = regv ws r := rfl
 
 theorem srcsView_nil (ws : PState) : srcsView ws [] = 0 := rfl
 
@@ -167,10 +167,10 @@ theorem fwdRead {π : Proto} {img : Image} {M : List PMsg} {ws : PState} {τ : T
 
 /-- **`fwdMono` for the recorded bound**: a forwarded store's knowledge index `pv ≤ vf ⊔ plainFloor ws_f` (FK, plain
 case) is below the pre-view of every later fulfil whose address or data view covers the forward view `vf`, when the
-hart has no fetch sources (label-level programs, `wIfr = 0`) — so `⟦pv⟧` is dischargeable where the forwarded value
+hart has no fetch view (label-level programs, [MachZiccid] `wIfv = 0`) — so `⟦pv⟧` is dischargeable where the forwarded value
 feeds a write. -/
 theorem fwdMono_bound {wsf ws'' : PState} {pv vf va'' vd'' : Nat} (aq'' rl'' : Bool)
-    (hpv : pv ≤ max vf (plainFloor wsf)) (hfl : stFloor wsf ≤ stFloor ws'') (hifr : wsf.wIfr = 0)
+    (hpv : pv ≤ max vf (plainFloor wsf)) (hfl : stFloor wsf ≤ stFloor ws'') (hifr : wsf.wIfv = 0)
     (hcov : vf ≤ max va'' vd'') : pv ≤ stPreA ws'' aq'' rl'' va'' vd'' := by
   unfold plainFloor at hpv
   unfold stFloor at hfl hpv
@@ -358,7 +358,7 @@ theorem wpH_instr {k : P} (hd : w.pdone s = none)
     (hl : ∀ l s', anyFab w.pstep s () l s' () → l = LInstr ∧ s' = k) :
     hartSt γ ws pr τ ∗
     ▷ (£ 1 -∗ |={⊤}=> ⌜∃ V, grd π w.img w.M V (Ψ (τ ++ [(LInstr, none)]))⌝ ∗
-          (hartSt γ { ws with wLdv := 0, wRmw := none, wIfv := 0 } pr (τ ++ [(LInstr, none)]) -∗
+          (hartSt γ { ws with wLdv := 0, wRmw := none } pr (τ ++ [(LInstr, none)]) -∗   -- [MachZiccid]
             wpH γ π w Ψ k Φ))
     ⊢ wpH γ π w Ψ s Φ := by
   iintro ⟨Hst, Hk⟩

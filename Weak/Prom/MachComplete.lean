@@ -174,13 +174,16 @@ theorem memStepL_complete {img : Image} {log : List PMsg} {i : Nat} {prom : GSet
     simp [memStepL, memStepF, okIf, hR, (promHas_iff ..).2 hts, hm, (exclOkB_iff ..).2 hx, hall,
       (cohBelowB_iff ..).2 hc, hpv]
   | scFail => simp [memStepL, memStepF]
-  | fetch base tvs hok =>
-    have hb : bytesAllB (fun a t v => memByte img log t a == some v && !writesInB log a t ws.wIfl) base tvs =
-        true := by
+  | fetch base tvs vf hv hvl hok =>   -- [MachZiccid] `vf` is listed by `fetchVfs`
+    have hb : fetchOkB img log vf base tvs = true := by
       refine bytesAllB_complete (fun a t v hp => ?_) base tvs hok
-      simp only [Bool.and_eq_true, beq_iff_eq]
-      exact ⟨hp.1, notB_of_not (writesInB_iff ..) hp.2⟩
-    simp [memStepL, memStepF, okIf, hb]
+      simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq]
+      exact ⟨⟨hp.1, hp.2.1⟩, notB_of_not (writesInB_iff ..) hp.2.2⟩
+    simp only [memStepL]
+    refine List.mem_map.2 ⟨vf, ?_, rfl⟩
+    unfold fetchVfs
+    simp only [List.mem_filter, List.mem_range, Bool.and_eq_true, decide_eq_true_eq]
+    exact ⟨by omega, hv, hb⟩
   | cmo k base len asrc ts hts hm hc hpv =>
     simp [memStepL, memStepF, okIf, (promHas_iff ..).2 hts, hm, (cohBelowB_iff ..).2 hc, hpv]
 
@@ -209,7 +212,7 @@ theorem memStep_reads {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     exact bytesAll_mono (fun _ _ _ hp => hp.1) _ _ hok
-  | fetch base tvs' hok =>
+  | fetch base tvs' _ _ _ hok =>   -- [MachZiccid]
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     exact bytesAll_mono (fun _ _ _ hp => hp.1) _ _ hok

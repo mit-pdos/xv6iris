@@ -58,7 +58,10 @@ Mark after the fix: FAITHFUL (rd depends on the CSR's previous writer, not on rs
   PROGRESS-S1Mdef.md (misaligned-exception choice, unrealised hooks, the `.error` arm, `cbo.inval`).  The `.error`
   arm is HAVOC ([OWN.P8]/[OWN.P9], MachFix-havoc): stuck here, run-level "every outcome" in MachHavoc.lean.
 * [OWN.P2] — `FENCE.I` (`Barrier_RISCV_i`) emits `LFenceI`; a fetch emits `LIFetch`; the announce no longer resets
-  anything (it banks the bits only), so the fetch view `wIfv` survives into the instruction.
+  anything (it banks the bits only), so the fetch view `wIfv` survives into the instruction.  [MachZiccid]
+  ([OWN.P22]) the fetch is Ziccid's: `wIfv` is the hart's MONOTONE fetch view, never reset (not by the announce,
+  not by `LInstr`); every `LIFetch` is a main-RAM read (`ramRead`; a fetch from a device address is an `LDev`,
+  M12) — the coherent+cacheable scope of Ziccid_model_scope.
 -/
 import Weak.Prom.Machine
 import Weak.WeakEvLang
@@ -327,7 +330,7 @@ def ramRead (h : HState) (n : Nat) (pa : PAddr) (ak : AK) (k : Result ((BitVec (
     (l : PLabel) (h' : HState) : Prop :=
   isTtw ak = false ∧
   if akIfetch ak then
-    -- [OWN.P2]: THE FETCH (no aq, no address sources)
+    -- [OWN.P2]: THE FETCH (no aq, no address sources); [MachZiccid] main RAM: Ziccid_model_scope's region
     ∃ (w : BitVec (8 * n)) (tvs : List (Nat × BitVec 8)),
       answers n w tvs ∧ l = LIFetch (paZ pa) tvs ∧ h' = { h with m := k (.Ok (w, none)) }
   else if akExcl ak then
@@ -424,7 +427,8 @@ def hnodeStep (h : HState) (d : DevStates) (l : PLabel) (h' : HState) (d' : DevS
         | none => False
     | .barrier b, k =>
         l = barLabel b ∧ d' = d ∧ h' = { h with m := k (), fn := ebarPark b }
-    -- the announce banks the bits and resets nothing (the fetch view must survive, PA-1f)
+    -- the announce banks the bits and resets nothing (the fetch view must survive, PA-1f; [MachZiccid] it is
+    -- the monotone Ziccid fetch view, Ziccid_fetch_before_access)
     | .instrAnnounce _ w, k =>
         l = LSilent ∧ d' = d ∧ h' = { h with m := k (), ix := { h.ix with bits := some (ibOfBvn w) } }
     | .branchAnnounce _ _, k => l = LSilent ∧ d' = d ∧ h' = { h with m := k () }

@@ -303,7 +303,7 @@ theorem sim_loadG (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
       have : j = s.evs.length := by omega
       subst this; rw [hsk, hnst] at hjs; cases hjs)
   · rfl
-  · rfl
+  · rw [instrE_regWE_ifv]; rw [← hwsQ]; exact i8.trans hinv.ifv   -- [MachZiccid] `LInstr` keeps `wIfv`
   · -- prom
     intro tt
     rw [hinv.prom tt, hn1]

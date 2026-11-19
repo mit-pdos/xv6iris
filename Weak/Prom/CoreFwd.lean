@@ -11,7 +11,8 @@ from the hart's own store `t_f` gets the knowledge recorded at that store's fulf
   `⟦pv⟧ proto(M[t_f])` and either `pv ≤ v_f ⊔ plainFloor ws` (the bound `fwdMono` needs; it holds for every plain
   store and every exclusive write, whose forward view is its own timestamp, M1) or the entry comes from a release /
   acquire store of the trace (whose pre-view also contains `vrOld ⊔ vwOld` / `vRel`, rules 6/7).
-* `fetchInv ws` (FI) — `wIfv ≤ wIfr` (a fetch view is bounded by the fetched sources).
+* `fetchInv ws` (FI) — [MachZiccid] `wIfr ≤ wIfv` (every fetched source is below the monotone fetch view; was
+  `wIfv ≤ wIfr`, false under the Ziccid fetch arm, whose `wIfv := vf` may exceed every source).
 * `fwd_step` — every state step keeps FI and FK, given the fulfil's `⟦fulPv⟧` knowledge.
 * `stFloor`, `floors_mono` (moved here from CoreRules.lean) — the capture and store floors only grow.
 No `sorry`, no axiom, no `native_decide`.
@@ -131,20 +132,22 @@ theorem storeBytes_fwd' : ∀ (ws : PState) (a : Int) (n ts fv : Nat) (b : Int),
       · subst h2; rw [lookupInsert, if_pos (by omega)]
       · rw [lookupInsertNe h2, if_neg (by omega)]
 
-theorem fetchView_le (log : List PMsg) (i : Nat) (prom : GSet Nat) :
-    ∀ (base : Int) (tvs : List (Nat × BitVec 8)), fetchView log i prom base tvs ≤ bytesMax (fun _ t => t) base tvs
-  | _, [] => Nat.le_refl _
-  | a, (t, _) :: r => by
-    have ih := fetchView_le log i prom (a + 1) r
-    unfold fetchView at ih ⊢
+/-- [MachZiccid] (was `fetchView_le`) The fetch's sources are below its fetch view `vf`. -/
+theorem fetch_srcs_le {img : Image} {log : List PMsg} {vf : Nat} :
+    ∀ (base : Int) (tvs : List (Nat × BitVec 8)), bytesAll (fetchByteOk img log vf) base tvs →
+      bytesMax (fun _ t => t) base tvs ≤ vf
+  | _, [], _ => Nat.zero_le _
+  | a, (t, _) :: r, ⟨h1, h2⟩ => by
+    have ih := fetch_srcs_le (a + 1) r h2
     simp only [bytesMax]
-    split <;> omega
+    have := h1.2.1
+    omega
 
 /-! ## 3. The invariants -/
 
-/-- The capture, store and fetch floors: what a later plain fulfil's pre-view contains (with the fetch floor
-`wIfr ≥ wIfv`). -/
-def plainFloor (ws : PState) : Nat := max (stFloor ws) ws.wIfr
+/-- The capture, store and fetch floors: what a later plain fulfil's pre-view contains.  [MachZiccid] The fetch
+term is the monotone fetch view `wIfv` itself (was `wIfr`, an upper bound of `wIfv` only while `LInstr` reset it). -/
+def plainFloor (ws : PState) : Nat := max (stFloor ws) ws.wIfv
 
 /-- A release or acquire store label (Zalasr `s*.rl`/`s*.aqrl`): its pre-view has `vrOld ⊔ vwOld` / `vRel`. -/
 def isRelAcq : PLabel → Bool
@@ -162,8 +165,8 @@ def fulPv (ws : PState) : PLabel → Nat
   | LCmo _ _ _ asrc => stPre ws false (srcsView ws asrc) 0
   | _ => 0
 
-/-- (FI) the fetch view is below the fetch sources. -/
-def fetchInv (ws : PState) : Prop := ws.wIfv ≤ ws.wIfr
+/-- (FI) [MachZiccid] the fetch sources are below the fetch view (was the converse). -/
+def fetchInv (ws : PState) : Prop := ws.wIfr ≤ ws.wIfv
 
 /-- (FK) THE FORWARD-BANK KNOWLEDGE (plan §2 "Forwarded reads"). -/
 def fwdKnow (π : Proto) (img : Image) (M : List PMsg) (ws : PState) (τ : Trace) : Prop :=
@@ -214,7 +217,7 @@ theorem fwdKnow_store {π : Proto} {img : Image} {M : List PMsg} {ws ws1 ws' : P
     · exact .inl (by omega)
     · exact .inr ⟨e', List.mem_append_left _ he', h4, h5⟩
 
-theorem plainFloor_of {ws ws' : PState} (h1 : stFloor ws ≤ stFloor ws') (h2 : ws.wIfr ≤ ws'.wIfr) :
+theorem plainFloor_of {ws ws' : PState} (h1 : stFloor ws ≤ stFloor ws') (h2 : ws.wIfv ≤ ws'.wIfv) :
     plainFloor ws ≤ plainFloor ws' := by unfold plainFloor; omega
 
 /-- **Every state step keeps (FI) and (FK)**, given the fulfil's knowledge at its own pre-view. -/
@@ -279,7 +282,7 @@ theorem fwd_step {π : Proto} {img : Image} {M : List PMsg} {i : Nat} {prom : GS
   | dev => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (Nat.le_refl _) hfk⟩
   | regW => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
   | ctrl => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
-  | instr => exact ⟨Nat.zero_le _, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
+  | instr => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩   -- [MachZiccid]
   | lr aq rl base tvs asrc _ vi _ =>
     have hl := loadBytes_keep aq (max (ldPre ws aq rl (srcsView ws asrc)) vi) ws base tvs
     refine ⟨?_, fwdKnow_keep (ws := ws) ?_ (plainFloor_of hfm ?_) hfk⟩
@@ -295,8 +298,8 @@ theorem fwd_step {π : Proto} {img : Image} {M : List PMsg} {i : Nat} {prom : GS
     · simp only [acqPost, storeRun, hsb]; omega
     · simp only [acqPost, storeRun, hsb]; omega
   | scFail => exact ⟨hfi, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm (Nat.le_refl _)) hfk⟩
-  | fetch base tvs _ =>
-    have := fetchView_le M i prom base tvs
+  | fetch base tvs vf hv _ hok =>   -- [MachZiccid]
+    have := fetch_srcs_le base tvs hok
     refine ⟨?_, fwdKnow_keep (ws := ws) rfl (plainFloor_of hfm ?_) hfk⟩
     · simp only; omega
     · simp only; omega

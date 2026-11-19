@@ -266,7 +266,7 @@ theorem memStep_len {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {w
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl; obtain ⟨rfl, rfl⟩ := hl; exact loadOk_ts hok
   | rmw aq rl b r data asrc vsrc ts _ _ _ hok =>
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl; obtain ⟨rfl, rfl⟩ := hl; exact loadOk_ts hok
-  | fetch b r hok =>
+  | fetch b r _ _ _ hok =>   -- [MachZiccid]
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl; obtain ⟨rfl, rfl⟩ := hl
     exact bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) _ _ hok
   | _ => cases hl
@@ -408,7 +408,8 @@ theorem runSeg {A : Nat} :   -- MachFix-R-b5: no `invalFree` premise
         exact ⟨fun b t e => bytesAll_mono (fun _ _ _ h => by omega) _ _ (hl.1 b t e),
           fun ts e => by have := hl.2 ts e; omega⟩
     obtain ⟨Q1, hm1, hQ1⟩ := memStep_restrict Q hm hpre
-      (fun _ => hfit.elim (fun hf => .inl (by unfold bnd at hz hf; omega)) .inr) hr.1 hr.2 hQ   -- MachFix-R-b5
+      (fun _ => hfit.elim (fun hf => .inl (by unfold bnd at hz hf; omega)) .inr) hr.1 hr.2 hQ
+      (fun _ _ _ => hfit.elim (fun hf => .inl (by unfold bnd at hz hf; omega)) .inr)   -- [MachZiccid]   -- MachFix-R-b5
     have hst : pmStep pstep c (.st A l ots) ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A ⟨p', ws', Q1⟩⟩ :=
       pmStep.state c A _ l ots p' () ws' Q1 hag hp (himg ▸ hm1)
     obtain ⟨Q', h1, h2, h3, h4, h5⟩ := ih ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A ⟨p', ws', Q1⟩⟩ Q1 himg hpre
@@ -561,6 +562,7 @@ theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) :   -- MachFix-R-b5: no `invalF
     obtain ⟨QA, hagA, hQA, _, hwA, hfA, hbA⟩ := g5 A
     have hbz : bnd z.2.1 < r := by
       have h1 := relClass_lt k6 k2
+      have h2 := Ziccid.memStep_fulfil_gt k6   -- [MachZiccid] `bnd` has `wIfv`: below every fulfil
       unfold bnd; omega
     obtain ⟨Qz, s1, s2, s3, s4, s5⟩ := runSeg k1 c1 QA g1 (by rw [g2]; exact take_prefix M _) hagA
       (by rw [hc1len]; exact hQA) hbA (.inl (by omega))
@@ -603,6 +605,7 @@ theorem schedule (hmsg : ∀ m ∈ M, msgOk N m) :   -- MachFix-R-b5: no `invalF
       exact bytesAll_mono (fun _ _ _ u => by omega) _ _ this
     obtain ⟨Q4, hm4, hQ4⟩ := memStep_restrict _ k6 (by rw [hlog3]; exact take_prefix M r) (fun h => by cases h) hrd
       (fun ts e => by cases e; rw [hlog3, take_length_of hrM]; exact Nat.le_refl _) hQ3
+      (fun _ _ e => by subst e; cases k6)   -- [MachZiccid]
     have hag3 : c3.pcAgs[(A : Nat)]? = some ⟨z.1, z.2.1, {c2.pcLog.length + 1} ∪ Qz⟩ := getElem?_set_eq_of hag2
     let c4 : PCfg P Unit := ⟨c3.pcImg, c3.pcLog, (), c3.pcAgs.set A ⟨p', ws', Q4⟩⟩
     have himg3 : c3.pcImg = img := g1
@@ -717,7 +720,10 @@ end sched
 /-! ## 5. The NF_R lemma -/
 
 /-- (P2) FETCH-BOUNDED (plan §4, premise of NF_R): in every hart's solo run (the run's trace from its initial
-state, against the final memory `M`), every release-class write at `r` has every earlier fetch source below `r`. -/
+state, against the final memory `M`), every release-class write at `r` has every earlier fetch source below `r`.
+[MachZiccid] NOTE (not refactored): under the Ziccid fetch arm this premise is PROVABLE for every solo run — every
+earlier fetch source is `≤ wIfr ≤ wIfv` (CoreFwd's `fetchInv`, kept by every arm from `psInit`) and every fulfil
+has `wIfv < r` (MachZiccidCyc.lean `memStep_fulfil_gt`); `nfR`'s use of it is now redundant. -/
 def fetchBounded {P : Type} (pstep : P → Unit → PLabel → P → Unit → Prop) (img : Image) (ps : List P)
     (M : List PMsg) (evs : List PEvt) : Prop :=
   ∀ h p (P0 : GSet Nat) y, ps[h]? = some p → (∀ t, t ∈ P0 ↔ 0 < t ∧ ownTs M h t) →
@@ -818,7 +824,7 @@ theorem soloQ_ofImg {P : Type} {pstep : P → Unit → PLabel → P → Unit →
     refine .step _ _ _ _ _ _ _ _ (fun hr r e => ?_) hp hm (ih ?_ (fun e he => hf e (List.mem_cons_of_mem _ he)))
     · subst e; have := relClass_lt hm hr; omega
     · cases hm with
-      | fetch base tvs hok =>
+      | fetch base tvs _ _ _ hok =>   -- [MachZiccid]
         show max x.2.1.wIfr (bytesMax (fun _ t => t) base tvs) = 0
         rw [bytesMax_zero base tvs (hf _ (List.mem_cons_self ..) base tvs rfl), h0]; rfl
       | load => simp only [loadRunV]; rw [(loadBytes_keep _ _ _ _ _).2.2.1]; exact h0   -- MachFix-R-b5: `loadRunV`

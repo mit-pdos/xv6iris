@@ -164,7 +164,7 @@ theorem regWE_sc_fields (ws : PState) (rd : Nat) (srcs : List Dsrc) :
     (instrE { regWE ws rd srcs with wRes := none }).wVRel = ws.wVRel ∧
     (instrE { regWE ws rd srcs with wRes := none }).wRes = none ∧
     (instrE { regWE ws rd srcs with wRes := none }).wLdv = 0 ∧
-    (instrE { regWE ws rd srcs with wRes := none }).wIfv = 0 ∧
+    (instrE { regWE ws rd srcs with wRes := none }).wIfv = ws.wIfv ∧   -- [MachZiccid] was `= 0`
     (∀ r, regv (instrE { regWE ws rd srcs with wRes := none }) r = regv (regWE ws rd srcs) r) := by
   unfold regWE; split <;> exact ⟨rfl, rfl, rfl, rfl, rfl, fun _ => rfl, rfl, rfl, rfl, rfl, rfl, fun _ => rfl⟩
 

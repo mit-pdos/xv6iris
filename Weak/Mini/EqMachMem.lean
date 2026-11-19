@@ -278,9 +278,9 @@ theorem relWs_ctrl {P : MProg} {ms : Mach.MSt} {ws : PState} (hR : RelWs P ms ws
     hR.vrel, hR.res, hR.rmw, hR.ifl, hR.ifr, hR.ifv⟩
 
 theorem relWs_instr {P : MProg} {ms : Mach.MSt} {ws : PState} (hR : RelWs P ms ws) :
-    RelWs P { ms with ldv := 0 } { ws with wLdv := 0, wRmw := none, wIfv := 0 } :=
+    RelWs P { ms with ldv := 0 } { ws with wLdv := 0, wRmw := none } :=   -- [MachZiccid]
   ⟨hR.vrOld, hR.vwOld, hR.vrNew, hR.vwNew, hR.vcap, rfl, hR.regv, hR.word, hR.vrel, hR.res, rfl, hR.ifl, hR.ifr,
-    rfl⟩
+    hR.ifv⟩   -- [MachZiccid] `wIfv` kept, still `0` by `hR.ifv`
 
 /-! ## 5. The read rule -/
 

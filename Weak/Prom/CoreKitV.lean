@@ -477,7 +477,7 @@ variable (ws : PState)
 @[simp] theorem instrR_ldv : (instrR ws).wLdv = 0 := rfl
 @[simp] theorem instrR_coh (a : Int) : coh (instrR ws) a = coh ws a := rfl
 @[simp] theorem instrR_res : (instrR ws).wRes = ws.wRes := rfl
-@[simp] theorem instrR_ifv : (instrR ws).wIfv = 0 := rfl
+@[simp] theorem instrR_ifv : (instrR ws).wIfv = ws.wIfv := rfl   -- [MachZiccid] was `= 0`
 
 @[simp] theorem regWP_vrOld (rd : Nat) (srcs : List Dsrc) : (regWP ws rd srcs).wVrOld = ws.wVrOld := rfl
 @[simp] theorem regWP_vwOld (rd : Nat) (srcs : List Dsrc) : (regWP ws rd srcs).wVwOld = ws.wVwOld := rfl

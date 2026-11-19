@@ -25,8 +25,8 @@ Checked (the review's claim, G4-review2.md §5.5 "no read in the segment can dep
 raise `vrOld` above `r`)"): TRUE for every explicit read and every log window of the segment — `memStep_selfF` bounds
 them by `bndF < r` unchanged, since the A/D arm moves no view.  Two reads are NOT so bounded and are replayed against
 `M` instead: fetches (E-b's `fet`) and the A/D update's own implicit read (`adF`, its sources are below `ts` only).
-The fetch view's own-store exemption must not count a pre-fulfilled A/D write (AdMachine.lean `ownDoneV`), and with
-that `fetchViewV_cut` holds.
+[MachZiccid] (Was: the fetch view's own-store exemption must not count a pre-fulfilled A/D write, `ownDoneV`,
+`fetchViewV_cut`.)  The Ziccid fetch arm has no own-store exemption; its post is a function of the fetch view `vf`.
 
 `nfRAd` / `nfRAd_pre`: EVERY valid run of the variant (`D = Unit`), NO premise, has an NF run with the same final
 configuration and per-hart traces.  No `sorry`, no axiom, no `native_decide`.
@@ -72,14 +72,14 @@ theorem memStepV_v_inv {l0 : PLabel} (h : memStepV img L i prom ws (.v l0) ots w
     memStep img L i prom ws l0 ots ws' prom' := by
   cases h with
   | v2 _ _ _ _ hm _ => exact hm
-  | fetch base tvs _ => exact (‹¬ isFetch (LIFetch base tvs)› ⟨base, tvs, rfl⟩).elim
+  | fetch base tvs _ _ => exact (‹¬ isFetch (LIFetch base tvs)› ⟨base, tvs, rfl⟩).elim
 
 theorem memStepV_fetch_inv {b : Int} {tvs : List (Nat × BitVec 8)}
     (h : memStepV img L i prom ws (.v (LIFetch b tvs)) ots ws' prom') :
-    bytesAll (fetchByteOk img L ws) b tvs ∧ ots = none ∧ ws' = fetchPostV L i prom ws b tvs ∧ prom' = prom := by
+    ∃ vf, fetchAt img L ws vf b tvs ∧ ots = none ∧ ws' = fetchPostV vf ws b tvs ∧ prom' = prom := by   -- [MachZiccid]
   cases h with
   | v2 _ _ _ _ _ hnf => exact (hnf ⟨b, tvs, rfl⟩).elim
-  | fetch _ _ hok => exact ⟨hok, rfl, rfl, rfl⟩
+  | fetch _ _ vf hok => exact ⟨vf, hok, rfl, rfl, rfl⟩
 
 theorem memStepV_ad_inv {b : Int} {tvs : List (Nat × BitVec 8)} {d : List (BitVec 8)}
     (h : memStepV img L i prom ws (.ad b tvs d) ots ws' prom') :
@@ -103,66 +103,24 @@ theorem adReadOk_iff (hpre : L <+: M) {ts : Nat} (hts : ts ≤ L.length) (a : In
   · rintro ⟨h1, h2, h3⟩
     exact ⟨by rw [memByte_ext hpre (by omega)]; exact h1, h2, fun hw => h3 ((writesIn_ext hpre (by omega)).1 hw)⟩
 
-theorem ownDoneV_ext {P : GSet Nat} {t : Nat} (h : L <+: M) (ht : t ≤ L.length)
-    (hP : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom)) : ownDoneV M i P t = ownDoneV L i prom t := by
-  unfold ownDoneV
-  rw [ownDone_ext h ht hP]
-  rcases Nat.eq_zero_or_pos t with h0 | h0
-  · subst h0
-    have : ownDone L i prom 0 = false := by unfold ownDone; cases L[0 - 1]? <;> simp
-    rw [this]; simp
-  · rw [prefix_getElem? h (by omega)]
+-- [MachZiccid] `ownDoneV_ext`, `fetchViewV_ext`, `fetchViewV_cut` removed with `ownDoneV`/`fetchViewV`.
 
-theorem fetchViewV_ext {P : GSet Nat} {base : Int} {tvs : List (Nat × BitVec 8)} (h : L <+: M)
-    (hts : bytesAll (fun _ t _ => t ≤ L.length) base tvs) (hP : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom)) :
-    fetchViewV M i P base tvs = fetchViewV L i prom base tvs := by
-  unfold fetchViewV
-  refine bytesMax_congr base tvs (bytesAll_mono (fun a t _ ht => ?_) base tvs hts)
-  rw [ownDoneV_ext h ht hP]
-
-/-- THE FETCH VIEW OF A REPLAYED FETCH (E-b's `fetchView_cut` for `ownDoneV`): an own message above the prefix is
-still promised or is an A/D message — neither is exempt. -/
-theorem fetchViewV_cut {P Q : GSet Nat} (hpre : L <+: M) (hQ : ∀ t, t ∈ Q ↔ t ∈ P ∧ t ≤ L.length)
-    (hfut : ∀ t, L.length < t → ownTs M i t → t ∈ P ∨ adAt M t) (base : Int) (tvs : List (Nat × BitVec 8)) :
-    fetchViewV M i P base tvs = fetchViewV L i Q base tvs := by
-  unfold fetchViewV
-  refine bytesMax_congr base tvs (bytesAll_all (fun a t _ => ?_) base tvs)
-  by_cases ht : t ≤ L.length
-  · rw [ownDoneV_ext hpre ht (fun t' ht' => by rw [hQ t']; exact ⟨fun h => ⟨h, ht'⟩, fun h => h.1⟩)]
-  · have h1 : ownDoneV L i Q t = false := by
-      unfold ownDoneV ownDone; rw [List.getElem?_eq_none (by omega)]; rfl
-    have h2 : ownDoneV M i P t = false := by
-      unfold ownDoneV ownDone
-      cases hm : M[t - 1]? with
-      | none => rfl
-      | some m =>
-        by_cases ht' : m.tid = some i
-        · rcases hfut t (by omega) ⟨m, hm, ht'⟩ with hp | ⟨m', hm', hc⟩
-          · simp [hp]
-          · rw [hm] at hm'; cases hm'; simp [hc]
-        · simp [ht']
-    rw [h1, h2]
-
-theorem fetchPostV_bnd {base : Int} {tvs : List (Nat × BitVec 8)} (hok : bytesAll (fetchByteOk img L ws) base tvs)
-    (hb : psBounded ws L.length) : psBounded (fetchPostV L i prom ws base tvs) L.length := by
+/-- [MachZiccid] The Ziccid fetch's post keeps the bounds (`wIfv := vf ≤ |L|`). -/
+theorem fetchPostV_bnd {vf : Nat} {base : Int} {tvs : List (Nat × BitVec 8)} (hok : fetchAt img L ws vf base tvs)
+    (hb : psBounded ws L.length) : psBounded (fetchPostV vf ws base tvs) L.length := by
   have hts : bytesAll (fun _ t _ => t ≤ L.length) base tvs :=
-    bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) base tvs hok
+    bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) base tvs hok.2.2
   have e1 : bytesMax (fun _ t => t) base tvs ≤ L.length := bytesMax_le base tvs hts
-  have e2 : fetchViewV L i prom base tvs ≤ L.length := by
-    unfold fetchViewV
-    refine bytesMax_le base tvs (bytesAll_mono (fun _ t _ ht => ?_) base tvs hts)
-    split <;> omega
   obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr, h6, h7, hR, hM, h8, h9, h10⟩ := hb
-  refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 hR hM h8 ?_ ?_
-  · simp only [fetchPostV]; omega
-  · simp only [fetchPostV]; omega
+  refine psB_intro hc h1 h2 h3 h4 h5 hf hr h6 h7 hR hM h8 ?_ hok.2.1
+  simp only [fetchPostV, fetchPost]; omega
 
 /-- Every arm keeps the bounds (MachWf.lean `memStep_bnd`). -/
 theorem memStepV_bnd (h : memStepV img L i prom ws l ots ws' prom') (hb : psBounded ws L.length)
     (hw : promWf L i prom) : psBounded ws' L.length ∧ promWf L i prom' := by
   cases h with
   | v2 _ _ _ _ hm _ => exact memStep_bnd hm hb hw
-  | fetch _ _ hok => exact ⟨fetchPostV_bnd hok hb, hw⟩
+  | fetch _ _ _ hok => exact ⟨fetchPostV_bnd hok hb, hw⟩
   | ad _ _ _ ts => exact ⟨hb, promWf_diff ts hw⟩
 
 /-- THE ARM LEMMA (MachFactor.lean `memStep_extend`) for the variant. -/
@@ -174,27 +132,12 @@ theorem memStepV_extend (P : GSet Nat) (Q : Nat → Prop) (h : memStepV img L i 
   | v2 _ _ _ _ hm hnf =>
     obtain ⟨P', h1, h2⟩ := memStep_extend P Q hm hpre hb hw hP
     exact ⟨P', .v2 _ _ _ _ _ _ h1 hnf, h2⟩
-  | fetch base tvs hok =>
-    have hts : bytesAll (fun _ t _ => t ≤ L.length) base tvs :=
-      bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) base tvs hok
-    have hifl : ws.wIfl ≤ L.length := hb.2.2.2.2.2.2.2.2.2.2.2.2.1
-    have hok' : bytesAll (fetchByteOk img M ws) base tvs := by
-      refine bytesAll_mono (fun a t v hp => ?_) base tvs hok
-      obtain ⟨h1, h2⟩ := hp
-      exact ⟨by rw [memByte_ext hpre (memByte_le h1)]; exact h1, by rw [writesIn_ext hpre hifl]; exact h2⟩
-    have hlow : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom) := by
-      intro t ht
-      rw [hP t]
-      constructor
-      · rintro (h1 | h1)
-        · exact h1
-        · omega
-      · exact .inl
-    refine ⟨P, ?_, hP⟩
-    have e : fetchPostV M i P ws base tvs = fetchPostV L i prom ws base tvs := by
-      unfold fetchPostV; rw [fetchViewV_ext hpre hts hlow]
-    rw [← e]
-    exact .fetch _ _ _ _ hok'
+  | fetch base tvs vf hok =>   -- [MachZiccid] the window `(t, vf]` with `vf ≤ |L|`
+    have hok' : bytesAll (fetchByteOk img M vf) base tvs := by
+      refine bytesAll_mono (fun a t v hp => ?_) base tvs hok.2.2
+      obtain ⟨h1, h2, h3⟩ := hp
+      exact ⟨by rw [memByte_ext hpre (memByte_le h1)]; exact h1, h2, by rw [writesIn_ext hpre hok.2.1]; exact h3⟩
+    exact ⟨P, .fetch _ _ _ _ vf ⟨hok.1, Nat.le_trans hok.2.1 (List.IsPrefix.length_le hpre), hok'⟩, hP⟩
   | ad base tvs data ts hlen h0 hts hm hrd =>
     have hts' := (hw ts hts).2.1
     refine ⟨P \ {ts}, .ad _ _ _ _ _ _ hlen h0 ((hP ts).2 (.inl hts))
@@ -334,7 +277,8 @@ theorem rcV_inv (hRC : RCOk RC) {prom : GSet Nat} {ws : PState} {l : VLabel} {ot
     ∃ l0, l = .v l0 ∧ memStep img M i prom ws l0 ots ws' prom' := by
   cases h with
   | v2 l0 _ _ _ hm _ => exact ⟨l0, rfl, hm⟩
-  | fetch base tvs hok => exact absurd hr (hRC.none_ (memStep.fetch (i := i) prom ws base tvs hok))
+  | fetch base tvs vf hok =>
+    exact absurd hr (hRC.none_ (memStep.fetch (i := i) prom ws base tvs vf hok.1 hok.2.1 hok.2.2))
   | ad => exact hr.elim
 
 theorem soloQV_mono {Q1 Q2 : PState → VLabel → Option Nat → Prop} (hQ : ∀ ws l ots, Q1 ws l ots → Q2 ws l ots) :
@@ -563,10 +507,10 @@ inductive nfStepsV : PCfg P D → List VEvt → PCfg P D → Prop
       pmStepV pstep c1 (.st i (.v l) (some r)) c2 → nfStepsV c2 es c3 →
       nfStepsV c (.prom i m :: .st i (.v l) (some r) :: es) c3
   | fet (c : PCfg P D) (i : Nat) (ag : PAgent P) (b : Int) (tvs : List (Nat × BitVec 8)) (st' : P) (d' : D)
-      (es : List VEvt) (c2 : PCfg P D) :
+      (vf : Nat) (es : List VEvt) (c2 : PCfg P D) :
       c.pcAgs[i]? = some ag → pstep ag.paSt c.pcDev (.v (LIFetch b tvs)) st' d' →
-      bytesAll (fetchByteOk c.pcImg M ag.paWs) b tvs →
-      nfStepsV ⟨c.pcImg, c.pcLog, d', c.pcAgs.set i ⟨st', fetchPostV c.pcLog i ag.paProm ag.paWs b tvs, ag.paProm⟩⟩
+      fetchAt c.pcImg M ag.paWs vf b tvs →   -- [MachZiccid]
+      nfStepsV ⟨c.pcImg, c.pcLog, d', c.pcAgs.set i ⟨st', fetchPostV vf ag.paWs b tvs, ag.paProm⟩⟩
         es c2 →
       nfStepsV c (.st i (.v (LIFetch b tvs)) none :: es) c2
   | adF (c : PCfg P D) (i : Nat) (ag : PAgent P) (b : Int) (tvs : List (Nat × BitVec 8)) (d : List (BitVec 8))
@@ -590,7 +534,7 @@ theorem nfStepsV_append {c c1 c2 : PCfg P D} {es1 es2 : List VEvt} (h1 : nfSteps
   | promF c i ag m es c2' ha hd ht hc _ ih => exact .promF _ _ _ _ _ _ ha hd ht hc (ih h2)
   | st c c1 i ag l ots es c2' ha hn h _ ih => exact .st _ _ _ _ _ _ _ _ ha hn h (ih h2)
   | rel c c1 c2' i m ag l r es c3 h ha hr hl h' _ ih => exact .rel _ _ _ _ _ _ _ _ _ _ h ha hr hl h' (ih h2)
-  | fet c i ag b tvs st' d' es c2' ha hp hok _ ih => exact .fet _ _ _ _ _ _ _ _ _ ha hp hok (ih h2)
+  | fet c i ag b tvs st' d' vf es c2' ha hp hok _ ih => exact .fet _ _ _ _ _ _ _ _ _ _ ha hp hok (ih h2)
   | adF c i ag b tvs d ts st' d' es c2' ha hp hlt hlen hm hrd _ ih =>
     exact .adF _ _ _ _ _ _ _ _ _ _ _ ha hp hlt hlen hm hrd (ih h2)
 
@@ -609,7 +553,7 @@ theorem nfStepsV_prefix {c c' : PCfg P D} {es : List VEvt} (h : nfStepsV RC pste
   | st c c1 i ag l ots es c2 _ _ h1 _ ih => exact List.IsPrefix.trans (pmStepV_prefix h1) ih
   | rel c c1 c2 i m ag l r es c3 h1 _ _ _ h2 _ ih =>
     exact List.IsPrefix.trans (pmStepV_prefix h1) (List.IsPrefix.trans (pmStepV_prefix h2) ih)
-  | fet c i ag b tvs st' d' es c2 _ _ _ _ ih => exact ih
+  | fet c i ag b tvs st' d' vf es c2 _ _ _ _ ih => exact ih
   | adF c i ag b tvs d ts st' d' es c2 _ _ _ _ _ _ _ ih => exact ih
 
 end nf
@@ -831,16 +775,13 @@ theorem runSegV {A : Nat} :
       by_cases hfe : isFetch l0
       · -- THE PROPHECY-FED FETCH (E-b)
         obtain ⟨b, tvs, rfl⟩ := hfe
-        obtain ⟨hok, rfl, rfl, rfl⟩ := memStepV_fetch_inv hm
-        have hws : fetchPostV M A x.2.2 x.2.1 b tvs = fetchPostV c.pcLog A Q x.2.1 b tvs := by
-          unfold fetchPostV; rw [fetchViewV_cut hpre hQ hfut b tvs]
-        rw [hws] at ih hrest
-        have hb' : fwdB (fetchPostV c.pcLog A Q x.2.1 b tvs) := hb
+        obtain ⟨vf, hok, rfl, rfl, rfl⟩ := memStepV_fetch_inv hm   -- [MachZiccid]
+        have hb' : fwdB (fetchPostV vf x.2.1 b tvs) := hb
         obtain ⟨Q', h1, h2, h3, h4, h5⟩ := ih ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A
-          ⟨p', fetchPostV c.pcLog A Q x.2.1 b tvs, Q⟩⟩ Q himg hpre (getElem?_set_eq_of hag) hQ hb' hfut hfit
+          ⟨p', fetchPostV vf x.2.1 b tvs, Q⟩⟩ Q himg hpre (getElem?_set_eq_of hag) hQ hb' hfut hfit
         refine ⟨Q', ?_, h2, h3, h4, h5⟩
-        rw [← eset ⟨p', fetchPostV c.pcLog A Q x.2.1 b tvs, Q⟩ ⟨z.1, z.2.1, Q'⟩]
-        exact .fet c A ⟨x.1, x.2.1, Q⟩ b tvs p' () _ _ hag hp (himg ▸ hok) h1
+        rw [← eset ⟨p', fetchPostV vf x.2.1 b tvs, Q⟩ ⟨z.1, z.2.1, Q'⟩]
+        exact .fet c A ⟨x.1, x.2.1, Q⟩ b tvs p' () vf _ _ hag hp (himg ▸ hok) h1
       · have hm0 := memStepV_v_inv hm hfe
         have hs := memStep_selfF hm0 hb
         have hz : bndF ws' ≤ bndF z.2.1 := (soloQV_bndF hrest hs.2.2.2).1
@@ -853,6 +794,7 @@ theorem runSegV {A : Nat} :
               fun ts e => by have := hl.2 ts e; omega⟩
         obtain ⟨Q1, hm1, hQ1⟩ := memStep_restrict Q hm0 hpre
           (fun _ => hfit.elim (fun hf => .inl (by unfold bndF at hz hf; omega)) .inr) hr.1 hr.2 hQ
+          (fun b tvs e => absurd ⟨b, tvs, e⟩ hfe)   -- [MachZiccid] not a fetch
         have hst : pmStepV pstep c (.st A (.v l0) ots) ⟨c.pcImg, c.pcLog, (), c.pcAgs.set A ⟨p', ws', Q1⟩⟩ :=
           pmStepV.state c A _ (.v l0) ots p' () ws' Q1 hag hp (himg ▸ .v2 _ _ _ _ _ _ hm1 hfe)
         have hfut' : ∀ t, c.pcLog.length < t → ownTs M A t → t ∈ prom' ∨ adAt M t := by
@@ -1034,6 +976,7 @@ theorem scheduleV (hRC : RCOk RC) (hmsg : ∀ m ∈ M, msgOk N m) :
       exact hRC.reads_ k6 k2 s3
     obtain ⟨Q4, hm4, hQ4⟩ := memStep_restrict _ k6 (by rw [hlog3]; exact take_prefix M r) (fun h => by cases h) hrd
       (fun ts e => by cases e; rw [hlog3, take_length_of hrM]; exact Nat.le_refl _) hQ3
+      (fun _ _ e => by subst e; cases k6)   -- [MachZiccid]
     have hag3 : c3.pcAgs[(A : Nat)]? = some ⟨z.1, z.2.1, {c2.pcLog.length + 1} ∪ Qz⟩ := getElem?_set_eq_of hag2
     let c4 : PCfg P Unit := ⟨c3.pcImg, c3.pcLog, (), c3.pcAgs.set A ⟨p', ws', Q4⟩⟩
     have himg3 : c3.pcImg = img := g1

@@ -51,9 +51,9 @@ inductive hstepA (w : OWA P V) (h : Nat) : OSt V → P → PState → VLabel →
       σ.n < w.M.length → authorAt w.M σ.n = some h → relClass ws l → w.pstep s () (.v l) s' () →
       memStepV w.img (w.M.take (σ.n + 1)) h ({σ.n + 1} ∪ σ.pr h) ws (.v l) (some (σ.n + 1)) ws' pr' →
       hstepA w h σ s ws (.v l) (some (σ.n + 1)) s' ws' { σ with n := σ.n + 1, pr := upd σ.pr h pr' }
-  | fetch (σ : OSt V) (s : P) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (s' : P) :
-      w.pstep s () (.v (LIFetch base tvs)) s' () → bytesAll (fetchByteOk w.img w.M ws) base tvs →
-      hstepA w h σ s ws (.v (LIFetch base tvs)) none s' (fetchPostV (w.M.take σ.n) h (σ.pr h) ws base tvs) σ
+  | fetch (σ : OSt V) (s : P) (ws : PState) (base : Int) (tvs : List (Nat × BitVec 8)) (s' : P) (vf : Nat) :
+      w.pstep s () (.v (LIFetch base tvs)) s' () → fetchAt w.img w.M ws vf base tvs →   -- [MachZiccid]
+      hstepA w h σ s ws (.v (LIFetch base tvs)) none s' (fetchPostV vf ws base tvs) σ
   /-- [E-c] THE PROPHECY-FED A/D UPDATE: timestamp above the prefix, admissible against `M`, no state change. -/
   | adF (σ : OSt V) (s : P) (ws : PState) (b : Int) (tvs : List (Nat × BitVec 8)) (d : List (BitVec 8)) (ts : Nat)
       (s' : P) :
@@ -266,18 +266,16 @@ theorem nf_simA {w : OWA P V} {N : Nat} :
       hlog1 hnM rfl rfl (.rel σ _ _ l st' ws' prom' hnM (by simp [authorAt, hMn, htid]) hrc hp hm')
     obtain ⟨k, tp', σ'', h1, h2⟩ := ih hpre tp1 _ (by simpa [List.set_set] using hs1)
     exact ⟨1 + k, tp', σ'', nstepsA_trans hstep h1, h2⟩
-  | fet c i ag b tvs st' d' es c2 hag hp hok hrest ih =>
+  | fet c i ag b tvs st' d' vf es c2 hag hp hok hrest ih =>   -- [MachZiccid] `vf`
     intro hpre tp σ hs
     obtain ⟨himg, hlog, hle, hlen, _, _, _, hh, hdone⟩ := id hs
     have hiN : i < N := by rw [← hlen]; exact (List.getElem?_eq_some_iff.1 hag).1
     obtain ⟨ag', τ, a1, _, a3⟩ := hh i hiN
     rw [hag] at a1; cases a1
-    have hws : fetchPostV c.pcLog i ag.paProm ag.paWs b tvs = fetchPostV (w.M.take σ.n) i (σ.pr i) ag.paWs b tvs := by
-      rw [hlog, a3]
     obtain ⟨tp1, hstep, hs1⟩ := simA_hart hs hag (σ' := σ) (prom' := ag.paProm)
-      (ws' := fetchPostV c.pcLog i ag.paProm ag.paWs b tvs) hlog hle
+      (ws' := fetchPostV vf ag.paWs b tvs) hlog hle
       (by funext j; by_cases e : j = i <;> simp [upd, e, a3]) rfl
-      (by rw [hws]; exact .fetch σ _ _ b tvs st' hp (himg ▸ hok))
+      (.fetch σ _ _ b tvs st' vf hp (himg ▸ hok))
     obtain ⟨k, tp', σ'', h1, h2⟩ := ih hpre tp1 _ hs1
     exact ⟨1 + k, tp', σ'', nstepsA_trans hstep h1, h2⟩
   | adF c i ag b tvs d ts st' d' es c2 hag hp hlt hlen' hm hrd hrest ih =>

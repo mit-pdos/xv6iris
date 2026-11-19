@@ -963,6 +963,8 @@ import Weak.Prom.MachSailX
 import Weak.Prom.MachSolo
 import Weak.Prom.MachSound
 import Weak.Prom.MachWf
+import Weak.Prom.MachZiccidCyc   -- [MachZiccid] new file
+import Weak.Prom.SailS0Fetch   -- [MachZiccid] rewritten proof module (drift lint)
 import Weak.Prom.HartLift
 import Weak.Prom.HartSwp
 import Weak.Prom.HartAdeq

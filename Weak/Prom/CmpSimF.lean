@@ -116,7 +116,7 @@ theorem sim_fence (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp ws 
   have hv := domF_fenceV c hinv fs
   refine inv_nomem hinv hwf' hfut (by simp) ?_ (by rw [lp_after, hinv.prog]) (by simp [hinv.pc]) rfl hinv.lpLen
     (fun r => hinv.regEq r) (fun r => hinv.regLt r) (fun r h0 h32 => hinv.regv r h0 h32) rfl rfl ?_ ?_ ?_
-    (fun _ => rfl) rfl rfl rfl
+    (fun _ => rfl) rfl rfl hinv.ifv   -- [MachZiccid] `LInstr` keeps `wIfv`
   · intro j h1 h2
     simp only [hn'] at h2
     have : j = s.evs.length := by omega
@@ -180,7 +180,7 @@ theorem sim_fenceTso (c : HCtx T trs ν X h sf) (hinv : SimInv T X ν h sf s lp 
     have := (hfut.later j _ (by simpa using h1) (List.getElem?_eq_getElem h2)).1; simp at this; omega
   refine inv_nomem hinv hwf' hfut (by simp) ?_ (by rw [lp_after, hinv.prog]) (by simp [hinv.pc]) rfl hinv.lpLen
     (fun r => hinv.regEq r) (fun r => hinv.regLt r) (fun r h0 h32 => hinv.regv r h0 h32) rfl rfl ?_ ?_ ?_
-    (fun _ => rfl) rfl rfl rfl
+    (fun _ => rfl) rfl rfl hinv.ifv   -- [MachZiccid] `LInstr` keeps `wIfv`
   · intro j h1 h2
     simp only [hn'] at h2
     rcases (by omega : j = s.evs.length ∨ j = s.evs.length + 1) with rfl | rfl

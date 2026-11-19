@@ -235,7 +235,7 @@ theorem memStep_entryWf {img : Image} {log : List PMsg} {i : Nat} {prom : GSet N
   | lr _ _ _ _ _ hl => exact ⟨fun b t h => (by cases h; exact rd hl), trivial⟩
   | sc _ _ _ _ _ _ ts _ _ _ hm => exact ⟨fun _ _ h => (by cases h), ⟨_, hm, rfl, rfl, rfl⟩⟩
   | scFail => exact ⟨fun _ _ h => (by cases h), trivial⟩
-  | fetch _ _ hf =>
+  | fetch _ _ _ _ _ hf =>   -- [MachZiccid] the arm takes `vf`
     exact ⟨fun b t h => (by cases h; exact bytesAll_mono (fun _ _ _ hp => hp.1) _ _ hf), trivial⟩
   | cmo _ _ _ _ ts _ hm => exact ⟨fun _ _ h => (by cases h), ⟨_, hm, rfl, rfl, rfl⟩⟩
 

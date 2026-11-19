@@ -6,7 +6,8 @@ Weak/Prom: **soundness of the label-level explorer of machine v2** (S0-P part (2
 * `memStepF` — the memory half of a state step as a FUNCTION of the full label and fulfil timestamp (the run
   certificate checker's step, `Weak/Prom/MachCert.lean`), and `memStepF_sound`: `memStepF … = some (ws', prom')`
   implies `memStep … ws' prom'`.  MachFix-R-b5: a load-like step takes the absorbed invalidate view `vi = 0`;
-  `memStepL` (every `vi`, `viOpts`) is the list of every step, `memStepL_sound`.
+  `memStepL` (every `vi`, `viOpts`) is the list of every step, `memStepL_sound`.  [MachZiccid] A fetch likewise takes
+  the fetch view `vf = max wIfv wIfl` in `memStepF` and every `vf ∈ [max wIfv wIfl, |log|]` in `memStepL`.
 
 Both rest on the Bool ↔ Prop lemmas of §1 (one per transcribed premise of MachExplore.lean §1, plus
 `ExtTreeSet.contains ↔ ∈`); post-states are Machine.lean's own functions, so they agree by definition.  Nothing here
@@ -298,6 +299,18 @@ theorem explorerStep_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSe
 
 /-! ## 3. The memory half as a function of the full label (the certificate checker's step) -/
 
+/-- [MachZiccid] `fetchOkB` is sound: the Ziccid fetch arm's byte premise. -/
+theorem fetchOkB_sound {img : Image} {log : List PMsg} {vf : Nat} {base : Int} {tvs : List (Nat × BitVec 8)}
+    (h : fetchOkB img log vf base tvs = true) : bytesAll (fetchByteOk img log vf) base tvs :=
+  bytesAllB_sound (fun a t v hp => by
+    simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hp
+    exact ⟨hp.1.1, hp.1.2, not_writesIn_of_B hp.2⟩) base tvs h
+
+/-- [MachZiccid] The fetch views `vf ∈ [max wIfv wIfl, |log|]` passing `ok` (`memStepL`, `succFetch`). -/
+def fetchVfs (log : List PMsg) (ws : PState) (_base : Int) (_tvs : List (Nat × BitVec 8)) (ok : Nat → Bool) :
+    List Nat :=
+  (List.range (log.length + 1)).filter (fun vf => decide (max ws.wIfv ws.wIfl ≤ vf) && ok vf)
+
 /-- `some x` iff the Bool holds. -/
 def okIf {α : Type} (c : Bool) (x : α) : Option α := if c then some x else none
 
@@ -368,7 +381,7 @@ def memStepF (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : P
   | LDev _ _ _ _ _, none => some (ws, prom)
   | LRegW rd srcs, none => some ({ ws with wRegv := insert ws.wRegv rd (srcsView ws srcs) }, prom)
   | LCtrl srcs, none => some ({ ws with wVcap := max (srcsView ws srcs) ws.wVcap }, prom)
-  | LInstr, none => some ({ ws with wLdv := 0, wRmw := none, wIfv := 0 }, prom)
+  | LInstr, none => some ({ ws with wLdv := 0, wRmw := none }, prom)   -- [MachZiccid] `wIfv` kept
   | LExLoad aq rl base tvs asrc, none =>   -- MachFix-R-b5: `vi = 0`
     okIf (loadOkB img log ws (ldPre ws aq rl (srcsView ws asrc)) base tvs &&
         invalCiteB log ws (ldPre ws aq rl (srcsView ws asrc)) 0 base tvs)
@@ -386,11 +399,11 @@ def memStepF (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : P
             wRes := none }, prom \ {ts})
     | none => none
   | LExFail, none => some ({ ws with wRes := none }, prom)
-  | LIFetch base tvs, none =>
-    okIf (bytesAllB (fun a t v => memByte img log t a == some v && !writesInB log a t ws.wIfl) base tvs)
+  | LIFetch base tvs, none =>   -- [MachZiccid] the `vf = max wIfv wIfl` step (`memStepL`: every `vf`)
+    okIf (decide (max ws.wIfv ws.wIfl ≤ log.length) && fetchOkB img log (max ws.wIfv ws.wIfl) base tvs)
       ({ ws with
           wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs)
-          wIfv := max ws.wIfv (fetchView log i prom base tvs) }, prom)
+          wIfv := max ws.wIfv ws.wIfl }, prom)
   | LCmo k base len asrc, some ts =>
     okIf (promHas prom ts && log[ts - 1]? == some ⟨base, [], some i, .cmo k len⟩ &&
         cohBelowB ws base len ts && decide (stPre ws false (srcsView ws asrc) 0 < ts))
@@ -470,12 +483,11 @@ theorem memStepF_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
       intro t ht
       exact of_decide_eq_true (List.all_eq_true.1 h4 t ht)
   case LExFail.none => cases h; exact .scFail _ _
-  case LIFetch.none base tvs =>
+  case LIFetch.none base tvs =>   -- [MachZiccid]
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
-    refine .fetch _ _ _ _ (bytesAllB_sound (fun a t v hp => ?_) base tvs hc)
-    simp only [Bool.and_eq_true, beq_iff_eq] at hp
-    exact ⟨hp.1, not_writesIn_of_B hp.2⟩
+    simp only [Bool.and_eq_true, decide_eq_true_eq] at hc
+    exact .fetch _ _ _ _ _ (Nat.le_refl _) hc.1 (fetchOkB_sound hc.2)
   case LCmo.some k base len asrc ts =>
     obtain ⟨hc, he⟩ := okIf_eq_some h
     cases he
@@ -518,7 +530,18 @@ def memStepL (img : Image) (log : List PMsg) (i : Nat) (prom : GSet Nat) (ws : P
         ({ loadRunV ws aq rl (srcsView ws asrc) vi base tvs with
             wRes := some ⟨base, tvs.map Prod.fst, readViewV ws aq rl (srcsView ws asrc) vi base tvs⟩ }, prom))
     else []
+  | LIFetch base tvs, none =>   -- [MachZiccid] every fetch view `vf ∈ [max wIfv wIfl, |log|]`
+    (fetchVfs log ws base tvs (fetchOkB img log · base tvs)).map (fun vf =>
+      ({ ws with wIfr := max ws.wIfr (bytesMax (fun _ t => t) base tvs), wIfv := vf }, prom))
   | l, o => (memStepF img log i prom ws l o).toList
+
+/-- [MachZiccid] `fetchVfs` lists only admissible fetch views. -/
+theorem fetchVfs_sound {log : List PMsg} {ws : PState} {base : Int} {tvs : List (Nat × BitVec 8)}
+    {ok : Nat → Bool} {vf : Nat} (h : vf ∈ fetchVfs log ws base tvs ok) :
+    max ws.wIfv ws.wIfl ≤ vf ∧ vf ≤ log.length ∧ ok vf = true := by
+  unfold fetchVfs at h
+  simp only [List.mem_filter, List.mem_range, Bool.and_eq_true, decide_eq_true_eq] at h
+  exact ⟨h.2.1, by omega, h.2.2⟩
 
 /-- `memStepL` IS SOUND. -/
 theorem memStepL_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState}
@@ -559,5 +582,10 @@ theorem memStepL_sound {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Na
       cases he
       exact .lr _ _ _ _ _ _ _ (loadOkB_sound hok) vi (viOpts_sound hvi)
     · cases h
+  case LIFetch.none base tvs =>   -- [MachZiccid]
+    obtain ⟨vf, hvf, he⟩ := List.mem_map.1 h
+    cases he
+    obtain ⟨h1, h2, h3⟩ := fetchVfs_sound hvf
+    exact .fetch _ _ _ _ vf h1 h2 (fetchOkB_sound h3)
 
 end Weak.Prom.Mach

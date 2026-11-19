@@ -9,7 +9,7 @@ A/D variant (A/D steps possible but unused by the program), and the row-50 negat
   `adEmit_liftV`: the adequacy's emission side condition holds vacuously.
 * `noAdL_of_run`: a valid run of such a program has no A/D message (only the A/D arm fulfils one: a v2 fulfil of
   a `.cmo .clean 0` message writes no data, which `msgOk` forbids for a length-0 block).  Hence `PO_adV`/`adExactV`
-  hold, `fOkV ↔ fOk`, `ownDoneV = ownDone` (the variant's fetch arm IS v2's) and `memStepV (.v l) ↔ memStep l`.
+  hold, `fOkV ↔ fOk` and `memStepV (.v l) ↔ memStep l` ([MachZiccid] the variant's fetch arm IS v2's Ziccid arm).
 * `validRunV_toV2`: such a run IS a valid machine-v2 run with the same final configuration and projected traces.
 * `wpA_wpAV`: THE HART PROOFS CARRY OVER — every v2 wp `wpA` (OwnAWp.lean) of an A/D-free program entails the
   variant's `wpAV` (Löb induction over the two languages' steps; the state interpretations agree when `M` has no
@@ -65,13 +65,7 @@ theorem fOkV_iff {M : List PMsg} {σ : CSt} {h : Nat} (hna : noAdL M) : fOkV M �
   unfold fOkV fOk stageGeV stageGe
   exact ⟨fun H t a b c => H t a b c (noAdL_adAt hna t), fun H t a b c _ => H t a b c⟩
 
-/-- Without A/D messages the variant's fetch exemption is v2's. -/
-theorem ownDoneV_eq {log : List PMsg} (hna : noAdL log) (i : Nat) (prom : GSet Nat) (t : Nat) :
-    Ad.ownDoneV log i prom t = ownDone log i prom t := by
-  unfold Ad.ownDoneV
-  cases h : log[t - 1]? with
-  | none => simp [ownDone, h]
-  | some m => simp [hna _ _ h]
+-- [MachZiccid] `ownDoneV_eq` removed: the variant's fetch arm is v2's Ziccid arm (no own-store exemption).
 
 /-- Without A/D messages a v2-label step of the variant is a machine-v2 step. -/
 theorem memStepV_toV2 {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState} {l : PLabel}
@@ -79,13 +73,9 @@ theorem memStepV_toV2 {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat
     (h : Ad.memStepV img log i prom ws (.v l) ots ws' prom') : memStep img log i prom ws l ots ws' prom' := by
   by_cases hf : Nfr.F.isFetch l
   · obtain ⟨b, tvs, rfl⟩ := hf
-    obtain ⟨hok, hots, hws, hpr⟩ := Ad.memStepV_fetch_inv h
+    obtain ⟨vf, hok, hots, hws, hpr⟩ := Ad.memStepV_fetch_inv h   -- [MachZiccid]
     rw [hots, hws, hpr]
-    have e : Ad.fetchPostV log i prom ws b tvs = { ws with
-        wIfr := max ws.wIfr (bytesMax (fun _ t => t) b tvs)
-        wIfv := max ws.wIfv (fetchView log i prom b tvs) } := by
-      simp only [Ad.fetchPostV, Ad.fetchViewV, fetchView, ownDoneV_eq hna]
-    rw [e]; exact .fetch prom ws b tvs hok
+    exact .fetch prom ws b tvs vf hok.1 hok.2.1 hok.2.2
   · exact Ad.memStepV_v_inv h hf
 
 section run

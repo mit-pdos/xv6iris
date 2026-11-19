@@ -15,7 +15,8 @@ fabric, program states and `PState`s; `c'`'s log is the final `M` (of which `c`'
 set of agent `i` is `c`'s plus every own message of `M` above `|c.pcLog|`.  A state step of `c` is then a state
 step of `c'` (`memStep_extend`): every arm is APPEND-STABLE (each window's upper end is a view or a fulfilled
 timestamp, all `≤ |c.pcLog|` by `psBounded`, MachWf.lean) and OWN-PROMISE-MONOTONE (the promises added are above
-`|c.pcLog|`; `ownDone`, the only other reader of the promise set, looks at timestamps `≤ |c.pcLog|`).
+`|c.pcLog|`; [MachZiccid] no arm reads the promise set beyond the fulfil membership, and the fetch view bound
+`vf ≤ |c.pcLog|` is monotone under append).
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.MachWf
@@ -148,19 +149,7 @@ theorem invalCite_ext {L M : List PMsg} {ws : PState} {vpre vi : Nat} {base : In
         exact ⟨.inr ⟨ti, hti, invalReadAt_ext h (by omega) hr⟩, ih (a + 1) h3 h4⟩
   exact key base tvs hts h1
 
-theorem ownDone_ext {L M : List PMsg} {i : Nat} {P prom : GSet Nat} {t : Nat} (h : L <+: M)
-    (ht : t ≤ L.length) (hP : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom)) :
-    ownDone M i P t = ownDone L i prom t := by
-  unfold ownDone
-  rcases Nat.eq_zero_or_pos t with h0 | h0
-  · subst h0
-    cases M[0 - 1]? <;> cases L[0 - 1]? <;> simp
-  · rw [prefix_getElem? h (by omega)]
-    cases L[t - 1]? with
-    | none => rfl
-    | some m =>
-      simp only
-      rw [decide_eq_decide.2 (hP t ht)]
+-- [MachZiccid] `ownDone_ext` removed with `ownDone` (the fetch arm reads no promise set).
 
 theorem bytesMax_congr {f g : Int → Nat → Nat} :
     ∀ (a : Int) (l : List (Nat × BitVec 8)), bytesAll (fun a t _ => f a t = g a t) a l →
@@ -234,29 +223,12 @@ theorem memStep_extend {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet Na
     exact ⟨P \ {ts}, .sc _ _ _ _ _ _ _ _ _ R hR (hPin ts hts) (hmsg ts _ hts hm)
       ((exclOk_ext hpre hts' _ _).2 hx) hlt hc hpv, hPdiff ts hts'⟩
   | scFail => exact ⟨P, .scFail _ _, hP⟩
-  | fetch base tvs hok =>
-    have hts : bytesAll (fun _ t _ => t ≤ L.length) base tvs :=
-      bytesAll_mono (fun _ _ _ hp => memByte_le hp.1) base tvs hok
-    have hifl : ws.wIfl ≤ L.length := hb.2.2.2.2.2.2.2.2.2.2.2.2.1
-    have hok' : bytesAll (fetchByteOk img M ws) base tvs := by
+  | fetch base tvs vf hv hvl hok =>   -- [MachZiccid] the window `(t, vf]` with `vf ≤ |L|`; no promise-set reader
+    have hok' : bytesAll (fetchByteOk img M vf) base tvs := by
       refine bytesAll_mono (fun a t v hp => ?_) base tvs hok
-      obtain ⟨h1, h2⟩ := hp
-      exact ⟨by rw [memByte_ext hpre (memByte_le h1)]; exact h1, by rw [writesIn_ext hpre hifl]; exact h2⟩
-    have hlow : ∀ t, t ≤ L.length → (t ∈ P ↔ t ∈ prom) := by
-      intro t ht
-      rw [hP t]
-      constructor
-      · rintro (h1 | h1)
-        · exact h1
-        · omega
-      · exact .inl
-    have e : fetchView M i P base tvs = fetchView L i prom base tvs := by
-      unfold fetchView
-      refine bytesMax_congr base tvs (bytesAll_mono (fun a t _ ht => ?_) base tvs hts)
-      rw [ownDone_ext hpre ht hlow]
-    refine ⟨P, ?_, hP⟩
-    rw [← e]
-    exact .fetch _ _ _ _ hok'
+      obtain ⟨h1, h2, h3⟩ := hp
+      exact ⟨by rw [memByte_ext hpre (memByte_le h1)]; exact h1, h2, by rw [writesIn_ext hpre hvl]; exact h3⟩
+    exact ⟨P, .fetch _ _ _ _ vf hv (Nat.le_trans hvl (List.IsPrefix.length_le hpre)) hok', hP⟩
   | cmo k base len asrc ts hts hm hc hpv =>
     exact ⟨P \ {ts}, .cmo _ _ _ _ _ _ _ (hPin ts hts) (hmsg ts _ hts hm) hc hpv, hPdiff ts (hw ts hts).2.1⟩
 

@@ -11,10 +11,11 @@ three step facts that make that possible, for every arm of machine v2 (`memStep`
   `invalCite`/`loadRunV`), so a cited invalidate is below the post-state's `vrOld` (`loadRunV_vi_le`), hence inside
   the prefix (premise `hvr`); for the fused AMO `vi < ts` (its arm).  (Was R-b5: the invalidate clause let a load
   cite an invalidate ABOVE every view, D-v2-5.)
-* `memStep_self` — THE SELF BOUND: with `bnd ws := vrOld ⊔ vwOld ⊔ wIfr`, every timestamp a step reads or fulfils
+* `memStep_self` — THE SELF BOUND: with `bnd ws := vrOld ⊔ vwOld ⊔ wIfv`, every timestamp a step reads or fulfils
   is at most `bnd` of its post-state, `bnd` only grows, and `psBounded ws (bnd ws)` is kept.  So every view of a hart
-  is bounded by its loads (`vrOld`), its fulfils (`vwOld`) and its fetches (`wIfr`), the plan's "Why the segment
-  fits" (§4).
+  is bounded by its loads (`vrOld`), its fulfils (`vwOld`) and its fetches (`wIfv`), the plan's "Why the segment
+  fits" (§4).  [MachZiccid] The fetch term is the monotone Ziccid fetch view `wIfv` (was `wIfr`, the maximum
+  fetched source: under Ziccid a fetch at `vf` sets `wIfv := vf`, which may exceed every source).
 * `relClass` — THE RELEASE CLASS, plan §3 "Release-class, defined precisely" [R1.8]: a write step (the five fulfil
   arms: store, fused AMO, AMO write half, SC, CMO) whose pre-view (`wrPre`, the expression its EXT premise compares
   with `ts`) is at least `vrOld ⊔ vwOld` of the state immediately before the write (`wrState`: for the fused AMO the
@@ -24,6 +25,7 @@ three step facts that make that possible, for every arm of machine v2 (`memStep`
 No `sorry`, no axiom, no `native_decide`.
 -/
 import Weak.Prom.MachSolo
+import Weak.Prom.MachZiccidCyc   -- [MachZiccid]
 
 namespace Weak.Prom.Nfr
 
@@ -59,8 +61,9 @@ raises `vwNew` to `vrOld ⊔ vwOld`). -/
 def relClass (ws : PState) (l : PLabel) : Prop :=
   ∃ pv, wrPre ws l = some pv ∧ max (wrState ws l).wVrOld (wrState ws l).wVwOld ≤ pv
 
-/-- THE SELF BOUND of a hart state: its load, store and fetch maxima. -/
-def bnd (ws : PState) : Nat := max (max ws.wVrOld ws.wVwOld) ws.wIfr
+/-- THE SELF BOUND of a hart state: its load, store and fetch maxima.  [MachZiccid] the fetch view `wIfv` (was
+`wIfr`). -/
+def bnd (ws : PState) : Nat := max (max ws.wVrOld ws.wVwOld) ws.wIfv
 
 /-- Every timestamp the label reads (load-like entries and fetches, `labelReads`) is at most `n`. -/
 def readsLe (l : PLabel) (n : Nat) : Prop :=
@@ -133,7 +136,8 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
     (h : memStep img M i prom ws l ots ws' prom') (hpre : L <+: M)
     (hvr : ots = none → ws'.wVrOld ≤ L.length ∨ M.length ≤ L.length)   -- MachFix-R-b5 (was: `invalFree M`)
     (hr : readsLe l L.length) (hts : ∀ ts, ots = some ts → ts ≤ L.length)
-    (hQ : ∀ t, t ∈ Q ↔ t ∈ prom ∧ t ≤ L.length) :
+    (hQ : ∀ t, t ∈ Q ↔ t ∈ prom ∧ t ≤ L.length)
+    (hvf : ∀ b tvs, l = LIFetch b tvs → ws'.wIfv ≤ L.length ∨ M.length ≤ L.length) :   -- [MachZiccid]
     ∃ Q', memStep img L i Q ws l ots ws' Q' ∧ ∀ t, t ∈ Q' ↔ t ∈ prom' ∧ t ≤ L.length := by
   have hmsg : ∀ ts (m : PMsg), 0 < ts → ts ≤ L.length → M[ts - 1]? = some m → L[ts - 1]? = some m := by
     intro ts m h0 hts' hm
@@ -181,28 +185,20 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
     exact ⟨Q \ {ts}, .sc _ _ _ _ _ _ _ _ _ R hR (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm)
       (exclOk_pre hpre _ _ hx) hlt hc hpv, promCut_diff hQ⟩
   | scFail => exact ⟨Q, .scFail _ _, hQ⟩
-  | fetch base tvs hok =>
-    have hts' : bytesAll (fun _ t _ => t ≤ L.length) base tvs := hr _ _ rfl
-    have hok' : bytesAll (fetchByteOk img L ws) base tvs := by
-      have key : ∀ (a : Int) (r : List (Nat × BitVec 8)), bytesAll (fetchByteOk img M ws) a r →
-          bytesAll (fun _ t _ => t ≤ L.length) a r → bytesAll (fetchByteOk img L ws) a r := by
-        intro a r
-        induction r generalizing a with
-        | nil => intro _ _; trivial
-        | cons tv r ih =>
-          obtain ⟨t, v⟩ := tv
-          rintro ⟨⟨hm, hw⟩, h2⟩ ⟨ht, h3⟩
-          exact ⟨⟨by rw [← memByte_ext hpre ht]; exact hm, fun h => hw (writesIn_pre hpre h)⟩, ih (a + 1) h2 h3⟩
-      exact key base tvs hok hts'
-    have hlow : ∀ t, t ≤ L.length → (t ∈ prom ↔ t ∈ Q) := by
-      intro t ht; rw [hQ t]; exact ⟨fun h => ⟨h, ht⟩, fun h => h.1⟩
-    have e : fetchView M i prom base tvs = fetchView L i Q base tvs := by
-      unfold fetchView
-      refine bytesMax_congr base tvs (bytesAll_mono (fun a t _ ht => ?_) base tvs hts')
-      rw [ownDone_ext hpre ht hlow]
-    refine ⟨Q, ?_, hQ⟩
-    rw [e]
-    exact .fetch _ _ _ _ hok'
+  | fetch base tvs vf hv hvl hok =>   -- [MachZiccid] the window `(t, vf]` with `vf ≤ |L|`
+    have hvL : vf ≤ L.length := (hvf base tvs rfl).elim id (fun h => Nat.le_trans hvl h)
+    have key : ∀ (a : Int) (r : List (Nat × BitVec 8)), bytesAll (fetchByteOk img M vf) a r →
+        bytesAll (fetchByteOk img L vf) a r := by
+      intro a r
+      induction r generalizing a with
+      | nil => intro _; trivial
+      | cons tv r ih =>
+        obtain ⟨t, v⟩ := tv
+        rintro ⟨⟨hm, htv, hw⟩, h2⟩
+        exact ⟨⟨by rw [← memByte_ext hpre (by omega)]; exact hm, htv, fun h => hw (writesIn_pre hpre h)⟩,
+          ih (a + 1) h2⟩
+    have hok' := key base tvs hok
+    exact ⟨Q, .fetch _ _ _ _ vf hv hvL hok', hQ⟩
   | cmo k base len asrc ts hts' hm hc hpv =>
     have h1 := hts ts rfl
     exact ⟨Q \ {ts}, .cmo _ _ _ _ _ _ _ (hin ts hts' h1) (hmsg ts _ (by omega) h1 hm) hc hpv,
@@ -213,7 +209,7 @@ theorem memStep_restrict {img : Image} {L M : List PMsg} {i : Nat} {prom : GSet 
 theorem memStep_bndN {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat} {ws : PState} {l : PLabel}
     {ots : Option Nat} {ws' : PState} {prom' : GSet Nat} {n : Nat} (h : memStep img log i prom ws l ots ws' prom')
     (hb : psBounded ws n) (hr : readsLe l n) (hts : ∀ ts, ots = some ts → ts ≤ n)
-    (hvr : ws'.wVrOld ≤ n) :   -- MachFix-R-b5: the absorbed view is in range
+    (hvr : ws'.wVrOld ≤ n) (hvf : ws'.wIfv ≤ n) :   -- MachFix-R-b5: the absorbed view is in range; [MachZiccid] `hvf`
     psBounded ws' n := by
   have hsv : ∀ s, srcsView ws s ≤ n := srcsView_le hb.2.2.2.2.2.2.2.1 hb.2.2.2.2.2.2.2.2.2.1
   cases h with
@@ -259,7 +255,7 @@ theorem memStep_bndN {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat}
   | instr =>
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 (Nat.zero_le _) hR (fun R hR' => by cases hR') h8 h9
-      (Nat.zero_le _)
+      h10   -- [MachZiccid] `wIfv` kept
   | lr aq rl base tvs asrc hok vi hci =>
     have hvi : vi ≤ n := Nat.le_trans (loadRunV_vi_le (aq := aq) (rl := rl) hci) hvr
     have hrv := readViewV_le (aq := aq) (rl := rl) hb (hsv asrc) hvi (hr _ _ rfl)
@@ -280,17 +276,12 @@ theorem memStep_bndN {img : Image} {log : List PMsg} {i : Nat} {prom : GSet Nat}
   | scFail =>
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, hR, hM, h8, h9, h10⟩ := hb
     exact psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 h7 (fun R hR' => by cases hR') hM h8 h9 h10
-  | fetch base tvs hok =>
+  | fetch base tvs vf _ _ _ =>   -- [MachZiccid] `wIfv := vf ≤ n` by `hvf`
     have hts' : bytesAll (fun _ t _ => t ≤ n) base tvs := hr _ _ rfl
     have e1 : bytesMax (fun _ t => t) base tvs ≤ n := bytesMax_le base tvs hts'
-    have e2 : fetchView log i prom base tvs ≤ n := by
-      unfold fetchView
-      refine bytesMax_le base tvs (bytesAll_mono (fun _ t _ ht => ?_) base tvs hts')
-      split <;> omega
     obtain ⟨hc, h1, h2, h3, h4, h5, hf, hr', h6, h7, hR, hM, h8, h9, h10⟩ := hb
-    refine psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 h7 hR hM h8 ?_ ?_
-    · simp only; omega
-    · simp only; omega
+    refine psB_intro hc h1 h2 h3 h4 h5 hf hr' h6 h7 hR hM h8 ?_ hvf
+    simp only; omega
   | cmo k base len asrc ts _ _ _ _ =>
     exact cmoPost_bnd hb (hsv _) (hts ts rfl)
 
@@ -387,12 +378,13 @@ theorem memStep_self {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {
     bnd ws ≤ bnd ws' ∧ readsLe l (bnd ws') ∧ (∀ ts, ots = some ts → ts ≤ bnd ws') ∧ psBounded ws' (bnd ws') := by
   suffices H : bnd ws ≤ bnd ws' ∧ readsLe l (bnd ws') ∧ (∀ ts, ots = some ts → ts ≤ bnd ws') by
     exact ⟨H.1, H.2.1, H.2.2, memStep_bndN h (psBounded_mono hb H.1) H.2.1 H.2.2
-      (by unfold bnd; omega)⟩
+      (by unfold bnd; omega) (by unfold bnd; omega)⟩
   have nor : ∀ n, readsLe l n → readsLe l n := fun _ h => h
   cases h with
   | silent => exact ⟨Nat.le_refl _, fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
   | load aq rl base tvs asrc hok vi _ =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    obtain ⟨_, i2, _, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    have i3 := Ziccid.loadRunV_ifv ws aq rl (srcsView ws asrc) vi base tvs   -- [MachZiccid]
     have e2 : (loadRunV ws aq rl (srcsView ws asrc) vi base tvs).wVwOld = ws.wVwOld := i2
     refine ⟨by unfold bnd; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
@@ -400,22 +392,27 @@ theorem memStep_self {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; rw [i2, i3]; omega
   | lr aq rl base tvs asrc hok vi _ =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    obtain ⟨_, i2, _, i4, i5⟩ := loadRunV_keep ws aq rl (srcsView ws asrc) vi base tvs
+    have i3 := Ziccid.loadRunV_ifv ws aq rl (srcsView ws asrc) vi base tvs   -- [MachZiccid]
     refine ⟨by unfold bnd; simp only; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; simp only; rw [i2, i3]; omega
   | amoLd aq base tvs asrc hok vi _ =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
+    obtain ⟨_, i2, _, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
+    have i3 := Ziccid.loadRunV_ifv ws aq false (srcsView ws asrc) vi base tvs   -- [MachZiccid]
     refine ⟨by unfold bnd; simp only; rw [i2, i3]; omega, fun b t hl => ?_, fun _ h => (by cases h)⟩
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
     refine bytesAll_mono (fun _ _ _ h => ?_) _ _ (reads_le_of hb i5)
     unfold bnd at h ⊢; simp only; rw [i2, i3]; omega
   | rmw aq rl base tvs data asrc vsrc ts _ _ _ hok _ _ _ vi _ _ =>
-    obtain ⟨_, i2, i3, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
-    obtain ⟨j1, j2, j3⟩ := storeRun_keep (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
+    obtain ⟨_, i2, _, i4, i5⟩ := loadRunV_keep ws aq false (srcsView ws asrc) vi base tvs
+    have i3 := Ziccid.loadRunV_ifv ws aq false (srcsView ws asrc) vi base tvs   -- [MachZiccid]
+    obtain ⟨j1, j2, _⟩ := storeRun_keep (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
+      (srcsView ws asrc) ts base data.length ts
+    have j3 := Ziccid.storeRun_ifv (loadRunV ws aq false (srcsView ws asrc) vi base tvs) rl
       (srcsView ws asrc) ts base data.length ts
     refine ⟨?_, ?_, ?_⟩
     · simp only [bnd, amoPost, j1, j2, j3, i2, i3]; omega
@@ -427,23 +424,28 @@ theorem memStep_self {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {
       unfold bnd at h; omega
     · intro t h; cases h; simp only [bnd, amoPost, j1, j2, j3, i2, i3]; omega
   | store aq rl base data asrc vsrc ts _ _ _ _ =>
-    obtain ⟨j1, j2, j3⟩ := storeRun_keep ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc))
+    obtain ⟨j1, j2, _⟩ := storeRun_keep ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc))
       base data.length ts
+    have j3 := Ziccid.storeRun_ifv ws rl (srcsView ws asrc) (max (srcsView ws asrc) (srcsView ws vsrc))
+      base data.length ts   -- [MachZiccid]
     refine ⟨?_, fun _ _ h => (by cases h), ?_⟩
     · simp only [bnd, acqPost, j1, j2, j3]; omega
     · intro t h; cases h; simp only [bnd, acqPost, j1, j2, j3]; omega
   | amoSt rl base data asrc vsrc ts R _ _ _ _ _ _ _ _ =>
-    obtain ⟨j1, j2, j3⟩ := storeRun_keep ws rl (srcsView ws asrc) ts base data.length ts
+    obtain ⟨j1, j2, _⟩ := storeRun_keep ws rl (srcsView ws asrc) ts base data.length ts
+    have j3 := Ziccid.storeRun_ifv ws rl (srcsView ws asrc) ts base data.length ts   -- [MachZiccid]
     refine ⟨?_, fun _ _ h => (by cases h), ?_⟩
     · simp only [bnd, amoPost, j1, j2, j3]; omega
     · intro t h; cases h; simp only [bnd, amoPost, j1, j2, j3]; omega
   | sc aq rl base data asrc vsrc ts R _ _ _ _ _ _ _ =>
-    obtain ⟨j1, j2, j3⟩ := storeRun_keep ws rl (srcsView ws asrc) ts base data.length ts
+    obtain ⟨j1, j2, _⟩ := storeRun_keep ws rl (srcsView ws asrc) ts base data.length ts
+    have j3 := Ziccid.storeRun_ifv ws rl (srcsView ws asrc) ts base data.length ts   -- [MachZiccid]
     refine ⟨?_, fun _ _ h => (by cases h), ?_⟩
     · simp only [bnd, acqPost, j1, j2, j3]; omega
     · intro t h; cases h; simp only [bnd, acqPost, j1, j2, j3]; omega
   | cmo k base len asrc ts _ _ _ _ =>
-    obtain ⟨j1, j2, j3⟩ := cohRaise_keep ws base len ts
+    obtain ⟨j1, j2, _⟩ := cohRaise_keep ws base len ts
+    have j3 := Ziccid.cohRaise_ifv ws base len ts   -- [MachZiccid]
     refine ⟨?_, fun _ _ h => (by cases h), ?_⟩
     · simp only [bnd, cmoPost, j1, j2, j3]; omega
     · intro t h; cases h; simp only [bnd, cmoPost, j1, j2, j3]; omega
@@ -454,20 +456,19 @@ theorem memStep_self {img : Image} {M : List PMsg} {i : Nat} {prom : GSet Nat} {
   | ctrl => exact ⟨Nat.le_refl _, fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
   | instr => exact ⟨Nat.le_refl _, fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
   | scFail => exact ⟨Nat.le_refl _, fun _ _ h => (by cases h), fun _ h => (by cases h)⟩
-  | fetch base tvs hok =>
+  | fetch base tvs vf hv _ hok =>   -- [MachZiccid] every source is `≤ vf = wIfv'`
+    have key : ∀ (a : Int) (r : List (Nat × BitVec 8)), bytesAll (fetchByteOk img M vf) a r →
+        bytesAll (fun _ t _ => t ≤ vf) a r := by
+      intro a r
+      induction r generalizing a with
+      | nil => intro _; trivial
+      | cons tv r ih => obtain ⟨t, v⟩ := tv; intro h; exact ⟨h.1.2.1, ih (a + 1) h.2⟩
+    have hk := key base tvs hok
     refine ⟨?_, fun b t hl => ?_, fun _ h => (by cases h)⟩
     · simp only [bnd]; omega
     simp only [labelReads, Option.some.injEq, Prod.mk.injEq] at hl
     obtain ⟨rfl, rfl⟩ := hl
-    have key : ∀ (a : Int) (r : List (Nat × BitVec 8)), bytesAll (fun _ t _ => t ≤ bytesMax (fun _ t => t) a r) a r := by
-      intro a r
-      induction r generalizing a with
-      | nil => trivial
-      | cons tv r ih =>
-        obtain ⟨t, v⟩ := tv
-        refine ⟨by simp only [bytesMax]; omega, bytesAll_mono (fun _ _ _ h => ?_) (a + 1) r (ih (a + 1))⟩
-        simp only [bytesMax]; omega
-    exact bytesAll_mono (fun _ _ _ h => by simp only [bnd]; omega) _ _ (key _ _)
+    exact bytesAll_mono (fun _ _ _ h => by simp only [bnd]; omega) _ _ hk
 
 /-! ## 7. Write-step facts -/
 
